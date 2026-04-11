@@ -185,7 +185,7 @@ RUN chmod +x /usr/local/bin/slipstream-client /usr/local/bin/slipstream-client-b
 
 # trusttunnel-client: download CLI client from TrustTunnelClient repo
 # TrustTunnelClient uses: linux-x86_64, linux-aarch64
-ARG TRUSTTUNNEL_CLIENT_VERSION=1.0.19
+ARG TRUSTTUNNEL_CLIENT_VERSION=1.0.49
 RUN ARCH=$(cat /tmp/arch) && \
     case "$ARCH" in \
         amd64) TT_ARCH="x86_64" ;; \

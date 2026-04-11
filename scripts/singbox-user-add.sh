@@ -306,10 +306,10 @@ killswitch_enabled = false
 killswitch_allow_ports = []
 post_quantum_group_enabled = true
 exclusions = []
-dns_upstreams = ["tls://1.1.1.1"]
 
 [endpoint]
 hostname = "${DOMAIN}"
+dns_upstreams = ["tls://1.1.1.1"]
 addresses = ["${SERVER_IP}:4443"]
 has_ipv6 = false
 username = "${USERNAME}"

@@ -858,10 +858,10 @@ loglevel = "info"
 vpn_mode = "general"
 killswitch_enabled = false
 post_quantum_group_enabled = true
-dns_upstreams = ["tls://1.1.1.1"]
 
 [endpoint]
 hostname = "$hostname"
+dns_upstreams = ["tls://1.1.1.1"]
 addresses = ["$server_ip:$port"]
 has_ipv6 = false
 username = "$username"

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **telemt** — Updated to 3.3.39 (memory hard-bounds, TLS fronting hash compact cert, bounded retries, build info metrics)
+- **TrustTunnel** — Updated server to v1.0.33 (deep-link DNS upstreams and server display names)
+- **TrustTunnel Client** — Updated to v1.0.49 (deep-link import, DNS socket hardening, `dns_upstreams` moved to `[endpoint]` section)
+
 ## [1.7.4] - 2026-03-27
 
 ### Added
