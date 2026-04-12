@@ -54,6 +54,7 @@ If `moav doctor` identifies the issue, follow its hints. If not, continue below.
   - [XHTTP not connecting](#xhttp-not-connecting)
   - [DNS tunnel not working](#dns-tunnel-not-working)
 - [Registry/Build Issues](#registrybuild-issues)
+  - [Build fails with "NotFound: forwarding Ping: no such job" (low-memory VPS)](#build-fails-with-notfound-forwarding-ping-no-such-job-low-memory-vps)
   - [Container registry blocked (gcr.io, ghcr.io)](#container-registry-blocked-gcrio-ghcrio)
   - [Building images locally](#building-images-locally)
 - [Monitoring Issues](#monitoring-issues)
@@ -871,6 +872,47 @@ iptables -A INPUT -p udp --dport 53 -j ACCEPT
 ---
 
 ## Registry/Build Issues
+
+### Build fails with `NotFound: forwarding Ping: no such job ...` (low-memory VPS)
+
+**Symptom:** During `moav start` or `moav build --profile all` on a small VPS (≤ 1 GB RAM), the parallel build dies with:
+
+```
+target amneziawg-exporter: NotFound: forwarding Ping: no such job mxjreqi1urjzqlsbvdw622pdk
+```
+
+**Cause:** Recent Docker Compose (v2.22+) defaults to "bake" mode, which builds all images in parallel via BuildKit. With 19+ MoaV images attempting to build concurrently, BuildKit's daemon runs out of memory and loses track of its own jobs — the `no such job` error is the symptom of BuildKit's internal registry crashing mid-build.
+
+**Fix — reset buildx state and force sequential builds:**
+
+```bash
+# 1. Clear the broken buildx state
+docker buildx prune -af
+docker buildx rm --force default 2>/dev/null || true
+
+# 2. Retry with bake disabled and parallelism pinned to 1
+cd /opt/moav
+COMPOSE_BAKE=false docker compose --profile all build --parallel 1
+
+# 3. Once build succeeds, start normally
+moav start
+```
+
+**Prevent recurrence on low-RAM hosts:** Add this to your shell profile (`~/.bashrc` or `~/.zshrc`):
+
+```bash
+export COMPOSE_BAKE=false
+```
+
+With bake disabled, Compose uses the legacy sequential build path. Individual image builds still succeed — they just happen one at a time instead of in parallel.
+
+**When to worry about this:**
+
+| RAM | Parallel build | Sequential build |
+|-----|----------------|------------------|
+| ≥ 2 GB | Usually OK | Always OK |
+| 1 GB  | Frequently crashes (this issue) | OK but slow (~15-20 min) |
+| < 1 GB | Not supported | Try, but may OOM anyway |
 
 ### Container registry blocked (gcr.io, ghcr.io)
 
