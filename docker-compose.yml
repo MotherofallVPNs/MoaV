@@ -1042,19 +1042,21 @@ services:
       - all
 
   # GeoIP Database Updater - downloads DB-IP Lite country database
+  # Uses curlimages/curl (~9 MB) instead of python:3.11-alpine (~50 MB).
+  # curl + ca-certs + gunzip (busybox) all pre-installed; no apk needed.
   geoip-updater:
-    image: python:3.11-alpine
+    image: curlimages/curl:latest
     container_name: moav-geoip-updater
+    user: "0:0"  # curlimages/curl defaults to UID 100; need root to write mounted volume
     volumes:
       - moav_geoip:/geoip
     entrypoint: /bin/sh
     command: >
       -c '
-        apk add --no-cache curl > /dev/null 2>&1 &&
         MONTH=$$(date +%Y-%m) &&
         URL="https://download.db-ip.com/free/dbip-country-lite-$${MONTH}.mmdb.gz" &&
         echo "Downloading GeoIP database for $${MONTH}..." &&
-        curl -fsSL "$$URL" | gunzip > /geoip/dbip-country-lite.mmdb &&
+        curl -fSL "$$URL" | gunzip > /geoip/dbip-country-lite.mmdb &&
         echo "GeoIP database updated successfully ($${MONTH})"
       '
     cap_drop:

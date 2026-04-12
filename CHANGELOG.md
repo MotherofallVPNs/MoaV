@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **TrustTunnel Client** — Updated to v1.0.49 (deep-link import, DNS socket hardening, `dns_upstreams` moved to `[endpoint]` section)
 
 ### Fixed
+- **GeoIP database download during bootstrap was slow** — Switched `geoip-updater` from `python:3.11-alpine` (~50 MB) to `curlimages/curl:latest` (~9 MB), eliminating the in-container `apk add curl` step that ran on every invocation. First-run bootstrap is faster and subsequent GeoIP refreshes are near-instant
 - **dns-router crash loop under port 53 conflict** — Previously when both XDNS (via xray) and dnstunnel profile were started, dns-router would infinitely restart trying to bind host port 53 already held by xray. Now blocked at `moav start` with a clear error message pointing to `moav switch-dns`
 - **Silent dnstt/slipstream crash loops on missing keys** — When `ENABLE_DNSTT=true` or `ENABLE_SLIPSTREAM=true` were set after initial bootstrap, containers started but waited indefinitely for key files that were never generated. `moav switch-dns` now detects missing keys pre-start and offers to bootstrap; `moav doctor` flags the condition explicitly
 
