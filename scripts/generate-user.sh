@@ -507,7 +507,7 @@ fi
 # -----------------------------------------------------------------------------
 # Generate dnstt instructions (if enabled)
 # -----------------------------------------------------------------------------
-if [[ "${ENABLE_DNSTT:-false}" == "true" ]]; then
+if [[ "${ENABLE_DNSTT:-true}" == "true" ]]; then
     if [[ -f "$OUTPUT_DIR/dnstt-instructions.txt" ]] && [[ "$FORCE_REGENERATE" != "force" ]]; then
         log_info "  - dnstt instructions exist, skipping"
     else
@@ -520,7 +520,7 @@ fi
 # -----------------------------------------------------------------------------
 # Generate Slipstream instructions (if enabled)
 # -----------------------------------------------------------------------------
-if [[ "${ENABLE_SLIPSTREAM:-false}" == "true" ]]; then
+if [[ "${ENABLE_SLIPSTREAM:-true}" == "true" ]]; then
     if [[ -f "$OUTPUT_DIR/slipstream-instructions.txt" ]] && [[ "$FORCE_REGENERATE" != "force" ]]; then
         log_info "  - Slipstream instructions exist, skipping"
     else
@@ -546,7 +546,7 @@ fi
 # -----------------------------------------------------------------------------
 # Generate XDNS client configs (if enabled)
 # -----------------------------------------------------------------------------
-if [[ "${ENABLE_XDNS:-true}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
+if [[ "${ENABLE_XDNS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
     if [[ -f "$OUTPUT_DIR/xdns-config.json" ]] && [[ -f "$OUTPUT_DIR/xdns-direct-config.json" ]] && [[ "$FORCE_REGENERATE" != "force" ]]; then
         log_info "  - XDNS config exists, skipping"
     else
@@ -677,7 +677,7 @@ elif [[ -f "$TEMPLATE_FILE" ]]; then
         # Build list of disabled services
         DISABLED_SERVICES=""
         [[ "${ENABLE_WIREGUARD:-true}" != "true" ]] && DISABLED_SERVICES+="WireGuard, "
-        [[ "${ENABLE_DNSTT:-false}" != "true" ]] && DISABLED_SERVICES+="DNS Tunnel, "
+        [[ "${ENABLE_DNSTT:-true}" != "true" ]] && DISABLED_SERVICES+="DNS Tunnel, "
         [[ "${ENABLE_TROJAN:-true}" != "true" ]] && DISABLED_SERVICES+="Trojan, "
         [[ "${ENABLE_HYSTERIA2:-true}" != "true" ]] && DISABLED_SERVICES+="Hysteria2, "
         [[ "${ENABLE_REALITY:-true}" != "true" ]] && DISABLED_SERVICES+="Reality, "

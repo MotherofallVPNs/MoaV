@@ -38,8 +38,8 @@ done
 domain_required=false
 [[ "${ENABLE_TROJAN:-true}" == "true" ]] && domain_required=true
 [[ "${ENABLE_HYSTERIA2:-true}" == "true" ]] && domain_required=true
-[[ "${ENABLE_DNSTT:-false}" == "true" ]] && domain_required=true
-[[ "${ENABLE_SLIPSTREAM:-false}" == "true" ]] && domain_required=true
+[[ "${ENABLE_DNSTT:-true}" == "true" ]] && domain_required=true
+[[ "${ENABLE_SLIPSTREAM:-true}" == "true" ]] && domain_required=true
 [[ "${ENABLE_TRUSTTUNNEL:-true}" == "true" ]] && domain_required=true
 
 if [[ "$domain_required" == "true" ]] && [[ -z "${DOMAIN:-}" ]]; then
@@ -239,14 +239,14 @@ export ENABLE_TROJAN="${ENABLE_TROJAN:-true}"
 export ENABLE_HYSTERIA2="${ENABLE_HYSTERIA2:-true}"
 export ENABLE_WIREGUARD="${ENABLE_WIREGUARD:-true}"
 export ENABLE_AMNEZIAWG="${ENABLE_AMNEZIAWG:-true}"
-export ENABLE_DNSTT="${ENABLE_DNSTT:-false}"
-export ENABLE_SLIPSTREAM="${ENABLE_SLIPSTREAM:-false}"
+export ENABLE_DNSTT="${ENABLE_DNSTT:-true}"
+export ENABLE_SLIPSTREAM="${ENABLE_SLIPSTREAM:-true}"
 export SLIPSTREAM_SUBDOMAIN="${SLIPSTREAM_SUBDOMAIN:-s}"
 export ENABLE_TRUSTTUNNEL="${ENABLE_TRUSTTUNNEL:-true}"
 export ENABLE_XHTTP="${ENABLE_XHTTP:-true}"
 export PORT_XHTTP="${PORT_XHTTP:-2096}"
 export XHTTP_REALITY_TARGET="${XHTTP_REALITY_TARGET:-dl.google.com:443}"
-export ENABLE_XDNS="${ENABLE_XDNS:-true}"
+export ENABLE_XDNS="${ENABLE_XDNS:-false}"
 export XDNS_SUBDOMAIN="${XDNS_SUBDOMAIN:-x}"
 export XDNS_MTU="${XDNS_MTU:-35}"
 export PORT_XDNS="${PORT_XDNS:-53}"
@@ -362,7 +362,7 @@ fi
 # -----------------------------------------------------------------------------
 # Generate dnstt server config (before creating users)
 # -----------------------------------------------------------------------------
-if [[ "${ENABLE_DNSTT:-false}" == "true" ]]; then
+if [[ "${ENABLE_DNSTT:-true}" == "true" ]]; then
     log_info "Generating dnstt server configuration..."
     if generate_dnstt_config; then
         log_info "dnstt configuration complete"
@@ -382,7 +382,7 @@ fi
 # -----------------------------------------------------------------------------
 # Generate Slipstream config (before creating users)
 # -----------------------------------------------------------------------------
-if [[ "${ENABLE_SLIPSTREAM:-false}" == "true" ]]; then
+if [[ "${ENABLE_SLIPSTREAM:-true}" == "true" ]]; then
     log_info "Generating Slipstream configuration..."
     if generate_slipstream_config; then
         log_info "Slipstream configuration complete"
@@ -648,7 +648,7 @@ if [[ "${ENABLE_XHTTP:-true}" == "true" ]]; then
     envsubst < /configs/xray/config.json.template > /configs/xray/config.json
 
     # Add XDNS inbound if enabled
-    if [[ "${ENABLE_XDNS:-true}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
+    if [[ "${ENABLE_XDNS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
         xdns_domain="${XDNS_SUBDOMAIN:-x}.${DOMAIN}"
         xdns_mtu="${XDNS_MTU:-35}"
         log_info "Adding XDNS inbound (domain: $xdns_domain, mtu: $xdns_mtu)..."

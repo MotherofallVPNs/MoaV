@@ -54,6 +54,7 @@ If `moav doctor` identifies the issue, follow its hints. If not, continue below.
   - [XHTTP not connecting](#xhttp-not-connecting)
   - [DNS tunnel not working](#dns-tunnel-not-working)
 - [Registry/Build Issues](#registrybuild-issues)
+  - [Build fails on low-memory VPS (≤ 1 GB RAM)](#build-fails-on-low-memory-vps--1-gb-ram)
   - [Container registry blocked (gcr.io, ghcr.io)](#container-registry-blocked-gcrio-ghcrio)
   - [Building images locally](#building-images-locally)
 - [Monitoring Issues](#monitoring-issues)
@@ -808,18 +809,23 @@ moav restart wireguard
 
 > **Quick check:** Run `moav doctor dns` to verify NS delegation for DNS tunnel subdomains, and `moav doctor ports` to check port 53 conflicts.
 
-**Port 53 conflict:** XDNS and dnstt/Slipstream both use port 53. Only one can be active at a time. Check your `.env`:
+**Port 53 conflict:** XDNS and dnstt/Slipstream both use port 53. Only one group can be active at a time. Use `moav switch-dns <name>` to swap safely, or edit `.env` directly:
 ```bash
-# Use EITHER XDNS:
-ENABLE_XDNS=true
-ENABLE_DNSTT=false
-ENABLE_SLIPSTREAM=false
-
-# OR dnstt/Slipstream:
+# Default — dnstt + Slipstream (broader client ecosystem via standalone binaries):
 ENABLE_XDNS=false
 ENABLE_DNSTT=true
 ENABLE_SLIPSTREAM=true
+PORT_DNS=53
+PORT_XDNS=5353
+
+# OR XDNS (modern, per-user auth, requires FinalMask-aware client like Happ):
+ENABLE_XDNS=true
+ENABLE_DNSTT=false
+ENABLE_SLIPSTREAM=false
+PORT_XDNS=53
+PORT_DNS=5353
 ```
+Easier: `moav switch-dns xdns` or `moav switch-dns dnstt+slipstream`.
 
 **Check logs for domain issues:**
 ```bash
@@ -866,6 +872,75 @@ iptables -A INPUT -p udp --dport 53 -j ACCEPT
 ---
 
 ## Registry/Build Issues
+
+### Build fails on low-memory VPS (≤ 1 GB RAM)
+
+**Symptoms:** During `moav start` or `moav build --profile all` on a small VPS, the parallel build dies with one of these errors (they have the same root cause):
+
+```
+target amneziawg-exporter: NotFound: forwarding Ping: no such job mxjreqi1urjzqlsbvdw622pdk
+```
+or:
+```
+target xray: failed to solve: process "/bin/sh -c apk add --no-cache bash ca-certificates tzdata"
+did not complete successfully: failed to create endpoint fs4tn8... on network bridge:
+failed to find host side interface vethf6f8751: resource temporarily unavailable
+```
+or: build hangs at ~1200s (20 min) before failing.
+
+**Cause:** Recent Docker Compose (v2.22+) defaults to "bake" mode, which builds all images in parallel via BuildKit. With 19+ MoaV images attempting to build concurrently on a tight VPS:
+
+- **OOM in BuildKit daemon** → `NotFound: no such job ...` (job registry corrupts when memory pressure kills internal goroutines)
+- **Kernel/network resource exhaustion** → `failed to find host side interface vethN: resource temporarily unavailable` (bridge networking can't allocate veth pairs fast enough when many containers spawn concurrently)
+- **Heavy swapping** → build appears stuck for 15-20+ minutes before eventually failing
+
+All three are the same underlying problem — too many parallel operations on a machine without the RAM to serve them.
+
+**Fix — reset buildx state and force sequential builds:**
+
+> ⚠️ Compose v2 removed the `--parallel N` flag — it will be interpreted as a service name. Use one of the patterns below instead.
+
+```bash
+# 1. Clear the broken buildx state
+docker buildx prune -af
+docker buildx rm --force default 2>/dev/null || true
+
+cd /opt/moav
+
+# 2a. RECOMMENDED — loop one service at a time (most reliable on ≤ 1 GB RAM)
+for svc in $(COMPOSE_BAKE=false docker compose --profile all config --services); do
+    echo "=== Building $svc ==="
+    COMPOSE_BAKE=false docker compose build "$svc" || { echo "FAILED: $svc"; break; }
+done
+
+# 2b. ALTERNATIVE — env-var based serialization (Compose v2.30+)
+# COMPOSE_BAKE=false COMPOSE_PARALLEL_LIMIT=1 docker compose --profile all build
+
+# 2c. LAST RESORT — disable BuildKit entirely (classic builder, always serial)
+#     May fail if any Dockerfile uses BuildKit-specific syntax
+# DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 COMPOSE_BAKE=false \
+#     docker compose --profile all build
+
+# 3. Once build succeeds, start normally
+moav start
+```
+
+**Prevent recurrence on low-RAM hosts:** Add these to your shell profile (`~/.bashrc` or `~/.zshrc`):
+
+```bash
+export COMPOSE_BAKE=false
+export COMPOSE_PARALLEL_LIMIT=1
+```
+
+With bake disabled and parallelism pinned to 1, Compose builds images sequentially. Each build still succeeds — they just happen one at a time instead of 19 concurrently.
+
+**When to worry about this:**
+
+| RAM | Parallel build | Sequential build |
+|-----|----------------|------------------|
+| ≥ 2 GB | Usually OK | Always OK |
+| 1 GB  | Frequently crashes (this issue) | OK but slow (~15-20 min) |
+| < 1 GB | Not supported | Try, but may OOM anyway |
 
 ### Container registry blocked (gcr.io, ghcr.io)
 

@@ -161,9 +161,9 @@ Value: dns.yourdomain.com
 TTL: 300
 ```
 
-XDNS is the recommended DNS tunnel protocol (enabled by default since v1.7.2). It uses Xray-core's FinalMask technology to encode VLESS traffic in DNS-like packets via mKCP transport. While dnstt and Slipstream are mature alternatives, XDNS uses the latest Xray-core protocols that are currently working in the most restrictive network environments. Best for Telegram and lightweight messaging.
+XDNS is a DNS tunnel protocol that uses Xray-core's FinalMask technology to encode VLESS traffic in DNS-like packets via mKCP transport, with per-user authentication. It requires a FinalMask-aware client (Happ, Xray CLI). For broader client-ecosystem support, dnstt and Slipstream are enabled by default (standalone client binaries on 25+ platforms).
 
-> **Note**: XDNS, dnstt, and Slipstream all use port 53. Only one group can be active at a time. XDNS is enabled by default (`PORT_XDNS=53`), and dnstt/Slipstream are set to `PORT_DNS=5353` to avoid conflicts. To switch to dnstt/Slipstream instead, set `ENABLE_XDNS=false`, `ENABLE_DNSTT=true`, `PORT_DNS=53`, and `PORT_XDNS=5353` in `.env`.
+> **Note**: XDNS, dnstt, and Slipstream all use port 53. Only one group can own port 53 at a time. dnstt+Slipstream share dns-router by default (`PORT_DNS=53`). To switch to XDNS instead, run `moav switch-dns xdns`. To combine dnstt+Slipstream, run `moav switch-dns dnstt+slipstream` (default). See `moav switch-dns list` for current state.
 
 #### Optional: IPv6 Support
 

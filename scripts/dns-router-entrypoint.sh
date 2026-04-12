@@ -11,8 +11,8 @@ echo "  MoaV DNS Router"
 echo "================================================"
 
 # Validate at least one backend is enabled
-ENABLE_DNSTT="${ENABLE_DNSTT:-false}"
-ENABLE_SLIPSTREAM="${ENABLE_SLIPSTREAM:-false}"
+ENABLE_DNSTT="${ENABLE_DNSTT:-true}"
+ENABLE_SLIPSTREAM="${ENABLE_SLIPSTREAM:-true}"
 
 if [[ "$ENABLE_DNSTT" != "true" && "$ENABLE_SLIPSTREAM" != "true" ]]; then
     echo "[ERROR] Neither ENABLE_DNSTT nor ENABLE_SLIPSTREAM is true. Nothing to route."

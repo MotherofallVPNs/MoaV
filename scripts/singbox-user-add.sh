@@ -432,7 +432,7 @@ EOF
 fi
 
 # Generate XDNS client config if enabled
-if [[ "${ENABLE_XDNS:-true}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
+if [[ "${ENABLE_XDNS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
     _xdns_domain="${XDNS_SUBDOMAIN:-x}.${DOMAIN}"
     _xdns_mtu="${XDNS_MTU:-35}"
     log_info "Generating XDNS client config for $USERNAME..."

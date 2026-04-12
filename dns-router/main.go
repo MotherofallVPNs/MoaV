@@ -83,7 +83,7 @@ func buildRoutes() ([]Route, error) {
 	var routes []Route
 
 	enableDnstt := strings.ToLower(envOr("ENABLE_DNSTT", "true"))
-	enableSlipstream := strings.ToLower(envOr("ENABLE_SLIPSTREAM", "false"))
+	enableSlipstream := strings.ToLower(envOr("ENABLE_SLIPSTREAM", "true"))
 
 	if enableDnstt == "true" {
 		domain := os.Getenv("DNSTT_DOMAIN")

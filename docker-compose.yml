@@ -164,8 +164,8 @@ services:
     environment:
       - DNSTT_DOMAIN=${DNSTT_SUBDOMAIN:-t}.${DOMAIN}
       - SLIPSTREAM_DOMAIN=${SLIPSTREAM_SUBDOMAIN:-s}.${DOMAIN}
-      - ENABLE_DNSTT=${ENABLE_DNSTT:-false}
-      - ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM:-false}
+      - ENABLE_DNSTT=${ENABLE_DNSTT:-true}
+      - ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM:-true}
       - TZ=${TZ:-UTC}
     cap_drop:
       - ALL
@@ -662,7 +662,7 @@ services:
       - ADMIN_IP_WHITELIST=${ADMIN_IP_WHITELIST:-}
       - SERVER_IP=${SERVER_IP:-}
       - DOMAIN=${DOMAIN:-}
-      - ENABLE_XDNS=${ENABLE_XDNS:-true}
+      - ENABLE_XDNS=${ENABLE_XDNS:-false}
       - XDNS_SUBDOMAIN=${XDNS_SUBDOMAIN:-x}
       - XDNS_MTU=${XDNS_MTU:-35}
       - PORT_XDNS=${PORT_XDNS:-53}
@@ -1042,19 +1042,21 @@ services:
       - all
 
   # GeoIP Database Updater - downloads DB-IP Lite country database
+  # Uses curlimages/curl (~9 MB) instead of python:3.11-alpine (~50 MB).
+  # curl + ca-certs + gunzip (busybox) all pre-installed; no apk needed.
   geoip-updater:
-    image: python:3.11-alpine
+    image: curlimages/curl:latest
     container_name: moav-geoip-updater
+    user: "0:0"  # curlimages/curl defaults to UID 100; need root to write mounted volume
     volumes:
       - moav_geoip:/geoip
     entrypoint: /bin/sh
     command: >
       -c '
-        apk add --no-cache curl > /dev/null 2>&1 &&
         MONTH=$$(date +%Y-%m) &&
         URL="https://download.db-ip.com/free/dbip-country-lite-$${MONTH}.mmdb.gz" &&
         echo "Downloading GeoIP database for $${MONTH}..." &&
-        curl -fsSL "$$URL" | gunzip > /geoip/dbip-country-lite.mmdb &&
+        curl -fSL "$$URL" | gunzip > /geoip/dbip-country-lite.mmdb &&
         echo "GeoIP database updated successfully ($${MONTH})"
       '
     cap_drop:
@@ -1097,8 +1099,8 @@ services:
       - ENABLE_TROJAN=${ENABLE_TROJAN:-true}
       - ENABLE_HYSTERIA2=${ENABLE_HYSTERIA2:-true}
       - ENABLE_WIREGUARD=${ENABLE_WIREGUARD:-true}
-      - ENABLE_DNSTT=${ENABLE_DNSTT:-false}
-      - ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM:-false}
+      - ENABLE_DNSTT=${ENABLE_DNSTT:-true}
+      - ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM:-true}
       - SLIPSTREAM_SUBDOMAIN=${SLIPSTREAM_SUBDOMAIN:-s}
       - ENABLE_TRUSTTUNNEL=${ENABLE_TRUSTTUNNEL:-true}
       - ENABLE_TELEMT=${ENABLE_TELEMT:-true}
@@ -1111,7 +1113,7 @@ services:
       - ENABLE_XHTTP=${ENABLE_XHTTP:-true}
       - PORT_XHTTP=${PORT_XHTTP:-2096}
       - XHTTP_REALITY_TARGET=${XHTTP_REALITY_TARGET:-dl.google.com:443}
-      - ENABLE_XDNS=${ENABLE_XDNS:-true}
+      - ENABLE_XDNS=${ENABLE_XDNS:-false}
       - XDNS_SUBDOMAIN=${XDNS_SUBDOMAIN:-x}
       - XDNS_MTU=${XDNS_MTU:-35}
       - PORT_XDNS=${PORT_XDNS:-53}

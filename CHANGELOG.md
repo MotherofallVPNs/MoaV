@@ -7,10 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.5] - 2026-04-12
+
+### Added
+- **`moav switch-dns`** — New command to switch active DNS tunnel(s) on port 53. Supports single tunnels (`xdns`, `dnstt`, `slipstream`) and same-group combos (`dnstt+slipstream` via dns-router). Flips `ENABLE_*` flags, swaps `PORT_DNS`/`PORT_XDNS`, stops old services, starts new profile. Pre-flight checks for missing state keys (dnstt/slipstream) and offers to re-run bootstrap before starting containers that would otherwise crash-loop
+- **`moav doctor conflicts`** — New diagnostic check for DNS tunnel port-group conflicts: multiple groups enabled in `.env`, multiple groups running, config/runtime drift, and dns-router crash loops. Uses a "port group" model where tunnels in the same group (e.g. dnstt+slipstream share dns-router) coexist via subdomain routing, while tunnels in different groups conflict on port 53
+- **Per-service state key checks in `moav doctor config`** — Detects when an enabled service (dnstt, slipstream, wireguard, amneziawg) is missing its key files, which previously only surfaced as silent container crash loops
+
 ### Changed
+- **DNS tunnel defaults flipped** — `ENABLE_DNSTT=true` and `ENABLE_SLIPSTREAM=true` are now the defaults; `ENABLE_XDNS=false`. Rationale: dnstt+Slipstream have broader client-ecosystem support (standalone binaries on 25+ platforms) while XDNS requires a FinalMask-aware Xray client (Happ, Xray CLI). `PORT_DNS=53` and `PORT_XDNS=5353` are the new default port assignments. Switching is a one-command operation via `moav switch-dns xdns`. `moav update` runs an automatic migration that detects sparse `.env` files and pins explicit values based on currently-running containers before `check_env_additions` appends the new defaults — existing installs are never silently flipped
+- **`moav start` blocks DNS tunnel conflicts** — Previously only warned; now hard-fails when starting a profile would put tunnels from different port groups on port 53. `--force` bypasses the check. Same-group tunnels (dnstt+slipstream) still allowed to coexist via dns-router multiplexing
+- **`dns_tunnels_running` detection for shared containers** — xray serves both XHTTP and XDNS; previously "xray container running" was mis-reported as "xdns running" even when `ENABLE_XDNS=false`. Now requires the enable flag to be true for tunnels on shared containers
 - **telemt** — Updated to 3.3.39 (memory hard-bounds, TLS fronting hash compact cert, bounded retries, build info metrics)
 - **TrustTunnel** — Updated server to v1.0.33 (deep-link DNS upstreams and server display names)
 - **TrustTunnel Client** — Updated to v1.0.49 (deep-link import, DNS socket hardening, `dns_upstreams` moved to `[endpoint]` section)
+
+### Fixed
+- **GeoIP database download during bootstrap was slow** — Switched `geoip-updater` from `python:3.11-alpine` (~50 MB) to `curlimages/curl:latest` (~9 MB), eliminating the in-container `apk add curl` step that ran on every invocation. First-run bootstrap is faster and subsequent GeoIP refreshes are near-instant
+- **dns-router crash loop under port 53 conflict** — Previously when both XDNS (via xray) and dnstunnel profile were started, dns-router would infinitely restart trying to bind host port 53 already held by xray. Now blocked at `moav start` with a clear error message pointing to `moav switch-dns`
+- **Silent dnstt/slipstream crash loops on missing keys** — When `ENABLE_DNSTT=true` or `ENABLE_SLIPSTREAM=true` were set after initial bootstrap, containers started but waited indefinitely for key files that were never generated. `moav switch-dns` now detects missing keys pre-start and offers to bootstrap; `moav doctor` flags the condition explicitly
 
 ## [1.7.4] - 2026-03-27
 
@@ -947,7 +962,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - uTLS fingerprint spoofing (Chrome)
 - Automatic short ID generation for Reality
 
-[Unreleased]: https://github.com/shayanb/MoaV/compare/v1.7.4...HEAD
+[Unreleased]: https://github.com/shayanb/MoaV/compare/v1.7.5...HEAD
+[1.7.5]: https://github.com/shayanb/MoaV/compare/v1.7.4...v1.7.5
 [1.7.4]: https://github.com/shayanb/MoaV/compare/v1.7.3...v1.7.4
 [1.7.3]: https://github.com/shayanb/MoaV/compare/v1.7.2...v1.7.3
 [1.7.2]: https://github.com/shayanb/MoaV/compare/v1.7.0...v1.7.2

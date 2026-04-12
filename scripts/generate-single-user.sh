@@ -223,8 +223,8 @@ if [[ -n "$DONATE_ONLY" ]]; then
 else
     export ENABLE_WIREGUARD="${ENABLE_WIREGUARD:-true}"
     export ENABLE_AMNEZIAWG="${ENABLE_AMNEZIAWG:-true}"
-    export ENABLE_DNSTT="${ENABLE_DNSTT:-false}"
-    export ENABLE_SLIPSTREAM="${ENABLE_SLIPSTREAM:-false}"
+    export ENABLE_DNSTT="${ENABLE_DNSTT:-true}"
+    export ENABLE_SLIPSTREAM="${ENABLE_SLIPSTREAM:-true}"
     export ENABLE_HYSTERIA2="${ENABLE_HYSTERIA2:-true}"
     export ENABLE_TRUSTTUNNEL="${ENABLE_TRUSTTUNNEL:-true}"
     export ENABLE_XHTTP="${ENABLE_XHTTP:-true}"
