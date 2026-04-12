@@ -1740,6 +1740,271 @@ check_dns_for_dnstunnel() {
     fi
 }
 
+# =============================================================================
+# DNS Tunnel Registry
+# =============================================================================
+# Declarative metadata for DNS tunnels sharing port 53. Used by:
+#   - cmd_switch_dns      (pick one active tunnel)
+#   - cmd_start           (block conflicting profile starts)
+#   - doctor_check_conflicts  (detect runtime collisions)
+# To add a new DNS tunnel: append its name here + add a case branch in dns_tunnel_field.
+
+DNS_TUNNELS=("xdns" "dnstt" "slipstream")
+
+# Field lookup: dns_tunnel_field <name> <field>
+# Fields: enable_var, port_var, default_port, services, profile, port_group, desc
+# port_group: tunnels in the SAME group can coexist on port 53 (e.g. via dns-router
+# multiplexing). Tunnels in DIFFERENT groups conflict.
+dns_tunnel_field() {
+    local name="$1" field="$2"
+    case "$name:$field" in
+        xdns:enable_var)    echo "ENABLE_XDNS" ;;
+        xdns:port_var)      echo "PORT_XDNS" ;;
+        xdns:default_port)  echo "53" ;;
+        xdns:services)      echo "xray" ;;
+        xdns:profile)       echo "xhttp" ;;
+        xdns:port_group)    echo "xray" ;;
+        xdns:desc)          echo "VLESS+mKCP+FinalMask via Xray (per-user auth, default)" ;;
+        dnstt:enable_var)   echo "ENABLE_DNSTT" ;;
+        dnstt:port_var)     echo "PORT_DNS" ;;
+        dnstt:default_port) echo "53" ;;
+        dnstt:services)     echo "dnstt dns-router" ;;
+        dnstt:profile)      echo "dnstunnel" ;;
+        dnstt:port_group)   echo "dns-router" ;;
+        dnstt:desc)         echo "KCP+Noise DNS tunnel (stable, slow)" ;;
+        slipstream:enable_var)   echo "ENABLE_SLIPSTREAM" ;;
+        slipstream:port_var)     echo "PORT_DNS" ;;
+        slipstream:default_port) echo "53" ;;
+        slipstream:services)     echo "slipstream dns-router" ;;
+        slipstream:profile)      echo "dnstunnel" ;;
+        slipstream:port_group)   echo "dns-router" ;;
+        slipstream:desc)         echo "QUIC-over-DNS (faster than dnstt)" ;;
+        *) return 1 ;;
+    esac
+}
+
+# Count distinct port groups in a space-separated tunnel list
+dns_tunnel_groups() {
+    local tunnels="$1"
+    local groups=""
+    for t in $tunnels; do
+        local g
+        g=$(dns_tunnel_field "$t" port_group) || continue
+        if ! echo " $groups " | grep -q " $g "; then
+            groups+="$g "
+        fi
+    done
+    echo "${groups% }"
+}
+
+# Which tunnels are enabled in .env (returns space-separated names)
+dns_tunnels_enabled() {
+    local env_file="$SCRIPT_DIR/.env"
+    local out=""
+    for t in "${DNS_TUNNELS[@]}"; do
+        local var default
+        var=$(dns_tunnel_field "$t" enable_var)
+        default="false"
+        [[ "$t" == "xdns" ]] && default="true"
+        [[ "$(get_env_val "$var" "$env_file" "$default")" == "true" ]] && out+="$t "
+    done
+    echo "${out% }"
+}
+
+# Which tunnels have at least one service currently running
+dns_tunnels_running() {
+    local running
+    running=$(docker compose ps --services --filter "status=running" 2>/dev/null || echo "")
+    local out=""
+    for t in "${DNS_TUNNELS[@]}"; do
+        local svcs
+        svcs=$(dns_tunnel_field "$t" services)
+        for s in $svcs; do
+            if echo "$running" | grep -qw "$s"; then
+                out+="$t "
+                break
+            fi
+        done
+    done
+    echo "${out% }"
+}
+
+cmd_switch_dns() {
+    local env_file="$SCRIPT_DIR/.env"
+    local target="${1:-}"
+
+    case "$target" in
+        ""|list|--list|-l)
+            print_section "DNS Tunnels"
+            local enabled running
+            enabled=$(dns_tunnels_enabled)
+            running=$(dns_tunnels_running)
+            printf "  %-12s %-10s %-8s %-8s %s\n" "NAME" "GROUP" "ENABLED" "RUNNING" "DESCRIPTION"
+            for t in "${DNS_TUNNELS[@]}"; do
+                local en="no" ru="no"
+                echo "$enabled" | grep -qw "$t" && en="yes"
+                echo "$running" | grep -qw "$t" && ru="yes"
+                printf "  %-12s %-10s %-8s %-8s %s\n" "$t" "$(dns_tunnel_field "$t" port_group)" "$en" "$ru" "$(dns_tunnel_field "$t" desc)"
+            done
+            echo ""
+            echo "Tunnels in the same GROUP can run together (via dns-router)."
+            echo "Tunnels in different groups conflict on port 53."
+            echo ""
+            echo "Usage: moav switch-dns <name>[+<name>...] | off"
+            echo "  moav switch-dns xdns                # activate XDNS only"
+            echo "  moav switch-dns dnstt               # activate dnstt only"
+            echo "  moav switch-dns dnstt+slipstream    # both via dns-router"
+            echo "  moav switch-dns off                 # disable all DNS tunnels"
+            return 0
+            ;;
+        help|--help|-h)
+            echo "Usage: moav switch-dns [<name>[+<name>...]|off|list]"
+            echo ""
+            echo "Switch which DNS tunnel(s) own port 53. Tunnels in the same port group"
+            echo "can coexist; tunnels in different groups conflict."
+            echo ""
+            echo "Available tunnels:"
+            for t in "${DNS_TUNNELS[@]}"; do
+                printf "  %-12s [group: %-10s] %s\n" "$t" "$(dns_tunnel_field "$t" port_group)" "$(dns_tunnel_field "$t" desc)"
+            done
+            echo "  off          Disable all DNS tunnels"
+            echo "  list         Show current state (default with no args)"
+            echo ""
+            echo "Examples:"
+            echo "  moav switch-dns xdns"
+            echo "  moav switch-dns dnstt+slipstream   # both legacy tunnels together"
+            return 0
+            ;;
+    esac
+
+    # Parse target: single name, "+"-joined combo, or "off"
+    local requested=()
+    if [[ "$target" != "off" ]]; then
+        IFS='+' read -ra requested <<< "$target"
+        # Validate each name
+        for req in "${requested[@]}"; do
+            local valid=false
+            for t in "${DNS_TUNNELS[@]}"; do
+                [[ "$t" == "$req" ]] && valid=true && break
+            done
+            if ! $valid; then
+                error "Unknown DNS tunnel: $req"
+                echo "Available: ${DNS_TUNNELS[*]} off"
+                echo "Combine same-group tunnels with '+', e.g. dnstt+slipstream"
+                return 1
+            fi
+        done
+        # All requested tunnels must share the same port_group
+        local groups
+        groups=$(dns_tunnel_groups "${requested[*]}")
+        local group_count=0
+        for g in $groups; do group_count=$((group_count + 1)); done
+        if [[ $group_count -gt 1 ]]; then
+            error "Cannot combine tunnels from different port groups: $target"
+            echo "  Groups involved: $groups"
+            echo "  Same-group combos are OK (e.g. dnstt+slipstream share dns-router)."
+            return 1
+        fi
+    fi
+
+    print_section "Switch DNS Tunnel → $target"
+
+    # Determine enable/disable lists
+    local to_enable=("${requested[@]}")
+    local to_disable=()
+    for t in "${DNS_TUNNELS[@]}"; do
+        local keep=false
+        for r in "${to_enable[@]}"; do
+            [[ "$t" == "$r" ]] && keep=true && break
+        done
+        $keep || to_disable+=("$t")
+    done
+
+    info "Updating .env..."
+    for t in "${to_disable[@]}"; do
+        local var
+        var=$(dns_tunnel_field "$t" enable_var)
+        update_env_var "$env_file" "$var" "false"
+        echo "  $var=false"
+    done
+    for t in "${to_enable[@]}"; do
+        local var
+        var=$(dns_tunnel_field "$t" enable_var)
+        update_env_var "$env_file" "$var" "true"
+        echo "  $var=true"
+    done
+
+    # Port assignment based on active group
+    if [[ ${#to_enable[@]} -gt 0 ]]; then
+        local active_group
+        active_group=$(dns_tunnel_field "${to_enable[0]}" port_group)
+        case "$active_group" in
+            xray)
+                update_env_var "$env_file" "PORT_XDNS" "53"
+                update_env_var "$env_file" "PORT_DNS" "5353"
+                echo "  PORT_XDNS=53, PORT_DNS=5353"
+                ;;
+            dns-router)
+                update_env_var "$env_file" "PORT_DNS" "53"
+                update_env_var "$env_file" "PORT_XDNS" "5353"
+                echo "  PORT_DNS=53, PORT_XDNS=5353"
+                ;;
+        esac
+    fi
+    echo ""
+
+    # Stop services of disabled tunnels — but only services that aren't also
+    # used by an enabled tunnel (e.g. dns-router stays up if either dnstt or
+    # slipstream is still enabled).
+    local keep_services=""
+    for t in "${to_enable[@]}"; do
+        keep_services+="$(dns_tunnel_field "$t" services) "
+    done
+    local stop_list=""
+    for t in "${to_disable[@]}"; do
+        for svc in $(dns_tunnel_field "$t" services); do
+            if ! echo " $keep_services " | grep -q " $svc "; then
+                stop_list+="$svc "
+            fi
+        done
+    done
+    # Deduplicate stop_list
+    local stop_unique=""
+    for s in $stop_list; do
+        echo " $stop_unique " | grep -q " $s " || stop_unique+="$s "
+    done
+    if [[ -n "$stop_unique" ]]; then
+        info "Stopping: $stop_unique"
+        docker compose stop $stop_unique 2>/dev/null || true
+        docker compose rm -f $stop_unique 2>/dev/null || true
+    fi
+
+    if [[ "$target" == "off" ]]; then
+        success "All DNS tunnels disabled."
+        echo ""
+        echo "Port 53 is now free. Other MoaV services are unaffected."
+        return 0
+    fi
+
+    # Start target profile(s) — deduplicate since xdns+xhttp share profile,
+    # dnstt+slipstream share dnstunnel
+    local profiles_unique=""
+    for t in "${to_enable[@]}"; do
+        local p
+        p=$(dns_tunnel_field "$t" profile)
+        echo " $profiles_unique " | grep -q " $p " || profiles_unique+="$p "
+    done
+    local profile_args=""
+    for p in $profiles_unique; do profile_args+="--profile $p "; done
+
+    info "Starting profiles: $profiles_unique"
+    docker compose $profile_args up -d --remove-orphans
+    echo ""
+    success "Switched to: ${to_enable[*]}"
+    echo ""
+    echo "Verify with: moav doctor conflicts"
+}
+
 setup_dns_for_dnstt() {
     info "Setting up DNS for DNS tunnels..."
 
@@ -1884,6 +2149,7 @@ DOCTOR_CHECKS=(
     "services:Check running services vs enabled config"
     "config:Check config files and keys from bootstrap"
     "ports:Check required ports are available"
+    "conflicts:Check for conflicting services (e.g. DNS tunnels on port 53)"
     "env:Compare .env with .env.example for missing vars"
     "updates:Check for MoaV updates"
 )
@@ -2541,6 +2807,65 @@ doctor_check_ports() {
             echo -e "    ${DIM}○${NC} Port $port ($svc) — not listening"
         fi
     done
+
+    $pass && return 0 || return 1
+}
+
+doctor_check_conflicts() {
+    local pass=true
+    local enabled running
+    enabled=$(dns_tunnels_enabled)
+    running=$(dns_tunnels_running)
+
+    # 1) Config-level: multiple port groups enabled in .env
+    local enabled_groups
+    enabled_groups=$(dns_tunnel_groups "$enabled")
+    local eg_count=0
+    for g in $enabled_groups; do eg_count=$((eg_count + 1)); done
+
+    if [[ $eg_count -gt 1 ]]; then
+        echo -e "    ${RED}✗${NC} DNS tunnels from multiple port groups enabled: ${enabled}"
+        echo -e "      ${DIM}Groups: ${enabled_groups} — only one can own port 53${NC}"
+        echo -e "      ${DIM}Fix: moav switch-dns <name>${NC}"
+        pass=false
+    elif [[ -n "$enabled" ]]; then
+        echo -e "    ${GREEN}✓${NC} DNS tunnel(s) enabled: $enabled (group: $enabled_groups)"
+    else
+        echo -e "    ${DIM}○${NC} No DNS tunnel enabled"
+    fi
+
+    # 2) Runtime: multiple port groups actually running
+    local running_groups
+    running_groups=$(dns_tunnel_groups "$running")
+    local rg_count=0
+    for g in $running_groups; do rg_count=$((rg_count + 1)); done
+
+    if [[ $rg_count -gt 1 ]]; then
+        echo -e "    ${RED}✗${NC} DNS tunnels from multiple port groups running: ${running}"
+        echo -e "      ${DIM}Groups: ${running_groups} — competing for port 53${NC}"
+        echo -e "      ${DIM}Fix: moav switch-dns <name>${NC}"
+        pass=false
+    fi
+
+    # 3) Config vs runtime drift: a disabled tunnel has containers running
+    for t in $running; do
+        if ! echo " $enabled " | grep -q " $t "; then
+            local svcs
+            svcs=$(dns_tunnel_field "$t" services)
+            echo -e "    ${YELLOW}!${NC} $t is running but disabled in .env"
+            echo -e "      ${DIM}Stop: docker compose stop $svcs${NC}"
+            pass=false
+        fi
+    done
+
+    # 4) dns-router crash loop — classic symptom of port 53 collision with xray/XDNS
+    local restarting
+    restarting=$(docker compose ps --services --filter "status=restarting" 2>/dev/null || echo "")
+    if echo "$restarting" | grep -qw "dns-router"; then
+        echo -e "    ${RED}✗${NC} dns-router is crash-looping (likely port 53 taken by xray/XDNS)"
+        echo -e "      ${DIM}Fix: moav switch-dns <xdns|dnstt|slipstream|dnstt+slipstream>${NC}"
+        pass=false
+    fi
 
     $pass && return 0 || return 1
 }
@@ -4056,6 +4381,7 @@ show_usage() {
     echo "  migrate-ip NEW_IP     Update SERVER_IP and regenerate all configs"
     echo "  regenerate-users      Regenerate all user bundles with current .env"
     echo "  setup-dns             Free port 53 for DNS tunnels (disables systemd-resolved)"
+    echo "  switch-dns [NAME|off] Switch active DNS tunnel (xdns/dnstt/slipstream)"
     echo ""
     echo "Profiles: proxy, wireguard, amneziawg, dnstunnel, trusttunnel, xhttp, telegram,"
     echo "          admin, conduit, snowflake, monitoring, client, all"
@@ -5332,6 +5658,15 @@ cmd_profiles() {
 cmd_start() {
     local profiles=""
     local valid_profiles="proxy wireguard amneziawg dnstunnel trusttunnel xhttp telegram admin conduit snowflake monitoring client all setup"
+    local force=false
+    local args=()
+    for arg in "$@"; do
+        case "$arg" in
+            --force|-f) force=true ;;
+            *) args+=("$arg") ;;
+        esac
+    done
+    set -- "${args[@]}"
 
     if [[ $# -eq 0 ]]; then
         # No arguments - check for DEFAULT_PROFILES in .env
@@ -5430,12 +5765,45 @@ cmd_start() {
     local xdns_start_enabled
     xdns_start_enabled=$(get_env_val "ENABLE_XDNS" "true")
 
-    # Warn if both XDNS and dnstt/Slipstream are enabled (port 53 conflict)
-    if [[ "$xdns_start_enabled" == "true" ]] && [[ "$dnstt_enabled" == "true" || "$slipstream_enabled" == "true" ]]; then
+    # Hard-block DNS tunnel port-group conflicts. Tunnels in the same group
+    # (e.g. dnstt+slipstream share dns-router) can coexist; different groups
+    # (xdns vs dns-router) cannot both own port 53.
+    local starting_tunnels="" running_tunnels
+    running_tunnels=$(dns_tunnels_running)
+
+    if echo "$profiles" | grep -qE "xhttp|dnstunnel|all" && [[ "$xdns_start_enabled" == "true" ]]; then
+        starting_tunnels+="xdns "
+    fi
+    if echo "$profiles" | grep -qE "dnstunnel|all" && [[ "$dnstt_enabled" == "true" ]]; then
+        starting_tunnels+="dnstt "
+    fi
+    if echo "$profiles" | grep -qE "dnstunnel|all" && [[ "$slipstream_enabled" == "true" ]]; then
+        starting_tunnels+="slipstream "
+    fi
+
+    local combined_groups
+    combined_groups=$(dns_tunnel_groups "$running_tunnels $starting_tunnels")
+    local group_count=0
+    for g in $combined_groups; do group_count=$((group_count + 1)); done
+
+    if [[ $group_count -gt 1 ]] && ! $force; then
         echo ""
-        warn "XDNS and dnstt/Slipstream both need port 53 — only one can be active."
-        echo "  Disable one in .env: set ENABLE_XDNS=false or ENABLE_DNSTT=false"
+        error "DNS tunnel port-group conflict — cannot start."
         echo ""
+        echo "  Running:    ${running_tunnels:-none}"
+        echo "  Requested:  ${starting_tunnels:-none}"
+        echo "  Groups:     ${combined_groups}"
+        echo ""
+        echo "  Tunnels from different port groups cannot both bind port 53."
+        echo "  (Same-group tunnels like dnstt+slipstream share dns-router and coexist fine.)"
+        echo ""
+        echo "  Fix:"
+        echo "    moav switch-dns <xdns|dnstt|slipstream|dnstt+slipstream>"
+        echo "    moav switch-dns off                         # disable all"
+        echo "    moav doctor conflicts                       # diagnose"
+        echo ""
+        echo "  Or bypass this check with --force (not recommended; dns-router will crash-loop)."
+        exit 1
     fi
 
     # Check if any DNS tunnel needs port 53
@@ -7237,6 +7605,10 @@ main() {
             ;;
         setup-dns|setup_dns|dns-setup)
             cmd_setup_dns
+            ;;
+        switch-dns|switch_dns|dns-switch|dnsswitch)
+            shift
+            cmd_switch_dns "$@"
             ;;
         donate)
             shift
