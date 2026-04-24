@@ -1,5 +1,7 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": false,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -8,427 +10,2145 @@
   "liveNow": false,
   "panels": [
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [
-            { "color": "green", "value": null },
-            { "color": "yellow", "value": 50 },
-            { "color": "orange", "value": 100 }
-          ]}
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "orange",
+                "value": 100
+              }
+            ]
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 3, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "pluginVersion": "10.4.1",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(conduit_connected_clients)", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(conduit_connected_clients)",
+          "refId": "A"
+        }
       ],
       "title": "Connected",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [
-            { "color": "blue", "value": null }
-          ]}
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 3, "x": 3, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 3,
+        "y": 0
+      },
       "id": 2,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "pluginVersion": "10.4.1",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(conduit_connecting_clients)", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(conduit_connecting_clients)",
+          "refId": "A"
+        }
       ],
       "title": "Connecting",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [
-            { "color": "orange", "value": null }
-          ]}
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 3, "x": 6, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 6,
+        "y": 0
+      },
       "id": 10,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "pluginVersion": "10.4.1",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(max_over_time(conduit_connected_clients[$__range])) + sum(max_over_time(conduit_connecting_clients[$__range]))", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(max_over_time(conduit_connected_clients[$__range])) + sum(max_over_time(conduit_connecting_clients[$__range]))",
+          "refId": "A"
+        }
       ],
       "title": "Peak Clients",
       "description": "Maximum concurrent clients (connected + connecting) in the selected time range",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
           "unit": "bytes"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 3, "x": 9, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 9,
+        "y": 0
+      },
       "id": 3,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "pluginVersion": "10.4.1",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(conduit_bytes_downloaded)", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(conduit_bytes_downloaded)",
+          "refId": "A"
+        }
       ],
       "title": "Total Download",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
           "unit": "bytes"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 3, "x": 12, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 12,
+        "y": 0
+      },
       "id": 4,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "pluginVersion": "10.4.1",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(conduit_bytes_uploaded)", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(conduit_bytes_uploaded)",
+          "refId": "A"
+        }
       ],
       "title": "Total Upload",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [
-            { "options": { "0": { "color": "red", "text": "Offline" }, "1": { "color": "green", "text": "Live" } }, "type": "value" }
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "text": "Offline"
+                },
+                "1": {
+                  "color": "green",
+                  "text": "Live"
+                }
+              },
+              "type": "value"
+            }
           ],
-          "thresholds": { "mode": "absolute", "steps": [
-            { "color": "red", "value": null },
-            { "color": "green", "value": 1 }
-          ]}
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 3, "x": 15, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 15,
+        "y": 0
+      },
       "id": 5,
       "options": {
         "colorMode": "background",
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "pluginVersion": "10.4.1",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "conduit_is_live", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "conduit_is_live",
+          "refId": "A"
+        }
       ],
       "title": "Status",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
           "unit": "binBps"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 3, "x": 18, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 18,
+        "y": 0
+      },
       "id": 6,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "pluginVersion": "10.4.1",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(conduit_bytes_downloaded[5m])) + sum(rate(conduit_bytes_uploaded[5m]))", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(conduit_bytes_downloaded[5m])) + sum(rate(conduit_bytes_uploaded[5m]))",
+          "refId": "A"
+        }
       ],
       "title": "Current Rate",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [
-            { "color": "purple", "value": null }
-          ]}
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 3, "x": 21, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 21,
+        "y": 0
+      },
       "id": 11,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "pluginVersion": "10.4.1",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "conduit_max_common_clients", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "conduit_max_common_clients",
+          "refId": "A"
+        }
       ],
       "title": "Max Clients",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
-            "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto",
-            "barAlignment": 0, "drawStyle": "line", "fillOpacity": 20, "gradientMode": "opacity",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5,
-            "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": true,
-            "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" }
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
       "id": 7,
       "options": {
-        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "pluginVersion": "10.4.1",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(conduit_connected_clients)", "legendFormat": "Connected", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(conduit_connecting_clients)", "legendFormat": "Connecting", "refId": "B" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(conduit_connected_clients)",
+          "legendFormat": "Connected",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(conduit_connecting_clients)",
+          "legendFormat": "Connecting",
+          "refId": "B"
+        }
       ],
       "title": "Client Connections",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
-            "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto",
-            "barAlignment": 0, "drawStyle": "line", "fillOpacity": 20, "gradientMode": "opacity",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5,
-            "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": true,
-            "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" }
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
           "unit": "binBps"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
       "id": 8,
       "options": {
-        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "pluginVersion": "10.4.1",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(conduit_bytes_downloaded[5m]))", "legendFormat": "Download", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(conduit_bytes_uploaded[5m]))", "legendFormat": "Upload", "refId": "B" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(conduit_bytes_downloaded[5m]))",
+          "legendFormat": "Download",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(conduit_bytes_uploaded[5m]))",
+          "legendFormat": "Upload",
+          "refId": "B"
+        }
       ],
       "title": "Bandwidth Rate",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
-            "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto",
-            "barAlignment": 0, "drawStyle": "line", "fillOpacity": 30, "gradientMode": "opacity",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5,
-            "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": true,
-            "stacking": { "group": "A", "mode": "normal" }, "thresholdsStyle": { "mode": "off" }
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
           "unit": "bytes"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
       "id": 9,
       "options": {
-        "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "pluginVersion": "10.4.1",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(conduit_bytes_downloaded)", "legendFormat": "Download", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(conduit_bytes_uploaded)", "legendFormat": "Upload", "refId": "B" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(conduit_bytes_downloaded)",
+          "legendFormat": "Download",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(conduit_bytes_uploaded)",
+          "legendFormat": "Upload",
+          "refId": "B"
+        }
       ],
       "title": "Total Bandwidth Over Time",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto",
-            "barAlignment": 0, "drawStyle": "line", "fillOpacity": 20, "gradientMode": "opacity",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5,
-            "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": true,
-            "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" }
+          "color": {
+            "mode": "palette-classic"
           },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "AE": {
+                  "text": "AE: United Arab Emirates",
+                  "index": 0
+                },
+                "AF": {
+                  "text": "AF: Afghanistan",
+                  "index": 1
+                },
+                "AR": {
+                  "text": "AR: Argentina",
+                  "index": 2
+                },
+                "AU": {
+                  "text": "AU: Australia",
+                  "index": 3
+                },
+                "BF": {
+                  "text": "BF: Burkina Faso",
+                  "index": 4
+                },
+                "BH": {
+                  "text": "BH: Bahrain",
+                  "index": 5
+                },
+                "BR": {
+                  "text": "BR: Brazil",
+                  "index": 6
+                },
+                "BY": {
+                  "text": "BY: Belarus",
+                  "index": 7
+                },
+                "CN": {
+                  "text": "CN: China",
+                  "index": 8
+                },
+                "CO": {
+                  "text": "CO: Colombia",
+                  "index": 9
+                },
+                "CU": {
+                  "text": "CU: Cuba",
+                  "index": 10
+                },
+                "DJ": {
+                  "text": "DJ: Djibouti",
+                  "index": 11
+                },
+                "DO": {
+                  "text": "DO: Dominican Republic",
+                  "index": 12
+                },
+                "EC": {
+                  "text": "EC: Ecuador",
+                  "index": 13
+                },
+                "EG": {
+                  "text": "EG: Egypt",
+                  "index": 14
+                },
+                "ET": {
+                  "text": "ET: Ethiopia",
+                  "index": 15
+                },
+                "GA": {
+                  "text": "GA: Gabon",
+                  "index": 16
+                },
+                "GN": {
+                  "text": "GN: Guinea",
+                  "index": 17
+                },
+                "GQ": {
+                  "text": "GQ: Equatorial Guinea",
+                  "index": 18
+                },
+                "GY": {
+                  "text": "GY: Guyana",
+                  "index": 19
+                },
+                "HK": {
+                  "text": "HK: Hong Kong",
+                  "index": 20
+                },
+                "ID": {
+                  "text": "ID: Indonesia",
+                  "index": 21
+                },
+                "IN": {
+                  "text": "IN: India",
+                  "index": 22
+                },
+                "IQ": {
+                  "text": "IQ: Iraq",
+                  "index": 23
+                },
+                "IR": {
+                  "text": "IR: Iran",
+                  "index": 24
+                },
+                "JO": {
+                  "text": "JO: Jordan",
+                  "index": 25
+                },
+                "KG": {
+                  "text": "KG: Kyrgyzstan",
+                  "index": 26
+                },
+                "LB": {
+                  "text": "LB: Lebanon",
+                  "index": 27
+                },
+                "LY": {
+                  "text": "LY: Libya",
+                  "index": 28
+                },
+                "MM": {
+                  "text": "MM: Myanmar",
+                  "index": 29
+                },
+                "MX": {
+                  "text": "MX: Mexico",
+                  "index": 30
+                },
+                "MY": {
+                  "text": "MY: Malaysia",
+                  "index": 31
+                },
+                "MZ": {
+                  "text": "MZ: Mozambique",
+                  "index": 32
+                },
+                "NG": {
+                  "text": "NG: Nigeria",
+                  "index": 33
+                },
+                "OM": {
+                  "text": "OM: Oman",
+                  "index": 34
+                },
+                "PA": {
+                  "text": "PA: Panama",
+                  "index": 35
+                },
+                "PH": {
+                  "text": "PH: Philippines",
+                  "index": 36
+                },
+                "PK": {
+                  "text": "PK: Pakistan",
+                  "index": 37
+                },
+                "QA": {
+                  "text": "QA: Qatar",
+                  "index": 38
+                },
+                "RU": {
+                  "text": "RU: Russia",
+                  "index": 39
+                },
+                "SA": {
+                  "text": "SA: Saudi Arabia",
+                  "index": 40
+                },
+                "SD": {
+                  "text": "SD: Sudan",
+                  "index": 41
+                },
+                "SN": {
+                  "text": "SN: Senegal",
+                  "index": 42
+                },
+                "SY": {
+                  "text": "SY: Syria",
+                  "index": 43
+                },
+                "TH": {
+                  "text": "TH: Thailand",
+                  "index": 44
+                },
+                "TR": {
+                  "text": "TR: Turkey",
+                  "index": 45
+                },
+                "TW": {
+                  "text": "TW: Taiwan",
+                  "index": 46
+                },
+                "TZ": {
+                  "text": "TZ: Tanzania",
+                  "index": 47
+                },
+                "UA": {
+                  "text": "UA: Ukraine",
+                  "index": 48
+                },
+                "UG": {
+                  "text": "UG: Uganda",
+                  "index": 49
+                },
+                "US": {
+                  "text": "US: United States",
+                  "index": 50
+                },
+                "VE": {
+                  "text": "VE: Venezuela",
+                  "index": 51
+                },
+                "YE": {
+                  "text": "YE: Yemen",
+                  "index": 52
+                },
+                "ZA": {
+                  "text": "ZA: South Africa",
+                  "index": 53
+                },
+                "ZW": {
+                  "text": "ZW: Zimbabwe",
+                  "index": 54
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AE"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "AE: United Arab Emirates"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AF"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "AF: Afghanistan"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AR"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "AR: Argentina"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AU"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "AU: Australia"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "BF"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "BF: Burkina Faso"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "BH"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "BH: Bahrain"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "BR"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "BR: Brazil"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "BY"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "BY: Belarus"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CN"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "CN: China"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CO"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "CO: Colombia"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CU"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "CU: Cuba"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DJ"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "DJ: Djibouti"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DO"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "DO: Dominican Republic"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "EC"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "EC: Ecuador"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "EG"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "EG: Egypt"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ET"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "ET: Ethiopia"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "GA"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "GA: Gabon"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "GN"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "GN: Guinea"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "GQ"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "GQ: Equatorial Guinea"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "GY"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "GY: Guyana"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "HK"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "HK: Hong Kong"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ID"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "ID: Indonesia"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IN"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "IN: India"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IQ"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "IQ: Iraq"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IR"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "IR: Iran"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "JO"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "JO: Jordan"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "KG"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "KG: Kyrgyzstan"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "LB"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "LB: Lebanon"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "LY"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "LY: Libya"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MM"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "MM: Myanmar"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MX"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "MX: Mexico"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MY"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "MY: Malaysia"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MZ"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "MZ: Mozambique"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "NG"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "NG: Nigeria"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "OM"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "OM: Oman"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PA"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PA: Panama"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PH"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PH: Philippines"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PK"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PK: Pakistan"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "QA"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "QA: Qatar"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RU"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "RU: Russia"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SA"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "SA: Saudi Arabia"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SD"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "SD: Sudan"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SN"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "SN: Senegal"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SY"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "SY: Syria"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TH"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "TH: Thailand"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TR"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "TR: Turkey"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TW"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "TW: Taiwan"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TZ"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "TZ: Tanzania"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "UA"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "UA: Ukraine"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "UG"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "UG: Uganda"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "US"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "US: United States"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "VE"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "VE: Venezuela"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "YE"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "YE: Yemen"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ZA"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "ZA: South Africa"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ZW"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "ZW: Zimbabwe"
+              }
+            ]
+          }
+        ]
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
       "id": 12,
       "options": {
-        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "displayMode": "hidden",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "pluginVersion": "10.4.1",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (region) (conduit_region_connected_clients)", "legendFormat": "{{region}}", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (region) (conduit_region_connected_clients)",
+          "legendFormat": "{{region}}",
+          "refId": "A"
+        }
       ],
       "title": "Connected Clients by Region",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "custom": {
             "align": "auto",
-            "cellOptions": { "type": "auto" },
+            "cellOptions": {
+              "type": "auto"
+            },
             "inspect": false
           },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "AE": {
+                  "text": "AE: United Arab Emirates",
+                  "index": 0
+                },
+                "AF": {
+                  "text": "AF: Afghanistan",
+                  "index": 1
+                },
+                "AR": {
+                  "text": "AR: Argentina",
+                  "index": 2
+                },
+                "AU": {
+                  "text": "AU: Australia",
+                  "index": 3
+                },
+                "BF": {
+                  "text": "BF: Burkina Faso",
+                  "index": 4
+                },
+                "BH": {
+                  "text": "BH: Bahrain",
+                  "index": 5
+                },
+                "BR": {
+                  "text": "BR: Brazil",
+                  "index": 6
+                },
+                "BY": {
+                  "text": "BY: Belarus",
+                  "index": 7
+                },
+                "CN": {
+                  "text": "CN: China",
+                  "index": 8
+                },
+                "CO": {
+                  "text": "CO: Colombia",
+                  "index": 9
+                },
+                "CU": {
+                  "text": "CU: Cuba",
+                  "index": 10
+                },
+                "DJ": {
+                  "text": "DJ: Djibouti",
+                  "index": 11
+                },
+                "DO": {
+                  "text": "DO: Dominican Republic",
+                  "index": 12
+                },
+                "EC": {
+                  "text": "EC: Ecuador",
+                  "index": 13
+                },
+                "EG": {
+                  "text": "EG: Egypt",
+                  "index": 14
+                },
+                "ET": {
+                  "text": "ET: Ethiopia",
+                  "index": 15
+                },
+                "GA": {
+                  "text": "GA: Gabon",
+                  "index": 16
+                },
+                "GN": {
+                  "text": "GN: Guinea",
+                  "index": 17
+                },
+                "GQ": {
+                  "text": "GQ: Equatorial Guinea",
+                  "index": 18
+                },
+                "GY": {
+                  "text": "GY: Guyana",
+                  "index": 19
+                },
+                "HK": {
+                  "text": "HK: Hong Kong",
+                  "index": 20
+                },
+                "ID": {
+                  "text": "ID: Indonesia",
+                  "index": 21
+                },
+                "IN": {
+                  "text": "IN: India",
+                  "index": 22
+                },
+                "IQ": {
+                  "text": "IQ: Iraq",
+                  "index": 23
+                },
+                "IR": {
+                  "text": "IR: Iran",
+                  "index": 24
+                },
+                "JO": {
+                  "text": "JO: Jordan",
+                  "index": 25
+                },
+                "KG": {
+                  "text": "KG: Kyrgyzstan",
+                  "index": 26
+                },
+                "LB": {
+                  "text": "LB: Lebanon",
+                  "index": 27
+                },
+                "LY": {
+                  "text": "LY: Libya",
+                  "index": 28
+                },
+                "MM": {
+                  "text": "MM: Myanmar",
+                  "index": 29
+                },
+                "MX": {
+                  "text": "MX: Mexico",
+                  "index": 30
+                },
+                "MY": {
+                  "text": "MY: Malaysia",
+                  "index": 31
+                },
+                "MZ": {
+                  "text": "MZ: Mozambique",
+                  "index": 32
+                },
+                "NG": {
+                  "text": "NG: Nigeria",
+                  "index": 33
+                },
+                "OM": {
+                  "text": "OM: Oman",
+                  "index": 34
+                },
+                "PA": {
+                  "text": "PA: Panama",
+                  "index": 35
+                },
+                "PH": {
+                  "text": "PH: Philippines",
+                  "index": 36
+                },
+                "PK": {
+                  "text": "PK: Pakistan",
+                  "index": 37
+                },
+                "QA": {
+                  "text": "QA: Qatar",
+                  "index": 38
+                },
+                "RU": {
+                  "text": "RU: Russia",
+                  "index": 39
+                },
+                "SA": {
+                  "text": "SA: Saudi Arabia",
+                  "index": 40
+                },
+                "SD": {
+                  "text": "SD: Sudan",
+                  "index": 41
+                },
+                "SN": {
+                  "text": "SN: Senegal",
+                  "index": 42
+                },
+                "SY": {
+                  "text": "SY: Syria",
+                  "index": 43
+                },
+                "TH": {
+                  "text": "TH: Thailand",
+                  "index": 44
+                },
+                "TR": {
+                  "text": "TR: Turkey",
+                  "index": 45
+                },
+                "TW": {
+                  "text": "TW: Taiwan",
+                  "index": 46
+                },
+                "TZ": {
+                  "text": "TZ: Tanzania",
+                  "index": 47
+                },
+                "UA": {
+                  "text": "UA: Ukraine",
+                  "index": 48
+                },
+                "UG": {
+                  "text": "UG: Uganda",
+                  "index": 49
+                },
+                "US": {
+                  "text": "US: United States",
+                  "index": 50
+                },
+                "VE": {
+                  "text": "VE: Venezuela",
+                  "index": 51
+                },
+                "YE": {
+                  "text": "YE: Yemen",
+                  "index": 52
+                },
+                "ZA": {
+                  "text": "ZA: South Africa",
+                  "index": 53
+                },
+                "ZW": {
+                  "text": "ZW: Zimbabwe",
+                  "index": 54
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Region" },
-            "properties": [{ "id": "custom.width", "value": 100 }]
+            "matcher": {
+              "id": "byName",
+              "options": "Region"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "Download" },
-            "properties": [{ "id": "unit", "value": "bytes" }]
+            "matcher": {
+              "id": "byName",
+              "options": "Download"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "Upload" },
-            "properties": [{ "id": "unit", "value": "bytes" }]
+            "matcher": {
+              "id": "byName",
+              "options": "Upload"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 46
+      },
       "id": 13,
       "options": {
         "showHeader": true,
         "cellHeight": "sm",
         "footer": {
           "show": true,
-          "reducer": ["sum"],
+          "reducer": [
+            "sum"
+          ],
           "countRows": false,
-          "fields": ["Connected", "Download", "Upload"]
+          "fields": [
+            "Connected",
+            "Download",
+            "Upload"
+          ]
         },
-        "sortBy": [{ "displayName": "Connected", "desc": true }]
+        "sortBy": [
+          {
+            "displayName": "Connected",
+            "desc": true
+          }
+        ]
       },
       "pluginVersion": "10.4.1",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (region) (conduit_region_connected_clients)", "format": "table", "instant": true, "refId": "Connected" },
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (region) (conduit_region_bytes_downloaded)", "format": "table", "instant": true, "refId": "Download" },
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (region) (conduit_region_bytes_uploaded)", "format": "table", "instant": true, "refId": "Upload" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (region) (conduit_region_connected_clients)",
+          "format": "table",
+          "instant": true,
+          "refId": "Connected"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (region) (conduit_region_bytes_downloaded)",
+          "format": "table",
+          "instant": true,
+          "refId": "Download"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (region) (conduit_region_bytes_uploaded)",
+          "format": "table",
+          "instant": true,
+          "refId": "Upload"
+        }
       ],
       "title": "Traffic by Region",
       "description": "Current connected clients and cumulative traffic per region",
       "transformations": [
         {
           "id": "seriesToColumns",
-          "options": { "byField": "region" }
+          "options": {
+            "byField": "region"
+          }
         },
         {
           "id": "organize",
           "options": {
-            "excludeByName": { "Time": true, "Time 1": true, "Time 2": true, "Time 3": true },
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true
+            },
             "renameByName": {
               "region": "Region",
               "Value #Connected": "Connected",
@@ -439,13 +2159,321 @@
         }
       ],
       "type": "table"
+    },
+    {
+      "id": 14,
+      "title": "Connected Clients by Region \u2014 Stats",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (region) (conduit_region_connected_clients)",
+          "legendFormat": "{{region}}",
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "mean",
+              "max",
+              "lastNotNull"
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Field": "Region",
+              "Last *": "Last",
+              "lastNotNull": "Last"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "AE": {
+                  "text": "AE: United Arab Emirates",
+                  "index": 0
+                },
+                "AF": {
+                  "text": "AF: Afghanistan",
+                  "index": 1
+                },
+                "AR": {
+                  "text": "AR: Argentina",
+                  "index": 2
+                },
+                "AU": {
+                  "text": "AU: Australia",
+                  "index": 3
+                },
+                "BF": {
+                  "text": "BF: Burkina Faso",
+                  "index": 4
+                },
+                "BH": {
+                  "text": "BH: Bahrain",
+                  "index": 5
+                },
+                "BR": {
+                  "text": "BR: Brazil",
+                  "index": 6
+                },
+                "BY": {
+                  "text": "BY: Belarus",
+                  "index": 7
+                },
+                "CN": {
+                  "text": "CN: China",
+                  "index": 8
+                },
+                "CO": {
+                  "text": "CO: Colombia",
+                  "index": 9
+                },
+                "CU": {
+                  "text": "CU: Cuba",
+                  "index": 10
+                },
+                "DJ": {
+                  "text": "DJ: Djibouti",
+                  "index": 11
+                },
+                "DO": {
+                  "text": "DO: Dominican Republic",
+                  "index": 12
+                },
+                "EC": {
+                  "text": "EC: Ecuador",
+                  "index": 13
+                },
+                "EG": {
+                  "text": "EG: Egypt",
+                  "index": 14
+                },
+                "ET": {
+                  "text": "ET: Ethiopia",
+                  "index": 15
+                },
+                "GA": {
+                  "text": "GA: Gabon",
+                  "index": 16
+                },
+                "GN": {
+                  "text": "GN: Guinea",
+                  "index": 17
+                },
+                "GQ": {
+                  "text": "GQ: Equatorial Guinea",
+                  "index": 18
+                },
+                "GY": {
+                  "text": "GY: Guyana",
+                  "index": 19
+                },
+                "HK": {
+                  "text": "HK: Hong Kong",
+                  "index": 20
+                },
+                "ID": {
+                  "text": "ID: Indonesia",
+                  "index": 21
+                },
+                "IN": {
+                  "text": "IN: India",
+                  "index": 22
+                },
+                "IQ": {
+                  "text": "IQ: Iraq",
+                  "index": 23
+                },
+                "IR": {
+                  "text": "IR: Iran",
+                  "index": 24
+                },
+                "JO": {
+                  "text": "JO: Jordan",
+                  "index": 25
+                },
+                "KG": {
+                  "text": "KG: Kyrgyzstan",
+                  "index": 26
+                },
+                "LB": {
+                  "text": "LB: Lebanon",
+                  "index": 27
+                },
+                "LY": {
+                  "text": "LY: Libya",
+                  "index": 28
+                },
+                "MM": {
+                  "text": "MM: Myanmar",
+                  "index": 29
+                },
+                "MX": {
+                  "text": "MX: Mexico",
+                  "index": 30
+                },
+                "MY": {
+                  "text": "MY: Malaysia",
+                  "index": 31
+                },
+                "MZ": {
+                  "text": "MZ: Mozambique",
+                  "index": 32
+                },
+                "NG": {
+                  "text": "NG: Nigeria",
+                  "index": 33
+                },
+                "OM": {
+                  "text": "OM: Oman",
+                  "index": 34
+                },
+                "PA": {
+                  "text": "PA: Panama",
+                  "index": 35
+                },
+                "PH": {
+                  "text": "PH: Philippines",
+                  "index": 36
+                },
+                "PK": {
+                  "text": "PK: Pakistan",
+                  "index": 37
+                },
+                "QA": {
+                  "text": "QA: Qatar",
+                  "index": 38
+                },
+                "RU": {
+                  "text": "RU: Russia",
+                  "index": 39
+                },
+                "SA": {
+                  "text": "SA: Saudi Arabia",
+                  "index": 40
+                },
+                "SD": {
+                  "text": "SD: Sudan",
+                  "index": 41
+                },
+                "SN": {
+                  "text": "SN: Senegal",
+                  "index": 42
+                },
+                "SY": {
+                  "text": "SY: Syria",
+                  "index": 43
+                },
+                "TH": {
+                  "text": "TH: Thailand",
+                  "index": 44
+                },
+                "TR": {
+                  "text": "TR: Turkey",
+                  "index": 45
+                },
+                "TW": {
+                  "text": "TW: Taiwan",
+                  "index": 46
+                },
+                "TZ": {
+                  "text": "TZ: Tanzania",
+                  "index": 47
+                },
+                "UA": {
+                  "text": "UA: Ukraine",
+                  "index": 48
+                },
+                "UG": {
+                  "text": "UG: Uganda",
+                  "index": 49
+                },
+                "US": {
+                  "text": "US: United States",
+                  "index": 50
+                },
+                "VE": {
+                  "text": "VE: Venezuela",
+                  "index": 51
+                },
+                "YE": {
+                  "text": "YE: Yemen",
+                  "index": 52
+                },
+                "ZA": {
+                  "text": "ZA: South Africa",
+                  "index": 53
+                },
+                "ZW": {
+                  "text": "ZW: Zimbabwe",
+                  "index": 54
+                }
+              }
+            }
+          ],
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "Last",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": false
+        }
+      }
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["moav", "conduit", "psiphon"],
-  "templating": { "list": [] },
-  "time": { "from": "now-6h", "to": "now" },
+  "tags": [
+    "moav",
+    "conduit",
+    "psiphon"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "",
   "title": "MoaV - Conduit",
