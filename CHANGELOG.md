@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Container log rotation** — All long-running services in `docker-compose.yml` now use a shared `x-logging` anchor that caps each container's `json-file` log at `max-size: 10m` × `max-file: 3` (~30 MB per container). Previously containers used the Docker default with no size cap, and chatty services (xray, sing-box, telemt, prometheus) could fill `/var/lib/docker/containers` over time on long-running VPS deployments
+
 ## [1.7.6] - 2026-05-01
 
 ### Added

@@ -2,6 +2,15 @@
 # MoaV - Multi-protocol Circumvention Stack
 # =============================================================================
 
+# Default container log rotation — caps per-container disk use at ~30 MB.
+# Applied to every long-running service via `logging: *default-logging`.
+# Override on a per-service basis if a service needs larger retention.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 networks:
   moav_net:
     driver: bridge
@@ -30,6 +39,7 @@ services:
         SINGBOX_VERSION: ${SINGBOX_VERSION:-1.12.23}
     container_name: moav-sing-box
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     ports:
@@ -82,6 +92,7 @@ services:
         WSTUNNEL_VERSION: ${WSTUNNEL_VERSION:-10.5.3}
     container_name: moav-wstunnel
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     ports:
@@ -116,6 +127,7 @@ services:
       dockerfile: dockerfiles/Dockerfile.wireguard
     container_name: moav-wireguard
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     ports:
@@ -157,6 +169,7 @@ services:
       dockerfile: dockerfiles/Dockerfile.dns-router
     container_name: moav-dns-router
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     ports:
@@ -187,6 +200,7 @@ services:
       dockerfile: dockerfiles/Dockerfile.dnstt
     container_name: moav-dnstt
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     expose:
@@ -221,6 +235,7 @@ services:
         SLIPSTREAM_VERSION: ${SLIPSTREAM_VERSION:-2026.02.22.1}
     container_name: moav-slipstream
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     expose:
@@ -297,6 +312,7 @@ services:
     image: ${IMAGE_NGINX:-nginx:alpine}
     container_name: moav-decoy
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     volumes:
@@ -345,6 +361,7 @@ services:
         TELEMT_VERSION: ${TELEMT_VERSION:-3.4.10}
     container_name: moav-telemt
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     ports:
@@ -393,6 +410,7 @@ services:
         CONDUIT_VERSION: ${CONDUIT_VERSION:-2.0.0}
     container_name: moav-conduit
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     volumes:
@@ -432,6 +450,7 @@ services:
         SNOWFLAKE_VERSION: ${SNOWFLAKE_VERSION:-2.11.0}
     container_name: moav-snowflake
     restart: unless-stopped
+    logging: *default-logging
     network_mode: host
     volumes:
       - moav_snowflake_logs:/var/log/snowflake
@@ -463,6 +482,7 @@ services:
       dockerfile: Dockerfile
     container_name: moav-snowflake-exporter
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     volumes:
@@ -497,6 +517,7 @@ services:
         AWGTOOLS_VERSION: ${AWGTOOLS_VERSION:-1.0.20260223}
     container_name: moav-amneziawg
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     ports:
@@ -541,6 +562,7 @@ services:
         TRUSTTUNNEL_VERSION: ${TRUSTTUNNEL_VERSION:-1.0.33}
     container_name: moav-trusttunnel
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     ports:
@@ -590,6 +612,7 @@ services:
         XRAY_VERSION: ${XRAY_VERSION:-v26.3.27}
     container_name: moav-xray
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     ports:
@@ -621,6 +644,7 @@ services:
     image: tecnativa/docker-socket-proxy:v0.4.2
     container_name: moav-docker-proxy
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     volumes:
@@ -652,6 +676,7 @@ services:
       dockerfile: dockerfiles/Dockerfile.admin
     container_name: moav-admin
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     ports:
@@ -704,6 +729,7 @@ services:
     image: ${IMAGE_PROMETHEUS:-prom/prometheus:latest}
     container_name: moav-prometheus
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     expose:
@@ -738,6 +764,7 @@ services:
     image: ${IMAGE_GRAFANA:-grafana/grafana:latest}
     container_name: moav-grafana
     restart: unless-stopped
+    logging: *default-logging
     user: "0"
     entrypoint: ["/bin/sh", "/scripts/grafana-entrypoint.sh"]
     networks:
@@ -779,6 +806,7 @@ services:
     image: ${IMAGE_NGINX:-nginx:alpine}
     container_name: moav-grafana-proxy
     restart: unless-stopped
+    logging: *default-logging
     entrypoint: ["/bin/sh", "/scripts/grafana-proxy-entrypoint.sh"]
     networks:
       - moav_net
@@ -816,6 +844,7 @@ services:
     image: ${IMAGE_NODE_EXPORTER:-prom/node-exporter:latest}
     container_name: moav-node-exporter
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     expose:
@@ -849,6 +878,7 @@ services:
     image: ${IMAGE_CADVISOR:-gcr.io/cadvisor/cadvisor:latest}
     container_name: moav-cadvisor
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     expose:
@@ -881,6 +911,7 @@ services:
     image: ${IMAGE_CLASH_EXPORTER:-ghcr.io/zxh326/clash-exporter:latest}
     container_name: moav-clash-exporter
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     expose:
@@ -910,6 +941,7 @@ services:
       dockerfile: singbox/Dockerfile
     container_name: moav-singbox-exporter
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     volumes:
@@ -942,6 +974,7 @@ services:
       dockerfile: Dockerfile
     container_name: moav-telemt-exporter
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     environment:
@@ -969,6 +1002,7 @@ services:
       dockerfile: xray/Dockerfile
     container_name: moav-xray-exporter
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     volumes:
@@ -998,6 +1032,7 @@ services:
       dockerfile: wireguard/Dockerfile
     container_name: moav-wireguard-exporter
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     volumes:
@@ -1026,6 +1061,7 @@ services:
       dockerfile: amneziawg/Dockerfile
     container_name: moav-amneziawg-exporter
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - moav_net
     volumes:
