@@ -15,10 +15,12 @@ This runs all checks automatically and tells you exactly what's wrong:
 - **docker** — Docker daemon running, Compose installed, disk usage
 - **memory** — Available RAM, warns if too low for your config
 - **disk** — Free disk space, warns before you run out
+- **logs** — Container `json-file` log sizes; prompts to truncate any over 100 MB (useful for clearing pre-1.7.6 unbounded logs)
 - **dns** — DNS records for your domain and enabled protocols
 - **services** — Running containers vs enabled config, crash-looping detection
 - **config** — Bootstrap status, config files exist for enabled protocols
 - **ports** — Required ports listening, systemd-resolved conflicts
+- **conflicts** — DNS-tunnel port-group collisions on port 53
 - **env** — Missing `.env` variables compared to `.env.example`
 - **updates** — New MoaV version available
 

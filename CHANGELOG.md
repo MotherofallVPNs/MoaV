@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`moav doctor logs` check** — New diagnostic that scans `/var/lib/docker/containers/*/*-json.log` for files over 100 MB, prints them grouped by container name with total MB, and prompts interactively to truncate them in place. Helpful for clearing accumulated logs from pre-1.7.6 containers that were created before the `x-logging` rotation anchor was added (rotation only applies to containers created *after* the upgrade — pre-existing containers keep growing under Docker's unbounded default until they're recreated). Skips the prompt non-interactively (cron / piped runs) and prints the manual `truncate -s 0` command instead. Auto-prefixes `sudo` when not running as root
+
+### Changed
+- **TROUBLESHOOTING.md "Disk space full"** — Documents in-place log truncation (`truncate -s 0` keeps the file descriptor live so Docker keeps writing without a service restart), the `--force-recreate` follow-up to enforce the 10m × 3 rotation policy on still-running pre-1.7.6 containers, and adds `docker builder prune -af` to the common-space-hogs list
+
 ## [1.7.7] - 2026-05-01
 
 ### Added

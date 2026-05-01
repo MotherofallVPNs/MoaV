@@ -133,10 +133,12 @@ moav doctor              # Run all checks
 moav doctor docker       # Docker and prerequisites
 moav doctor memory       # RAM availability
 moav doctor disk         # Disk space
+moav doctor logs         # Container log file sizes (offers to truncate oversized)
 moav doctor dns          # DNS records
 moav doctor services     # Enabled vs running services
 moav doctor config       # Config files and keys
 moav doctor ports        # Port availability
+moav doctor conflicts    # DNS-tunnel port-group collisions
 moav doctor env          # Compare .env with .env.example
 moav doctor updates      # Check for MoaV updates
 ```
@@ -145,10 +147,12 @@ moav doctor updates      # Check for MoaV updates
 - `docker` — Docker daemon running, Compose available, Docker disk usage summary
 - `memory` — Total RAM, available memory, warns if <1GB or <2GB with monitoring enabled
 - `disk` — Disk space on root and Docker partition, warns if <2GB free
+- `logs` — Scans `/var/lib/docker/containers/*/*-json.log` for files >100 MB; lists oversized files by container name and prompts to truncate in place. `truncate -s 0` keeps the FD live so Docker keeps writing — no service restart needed. Skips the prompt in non-interactive sessions (cron / piped runs) and prints the manual command instead. Pre-1.7.6 containers keep growing under Docker's unbounded default until they're recreated; this check is the fastest way to reclaim that space without a full restart
 - `dns` — Verify DNS records for enabled protocols (A records, NS delegation, CDN)
 - `services` — Compare enabled services in `.env` with running containers; flag crash-looping services
 - `config` — Check bootstrap has been run and config files exist for enabled protocols
 - `ports` — Verify required ports are listening; detect systemd-resolved on port 53
+- `conflicts` — Detect DNS-tunnel port-group collisions on port 53 (XDNS vs dnstt+Slipstream); see `moav switch-dns`
 - `env` — Compare `.env` with `.env.example` for missing variables; flag critical missing vars
 - `updates` — Check current version against latest GitHub release
 
