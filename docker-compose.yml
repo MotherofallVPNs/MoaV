@@ -1153,7 +1153,7 @@ services:
       - PORT_TELEMT=${PORT_TELEMT:-993}
       - ENABLE_SS=${ENABLE_SS:-false}
       - PORT_SS=${PORT_SS:-8388}
-      - SS_METHOD=${SS_METHOD:-2022-blake3-chacha20-poly1305}
+      - SS_METHOD=${SS_METHOD:-2022-blake3-aes-128-gcm}
       - TELEMT_TLS_DOMAIN=${TELEMT_TLS_DOMAIN:-dl.google.com}
       - TELEMT_MAX_TCP_CONNS=${TELEMT_MAX_TCP_CONNS:-100}
       - TELEMT_MAX_UNIQUE_IPS=${TELEMT_MAX_UNIQUE_IPS:-10}

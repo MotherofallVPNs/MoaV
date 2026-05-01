@@ -45,7 +45,7 @@ EOF
 # Shadowsocks-2022 per-user PSK (only if SS is enabled)
 SS_USER_PSK=""
 if [[ "${ENABLE_SS:-false}" == "true" ]]; then
-    case "${SS_METHOD:-2022-blake3-chacha20-poly1305}" in
+    case "${SS_METHOD:-2022-blake3-aes-128-gcm}" in
         2022-blake3-aes-128-gcm) SS_PSK_BYTES=16 ;;
         *)                       SS_PSK_BYTES=32 ;;
     esac
@@ -258,7 +258,7 @@ else
     export ENABLE_SS="${ENABLE_SS:-false}"
 fi
 export PORT_SS="${PORT_SS:-8388}"
-export SS_METHOD="${SS_METHOD:-2022-blake3-chacha20-poly1305}"
+export SS_METHOD="${SS_METHOD:-2022-blake3-aes-128-gcm}"
 if [[ -f "$STATE_DIR/keys/shadowsocks-server.psk" ]]; then
     export SS_SERVER_PSK="$(cat "$STATE_DIR/keys/shadowsocks-server.psk")"
 fi

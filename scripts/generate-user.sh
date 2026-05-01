@@ -272,7 +272,7 @@ if [[ "${ENABLE_SS:-false}" == "true" ]]; then
     else
         BUNDLE_CHANGED=true
         SS_PORT="${PORT_SS:-8388}"
-        SS_METHOD_LOCAL="${SS_METHOD:-2022-blake3-chacha20-poly1305}"
+        SS_METHOD_LOCAL="${SS_METHOD:-2022-blake3-aes-128-gcm}"
 
         cat > "$OUTPUT_DIR/shadowsocks-singbox.json" <<EOF
 {

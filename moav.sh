@@ -7569,7 +7569,7 @@ cmd_regenerate_users() {
     local port_telemt=$(get_env_val "PORT_TELEMT" .env "993")
     local enable_ss=$(get_env_val "ENABLE_SS" .env "false")
     local port_ss=$(get_env_val "PORT_SS" .env "8388")
-    local ss_method=$(get_env_val "SS_METHOD" .env "2022-blake3-chacha20-poly1305")
+    local ss_method=$(get_env_val "SS_METHOD" .env "2022-blake3-aes-128-gcm")
 
     # Run the regeneration using bootstrap container
     # This mounts all necessary volumes and has the generate scripts
@@ -7605,7 +7605,7 @@ cmd_regenerate_users() {
             -e "PORT_TELEMT=${port_telemt:-993}" \
             -e "ENABLE_SS=${enable_ss:-false}" \
             -e "PORT_SS=${port_ss:-8388}" \
-            -e "SS_METHOD=${ss_method:-2022-blake3-chacha20-poly1305}" \
+            -e "SS_METHOD=${ss_method:-2022-blake3-aes-128-gcm}" \
             bootstrap /app/generate-user.sh "$username" >/dev/null 2>&1; then
             echo -e "${GREEN}✓${NC}"
             ((user_count++)) || true

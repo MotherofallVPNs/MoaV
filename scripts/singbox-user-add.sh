@@ -91,7 +91,7 @@ EOF
 
 # Shadowsocks-2022 per-user PSK (only if SS is enabled)
 if [[ "${ENABLE_SS:-false}" == "true" ]]; then
-    case "${SS_METHOD:-2022-blake3-chacha20-poly1305}" in
+    case "${SS_METHOD:-2022-blake3-aes-128-gcm}" in
         2022-blake3-aes-128-gcm) SS_PSK_BYTES=16 ;;
         *)                       SS_PSK_BYTES=32 ;;
     esac

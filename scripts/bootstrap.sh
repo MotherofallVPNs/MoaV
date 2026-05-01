@@ -254,7 +254,7 @@ export ENABLE_TELEMT="${ENABLE_TELEMT:-true}"
 export PORT_TELEMT="${PORT_TELEMT:-993}"
 export ENABLE_SS="${ENABLE_SS:-false}"
 export PORT_SS="${PORT_SS:-8388}"
-export SS_METHOD="${SS_METHOD:-2022-blake3-chacha20-poly1305}"
+export SS_METHOD="${SS_METHOD:-2022-blake3-aes-128-gcm}"
 export TELEMT_TLS_DOMAIN="${TELEMT_TLS_DOMAIN:-dl.google.com}"
 export TELEMT_MAX_TCP_CONNS="${TELEMT_MAX_TCP_CONNS:-100}"
 export TELEMT_MAX_UNIQUE_IPS="${TELEMT_MAX_UNIQUE_IPS:-10}"
@@ -413,11 +413,32 @@ ss_psk_bytes() {
 }
 
 if [[ "${ENABLE_SS:-false}" == "true" ]]; then
+    case "$SS_METHOD" in
+        2022-blake3-aes-128-gcm|2022-blake3-aes-256-gcm) : ;;
+        *)
+            log_error "SS_METHOD=$SS_METHOD is not supported in multi-user mode."
+            log_error "Use 2022-blake3-aes-128-gcm or 2022-blake3-aes-256-gcm."
+            log_error "(2022-blake3-chacha20-poly1305 is single-user only and will fail at sing-box startup.)"
+            exit 1 ;;
+    esac
+
+    expected_psk_len=$(ss_psk_bytes "$SS_METHOD")
+    # If the saved PSK no longer matches the cipher's key length (operator changed
+    # SS_METHOD), wipe the SS state so we regenerate everything cleanly.
+    if [[ -f "$STATE_DIR/keys/shadowsocks-server.psk" ]]; then
+        actual_psk_len=$(base64 -d < "$STATE_DIR/keys/shadowsocks-server.psk" 2>/dev/null | wc -c | tr -d ' ')
+        if [[ "$actual_psk_len" != "$expected_psk_len" ]]; then
+            log_info "SS_METHOD changed (server PSK is ${actual_psk_len} bytes, cipher expects ${expected_psk_len}); regenerating SS keys"
+            rm -f "$STATE_DIR/keys/shadowsocks-server.psk"
+            rm -f "$STATE_DIR"/users/*/shadowsocks.env 2>/dev/null || true
+        fi
+    fi
+
     if [[ -f "$STATE_DIR/keys/shadowsocks-server.psk" ]]; then
         SS_SERVER_PSK=$(cat "$STATE_DIR/keys/shadowsocks-server.psk")
         log_info "Loaded existing Shadowsocks server PSK"
     else
-        SS_SERVER_PSK=$(openssl rand -base64 "$(ss_psk_bytes "$SS_METHOD")")
+        SS_SERVER_PSK=$(openssl rand -base64 "$expected_psk_len")
         mkdir -p "$STATE_DIR/keys"
         echo "$SS_SERVER_PSK" > "$STATE_DIR/keys/shadowsocks-server.psk"
         log_info "Generated Shadowsocks server PSK"
