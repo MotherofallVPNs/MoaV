@@ -79,7 +79,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.wstunnel
       args:
-        WSTUNNEL_VERSION: ${WSTUNNEL_VERSION:-10.5.2}
+        WSTUNNEL_VERSION: ${WSTUNNEL_VERSION:-10.5.3}
     container_name: moav-wstunnel
     restart: unless-stopped
     networks:
@@ -342,7 +342,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.telemt
       args:
-        TELEMT_VERSION: ${TELEMT_VERSION:-3.4.8}
+        TELEMT_VERSION: ${TELEMT_VERSION:-3.4.10}
     container_name: moav-telemt
     restart: unless-stopped
     networks:
@@ -1146,7 +1146,7 @@ services:
       dockerfile: dockerfiles/Dockerfile.client
       args:
         SINGBOX_VERSION: ${SINGBOX_VERSION:-1.12.23}
-        WSTUNNEL_VERSION: ${WSTUNNEL_VERSION:-10.5.2}
+        WSTUNNEL_VERSION: ${WSTUNNEL_VERSION:-10.5.3}
         SNOWFLAKE_VERSION: ${SNOWFLAKE_VERSION:-2.11.0}
         TRUSTTUNNEL_CLIENT_VERSION: ${TRUSTTUNNEL_CLIENT_VERSION:-1.0.49}
         AWGTOOLS_VERSION: ${AWGTOOLS_VERSION:-1.0.20260223}

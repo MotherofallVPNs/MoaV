@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **telemt container healthcheck** — Wired up the `telemt healthcheck … --mode liveness` subcommand (added upstream in 3.4.3) as a Docker healthcheck on the telemt service. `docker compose ps` and `moav doctor` now reflect actual daemon liveness instead of just process-up state
 
 ### Changed
-- **telemt** — Updated 3.3.39 → 3.4.8. Highlights since 3.3.39: configurable mask timeouts and unlimited `mask_relay_max_bytes` (3.4.0/3.4.5), traffic-control + weighted fairness + 3-leveled pressure model (3.4.1/3.4.4), TLS 1.2/1.3 correctness in fronting + full ServerHello + ALPN in TLS Fetcher (3.4.6), unknown-SNI reject-handshake option (3.4.4), bounded relay queues by bytes (3.4.7), and restored active-IP observability for users without unique-IP limits (3.4.8). No config-file changes required — MoaV's existing `[censorship]` and `[server.api]` sections remain compatible
+- **telemt** — Updated 3.3.39 → 3.4.10. Highlights since 3.3.39: configurable mask timeouts and unlimited `mask_relay_max_bytes` (3.4.0/3.4.5), traffic-control + weighted fairness + 3-leveled pressure model (3.4.1/3.4.4), TLS 1.2/1.3 correctness in fronting + full ServerHello + ALPN in TLS Fetcher (3.4.6), unknown-SNI reject-handshake option (3.4.4), bounded relay queues by bytes (3.4.7), restored active-IP observability for users without unique-IP limits (3.4.8), TimeWindow IP-limit fix and atomic config Includes (3.4.9), and TLS full-cert budget bookkeeping + IP-tracker refactor (3.4.10). No config-file changes required — MoaV's existing `[censorship]` and `[server.api]` sections remain compatible
+- **wstunnel** — Updated 10.5.2 → 10.5.3 (proxy-protocol IP-family-mismatch workaround, log-noise reduction, deps bump)
 
 ## [1.7.5] - 2026-04-12
 
