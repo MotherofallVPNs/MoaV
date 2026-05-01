@@ -42,6 +42,19 @@ USER_PASSWORD=$USER_PASSWORD
 CREATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
 
+# Shadowsocks-2022 per-user PSK (only if SS is enabled)
+SS_USER_PSK=""
+if [[ "${ENABLE_SS:-false}" == "true" ]]; then
+    case "${SS_METHOD:-2022-blake3-chacha20-poly1305}" in
+        2022-blake3-aes-128-gcm) SS_PSK_BYTES=16 ;;
+        *)                       SS_PSK_BYTES=32 ;;
+    esac
+    SS_USER_PSK=$(openssl rand -base64 "$SS_PSK_BYTES")
+    cat > "$STATE_DIR/users/$USER_ID/shadowsocks.env" <<EOF
+SS_USER_PSK=$SS_USER_PSK
+EOF
+fi
+
 log_info "Created credentials for $USER_ID"
 
 # DONATE_ONLY_PROTOCOLS: space-separated list of protocols to provision
@@ -66,7 +79,7 @@ donate_needs() {
 # Add to sing-box config (Reality, Trojan, Hysteria2, CDN — all sing-box inbounds)
 CONFIG_FILE="/configs/sing-box/config.json"
 
-if [[ -f "$CONFIG_FILE" ]] && donate_needs singbox reality trojan hysteria2 cdn; then
+if [[ -f "$CONFIG_FILE" ]] && donate_needs singbox reality trojan hysteria2 cdn shadowsocks ss; then
     # Add to Reality inbound
     if donate_needs reality reality; then
         jq --arg name "$USER_ID" --arg uuid "$USER_UUID" \
@@ -92,6 +105,14 @@ if [[ -f "$CONFIG_FILE" ]] && donate_needs singbox reality trojan hysteria2 cdn;
     if donate_needs cdn cdn; then
         jq --arg name "$USER_ID" --arg uuid "$USER_UUID" \
             '(.inbounds[] | select(.tag == "vless-ws-in") | .users) += [{"name": $name, "uuid": $uuid}]' \
+            "$CONFIG_FILE" > /tmp/config.tmp && mv -f /tmp/config.tmp "$CONFIG_FILE"
+    fi
+
+    # Add to Shadowsocks-2022 inbound
+    if [[ -n "$SS_USER_PSK" ]] && donate_needs shadowsocks ss \
+            && jq -e '.inbounds[] | select(.tag == "shadowsocks-in")' "$CONFIG_FILE" >/dev/null 2>&1; then
+        jq --arg name "$USER_ID" --arg pass "$SS_USER_PSK" \
+            '(.inbounds[] | select(.tag == "shadowsocks-in") | .users) += [{"name": $name, "password": $pass}]' \
             "$CONFIG_FILE" > /tmp/config.tmp && mv -f /tmp/config.tmp "$CONFIG_FILE"
     fi
 
@@ -211,6 +232,11 @@ if [[ -n "$DONATE_ONLY" ]]; then
     else
         export ENABLE_TELEMT=false
     fi
+    if echo " $DONATE_ONLY " | grep -q -E " (shadowsocks|ss) "; then
+        export ENABLE_SS=true
+    else
+        export ENABLE_SS=false
+    fi
     if echo " $DONATE_ONLY " | grep -q " xhttp "; then
         export ENABLE_XHTTP=true
     else
@@ -229,6 +255,12 @@ else
     export ENABLE_TRUSTTUNNEL="${ENABLE_TRUSTTUNNEL:-true}"
     export ENABLE_XHTTP="${ENABLE_XHTTP:-true}"
     export ENABLE_TELEMT="${ENABLE_TELEMT:-true}"
+    export ENABLE_SS="${ENABLE_SS:-false}"
+fi
+export PORT_SS="${PORT_SS:-8388}"
+export SS_METHOD="${SS_METHOD:-2022-blake3-chacha20-poly1305}"
+if [[ -f "$STATE_DIR/keys/shadowsocks-server.psk" ]]; then
+    export SS_SERVER_PSK="$(cat "$STATE_DIR/keys/shadowsocks-server.psk")"
 fi
 export PORT_XHTTP="${PORT_XHTTP:-2096}"
 export XHTTP_REALITY_TARGET="${XHTTP_REALITY_TARGET:-dl.google.com:443}"

@@ -50,6 +50,7 @@ Complete guide to deploy MoaV on a VPS or home server.
 | 443/tcp | TCP | Reality (VLESS) | Yes |
 | 443/udp | UDP | Hysteria2 | Yes |
 | 8443/tcp | TCP | Trojan | Yes |
+| 8388/tcp+udp | TCP+UDP | Shadowsocks-2022 (when `ENABLE_SS=true`) | No |
 | 4443/tcp+udp | TCP+UDP | TrustTunnel | Yes |
 | 2082/tcp | TCP | CDN WebSocket | Yes (Cloudflare) or No (CloudFront) |
 | 51820/udp | UDP | WireGuard | No |
@@ -255,7 +256,7 @@ moav start all                   # Everything
 ```
 
 **Available Profiles:**
-- `proxy` - Reality, Trojan, Hysteria2, CDN (sing-box + decoy)
+- `proxy` - Reality, Trojan, Hysteria2, CDN, Shadowsocks-2022 (sing-box + decoy)
 - `wireguard` - WireGuard VPN + wstunnel
 - `amneziawg` - AmneziaWG (obfuscated WireGuard)
 - `dnstt` - DNS tunnel
@@ -274,6 +275,7 @@ moav start all                   # Everything
 ufw allow 443/tcp    # Reality
 ufw allow 443/udp    # Hysteria2
 ufw allow 8443/tcp   # Trojan
+ufw allow 8388       # Shadowsocks-2022 (only if ENABLE_SS=true)
 
 # TrustTunnel
 ufw allow 4443/tcp   # HTTP/2
@@ -323,6 +325,7 @@ ls outputs/bundles/
 - `README.html` - User instructions (English + Farsi)
 - `reality.txt` - Reality share link + QR code
 - `trojan.txt` - Trojan share link
+- `shadowsocks.txt` / `shadowsocks-qr.png` - Shadowsocks-2022 `ss://` URI + QR (when `ENABLE_SS=true`)
 - `hysteria2.txt` - Hysteria2 share link
 - `cdn-vless.txt` - CDN share link (if CDN_DOMAIN set)
 - `wireguard.conf` - WireGuard config + QR code

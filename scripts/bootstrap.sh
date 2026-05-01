@@ -252,6 +252,9 @@ export XDNS_MTU="${XDNS_MTU:-35}"
 export PORT_XDNS="${PORT_XDNS:-53}"
 export ENABLE_TELEMT="${ENABLE_TELEMT:-true}"
 export PORT_TELEMT="${PORT_TELEMT:-993}"
+export ENABLE_SS="${ENABLE_SS:-false}"
+export PORT_SS="${PORT_SS:-8388}"
+export SS_METHOD="${SS_METHOD:-2022-blake3-chacha20-poly1305}"
 export TELEMT_TLS_DOMAIN="${TELEMT_TLS_DOMAIN:-dl.google.com}"
 export TELEMT_MAX_TCP_CONNS="${TELEMT_MAX_TCP_CONNS:-100}"
 export TELEMT_MAX_UNIQUE_IPS="${TELEMT_MAX_UNIQUE_IPS:-10}"
@@ -399,6 +402,30 @@ else
 fi
 
 # -----------------------------------------------------------------------------
+# Generate / load Shadowsocks-2022 server PSK (stable across re-bootstraps)
+# Key length depends on the cipher: aes-128 → 16 bytes, aes-256/chacha20 → 32 bytes.
+# -----------------------------------------------------------------------------
+ss_psk_bytes() {
+    case "$1" in
+        2022-blake3-aes-128-gcm) echo 16 ;;
+        *)                       echo 32 ;;  # aes-256-gcm, chacha20-poly1305, future ciphers
+    esac
+}
+
+if [[ "${ENABLE_SS:-false}" == "true" ]]; then
+    if [[ -f "$STATE_DIR/keys/shadowsocks-server.psk" ]]; then
+        SS_SERVER_PSK=$(cat "$STATE_DIR/keys/shadowsocks-server.psk")
+        log_info "Loaded existing Shadowsocks server PSK"
+    else
+        SS_SERVER_PSK=$(openssl rand -base64 "$(ss_psk_bytes "$SS_METHOD")")
+        mkdir -p "$STATE_DIR/keys"
+        echo "$SS_SERVER_PSK" > "$STATE_DIR/keys/shadowsocks-server.psk"
+        log_info "Generated Shadowsocks server PSK"
+    fi
+    export SS_SERVER_PSK
+fi
+
+# -----------------------------------------------------------------------------
 # Create initial users
 # -----------------------------------------------------------------------------
 log_info "Creating $INITIAL_USERS initial users..."
@@ -407,6 +434,7 @@ REALITY_USERS_JSON="["
 TROJAN_USERS_JSON="["
 HYSTERIA2_USERS_JSON="["
 VLESS_WS_USERS_JSON="["
+SHADOWSOCKS_USERS_JSON="["
 TRUSTTUNNEL_CREDENTIALS=""
 XRAY_USERS_JSON=""
 TELEMT_USERS_TOML=""
@@ -448,11 +476,25 @@ EOF
     [[ $i -gt 1 ]] && TROJAN_USERS_JSON+=","
     [[ $i -gt 1 ]] && HYSTERIA2_USERS_JSON+=","
     [[ $i -gt 1 ]] && VLESS_WS_USERS_JSON+=","
+    [[ $i -gt 1 ]] && SHADOWSOCKS_USERS_JSON+=","
 
     REALITY_USERS_JSON+="{\"name\":\"$USER_ID\",\"uuid\":\"$USER_UUID\",\"flow\":\"xtls-rprx-vision\"}"
     TROJAN_USERS_JSON+="{\"name\":\"$USER_ID\",\"password\":\"$USER_PASSWORD\"}"
     HYSTERIA2_USERS_JSON+="{\"name\":\"$USER_ID\",\"password\":\"$USER_PASSWORD\"}"
     VLESS_WS_USERS_JSON+="{\"name\":\"$USER_ID\",\"uuid\":\"$USER_UUID\"}"
+
+    # Shadowsocks-2022 per-user PSK — same length as the server PSK
+    if [[ "${ENABLE_SS:-false}" == "true" ]]; then
+        if [[ -f "$STATE_DIR/users/$USER_ID/shadowsocks.env" ]]; then
+            source "$STATE_DIR/users/$USER_ID/shadowsocks.env"
+        else
+            SS_USER_PSK=$(openssl rand -base64 "$(ss_psk_bytes "$SS_METHOD")")
+            cat > "$STATE_DIR/users/$USER_ID/shadowsocks.env" <<EOF
+SS_USER_PSK=$SS_USER_PSK
+EOF
+        fi
+        SHADOWSOCKS_USERS_JSON+="{\"name\":\"$USER_ID\",\"password\":\"$SS_USER_PSK\"}"
+    fi
 
     # TrustTunnel credentials (TOML format - uses [[client]] not [[credentials]])
     TRUSTTUNNEL_CREDENTIALS+="[[client]]
@@ -604,6 +646,7 @@ REALITY_USERS_JSON+="]"
 TROJAN_USERS_JSON+="]"
 HYSTERIA2_USERS_JSON+="]"
 VLESS_WS_USERS_JSON+="]"
+SHADOWSOCKS_USERS_JSON+="]"
 
 # -----------------------------------------------------------------------------
 # Generate TrustTunnel config (if enabled)
@@ -707,6 +750,7 @@ singbox_needed=false
 [[ "${ENABLE_REALITY:-true}" == "true" ]] && singbox_needed=true
 [[ "${ENABLE_TROJAN:-true}" == "true" ]] && singbox_needed=true
 [[ "${ENABLE_HYSTERIA2:-true}" == "true" ]] && singbox_needed=true
+[[ "${ENABLE_SS:-false}" == "true" ]] && singbox_needed=true
 
 if [[ "$singbox_needed" == "true" ]]; then
     log_info "Generating sing-box configuration (using existing keys)..."
@@ -715,6 +759,10 @@ if [[ "$singbox_needed" == "true" ]]; then
     export TROJAN_USERS_JSON
     export HYSTERIA2_USERS_JSON
     export VLESS_WS_USERS_JSON
+    export SHADOWSOCKS_USERS_JSON="${SHADOWSOCKS_USERS_JSON:-[]}"
+    export SS_SERVER_PSK="${SS_SERVER_PSK:-}"
+    export SS_METHOD
+    export PORT_SS
     export REALITY_PRIVATE_KEY
     export REALITY_SHORT_ID
     export REALITY_TARGET_HOST
@@ -745,6 +793,10 @@ if [[ "$singbox_needed" == "true" ]]; then
     if [[ "${ENABLE_REALITY:-true}" != "true" ]]; then
         jq 'del(.inbounds[] | select(.tag == "vless-reality-in"))' "$config_file" > "${config_file}.tmp" && mv -f "${config_file}.tmp" "$config_file"
         log_info "  Removed Reality inbound (disabled)"
+    fi
+    if [[ "${ENABLE_SS:-false}" != "true" ]]; then
+        jq 'del(.inbounds[] | select(.tag == "shadowsocks-in"))' "$config_file" > "${config_file}.tmp" && mv -f "${config_file}.tmp" "$config_file"
+        log_info "  Removed Shadowsocks inbound (disabled)"
     fi
 
     log_info "sing-box configuration written to /configs/sing-box/config.json"

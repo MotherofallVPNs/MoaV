@@ -36,6 +36,7 @@ This guide explains how to connect to MoaV from various devices.
 |----------|------|-------------|
 | [Reality (VLESS)](https://github.com/XTLS/REALITY) | 443/tcp | TLS camouflage, virtually undetectable |
 | [Trojan](https://trojan-gfw.github.io/trojan/) | 8443/tcp | HTTPS mimicry, battle-tested |
+| [Shadowsocks-2022](https://github.com/shadowsocks/shadowsocks-org/blob/main/docs/doc/sip022.md) | 8388/tcp+udp | AEAD-2022 anti-active-probing; same protocol Outline VPN uses |
 | [Hysteria2](https://v2.hysteria.network/) | 443/udp | QUIC-based, fast on lossy networks |
 | CDN (VLESS+WS) | 443 via Cloudflare | When server IP is blocked |
 | [TrustTunnel](https://trusttunnel.org/) | 4443/tcp+udp | HTTP/2 & QUIC, looks like HTTPS |

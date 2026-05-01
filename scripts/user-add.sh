@@ -542,6 +542,7 @@ if [[ -f "$TEMPLATE_FILE" ]]; then
     CONFIG_REALITY=$(cat "$OUTPUT_DIR/reality.txt" 2>/dev/null | tr -d '\n' || echo "")
     CONFIG_HYSTERIA2=$(cat "$OUTPUT_DIR/hysteria2.txt" 2>/dev/null | tr -d '\n' || echo "")
     CONFIG_TROJAN=$(cat "$OUTPUT_DIR/trojan.txt" 2>/dev/null | tr -d '\n' || echo "")
+    CONFIG_SHADOWSOCKS=$(cat "$OUTPUT_DIR/shadowsocks.txt" 2>/dev/null | tr -d '\n' || echo "")
     CONFIG_CDN=$(cat "$OUTPUT_DIR/cdn-vless.txt" 2>/dev/null | tr -d '\n' || echo "")
     CONFIG_WIREGUARD=$(cat "$OUTPUT_DIR/wireguard.conf" 2>/dev/null || echo "")
     CONFIG_WIREGUARD_WSTUNNEL=$(cat "$OUTPUT_DIR/wireguard-wstunnel.conf" 2>/dev/null || echo "")
@@ -600,6 +601,7 @@ if [[ -f "$TEMPLATE_FILE" ]]; then
     QR_AMNEZIAWG_B64=$(qr_to_base64 "$OUTPUT_DIR/amneziawg-qr.png")
     QR_TELEMT_B64=$(qr_to_base64 "$OUTPUT_DIR/telegram-proxy-qr.png")
     QR_XHTTP_B64=$(qr_to_base64 "$OUTPUT_DIR/xhttp-qr.png")
+    QR_SHADOWSOCKS_B64=$(qr_to_base64 "$OUTPUT_DIR/shadowsocks-qr.png")
 
     # Copy template
     cp "$TEMPLATE_FILE" "$OUTPUT_HTML"
@@ -608,6 +610,7 @@ if [[ -f "$TEMPLATE_FILE" ]]; then
     sed -i.bak "s|{{USERNAME}}|$USERNAME|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{SERVER_IP}}|$SERVER_IP|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{DOMAIN}}|${DOMAIN:-YOUR_DOMAIN}|g" "$OUTPUT_HTML"
+    sed -i.bak "s|{{PORT_SS}}|${PORT_SS:-8388}|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{GENERATED_DATE}}|$GENERATED_DATE|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{DNSTT_DOMAIN}}|$DNSTT_DOMAIN|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{DNSTT_PUBKEY}}|$DNSTT_PUBKEY|g" "$OUTPUT_HTML"
@@ -650,6 +653,7 @@ with open(filepath, 'w') as f:
     sed -i.bak "s|{{QR_AMNEZIAWG}}|$QR_AMNEZIAWG_B64|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{QR_TELEMT}}|$QR_TELEMT_B64|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{QR_XHTTP}}|$QR_XHTTP_B64|g" "$OUTPUT_HTML"
+    sed -i.bak "s|{{QR_SHADOWSOCKS}}|$QR_SHADOWSOCKS_B64|g" "$OUTPUT_HTML"
 
     if [[ -n "$CONFIG_REALITY" ]]; then
         replace_placeholder "{{CONFIG_REALITY}}" "$CONFIG_REALITY"
@@ -667,6 +671,12 @@ with open(filepath, 'w') as f:
         replace_placeholder "{{CONFIG_TROJAN}}" "$CONFIG_TROJAN"
     else
         replace_placeholder "{{CONFIG_TROJAN}}" "No Trojan config available"
+    fi
+
+    if [[ -n "$CONFIG_SHADOWSOCKS" ]]; then
+        replace_placeholder "{{CONFIG_SHADOWSOCKS}}" "$CONFIG_SHADOWSOCKS"
+    else
+        replace_placeholder "{{CONFIG_SHADOWSOCKS}}" "No Shadowsocks config available"
     fi
 
     # CDN VLESS+WS config

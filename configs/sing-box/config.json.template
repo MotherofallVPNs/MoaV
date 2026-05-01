@@ -105,6 +105,20 @@
         "enabled": true,
         "padding": true
       }
+    },
+    {
+      "type": "shadowsocks",
+      "tag": "shadowsocks-in",
+      "listen": "::",
+      "listen_port": ${PORT_SS},
+      "sniff": true,
+      "method": "${SS_METHOD}",
+      "password": "${SS_SERVER_PSK}",
+      "users": ${SHADOWSOCKS_USERS_JSON},
+      "multiplex": {
+        "enabled": true,
+        "padding": true
+      }
     }
   ],
   "outbounds": [

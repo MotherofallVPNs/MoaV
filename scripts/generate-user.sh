@@ -250,6 +250,77 @@ EOF
 fi
 
 # -----------------------------------------------------------------------------
+# Generate Shadowsocks-2022 client config (sing-box compatible URI format)
+# -----------------------------------------------------------------------------
+if [[ "${ENABLE_SS:-false}" == "true" ]]; then
+  if [[ -f "$OUTPUT_DIR/shadowsocks.txt" ]] && [[ "$FORCE_REGENERATE" != "force" ]]; then
+    log_info "  - Shadowsocks config exists, skipping"
+  else
+    # Load per-user PSK + server PSK
+    SS_USER_PSK=""
+    if [[ -f "$STATE_DIR/users/$USER_ID/shadowsocks.env" ]]; then
+        # shellcheck source=/dev/null
+        source "$STATE_DIR/users/$USER_ID/shadowsocks.env"
+    fi
+    SS_SERVER_PSK_LOCAL="${SS_SERVER_PSK:-}"
+    if [[ -z "$SS_SERVER_PSK_LOCAL" && -f "$STATE_DIR/keys/shadowsocks-server.psk" ]]; then
+        SS_SERVER_PSK_LOCAL=$(cat "$STATE_DIR/keys/shadowsocks-server.psk")
+    fi
+
+    if [[ -z "$SS_USER_PSK" || -z "$SS_SERVER_PSK_LOCAL" ]]; then
+        log_error "  - Shadowsocks PSK missing for $USER_ID, skipping"
+    else
+        BUNDLE_CHANGED=true
+        SS_PORT="${PORT_SS:-8388}"
+        SS_METHOD_LOCAL="${SS_METHOD:-2022-blake3-chacha20-poly1305}"
+
+        cat > "$OUTPUT_DIR/shadowsocks-singbox.json" <<EOF
+{
+  "log": {"level": "info"},
+  "inbounds": [
+    {"type": "tun", "tag": "tun-in", "address": ["172.19.0.1/30"], "auto_route": true, "strict_route": true}
+  ],
+  "outbounds": [
+    {
+      "type": "shadowsocks",
+      "tag": "proxy",
+      "server": "${SERVER_IP}",
+      "server_port": ${SS_PORT},
+      "method": "${SS_METHOD_LOCAL}",
+      "password": "${SS_SERVER_PSK_LOCAL}:${SS_USER_PSK}",
+      "multiplex": {
+        "enabled": true,
+        "protocol": "h2mux",
+        "padding": true
+      }
+    }
+  ],
+  "route": {
+    "auto_detect_interface": true,
+    "final": "proxy"
+  }
+}
+EOF
+
+        # Build ss:// URI per SIP002 with SS-2022 multi-user encoding
+        # Format: ss://BASE64URL_NOPAD(method:server_psk:user_psk)@host:port#tag
+        SS_USERINFO=$(printf '%s' "${SS_METHOD_LOCAL}:${SS_SERVER_PSK_LOCAL}:${SS_USER_PSK}" | base64 | tr -d '\n=' | tr '/+' '_-')
+        SS_LINK="ss://${SS_USERINFO}@${SERVER_IP}:${SS_PORT}#MoaV-Shadowsocks-${USER_ID}"
+        echo "$SS_LINK" > "$OUTPUT_DIR/shadowsocks.txt"
+        qrencode -o "$OUTPUT_DIR/shadowsocks-qr.png" -s 6 "$SS_LINK" 2>/dev/null || true
+
+        if [[ -n "${SERVER_IPV6:-}" ]]; then
+            SS_LINK_V6="ss://${SS_USERINFO}@[${SERVER_IPV6}]:${SS_PORT}#MoaV-Shadowsocks-${USER_ID}-IPv6"
+            echo "$SS_LINK_V6" > "$OUTPUT_DIR/shadowsocks-ipv6.txt"
+            qrencode -o "$OUTPUT_DIR/shadowsocks-ipv6-qr.png" -s 6 "$SS_LINK_V6" 2>/dev/null || true
+        fi
+
+        log_info "  - Shadowsocks-2022 config generated"
+    fi
+  fi
+fi
+
+# -----------------------------------------------------------------------------
 # Generate CDN VLESS+WS client config (if CDN_DOMAIN is set)
 # -----------------------------------------------------------------------------
 # Construct CDN_DOMAIN from CDN_SUBDOMAIN + DOMAIN if not explicitly set

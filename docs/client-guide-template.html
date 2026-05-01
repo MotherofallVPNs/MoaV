@@ -586,6 +586,7 @@
                 <li><a href="#en" onclick="scrollToSection('reality-en')">1. Reality (VLESS) <span class="toc-badge badge-primary">Primary</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('hysteria2-en')">2. Hysteria2 <span class="toc-badge badge-secondary">Fast</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('trojan-en')">3. Trojan <span class="toc-badge badge-secondary">Backup</span></a></li>
+                <li><a href="#en" onclick="scrollToSection('shadowsocks-en')">3b. Shadowsocks-2022 <span class="toc-badge badge-secondary">Outline-style</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('cdn-en')">4. CDN VLESS+WS <span class="toc-badge badge-secondary">IP Blocked?</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('xhttp-en')">4b. XHTTP <span class="toc-badge badge-secondary">Xray-core</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('amneziawg-en')">5. AmneziaWG <span class="toc-badge badge-secondary">Anti-DPI</span></a></li>
@@ -720,6 +721,37 @@
                     <p>Enable <strong>TLS Fragment</strong> to bypass DPI, and <strong>MUX</strong> to multiplex connections (fewer handshakes, harder to fingerprint).</p>
                     <p style="margin-top: 6px;"><strong>Hiddify:</strong> Settings → Config Options → TLS Fragment (Size: <code>10-100</code>, Sleep: <code>10-50</code>) and MUX (Protocol: <code>h2mux</code>, Max Connections: <code>2</code>, Padding: On)</p>
                     <p><strong>v2rayNG:</strong> Settings → TLS Fragment (Length: <code>50-200</code>, Interval: <code>10-50</code>) and MUX (Concurrency: <code>2-4</code>)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Shadowsocks-2022 -->
+        <div class="protocol-section" id="shadowsocks-en">
+            <div class="protocol-header">
+                <div class="protocol-title">
+                    <h2>3b. Shadowsocks-2022</h2>
+                    <span class="protocol-badge badge-secondary">Outline-style</span>
+                </div>
+                <span class="protocol-port">Port {{PORT_SS}}/tcp+udp</span>
+            </div>
+            <div class="protocol-content">
+                <p class="protocol-desc">Modern Shadowsocks (AEAD-2022) with anti-active-probing. Same protocol family Outline VPN uses — connect with NekoBox, Hiddify, Streisand, sing-box, or the Outline app via the standard <code>ss://</code> URI.</p>
+                <div class="qr-section">
+                    <div class="qr-code">
+                        <img src="data:image/png;base64,{{QR_SHADOWSOCKS}}" alt="Shadowsocks QR Code" onerror="this.parentElement.classList.add('qr-missing'); this.parentElement.innerHTML='QR not available<br>Use config below';">
+                    </div>
+                    <div class="qr-instructions">
+                        <h4>How to connect:</h4>
+                        <ol>
+                            <li>Install <strong>NekoBox</strong>, <strong>Hiddify</strong>, <strong>Streisand</strong>, or <strong>Outline</strong></li>
+                            <li>Scan the QR code or paste the <code>ss://</code> link</li>
+                            <li>Enable the connection</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="config-box">
+                    <h4>Config Link (click to copy)</h4>
+                    <div class="config-value" onclick="copyConfig(this)">{{CONFIG_SHADOWSOCKS}}</div>
                 </div>
             </div>
         </div>
@@ -1386,6 +1418,7 @@
                 <li><a href="#fa" onclick="scrollToSection('reality-fa')">۱. Reality (VLESS) <span class="toc-badge badge-primary">اصلی</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('hysteria2-fa')">۲. Hysteria2 <span class="toc-badge badge-secondary">سریع</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('trojan-fa')">۳. Trojan <span class="toc-badge badge-secondary">پشتیبان</span></a></li>
+                <li><a href="#fa" onclick="scrollToSection('shadowsocks-fa')">۳ب. Shadowsocks-2022 <span class="toc-badge badge-secondary">سبک Outline</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('cdn-fa')">۴. CDN VLESS+WS <span class="toc-badge badge-secondary">IP مسدود؟</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('xhttp-fa')">۴ب. XHTTP <span class="toc-badge badge-secondary">Xray-core</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('amneziawg-fa')">۵. AmneziaWG <span class="toc-badge badge-secondary">ضد فیلتر</span></a></li>
@@ -1520,6 +1553,37 @@
                     <p><strong>TLS Fragment</strong> را برای عبور از DPI و <strong>MUX</strong> را برای ادغام اتصالات فعال کنید (Handshake کمتر، شناسایی سخت‌تر).</p>
                     <p style="margin-top: 6px;"><strong>Hiddify:</strong> Settings → Config Options → TLS Fragment (Size: <code>10-100</code>، Sleep: <code>10-50</code>) و MUX (Protocol: <code>h2mux</code>، Max Connections: <code>2</code>، Padding: روشن)</p>
                     <p><strong>v2rayNG:</strong> Settings → TLS Fragment (Length: <code>50-200</code>، Interval: <code>10-50</code>) و MUX (Concurrency: <code>2-4</code>)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Shadowsocks-2022 -->
+        <div class="protocol-section" id="shadowsocks-fa">
+            <div class="protocol-header">
+                <div class="protocol-title">
+                    <h2>۳ب. Shadowsocks-2022</h2>
+                    <span class="protocol-badge badge-secondary">سبک Outline</span>
+                </div>
+                <span class="protocol-port">پورت {{PORT_SS}}/tcp+udp</span>
+            </div>
+            <div class="protocol-content">
+                <p class="protocol-desc">Shadowsocks مدرن (AEAD-2022) با مقاومت در برابر پروب فعال. همان خانواده پروتکل که Outline VPN استفاده می‌کند — با NekoBox، Hiddify، Streisand، sing-box یا اپ Outline از طریق لینک استاندارد <code>ss://</code> متصل شوید.</p>
+                <div class="qr-section">
+                    <div class="qr-code">
+                        <img src="data:image/png;base64,{{QR_SHADOWSOCKS}}" alt="QR Code Shadowsocks" onerror="this.parentElement.classList.add('qr-missing'); this.parentElement.innerHTML='QR در دسترس نیست<br>از لینک زیر استفاده کنید';">
+                    </div>
+                    <div class="qr-instructions">
+                        <h4>نحوه اتصال:</h4>
+                        <ol>
+                            <li><strong>NekoBox</strong>، <strong>Hiddify</strong>، <strong>Streisand</strong> یا <strong>Outline</strong> را نصب کنید</li>
+                            <li>کد QR را اسکن کنید یا لینک <code>ss://</code> را پیست کنید</li>
+                            <li>اتصال را فعال کنید</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="config-box">
+                    <h4>لینک کانفیگ (کلیک برای کپی)</h4>
+                    <div class="config-value" onclick="copyConfig(this)">{{CONFIG_SHADOWSOCKS}}</div>
                 </div>
             </div>
         </div>

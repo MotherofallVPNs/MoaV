@@ -421,6 +421,18 @@ docker compose logs certbot
    PORT_TROJAN=9443  # Or any available port
    ```
 
+### Shadowsocks not working
+
+- **Inbound missing from sing-box config** — confirm `ENABLE_SS=true` in `.env`, then `moav restart sing-box` (the inbound is templated in at bootstrap; flipping the flag without re-bootstrapping won't add it):
+  ```bash
+  jq '.inbounds[] | select(.tag == "shadowsocks-in")' configs/sing-box/config.json
+  # if empty, the flag was off when bootstrap ran
+  moav bootstrap   # or rerun bootstrap to splice it in
+  ```
+- **Server PSK missing** — `moav doctor config` will flag missing state keys. The server PSK lives at `state/keys/shadowsocks-server.psk`; per-user PSK at `state/users/<user>/shadowsocks.env`.
+- **Outline app says "invalid key"** — Outline's iOS/Android app expects the standard `ss://` URI with SS-2022 multi-user encoding (`method:server_psk:user_psk` base64-encoded). The bundle's `shadowsocks.txt` has this format. NekoBox / Hiddify / Streisand handle the same URI.
+- **Port 8388 blocked by ISP** — change `PORT_SS` in `.env` to a less-fingerprinted port (e.g., 4443, 8443 if Trojan is off) and rerun `moav restart sing-box`.
+
 ### Certificate issues
 
 > **Quick check:** Run `moav doctor dns` to verify DNS records point to your server, and `moav doctor config` to verify certificate files exist.

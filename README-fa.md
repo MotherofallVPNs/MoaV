@@ -8,7 +8,7 @@
 
 ## ویژگی‌ها
 
-- **پروتکل‌های متعدد** - Reality (VLESS)، Trojan، Hysteria2، XHTTP (VLESS+XHTTP+Reality)، XDNS (تونل DNS با mKCP)، TrustTunnel، AmneziaWG، WireGuard (مستقیم و wstunnel)، تونل‌های DNS (dnstt + Slipstream)، Telegram MTProxy، CDN (VLESS+WS)
+- **پروتکل‌های متعدد** - Reality (VLESS)، Trojan، Shadowsocks-2022، Hysteria2، XHTTP (VLESS+XHTTP+Reality)، XDNS (تونل DNS با mKCP)، TrustTunnel، AmneziaWG، WireGuard (مستقیم و wstunnel)، تونل‌های DNS (dnstt + Slipstream)، Telegram MTProxy، CDN (VLESS+WS)
 - **اولویت پنهان‌کاری** - تمام ترافیک شبیه HTTPS معمولی، WebSocket، DNS، یا IMAPS به نظر می‌رسد
 - **اعتبارنامه‌های جداگانه برای هر کاربر** - ایجاد، لغو و مدیریت کاربران به صورت مستقل
 - **نصب آسان** - مبتنی بر Docker Compose، راه‌اندازی با یک دستور
@@ -143,6 +143,7 @@ moav help                 # نمایش تمام دستورات
 | Reality (VLESS) | 443/tcp | ★★★★★ | ★★★★☆ | اصلی، قابل اعتمادترین |
 | Hysteria2 | 443/udp | ★★★★☆ | ★★★★★ | سریع، کار می‌کند وقتی TCP محدود است |
 | Trojan | 8443/tcp | ★★★★☆ | ★★★★☆ | پشتیبان، از دامنه شما استفاده می‌کند |
+| Shadowsocks-2022 | 8388/tcp+udp | ★★★★☆ | ★★★★☆ | AEAD-2022 ضد پروب فعال؛ سازگار با اپ Outline (پیش‌فرض خاموش) |
 | CDN (VLESS+WS) | 443 از Cloudflare | ★★★★★ | ★★★☆☆ | وقتی IP سرور مسدود است |
 | TrustTunnel | 4443/tcp+udp | ★★★★★ | ★★★★☆ | HTTP/2 و QUIC، شبیه HTTPS |
 | WireGuard (مستقیم) | 51820/udp | ★★★☆☆ | ★★★★★ | VPN کامل، نصب ساده |
@@ -274,6 +275,7 @@ moav client connect user1 # اتصال به عنوان کاربر (پراکسی 
 | 443/tcp | TCP | Reality (VLESS) | بله |
 | 443/udp | UDP | Hysteria2 | بله |
 | 8443/tcp | TCP | Trojan | بله |
+| 8388/tcp+udp | TCP+UDP | Shadowsocks-2022 (وقتی `ENABLE_SS=true`) | خیر |
 | 4443/tcp+udp | TCP+UDP | TrustTunnel | بله |
 | 2082/tcp | TCP | CDN WebSocket | بله (Cloudflare) |
 | 51820/udp | UDP | WireGuard | خیر |

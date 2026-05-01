@@ -89,6 +89,18 @@ USER_PASSWORD=$USER_PASSWORD
 CREATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
 
+# Shadowsocks-2022 per-user PSK (only if SS is enabled)
+if [[ "${ENABLE_SS:-false}" == "true" ]]; then
+    case "${SS_METHOD:-2022-blake3-chacha20-poly1305}" in
+        2022-blake3-aes-128-gcm) SS_PSK_BYTES=16 ;;
+        *)                       SS_PSK_BYTES=32 ;;
+    esac
+    SS_USER_PSK=$(openssl rand -base64 "$SS_PSK_BYTES")
+    cat > "$STATE_DIR/users/$USERNAME/shadowsocks.env" <<EOF
+SS_USER_PSK=$SS_USER_PSK
+EOF
+fi
+
 log_info "Generated credentials for $USERNAME"
 
 # Add user to sing-box config using jq
@@ -117,6 +129,15 @@ jq --arg name "$USERNAME" --arg uuid "$USER_UUID" \
     '.inbounds |= map(if .tag == "vless-ws-in" then .users += [{"name": $name, "uuid": $uuid}] else . end)' \
     "$TEMP_CONFIG" > "${TEMP_CONFIG}.2"
 mv -f "${TEMP_CONFIG}.2" "$TEMP_CONFIG"
+
+# Add to Shadowsocks-2022 users (only if the inbound exists in the current config)
+if [[ "${ENABLE_SS:-false}" == "true" ]] && [[ -n "${SS_USER_PSK:-}" ]] \
+        && jq -e '.inbounds[] | select(.tag == "shadowsocks-in")' "$TEMP_CONFIG" >/dev/null 2>&1; then
+    jq --arg name "$USERNAME" --arg pass "$SS_USER_PSK" \
+        '.inbounds |= map(if .tag == "shadowsocks-in" then .users += [{"name": $name, "password": $pass}] else . end)' \
+        "$TEMP_CONFIG" > "${TEMP_CONFIG}.2"
+    mv -f "${TEMP_CONFIG}.2" "$TEMP_CONFIG"
+fi
 
 # Validate the new config
 if ! jq empty "$TEMP_CONFIG" 2>/dev/null; then
