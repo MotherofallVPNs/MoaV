@@ -20,7 +20,9 @@ ARG DNSTT_VERSION=v1.20260501.0
 RUN apk add --no-cache git
 
 # Build dnstt-client with cross-compilation, pinned to release tag
-RUN git clone --depth 1 --branch ${DNSTT_VERSION} https://www.bamsoftware.com/git/dnstt.git /tmp/dnstt
+# Note: bamsoftware.com serves dumb HTTP (no `--depth 1 --branch <tag>`); full clone + checkout instead
+RUN git clone https://www.bamsoftware.com/git/dnstt.git /tmp/dnstt && \
+    git -C /tmp/dnstt checkout ${DNSTT_VERSION}
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \

@@ -7,7 +7,8 @@ RUN apk add --no-cache git
 
 WORKDIR /src
 
-RUN git clone --depth 1 --branch ${DNSTT_VERSION} https://www.bamsoftware.com/git/dnstt.git .
+RUN git clone https://www.bamsoftware.com/git/dnstt.git . && \
+    git checkout ${DNSTT_VERSION}
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
