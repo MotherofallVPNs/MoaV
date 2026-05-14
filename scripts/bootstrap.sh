@@ -728,7 +728,7 @@ xdns_inbound = {
     'port': 5355,
     'protocol': 'vless',
     'settings': {
-        'clients': config['inbounds'][1]['settings']['clients'],
+        'users': config['inbounds'][1]['settings']['users'],
         'decryption': 'none'
     },
     'streamSettings': {

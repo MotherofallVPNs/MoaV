@@ -8,7 +8,7 @@ FROM golang:1.26-alpine AS builder
 RUN apk add --no-cache git
 
 ARG XRAY_REPO=https://github.com/XTLS/Xray-core.git
-ARG XRAY_VERSION=v26.3.27
+ARG XRAY_VERSION=v26.5.9
 
 RUN git clone --depth 1 -b ${XRAY_VERSION} ${XRAY_REPO} /src
 WORKDIR /src

@@ -35,7 +35,7 @@
       "port": ${PORT_XHTTP},
       "protocol": "vless",
       "settings": {
-        "clients": [${XRAY_USERS_JSON}],
+        "users": [${XRAY_USERS_JSON}],
         "decryption": "none"
       },
       "streamSettings": {

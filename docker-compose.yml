@@ -91,7 +91,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.wstunnel
       args:
-        WSTUNNEL_VERSION: ${WSTUNNEL_VERSION:-10.5.3}
+        WSTUNNEL_VERSION: ${WSTUNNEL_VERSION:-10.5.5}
     container_name: moav-wstunnel
     restart: unless-stopped
     logging: *default-logging
@@ -362,7 +362,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.telemt
       args:
-        TELEMT_VERSION: ${TELEMT_VERSION:-3.4.10}
+        TELEMT_VERSION: ${TELEMT_VERSION:-3.4.11}
     container_name: moav-telemt
     restart: unless-stopped
     logging: *default-logging
@@ -613,7 +613,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.xray
       args:
-        XRAY_VERSION: ${XRAY_VERSION:-v26.3.27}
+        XRAY_VERSION: ${XRAY_VERSION:-v26.5.9}
     container_name: moav-xray
     restart: unless-stopped
     logging: *default-logging
@@ -700,6 +700,7 @@ services:
       - ENABLE_XDNS=${ENABLE_XDNS:-false}
       - XDNS_SUBDOMAIN=${XDNS_SUBDOMAIN:-x}
       - XDNS_MTU=${XDNS_MTU:-35}
+      - XDNS_RESOLVERS=${XDNS_RESOLVERS:-1.1.1.1,8.8.8.8}
       - PORT_XDNS=${PORT_XDNS:-53}
       - ENABLE_XHTTP=${ENABLE_XHTTP:-true}
       - MAHSANET_API_KEY=${MAHSANET_API_KEY:-}
@@ -1165,6 +1166,7 @@ services:
       - ENABLE_XDNS=${ENABLE_XDNS:-false}
       - XDNS_SUBDOMAIN=${XDNS_SUBDOMAIN:-x}
       - XDNS_MTU=${XDNS_MTU:-35}
+      - XDNS_RESOLVERS=${XDNS_RESOLVERS:-1.1.1.1,8.8.8.8}
       - PORT_XDNS=${PORT_XDNS:-53}
       - ENABLE_ADMIN_UI=${ENABLE_ADMIN_UI:-true}
       - CDN_SUBDOMAIN=${CDN_SUBDOMAIN:-}
@@ -1189,7 +1191,7 @@ services:
       dockerfile: dockerfiles/Dockerfile.client
       args:
         SINGBOX_VERSION: ${SINGBOX_VERSION:-1.12.23}
-        WSTUNNEL_VERSION: ${WSTUNNEL_VERSION:-10.5.3}
+        WSTUNNEL_VERSION: ${WSTUNNEL_VERSION:-10.5.5}
         SNOWFLAKE_VERSION: ${SNOWFLAKE_VERSION:-2.11.0}
         TRUSTTUNNEL_CLIENT_VERSION: ${TRUSTTUNNEL_CLIENT_VERSION:-1.0.49}
         AWGTOOLS_VERSION: ${AWGTOOLS_VERSION:-1.0.20260223}

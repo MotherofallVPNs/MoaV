@@ -624,6 +624,23 @@ if [[ "${ENABLE_XDNS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
         BUNDLE_CHANGED=true
         _xdns_domain="${XDNS_SUBDOMAIN:-x}.${DOMAIN}"
         _xdns_mtu="${XDNS_MTU:-35}"
+        # Multi-resolver round-robin for DNS-tunnel mode (Xray v26.4.13+, PR #5872).
+        # Direct mode omits resolvers since it bypasses public DNS.
+        _xdns_resolvers_csv="${XDNS_RESOLVERS:-1.1.1.1,8.8.8.8}"
+        _xdns_finalmask_settings=$(XDNS_DOMAIN="$_xdns_domain" XDNS_RESOLVERS_CSV="$_xdns_resolvers_csv" python3 -c '
+import os, json
+domain = os.environ["XDNS_DOMAIN"]
+csv = os.environ.get("XDNS_RESOLVERS_CSV", "").strip()
+resolvers = [x.strip() for x in csv.split(",") if x.strip()] if csv else []
+settings = {"domain": domain}
+if resolvers:
+    settings["resolvers"] = resolvers
+print(json.dumps(settings))
+')
+        _xdns_finalmask_settings_direct=$(XDNS_DOMAIN="$_xdns_domain" python3 -c '
+import os, json
+print(json.dumps({"domain": os.environ["XDNS_DOMAIN"]}))
+')
 
         # Load user UUID
         _xdns_uuid=""
@@ -640,7 +657,7 @@ if [[ "${ENABLE_XDNS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
   "log": {"loglevel": "warning"},
   "inbounds": [{"listen": "127.0.0.1", "port": 7891, "protocol": "socks", "settings": {"auth": "noauth", "udp": true}}],
   "outbounds": [
-    {"tag": "proxy", "protocol": "vless", "settings": {"vnext": [{"address": "8.8.8.8", "port": 53, "users": [{"id": "$_xdns_uuid", "encryption": "none"}]}]}, "streamSettings": {"network": "kcp", "kcpSettings": {"mtu": $_xdns_mtu, "tti": 100, "uplinkCapacity": 0, "downlinkCapacity": 0, "congestion": true}, "finalmask": {"udp": [{"type": "xdns", "settings": {"domain": "$_xdns_domain"}}]}}},
+    {"tag": "proxy", "protocol": "vless", "settings": {"vnext": [{"address": "8.8.8.8", "port": 53, "users": [{"id": "$_xdns_uuid", "encryption": "none"}]}]}, "streamSettings": {"network": "kcp", "kcpSettings": {"mtu": $_xdns_mtu, "tti": 100, "uplinkCapacity": 0, "downlinkCapacity": 0, "congestion": true}, "finalmask": {"udp": [{"type": "xdns", "settings": ${_xdns_finalmask_settings}}]}}},
     {"tag": "direct", "protocol": "freedom"}
   ],
   "routing": {"rules": [{"type": "field", "ip": ["::/0"], "outboundTag": "direct"}]}
@@ -654,7 +671,7 @@ XDNSEOF
   "log": {"loglevel": "warning"},
   "inbounds": [{"listen": "127.0.0.1", "port": 7891, "protocol": "socks", "settings": {"auth": "noauth", "udp": true}}],
   "outbounds": [
-    {"tag": "proxy", "protocol": "vless", "settings": {"vnext": [{"address": "${SERVER_IP}", "port": ${PORT_XDNS:-53}, "users": [{"id": "$_xdns_uuid", "encryption": "none"}]}]}, "streamSettings": {"network": "kcp", "kcpSettings": {"mtu": $_xdns_mtu, "tti": 100, "uplinkCapacity": 0, "downlinkCapacity": 0, "congestion": true}, "finalmask": {"udp": [{"type": "xdns", "settings": {"domain": "$_xdns_domain"}}]}}},
+    {"tag": "proxy", "protocol": "vless", "settings": {"vnext": [{"address": "${SERVER_IP}", "port": ${PORT_XDNS:-53}, "users": [{"id": "$_xdns_uuid", "encryption": "none"}]}]}, "streamSettings": {"network": "kcp", "kcpSettings": {"mtu": $_xdns_mtu, "tti": 100, "uplinkCapacity": 0, "downlinkCapacity": 0, "congestion": true}, "finalmask": {"udp": [{"type": "xdns", "settings": ${_xdns_finalmask_settings_direct}}]}}},
     {"tag": "direct", "protocol": "freedom"}
   ],
   "routing": {"rules": [{"type": "field", "ip": ["::/0"], "outboundTag": "direct"}]}

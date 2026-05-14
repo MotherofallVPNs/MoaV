@@ -92,8 +92,8 @@ ARG TARGETARCH
 
 # Versions - read from .env via docker-compose build args, with fallback defaults
 ARG SINGBOX_VERSION=1.12.23
-ARG XRAY_VERSION=26.2.6
-ARG WSTUNNEL_VERSION=10.5.3
+ARG XRAY_VERSION=26.5.9
+ARG WSTUNNEL_VERSION=10.5.5
 ARG TRUSTTUNNEL_VERSION=1.0.13
 
 # Install runtime dependencies

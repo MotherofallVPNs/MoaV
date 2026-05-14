@@ -513,6 +513,24 @@ fi
 if [[ "${ENABLE_XDNS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
     _xdns_domain="${XDNS_SUBDOMAIN:-x}.${DOMAIN}"
     _xdns_mtu="${XDNS_MTU:-35}"
+    # Multi-resolver round-robin for DNS-tunnel mode (Xray v26.4.13+, PR #5872).
+    # Direct mode connects to SERVER_IP:53 and never goes through public DNS,
+    # so resolvers must be omitted there.
+    _xdns_resolvers_csv="${XDNS_RESOLVERS:-1.1.1.1,8.8.8.8}"
+    _xdns_finalmask_settings=$(XDNS_DOMAIN="$_xdns_domain" XDNS_RESOLVERS_CSV="$_xdns_resolvers_csv" python3 -c '
+import os, json
+domain = os.environ["XDNS_DOMAIN"]
+csv = os.environ.get("XDNS_RESOLVERS_CSV", "").strip()
+resolvers = [x.strip() for x in csv.split(",") if x.strip()] if csv else []
+settings = {"domain": domain}
+if resolvers:
+    settings["resolvers"] = resolvers
+print(json.dumps(settings))
+')
+    _xdns_finalmask_settings_direct=$(XDNS_DOMAIN="$_xdns_domain" python3 -c '
+import os, json
+print(json.dumps({"domain": os.environ["XDNS_DOMAIN"]}))
+')
     log_info "Generating XDNS client config for $USERNAME..."
 
     # Full Xray config (for apps that support custom JSON import)
@@ -552,7 +570,7 @@ if [[ "${ENABLE_XDNS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
           "congestion": true
         },
         "finalmask": {
-          "udp": [{"type": "xdns", "settings": {"domain": "${_xdns_domain}"}}]
+          "udp": [{"type": "xdns", "settings": ${_xdns_finalmask_settings}}]
         }
       }
     },
@@ -609,7 +627,7 @@ XDNSEOF
           "congestion": true
         },
         "finalmask": {
-          "udp": [{"type": "xdns", "settings": {"domain": "${_xdns_domain}"}}]
+          "udp": [{"type": "xdns", "settings": ${_xdns_finalmask_settings_direct}}]
         }
       }
     },
