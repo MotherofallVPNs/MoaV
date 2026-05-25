@@ -10,6 +10,12 @@ FROM --platform=$BUILDPLATFORM golang:1.22-alpine AS builder
 ARG TARGETARCH
 ARG TARGETOS=linux
 
+# Go module fetch resilience (pipe = fall through on ANY error incl. 403).
+# See Dockerfile.xray for the full rationale. Override via .env.
+ARG GOPROXY="https://proxy.golang.org|https://goproxy.cn|direct"
+ARG GOSUMDB=off
+ENV GOPROXY=${GOPROXY} GOSUMDB=${GOSUMDB}
+
 WORKDIR /src
 
 COPY dns-router/ .

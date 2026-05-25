@@ -5,6 +5,12 @@ FROM golang:1.24-alpine AS builder
 ARG AMNEZIAWG_GO_VERSION=v0.2.16
 ARG AWGTOOLS_VERSION=1.0.20260223
 
+# Go module fetch resilience (pipe = fall through on ANY error incl. 403).
+# See Dockerfile.xray for the full rationale. Override via .env.
+ARG GOPROXY="https://proxy.golang.org|https://goproxy.cn|direct"
+ARG GOSUMDB=off
+ENV GOPROXY=${GOPROXY} GOSUMDB=${GOSUMDB}
+
 RUN apk add --no-cache git gcc musl-dev make linux-headers
 
 # Build amneziawg-go
