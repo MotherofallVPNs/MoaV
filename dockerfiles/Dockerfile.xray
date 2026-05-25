@@ -1,29 +1,54 @@
-# Xray-core: VLESS+XHTTP+Reality+XDNS
-# Built from source for latest FinalMask/XDNS/XHTTP support
-# XHTTP transport, mKCP+XDNS DNS tunnel, Reality TLS camouflage
+# Xray-core: VLESS+XHTTP+Reality+XDNS — XHTTP transport, mKCP+XDNS DNS tunnel,
+# Reality TLS camouflage.
+#
+# Prefers the official prebuilt release binary (installs in seconds) and only
+# falls back to compiling from source when the download is unavailable (e.g.
+# GitHub blocked, or no asset for the target arch). The release binary is built
+# from the same tag and already includes FinalMask/XDNS — the client image uses
+# the same prebuilt binary for XDNS — so source compilation is just a fallback,
+# not a requirement.
 
-# Build stage
+# Build stage (golang base so the source-compile fallback is available)
 FROM golang:1.26-alpine AS builder
 
-RUN apk add --no-cache git
+RUN apk add --no-cache git wget unzip ca-certificates
 
 ARG XRAY_REPO=https://github.com/XTLS/Xray-core.git
 ARG XRAY_VERSION=v26.5.9
+ARG TARGETARCH
 
-# Go module fetch resilience. Tries Google first, then falls back to goproxy.cn
-# on ANY error — note the pipe (|), not comma: comma only falls through on
-# 404/410, so it would NOT survive the 403/timeout that Google's module CDN
-# returns under rate-limiting or regional restriction. GOSUMDB=off drops the
-# second hard dependency on Google's checksum server; module integrity is still
-# enforced against the go.sum committed in the upstream repo. Override via
-# .env (GOPROXY=/GOSUMDB=) if you run your own Athens mirror or want direct VCS.
+# Go module fetch resilience — used ONLY by the source-compile fallback below.
+# Pipe (|) falls through to the next proxy on ANY error (incl. the 403 Google's
+# module CDN returns under rate-limiting); comma only falls through on 404/410.
+# goproxy.cn isn't subject to Google's CDN limits. GOSUMDB=off drops the
+# matching dependency on sum.golang.org; integrity is still verified against the
+# committed go.sum. Override via .env if you run your own Athens mirror.
 ARG GOPROXY="https://proxy.golang.org|https://goproxy.cn|direct"
 ARG GOSUMDB=off
 ENV GOPROXY=${GOPROXY} GOSUMDB=${GOSUMDB}
 
-RUN git clone --depth 1 -b ${XRAY_VERSION} ${XRAY_REPO} /src
-WORKDIR /src
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /xray ./main
+# 1) Download the prebuilt release binary. 2) On any failure, compile from source.
+RUN set -eux; \
+    case "${TARGETARCH:-amd64}" in \
+        amd64) XR_ARCH="64" ;; \
+        arm64) XR_ARCH="arm64-v8a" ;; \
+        *)     XR_ARCH="" ;; \
+    esac; \
+    got=0; \
+    if [ -n "$XR_ARCH" ] && \
+       wget -qO /tmp/xray.zip "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-${XR_ARCH}.zip" && \
+       unzip -j /tmp/xray.zip xray -d / ; then \
+        got=1; \
+        echo "xray ${XRAY_VERSION}: installed from prebuilt release (Xray-linux-${XR_ARCH})"; \
+    fi; \
+    if [ "$got" -ne 1 ]; then \
+        echo "xray ${XRAY_VERSION}: prebuilt unavailable, compiling from source..."; \
+        git clone --depth 1 -b "${XRAY_VERSION}" "${XRAY_REPO}" /src; \
+        cd /src; \
+        CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /xray ./main; \
+    fi; \
+    rm -f /tmp/xray.zip; \
+    /xray version
 
 # Runtime stage
 FROM alpine:3.21
