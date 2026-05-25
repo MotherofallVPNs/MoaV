@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Conduit lifetime bandwidth tracking** (PR [#97](https://github.com/shayanb/MoaV/pull/97), thanks @jSFBay) — `conduit_bytes_downloaded`/`conduit_bytes_uploaded` are in-memory gauges that reset on every Conduit restart, so cumulative contribution was impossible to see in Grafana. New Prometheus recording rules (`configs/monitoring/conduit_lifetime.rules.yml`) maintain `*_lifetime` totals by adding a per-install offset to the live counters, and two **Lifetime Download / Lifetime Upload** stat panels were added to the Conduit dashboard. After a Conduit restart, `scripts/update-conduit-offsets.sh` recovers the pre-restart running total and rewrites the offset, then hot-reloads Prometheus via the lifecycle API. Offsets start at 0 for new installs. The script reads Prometheus at `PROM_URL` (default `http://localhost:9091`; Prometheus is `expose`d, not host-published, so set `PROM_URL` or add a `ports:` mapping). The offset is derived from the `*_lifetime` metric's high-water mark (not the raw gauge) so it accumulates correctly across multiple restarts
+
 ## [1.7.8] - 2026-05-15
 
 ### Upgrade Notes
