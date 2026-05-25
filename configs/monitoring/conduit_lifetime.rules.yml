@@ -1,0 +1,23 @@
+groups:
+  - name: conduit_lifetime
+    rules:
+      # Lifetime bandwidth totals that survive Conduit process restarts.
+      #
+      # Problem: conduit_bytes_downloaded and conduit_bytes_uploaded are gauge
+      # metrics that reset to 0 each time Conduit restarts. This makes it
+      # impossible to track total bandwidth contributed over time.
+      #
+      # Solution: These recording rules add an OFFSET (bytes from all previous
+      # runs) to the current session's counters, giving a running lifetime total.
+      #
+      # After each Conduit restart, run scripts/update-conduit-offsets.sh to
+      # update the OFFSET values below and reload Prometheus automatically.
+      #
+      # OFFSET values below start at 0 for new installations. Update them with
+      # the actual pre-restart totals after your first restart.
+
+      - record: conduit_bytes_downloaded_lifetime
+        expr: conduit_bytes_downloaded + 0
+
+      - record: conduit_bytes_uploaded_lifetime
+        expr: conduit_bytes_uploaded + 0

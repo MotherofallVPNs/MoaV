@@ -752,6 +752,7 @@ services:
       - "9091"
     volumes:
       - ./configs/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./configs/monitoring/conduit_lifetime.rules.yml:/etc/prometheus/conduit_lifetime.rules.yml:ro
       - moav_prometheus:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'

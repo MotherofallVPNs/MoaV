@@ -560,7 +560,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 4
+        "y": 8
       },
       "id": 7,
       "options": {
@@ -661,7 +661,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 4
+        "y": 8
       },
       "id": 8,
       "options": {
@@ -762,7 +762,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 16
       },
       "id": 9,
       "options": {
@@ -4851,7 +4851,7 @@
         "h": 16,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 24
       },
       "id": 12,
       "options": {
@@ -5953,7 +5953,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 46
+        "y": 50
       },
       "id": 13,
       "options": {
@@ -6052,7 +6052,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 36
+        "y": 40
       },
       "pluginVersion": "10.4.1",
       "targets": [
@@ -7114,6 +7114,130 @@
           "show": false
         }
       }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "id": 15,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(conduit_bytes_downloaded_lifetime)",
+          "refId": "A",
+          "legendFormat": "Lifetime Download"
+        }
+      ],
+      "title": "Lifetime Download",
+      "type": "stat",
+      "description": "Total bytes downloaded across all Conduit sessions (survives restarts). Requires conduit_lifetime.rules.yml to be configured."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 16,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(conduit_bytes_uploaded_lifetime)",
+          "refId": "A",
+          "legendFormat": "Lifetime Upload"
+        }
+      ],
+      "title": "Lifetime Upload",
+      "type": "stat",
+      "description": "Total bytes uploaded across all Conduit sessions (survives restarts). Requires conduit_lifetime.rules.yml to be configured."
     }
   ],
   "refresh": "30s",

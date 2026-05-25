@@ -6,6 +6,12 @@ global:
   scrape_interval: 30s
   evaluation_interval: 30s
 
+rule_files:
+  # Recording rules for lifetime bandwidth totals (survive Conduit restarts).
+  # Update configs/monitoring/conduit_lifetime.rules.yml after each restart
+  # by running: ./scripts/update-conduit-offsets.sh
+  - /etc/prometheus/conduit_lifetime.rules.yml
+
 scrape_configs:
   # Prometheus self-monitoring
   - job_name: 'prometheus'
