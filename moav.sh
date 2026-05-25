@@ -1306,15 +1306,19 @@ cmd_update() {
         else
             success "Updated: $current_commit → $new_commit (branch: $new_branch)"
 
-            # Re-exec with new code for post-update checks
-            # The running script is the old version; the new code is on disk
-            exec "$SCRIPT_DIR/moav.sh" _post-update
+            # Re-exec with new code for post-update checks. The running script is
+            # the old version; the new code is on disk. Pass the pre-pull commit so
+            # the new code can diff it for config-template changes (re-bootstrap).
+            exec "$SCRIPT_DIR/moav.sh" _post-update "$current_commit"
         fi
 
-        # Post-update checks (reached on "already up to date" or via _post-update re-exec)
+        # Post-update checks (reached on "already up to date"; the updated path
+        # re-execs into _post-update above and never returns here). No pull
+        # happened, so there are no config-template changes to diff.
         check_component_versions
         migrate_dns_tunnel_state
         check_env_additions
+        print_post_update_apply_steps
     else
         error "Failed to update. Check your network connection or git status."
         echo ""
@@ -1418,22 +1422,82 @@ check_component_versions() {
         done
 
         success "Component versions updated in .env"
-        echo ""
 
-        # Show rebuild command
+        # Record which services need rebuilding. The ordered apply sequence is
+        # composed and printed once by print_post_update_apply_steps (so a
+        # rebuild + a config-template re-bootstrap are shown as one flow).
         if [[ ${#services_to_rebuild[@]} -gt 0 ]]; then
-            local services_str="${services_to_rebuild[*]}"
-            echo -e "To apply updates, rebuild the affected containers:"
-            echo ""
-            echo -e "  ${WHITE}moav build ${services_str} --no-cache${NC}"
-            echo ""
-            echo -e "Or rebuild all: ${WHITE}moav build --no-cache${NC}"
+            POST_UPDATE_REBUILD_SERVICES="${services_to_rebuild[*]}"
         fi
     else
         echo ""
         echo "Versions not updated. To update later, compare:"
         echo "  .env.example (new versions) vs .env (your versions)"
     fi
+}
+
+# After a self-update pull, detect changes to server config *templates*
+# (configs/**/*.template). When a template changes, the generated configs on
+# disk are stale and must be regenerated via bootstrap, or services can
+# crash-loop — e.g. Xray v26.5.9 rejects the pre-rename `clients` inbound key
+# until configs/xray/config.json is rewritten from the updated template.
+# Records the changed templates for print_post_update_apply_steps.
+check_config_template_changes() {
+    local old_commit="${1:-}"
+    [[ -z "$old_commit" ]] && return 0
+    [[ -d "$SCRIPT_DIR/.git" ]] || return 0
+
+    local changed
+    changed=$(git -C "$SCRIPT_DIR" diff --name-only "$old_commit" HEAD 2>/dev/null \
+        | grep -E '\.template$' || true)
+    [[ -z "$changed" ]] && return 0
+
+    POST_UPDATE_BOOTSTRAP_TEMPLATES="$changed"
+}
+
+# Compose a single ordered "how to apply this update" summary from what the
+# post-update checks found: component rebuilds (POST_UPDATE_REBUILD_SERVICES)
+# and/or stale server configs (POST_UPDATE_BOOTSTRAP_TEMPLATES). Print-only by
+# design — never auto-rebuilds or restarts a running server (a build-all would
+# OOM low-RAM VPSes, and restarting a live circumvention node is the operator's
+# call). Fixes two non-obvious gotchas: (1) `moav build` doesn't recreate
+# containers and `moav restart` reuses the old image — you need `moav start`
+# (up -d); (2) a config-template change needs a re-bootstrap, not just a build.
+print_post_update_apply_steps() {
+    local rebuild="${POST_UPDATE_REBUILD_SERVICES:-}"
+    local templates="${POST_UPDATE_BOOTSTRAP_TEMPLATES:-}"
+
+    [[ -z "$rebuild" && -z "$templates" ]] && return 0
+
+    echo ""
+    if [[ -n "$templates" ]]; then
+        warn "This update changed server config templates:"
+        while IFS= read -r f; do
+            [[ -n "$f" ]] && echo -e "    ${CYAN}$f${NC}"
+        done <<< "$templates"
+        echo ""
+        echo "The generated configs on disk are now stale — affected services can"
+        echo "fail to start until they are regenerated. Bootstrap is idempotent and"
+        echo "preserves your keys and user UUIDs."
+        echo ""
+    fi
+
+    local n=1
+    echo -e "${WHITE}Apply this update in order:${NC}"
+    echo ""
+    if [[ -n "$rebuild" ]]; then
+        echo -e "  ${WHITE}${n}.${NC} moav build ${rebuild} --no-cache   ${DIM}# build new images${NC}"
+        n=$((n+1))
+    fi
+    if [[ -n "$templates" ]]; then
+        echo -e "  ${WHITE}${n}.${NC} moav bootstrap                  ${DIM}# regenerate server configs (keeps keys + users)${NC}"
+        n=$((n+1))
+        echo -e "  ${WHITE}${n}.${NC} moav regenerate-users           ${DIM}# refresh user bundles${NC}"
+        n=$((n+1))
+    fi
+    echo -e "  ${WHITE}${n}.${NC} moav start                      ${DIM}# recreate containers on the new images${NC}"
+    echo ""
+    echo -e "${DIM}Note: 'moav restart' reuses the old image — use 'moav start' (docker compose up -d) to pick up rebuilt images.${NC}"
 }
 
 # Check for new variables in .env.example that are missing from .env
@@ -7791,10 +7855,13 @@ main() {
             cmd_update "$@"
             ;;
         _post-update)
-            # Internal: re-exec target after self-update pulls new code
+            # Internal: re-exec target after self-update pulls new code.
+            # $2 = short commit before the pull (for config-template diffing).
             check_component_versions
             migrate_dns_tunnel_state
             check_env_additions
+            check_config_template_changes "${2:-}"
+            print_post_update_apply_steps
             ;;
         check)
             cmd_check
