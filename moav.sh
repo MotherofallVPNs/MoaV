@@ -6075,20 +6075,20 @@ cmd_start() {
         # Replace 'all' with individual profiles excluding monitoring
         # Respect ENABLE_* flags to avoid starting disabled services
         profiles="--profile proxy --profile wireguard --profile trusttunnel --profile xhttp --profile telegram --profile admin --profile conduit --profile snowflake"
-        local _dnstt_s=$(get_env_val "ENABLE_DNSTT" "true")
-        local _slip_s=$(get_env_val "ENABLE_SLIPSTREAM" "true")
+        local _dnstt_s=$(get_env_val "ENABLE_DNSTT" "$SCRIPT_DIR/.env" "true")
+        local _slip_s=$(get_env_val "ENABLE_SLIPSTREAM" "$SCRIPT_DIR/.env" "true")
         [[ "$_dnstt_s" == "true" || "$_slip_s" == "true" ]] && profiles="$profiles --profile dnstunnel"
-        local _amneziawg_s=$(get_env_val "ENABLE_AMNEZIAWG" "true")
+        local _amneziawg_s=$(get_env_val "ENABLE_AMNEZIAWG" "$SCRIPT_DIR/.env" "true")
         [[ "$_amneziawg_s" == "true" ]] && profiles="$profiles --profile amneziawg"
     fi
 
     # Check port 53 conflicts for DNS tunnels
     local dnstt_enabled
-    dnstt_enabled=$(get_env_val "ENABLE_DNSTT" "true")
+    dnstt_enabled=$(get_env_val "ENABLE_DNSTT" "$SCRIPT_DIR/.env" "true")
     local slipstream_enabled
-    slipstream_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "true")
+    slipstream_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$SCRIPT_DIR/.env" "true")
     local xdns_start_enabled
-    xdns_start_enabled=$(get_env_val "ENABLE_XDNS" "false")
+    xdns_start_enabled=$(get_env_val "ENABLE_XDNS" "$SCRIPT_DIR/.env" "false")
 
     # Hard-block DNS tunnel port-group conflicts. Tunnels in the same group
     # (e.g. dnstt+slipstream share dns-router) can coexist; different groups
@@ -7926,7 +7926,7 @@ cmd_conduit_offsets() {
 # without the operator remembering to run the script. No-op if already
 # installed, opted out (CONDUIT_OFFSETS_AUTOUPDATE=false), or no systemd.
 auto_setup_conduit_offsets() {
-    [[ "$(get_env_val "CONDUIT_OFFSETS_AUTOUPDATE" "true")" == "true" ]] || return 0
+    [[ "$(get_env_val "CONDUIT_OFFSETS_AUTOUPDATE" "$SCRIPT_DIR/.env" "true")" == "true" ]] || return 0
     _has_systemd || return 0
     [[ -f "$CONDUIT_OFFSETS_UNIT_PATH" ]] && return 0
     docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^moav-conduit$'    || return 0
