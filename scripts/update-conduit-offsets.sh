@@ -24,13 +24,32 @@ query() {
 
 echo "Querying Prometheus for lifetime offsets..."
 
-DL=$(query "max_over_time(conduit_bytes_downloaded[60d])")
-UL=$(query "max_over_time(conduit_bytes_uploaded[60d])")
+# Recover the pre-restart running total, then subtract the current (post-restart)
+# session so the new offset = everything accumulated *before* this session.
+#
+# Query the *_lifetime recording rule, not the raw conduit_bytes_* gauge: the raw
+# gauge's max is only the single largest session, so basing the offset on it
+# would discard every other prior session and undercount across multiple
+# restarts. The lifetime metric already carries the cumulative total, so its peak
+# is the true high-water mark. On the very first run the recording rule hasn't
+# been evaluated yet (no lifetime series → query returns 0), so fall back to the
+# raw gauge for that one bootstrap case.
+#
+# Window is 15d to match Prometheus' --storage.tsdb.retention.time=15d; samples
+# older than retention aren't queryable anyway. Run this soon after a restart.
+DL=$(query "max_over_time(conduit_bytes_downloaded_lifetime[15d])")
+[[ "$DL" -eq 0 ]] && DL=$(query "max_over_time(conduit_bytes_downloaded[15d])")
+UL=$(query "max_over_time(conduit_bytes_uploaded_lifetime[15d])")
+[[ "$UL" -eq 0 ]] && UL=$(query "max_over_time(conduit_bytes_uploaded[15d])")
 CURRENT_DL=$(query "conduit_bytes_downloaded")
 CURRENT_UL=$(query "conduit_bytes_uploaded")
 
 DL_OFFSET=$((DL - CURRENT_DL))
 UL_OFFSET=$((UL - CURRENT_UL))
+
+# Never let a transient/empty read push the running total backwards.
+[[ "$DL_OFFSET" -lt 0 ]] && DL_OFFSET=0
+[[ "$UL_OFFSET" -lt 0 ]] && UL_OFFSET=0
 DATE=$(date "+%Y-%m-%d")
 DL_GB=$(python3 -c "print(f'{$DL_OFFSET/1e9:.1f}')")
 UL_GB=$(python3 -c "print(f'{$UL_OFFSET/1e9:.1f}')")
