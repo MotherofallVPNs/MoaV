@@ -1,6 +1,6 @@
 # Quick Start
 
-Get MoaV running on a VPS in 5 steps. MoaV deploys [12 anti-censorship protocols](protocols.md) and generates client bundles that make it easy for anyone to connect — no technical knowledge needed. For the full story, see [why MoaV exists](philosophy.md). For detailed setup options, see the full [Setup Guide](SETUP.md).
+Get MoaV running on a VPS in 5 steps. MoaV deploys [16+ anti-censorship protocols](protocols.md) and generates client bundles that make it easy for anyone to connect — no technical knowledge needed. For the full story, see [why MoaV exists](philosophy.md). For detailed setup options, see the full [Setup Guide](SETUP.md).
 
 ## Requirements
 

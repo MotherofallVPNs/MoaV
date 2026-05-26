@@ -60,7 +60,8 @@ Complete guide to deploy MoaV on a VPS or home server.
 | 9444/tcp | TCP | Grafana (monitoring) | No |
 | 993/tcp | TCP | Telegram MTProxy (telemt) | No |
 | 2096/tcp | TCP | XHTTP (VLESS+XHTTP+Reality) | No |
-| 53/udp | UDP | DNS tunnels (dnstt + Slipstream OR XDNS — not both) | Yes |
+| 53/udp | UDP | DNS tunnels — dnstt, Slipstream, MasterDNS, XDNS (all 4 share port 53 via dns-router) | Yes |
+| 8444/tcp | TCP | GooseRelay (when `ENABLE_GOOSERELAY=true`) | No |
 | 80/tcp | TCP | Let's Encrypt | Yes (during setup) |
 
 ---
@@ -121,6 +122,7 @@ Point your domain to your server **before** running setup.
 | A | dns | YOUR_SERVER_IP | For DNS tunnel NS delegation |
 | NS | t | dns.yourdomain.com | dnstt tunnel subdomain |
 | NS | s | dns.yourdomain.com | Slipstream tunnel subdomain |
+| NS | m | dns.yourdomain.com | MasterDNS tunnel subdomain |
 | NS | x | dns.yourdomain.com | XDNS tunnel subdomain |
 | A | cdn | YOUR_SERVER_IP | CDN mode (Cloudflare: **Proxied** orange cloud) |
 

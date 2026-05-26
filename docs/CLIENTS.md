@@ -651,7 +651,7 @@ XDNS encodes VPN traffic inside DNS-like packets using Xray-core's mKCP transpor
 - Best for **Telegram only** — too slow for web browsing
 - MTU 35 (default) is safest. Try 67 or 130 for faster speeds if your network allows
 - MTU must match on both server and client
-- XDNS and dnstt/Slipstream cannot run at the same time (both use port 53)
+- All four DNS tunnels (dnstt, Slipstream, MasterDNS, XDNS) run simultaneously on port 53 — `dns-router` fans queries out by subdomain, so no conflict
 - **Resolver choice matters.** The default `xdns-config.json` round-robins across multiple public DNS resolvers (set by `XDNS_RESOLVERS` in the server's `.env`); if it keeps dropping, swap in resolvers that actually answer from your network. See [protocols.md → Reachable DNS resolvers](protocols.md#reachable-dns-resolvers) for scanner tools ([findns](https://github.com/SamNet-dev/findns), [dns-mns](https://gitlab.com/E-Gurl/dns-mns)).
 
 ---

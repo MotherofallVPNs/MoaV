@@ -92,8 +92,8 @@ ufw enable
 | 8080/tcp | wstunnel | Required if enabled |
 | 993/tcp | Telegram MTProxy | Required if enabled |
 | 2096/tcp | XHTTP | Required if enabled |
-| 53/udp | XDNS (default) or dnstt/Slipstream | Required if DNS tunnels enabled |
-| 5353/udp | dnstt/Slipstream (when XDNS uses 53) | Only if dnstt/Slipstream enabled alongside XDNS |
+| 53/udp | DNS tunnels — dnstt, Slipstream, MasterDNS, XDNS (all 4 via dns-router) | Required if DNS tunnels enabled |
+| 8444/tcp | GooseRelay (SOCKS5-over-Google-Apps-Script exit) | Only if `ENABLE_GOOSERELAY=true` |
 | 80/tcp | Let's Encrypt | Required during cert renewal |
 | 9443/tcp | Admin dashboard | See access control below |
 | 9444/tcp | Grafana | See access control below |

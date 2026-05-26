@@ -138,7 +138,7 @@ moav doctor dns          # DNS records
 moav doctor services     # Enabled vs running services
 moav doctor config       # Config files and keys
 moav doctor ports        # Port availability
-moav doctor conflicts    # DNS-tunnel port-group collisions
+moav doctor conflicts    # DNS-tunnel health (all 4 share port 53 via dns-router)
 moav doctor env          # Compare .env with .env.example
 moav doctor updates      # Check for MoaV updates
 ```
@@ -152,7 +152,7 @@ moav doctor updates      # Check for MoaV updates
 - `services` — Compare enabled services in `.env` with running containers; flag crash-looping services
 - `config` — Check bootstrap has been run and config files exist for enabled protocols
 - `ports` — Verify required ports are listening; detect systemd-resolved on port 53
-- `conflicts` — Detect DNS-tunnel port-group collisions on port 53 (XDNS vs dnstt+Slipstream); see `moav switch-dns`
+- `conflicts` — Check DNS-tunnel health. All four tunnels (dnstt, Slipstream, MasterDNS, XDNS) share port 53 via `dns-router`, fanned out by subdomain (`t.`/`s.`/`m.`/`x.`), so they coexist — this verifies enabled-vs-running state and that `dns-router` isn't crash-looping. Toggle individual tunnels with `ENABLE_*` or `moav switch-dns`
 - `env` — Compare `.env` with `.env.example` for missing variables; flag critical missing vars
 - `updates` — Check current version against latest GitHub release
 

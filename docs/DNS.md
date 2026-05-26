@@ -595,7 +595,7 @@ Configure your router to forward the ports you need to your MoaV server's local 
 | 8443/tcp | TCP | Trojan |
 | 4443/tcp | TCP | TrustTunnel (HTTP/2) |
 | 4443/udp | UDP | TrustTunnel (HTTP/3 / QUIC) |
-| 53/udp | UDP | DNS tunnels (dnstt / Slipstream / XDNS) |
+| 53/udp | UDP | DNS tunnels (dnstt / Slipstream / MasterDNS / XDNS — all via dns-router) |
 
 **Optional**:
 

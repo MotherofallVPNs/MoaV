@@ -4,7 +4,7 @@
 
 MoaV was created to **democratize access to anti-censorship tools**. Running a VPN server shouldn't require deep technical expertise. Running *multiple* protocols — so users can find one that works when others are blocked — shouldn't require managing a dozen separate tools.
 
-MoaV packages 12+ distinct protocols into a single deployment. When a government blocks one protocol, users switch to another. When that gets blocked too, there's always a fallback. DNS tunnels, CDN-fronted connections, obfuscated WireGuard, Telegram proxies — each has different network characteristics that make them resistant to different blocking techniques.
+MoaV packages 16+ distinct protocols into a single deployment. When a government blocks one protocol, users switch to another. When that gets blocked too, there's always a fallback. DNS tunnels, CDN-fronted connections, obfuscated WireGuard, Telegram proxies — each has different network characteristics that make them resistant to different blocking techniques.
 
 **The goal is simple:** make it as easy as possible for anyone with a $5/month VPS to provide reliable internet access to people who need it.
 
