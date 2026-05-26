@@ -995,6 +995,18 @@ do_uninstall() {
             echo "  - configs/trusttunnel/*"
         fi
 
+        # Remove generated MasterDNS files
+        if [[ -f "$SCRIPT_DIR/configs/masterdns/server_config.toml" ]]; then
+            _wrm -f "$SCRIPT_DIR/configs/masterdns/server_config.toml"
+            echo "  - configs/masterdns/*"
+        fi
+
+        # Remove generated GooseRelay files
+        if [[ -f "$SCRIPT_DIR/configs/gooserelay/server_config.json" ]]; then
+            _wrm -f "$SCRIPT_DIR/configs/gooserelay/server_config.json"
+            echo "  - configs/gooserelay/*"
+        fi
+
         # Remove generated Xray files
         if [[ -f "$SCRIPT_DIR/configs/xray/config.json" ]]; then
             _wrm -f "$SCRIPT_DIR/configs/xray/config.json"
@@ -7746,6 +7758,10 @@ cmd_regenerate_users() {
     local enable_dnstt=$(get_env_val "ENABLE_DNSTT" .env "true")
     local enable_slipstream=$(get_env_val "ENABLE_SLIPSTREAM" .env "true")
     local slipstream_subdomain=$(get_env_val "SLIPSTREAM_SUBDOMAIN" .env "s")
+    local enable_masterdns=$(get_env_val "ENABLE_MASTERDNS" .env "true")
+    local masterdns_subdomain=$(get_env_val "MASTERDNS_SUBDOMAIN" .env "m")
+    local enable_gooserelay=$(get_env_val "ENABLE_GOOSERELAY" .env "false")
+    local port_goose=$(get_env_val "PORT_GOOSE" .env "8444")
     local enable_trusttunnel=$(get_env_val "ENABLE_TRUSTTUNNEL" .env "true")
     local enable_xhttp=$(get_env_val "ENABLE_XHTTP" .env "true")
     local port_xhttp=$(get_env_val "PORT_XHTTP" .env "2096")
@@ -7791,6 +7807,10 @@ cmd_regenerate_users() {
             -e "ENABLE_DNSTT=${enable_dnstt:-false}" \
             -e "ENABLE_SLIPSTREAM=${enable_slipstream:-false}" \
             -e "SLIPSTREAM_SUBDOMAIN=${slipstream_subdomain:-s}" \
+            -e "ENABLE_MASTERDNS=${enable_masterdns:-true}" \
+            -e "MASTERDNS_SUBDOMAIN=${masterdns_subdomain:-m}" \
+            -e "ENABLE_GOOSERELAY=${enable_gooserelay:-false}" \
+            -e "PORT_GOOSE=${port_goose:-8444}" \
             -e "ENABLE_TRUSTTUNNEL=${enable_trusttunnel:-true}" \
             -e "ENABLE_XHTTP=${enable_xhttp:-true}" \
             -e "PORT_XHTTP=${port_xhttp:-2096}" \

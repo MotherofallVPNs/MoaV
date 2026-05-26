@@ -83,6 +83,12 @@ configs/slipstream/key.pem
 # Telegram MTProxy (telemt) generated files
 configs/telemt/config.toml
 
+# MasterDNS generated files
+configs/masterdns/server_config.toml
+
+# GooseRelay generated files
+configs/gooserelay/server_config.json
+
 # DNS router
 configs/dns-router/
 

@@ -795,6 +795,14 @@ elif [[ -f "$TEMPLATE_FILE" ]]; then
     XDNS_DISPLAY=""
     [[ -z "$CONFIG_XDNS" ]] && XDNS_DISPLAY="display:none"
 
+    # Get MasterDNS / GooseRelay info (MahsaNG v16 extras; instructions text + display toggle)
+    CONFIG_MASTERDNS=$(cat "$OUTPUT_DIR/masterdns-instructions.txt" 2>/dev/null || echo "")
+    MASTERDNS_DISPLAY=""
+    [[ -z "$CONFIG_MASTERDNS" ]] && MASTERDNS_DISPLAY="display:none"
+    CONFIG_GOOSERELAY=$(cat "$OUTPUT_DIR/gooserelay-instructions.txt" 2>/dev/null || echo "")
+    GOOSERELAY_DISPLAY=""
+    [[ -z "$CONFIG_GOOSERELAY" ]] && GOOSERELAY_DISPLAY="display:none"
+
     # Get telemt info
     CONFIG_TELEMT=$(cat "$OUTPUT_DIR/telegram-proxy-link.txt" 2>/dev/null | tr -d '\n' || echo "")
 
@@ -973,6 +981,30 @@ with open(html_path, 'w') as f: f.write(html)
         replace_placeholder "{{CONFIG_XDNS_DIRECT}}" "XDNS not enabled"
         replace_placeholder "{{XDNS_DISPLAY}}" "display:none"
     fi
+
+    # MasterDNS / GooseRelay (MahsaNG v16) — multiline instructions; file-based
+    # replacement avoids shell-escaping issues, and toggles the section + TOC
+    # entry off (display:none) when the protocol isn't enabled for this user.
+    python3 -c "
+import sys
+html_path = sys.argv[1]
+with open(html_path) as f: html = f.read()
+def fill(name, path, label):
+    global html
+    try:
+        with open(path) as f: cfg = f.read().strip()
+    except Exception:
+        cfg = ''
+    if cfg:
+        html = html.replace('{{CONFIG_%s}}' % name, cfg)
+        html = html.replace('{{%s_DISPLAY}}' % name, '')
+    else:
+        html = html.replace('{{CONFIG_%s}}' % name, label + ' not enabled')
+        html = html.replace('{{%s_DISPLAY}}' % name, 'display:none')
+fill('MASTERDNS', sys.argv[2], 'MasterDNS')
+fill('GOOSERELAY', sys.argv[3], 'GooseRelay')
+with open(html_path, 'w') as f: f.write(html)
+" "$OUTPUT_HTML" "$OUTPUT_DIR/masterdns-instructions.txt" "$OUTPUT_DIR/gooserelay-instructions.txt"
 
     # telemt (Telegram MTProxy) link
     if [[ -n "${CONFIG_TELEMT:-}" ]]; then

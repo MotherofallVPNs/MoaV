@@ -595,6 +595,8 @@
                 <li><a href="#en" onclick="scrollToSection('dns-tunnel-en')">8. DNS Tunnel <span class="toc-badge badge-fallback">Last Resort</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('slipstream-en')">8b. Slipstream <span class="toc-badge badge-fallback">Faster DNS Tunnel</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('xdns-en')">8c. XDNS <span class="toc-badge badge-fallback">mKCP DNS Tunnel</span></a></li>
+                <li style="{{MASTERDNS_DISPLAY}}"><a href="#en" onclick="scrollToSection('masterdns-en')">8d. MasterDNS <span class="toc-badge badge-fallback">DNS Tunnel · MahsaNG v16</span></a></li>
+                <li style="{{GOOSERELAY_DISPLAY}}"><a href="#en" onclick="scrollToSection('gooserelay-en')">8e. GooseRelay <span class="toc-badge badge-standalone">SOCKS5 via Google</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('telemt-en')">9. Telegram MTProxy <span class="toc-badge badge-secondary">Telegram</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('tor-en')">10. Tor <span class="toc-badge badge-standalone">Standalone</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('psiphon-en')">11. Psiphon <span class="toc-badge badge-standalone">Standalone</span></a></li>
@@ -1131,6 +1133,51 @@
             </div>
         </div>
 
+        <!-- MasterDNS (MahsaNG v16 DNS tunnel) -->
+        <div class="protocol-section" id="masterdns-en" style="{{MASTERDNS_DISPLAY}}">
+            <div class="protocol-header">
+                <div class="protocol-title">
+                    <h2>8d. MasterDNS</h2>
+                    <span class="protocol-badge badge-fallback">DNS Tunnel · MahsaNG v16</span>
+                </div>
+                <span class="protocol-port">Port 53/udp</span>
+            </div>
+            <div class="protocol-content">
+                <p class="protocol-desc">Advanced DNS tunnel (ARQ + resolver load-balancing) bundled natively in the <a href="https://www.mahsaserver.com/" target="_blank"><strong>MahsaNG v16</strong></a> app — typically faster and more resilient than dnstt/Slipstream during heavy shutdowns. Works when almost everything except DNS is blocked. Best for Telegram and light chat.</p>
+                <div class="extra-section">
+                    <h4>Setup</h4>
+                    <ol>
+                        <li>Install <strong>MahsaNG v16</strong> (Android / iOS / Desktop)</li>
+                        <li>Open the built-in <strong>MasterDNS</strong> tab and enter the domain + key from the config below</li>
+                    </ol>
+                </div>
+                <div class="config-box">
+                    <h4>MasterDNS Config (also in <code>masterdns-instructions.txt</code>)</h4>
+                    <div class="config-value multiline" onclick="copyConfig(this)" style="font-size: 11px; max-height: 220px; overflow-y: auto; white-space: pre-wrap;">{{CONFIG_MASTERDNS}}</div>
+                </div>
+                <p style="color: var(--text-muted); font-size: 12px; margin-top: 12px;">The key is shared by everyone on this server — keep it private. Telegram &amp; light chat only.</p>
+            </div>
+        </div>
+
+        <!-- GooseRelay (SOCKS5 over Google Apps Script) -->
+        <div class="protocol-section" id="gooserelay-en" style="{{GOOSERELAY_DISPLAY}}">
+            <div class="protocol-header">
+                <div class="protocol-title">
+                    <h2>8e. GooseRelay</h2>
+                    <span class="protocol-badge badge-standalone">SOCKS5 via Google · MahsaNG v16</span>
+                </div>
+                <span class="protocol-port">via Google</span>
+            </div>
+            <div class="protocol-content">
+                <p class="protocol-desc">Tunnels traffic through a Google Apps Script you deploy in your own Google account (fronted as <code>google.com</code>) to this server's exit, encrypted with AES-256-GCM. Bundled in <a href="https://www.mahsaserver.com/" target="_blank"><strong>MahsaNG v16</strong></a>. Useful when direct connections to the server are blocked but Google is reachable.</p>
+                <div class="config-box">
+                    <h4>GooseRelay Config (also in <code>gooserelay-instructions.txt</code>)</h4>
+                    <div class="config-value multiline" onclick="copyConfig(this)" style="font-size: 11px; max-height: 260px; overflow-y: auto; white-space: pre-wrap;">{{CONFIG_GOOSERELAY}}</div>
+                </div>
+                <p style="color: var(--text-muted); font-size: 12px; margin-top: 12px;">Requires deploying a small Google Apps Script (steps in the config above). The tunnel key is shared by everyone on this server — keep it private.</p>
+            </div>
+        </div>
+
         <!-- Telegram MTProxy -->
         <div class="protocol-section" id="telemt-en">
             <div class="protocol-header">
@@ -1426,6 +1473,8 @@
                 <li><a href="#fa" onclick="scrollToSection('dns-tunnel-fa')">۸. تونل DNS <span class="toc-badge badge-fallback">آخرین راه‌حل</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('slipstream-fa')">۸ب. Slipstream <span class="toc-badge badge-fallback">تونل DNS سریع‌تر</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('xdns-fa')">۸پ. XDNS <span class="toc-badge badge-fallback">تونل DNS با mKCP</span></a></li>
+                <li style="{{MASTERDNS_DISPLAY}}"><a href="#fa" onclick="scrollToSection('masterdns-fa')">۸ت. MasterDNS <span class="toc-badge badge-fallback">تونل DNS · MahsaNG v16</span></a></li>
+                <li style="{{GOOSERELAY_DISPLAY}}"><a href="#fa" onclick="scrollToSection('gooserelay-fa')">۸ث. GooseRelay <span class="toc-badge badge-standalone">SOCKS5 از طریق گوگل</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('telemt-fa')">۹. Telegram MTProxy <span class="toc-badge badge-secondary">فقط تلگرام</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('tor-fa')">۱۰. Tor <span class="toc-badge badge-standalone">مستقل</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('psiphon-fa')">۱۱. Psiphon <span class="toc-badge badge-standalone">مستقل</span></a></li>
@@ -1956,6 +2005,51 @@
                     <p style="margin-top: 8px;">کانفیگ به‌صورت پیش‌فرض روی چند resolver می‌چرخه. اگه قطع شدن، resolverهایی رو جایگزین کنید که از شبکه شما جواب می‌دن: <a href="https://github.com/SamNet-dev/findns" target="_blank">findns</a> / <a href="https://gitlab.com/E-Gurl/dns-mns" target="_blank">dns-mns</a></p>
                     <p style="color: var(--text-muted); font-size: 12px;"><strong>فقط تلگرام</strong> — این پروتکل برای وب‌گردی کنده.</p>
                 </div>
+            </div>
+        </div>
+
+        <!-- MasterDNS (تونل DNS مهسانگ نسخه ۱۶) -->
+        <div class="protocol-section" id="masterdns-fa" style="{{MASTERDNS_DISPLAY}}">
+            <div class="protocol-header">
+                <div class="protocol-title">
+                    <h2>۸ت. MasterDNS</h2>
+                    <span class="protocol-badge badge-fallback">تونل DNS · MahsaNG v16</span>
+                </div>
+                <span class="protocol-port">پورت ۵۳/udp</span>
+            </div>
+            <div class="protocol-content">
+                <p class="protocol-desc">تونل DNS پیشرفته (با ARQ و توزیع بار روی چند resolver) که به‌صورت داخلی در اپ <a href="https://www.mahsaserver.com/" target="_blank"><strong>MahsaNG نسخه ۱۶</strong></a> هست — معمولاً سریع‌تر و پایدارتر از dnstt/Slipstream در قطعی‌های شدید. وقتی همه‌چیز جز DNS بسته شده کار می‌کنه. مناسب تلگرام و چت سبک.</p>
+                <div class="extra-section">
+                    <h4>راه‌اندازی</h4>
+                    <ol>
+                        <li>اپ <strong>MahsaNG نسخه ۱۶</strong> رو نصب کنید (اندروید / iOS / دسکتاپ)</li>
+                        <li>تب <strong>MasterDNS</strong> رو باز کنید و دامنه و کلید زیر رو وارد کنید</li>
+                    </ol>
+                </div>
+                <div class="config-box">
+                    <h4>کانفیگ MasterDNS (در فایل <code>masterdns-instructions.txt</code> هم هست)</h4>
+                    <div class="config-value multiline" onclick="copyConfig(this)" style="font-size: 11px; max-height: 220px; overflow-y: auto; white-space: pre-wrap;">{{CONFIG_MASTERDNS}}</div>
+                </div>
+                <p style="color: var(--text-muted); font-size: 12px; margin-top: 12px;">این کلید بین همه کاربران این سرور مشترکه — خصوصی نگهش دارید. فقط تلگرام و چت سبک.</p>
+            </div>
+        </div>
+
+        <!-- GooseRelay (SOCKS5 روی Google Apps Script) -->
+        <div class="protocol-section" id="gooserelay-fa" style="{{GOOSERELAY_DISPLAY}}">
+            <div class="protocol-header">
+                <div class="protocol-title">
+                    <h2>۸ث. GooseRelay</h2>
+                    <span class="protocol-badge badge-standalone">SOCKS5 از طریق گوگل · MahsaNG v16</span>
+                </div>
+                <span class="protocol-port">از طریق گوگل</span>
+            </div>
+            <div class="protocol-content">
+                <p class="protocol-desc">ترافیک رو از طریق یک Google Apps Script که خودتون توی اکانت گوگل‌تون می‌سازید (با ظاهر <code>google.com</code>) به خروجی این سرور تونل می‌کنه، با رمزنگاری AES-256-GCM. توی <a href="https://www.mahsaserver.com/" target="_blank"><strong>MahsaNG نسخه ۱۶</strong></a> هست. وقتی اتصال مستقیم به سرور بسته‌ست ولی گوگل در دسترسه مفیده.</p>
+                <div class="config-box">
+                    <h4>کانفیگ GooseRelay (در فایل <code>gooserelay-instructions.txt</code> هم هست)</h4>
+                    <div class="config-value multiline" onclick="copyConfig(this)" style="font-size: 11px; max-height: 260px; overflow-y: auto; white-space: pre-wrap;">{{CONFIG_GOOSERELAY}}</div>
+                </div>
+                <p style="color: var(--text-muted); font-size: 12px; margin-top: 12px;">نیاز به ساختن یک Google Apps Script کوچک داره (مراحلش توی کانفیگ بالاست). کلید تونل بین همه کاربران این سرور مشترکه — خصوصی نگهش دارید.</p>
             </div>
         </div>
 

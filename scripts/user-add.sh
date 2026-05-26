@@ -758,6 +758,26 @@ with open(html_path, 'w') as f: f.write(html)
         replace_placeholder "{{XDNS_DISPLAY}}" "display:none"
     fi
 
+    # MasterDNS / GooseRelay (MahsaNG v16). These use a server-shared key that
+    # lives in the docker state volume, so the host-side `moav user add` path
+    # can't generate the instructions — `moav regenerate-users` (which runs in
+    # the bootstrap container) populates them. Toggle the section off here unless
+    # an instructions file is already present in the bundle.
+    if [[ -f "$OUTPUT_DIR/masterdns-instructions.txt" ]]; then
+        replace_placeholder "{{CONFIG_MASTERDNS}}" "$(cat "$OUTPUT_DIR/masterdns-instructions.txt")"
+        replace_placeholder "{{MASTERDNS_DISPLAY}}" ""
+    else
+        replace_placeholder "{{CONFIG_MASTERDNS}}" "Run 'moav regenerate-users' to include MasterDNS"
+        replace_placeholder "{{MASTERDNS_DISPLAY}}" "display:none"
+    fi
+    if [[ -f "$OUTPUT_DIR/gooserelay-instructions.txt" ]]; then
+        replace_placeholder "{{CONFIG_GOOSERELAY}}" "$(cat "$OUTPUT_DIR/gooserelay-instructions.txt")"
+        replace_placeholder "{{GOOSERELAY_DISPLAY}}" ""
+    else
+        replace_placeholder "{{CONFIG_GOOSERELAY}}" "Run 'moav regenerate-users' to include GooseRelay"
+        replace_placeholder "{{GOOSERELAY_DISPLAY}}" "display:none"
+    fi
+
     # Clean up backup files
     rm -f "$OUTPUT_HTML.bak"
 
