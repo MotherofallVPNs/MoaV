@@ -195,14 +195,12 @@ blocked. They differ in speed, client support, and resilience:
 | **MasterDNS** | `m` | up to 9× | high (ARQ + packet duplication + multi-resolver) | ✅ on | Harsh networks / heavy shutdowns; **native MahsaNG v16** import |
 | **XDNS** | `x` | ~1× | low | ⬜ off | FinalMask-aware clients (Happ, Xray CLI); per-user auth |
 
-dnstt, Slipstream, and MasterDNS are all enabled by default and run in
-parallel, sharing port 53 via `dns-router` (no `switch-dns` needed — queries
-are fanned out by subdomain suffix). Set `ENABLE_MASTERDNS=false` to opt out.
-XDNS is the exception — it needs sole ownership of port 53, so enable it
-*instead* of the others with
-`moav switch-dns xdns`. For Iran during severe throttling/blackouts, MasterDNS
-is the strongest choice and works directly from the MahsaNG app
-(see [docs/mahsanet.md](mahsanet.md)).
+All four tunnels run in parallel, sharing port 53 via `dns-router` — queries are
+fanned out by subdomain suffix. dnstt, Slipstream, and MasterDNS are on by default;
+XDNS is opt-in (`ENABLE_XDNS=true` in `.env`). Toggle any tunnel independently
+with `ENABLE_XXX=true/false` or via `moav switch-dns`. For Iran during severe
+throttling/blackouts, MasterDNS is the strongest choice and works directly from
+the MahsaNG app (see [docs/mahsanet.md](mahsanet.md)).
 
 #### Optional: IPv6 Support
 

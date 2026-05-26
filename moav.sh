@@ -1876,9 +1876,9 @@ check_dns_for_dnstunnel() {
 # DNS Tunnel Registry
 # =============================================================================
 # Declarative metadata for DNS tunnels sharing port 53. Used by:
-#   - cmd_switch_dns      (pick one active tunnel)
-#   - cmd_start           (block conflicting profile starts)
-#   - doctor_check_conflicts  (detect runtime collisions)
+#   - cmd_switch_dns      (enable/disable individual tunnel daemons)
+#   - cmd_start           (port 53 availability check)
+#   - doctor_check_conflicts  (detect runtime anomalies)
 # To add a new DNS tunnel: append its name here + add a case branch in dns_tunnel_field.
 
 DNS_TUNNELS=("xdns" "dnstt" "slipstream" "masterdns")
@@ -2053,21 +2053,9 @@ cmd_switch_dns() {
             if ! $valid; then
                 error "Unknown DNS tunnel: $req"
                 echo "Available: ${DNS_TUNNELS[*]} off"
-                echo "Combine same-group tunnels with '+', e.g. dnstt+slipstream"
                 return 1
             fi
         done
-        # All requested tunnels must share the same port_group
-        local groups
-        groups=$(dns_tunnel_groups "${requested[*]}")
-        local group_count=0
-        for g in $groups; do group_count=$((group_count + 1)); done
-        if [[ $group_count -gt 1 ]]; then
-            error "Cannot combine tunnels from different port groups: $target"
-            echo "  Groups involved: $groups"
-            echo "  Same-group combos are OK (e.g. dnstt+slipstream share dns-router)."
-            return 1
-        fi
     fi
 
     print_section "Switch DNS Tunnel → $target"
@@ -2292,15 +2280,14 @@ ZONEOF
 dns.${domain}.	1	IN	A	${server_ip}
 
 ;; DNS tunnel NS delegations
-;; dnstt, Slipstream, and MasterDNS share port 53 via dns-router (run in parallel by default)
-;; XDNS is separate — needs sole ownership of port 53 (disabled by default)
+;; All four DNS tunnels share port 53 via dns-router (dnstt/Slipstream/MasterDNS on by default; XDNS opt-in)
 ;; dnstt KCP+Noise DNS tunnel (currently ${dnstt_status})
 ${dnstt_sub}.${domain}.	1	IN	NS	dns.${domain}.
 ;; Slipstream QUIC-over-DNS tunnel (currently ${slip_status})
 ${slip_sub}.${domain}.	1	IN	NS	dns.${domain}.
 ;; MasterDNS ARQ DNS tunnel — MahsaNG v16 native (currently ${masterdns_status})
 ${masterdns_sub}.${domain}.	1	IN	NS	dns.${domain}.
-;; XDNS mKCP DNS tunnel — mutually exclusive with above (currently ${xdns_status})
+;; XDNS mKCP DNS tunnel — opt-in, shares port 53 via dns-router (currently ${xdns_status})
 ${xdns_sub}.${domain}.	1	IN	NS	dns.${domain}.
 ZONEOF
 
@@ -3100,30 +3087,21 @@ doctor_check_ports() {
         ["grafana"]="$(get_env_val 'PORT_GRAFANA' "$env_file" '9444')"
     )
 
-    # Check for systemd-resolved on port 53 (if dnstt enabled)
-    local dnstt_enabled
+    # Check port 53 availability for any enabled DNS tunnel
+    local dnstt_enabled slip_enabled xdns_enabled masterdns_enabled
     dnstt_enabled=$(get_env_val "ENABLE_DNSTT" "$env_file" "true")
-    local slip_enabled
     slip_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
-
-    local xdns_enabled
+    masterdns_enabled=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
     xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "false")
 
-    # Check XDNS vs dnstt/slipstream port 53 conflict
-    if [[ "$xdns_enabled" == "true" ]] && [[ "$dnstt_enabled" == "true" || "$slip_enabled" == "true" ]]; then
-        echo -e "    ${YELLOW}!${NC} XDNS and dnstt/Slipstream both need port 53 — only one can run"
-        echo -e "      ${DIM}Disable one: set ENABLE_XDNS=false or ENABLE_DNSTT=false in .env${NC}"
-        pass=false
-    fi
-
-    if [[ "$dnstt_enabled" == "true" || "$slip_enabled" == "true" ]] && [[ "$xdns_enabled" != "true" ]]; then
+    if [[ "$dnstt_enabled" == "true" || "$slip_enabled" == "true" || "$masterdns_enabled" == "true" || "$xdns_enabled" == "true" ]]; then
         if ss -ulnp 2>/dev/null | grep -q ':53 ' || netstat -ulnp 2>/dev/null | grep -q ':53 '; then
             if systemctl is-active systemd-resolved &>/dev/null; then
                 echo -e "    ${RED}✗${NC} Port 53 in use by systemd-resolved (DNS tunnels need it)"
                 echo -e "      ${DIM}Run: moav setup-dns${NC}"
                 pass=false
             else
-                echo -e "    ${YELLOW}○${NC} Port 53 in use (DNS tunnels may conflict)"
+                echo -e "    ${YELLOW}○${NC} Port 53 in use — DNS tunnels may fail to bind"
             fi
         else
             echo -e "    ${GREEN}✓${NC} Port 53 available for DNS tunnels"
@@ -3149,37 +3127,14 @@ doctor_check_conflicts() {
     enabled=$(dns_tunnels_enabled)
     running=$(dns_tunnels_running)
 
-    # 1) Config-level: multiple port groups enabled in .env
-    local enabled_groups
-    enabled_groups=$(dns_tunnel_groups "$enabled")
-    local eg_count=0
-    for g in $enabled_groups; do eg_count=$((eg_count + 1)); done
-
-    if [[ $eg_count -gt 1 ]]; then
-        echo -e "    ${RED}✗${NC} DNS tunnels from multiple port groups enabled: ${enabled}"
-        echo -e "      ${DIM}Groups: ${enabled_groups} — only one can own port 53${NC}"
-        echo -e "      ${DIM}Fix: moav switch-dns <name>${NC}"
-        pass=false
-    elif [[ -n "$enabled" ]]; then
-        echo -e "    ${GREEN}✓${NC} DNS tunnel(s) enabled: $enabled (group: $enabled_groups)"
+    # 1) Report enabled tunnels (all can coexist via dns-router)
+    if [[ -n "$enabled" ]]; then
+        echo -e "    ${GREEN}✓${NC} DNS tunnel(s) enabled: $enabled"
     else
         echo -e "    ${DIM}○${NC} No DNS tunnel enabled"
     fi
 
-    # 2) Runtime: multiple port groups actually running
-    local running_groups
-    running_groups=$(dns_tunnel_groups "$running")
-    local rg_count=0
-    for g in $running_groups; do rg_count=$((rg_count + 1)); done
-
-    if [[ $rg_count -gt 1 ]]; then
-        echo -e "    ${RED}✗${NC} DNS tunnels from multiple port groups running: ${running}"
-        echo -e "      ${DIM}Groups: ${running_groups} — competing for port 53${NC}"
-        echo -e "      ${DIM}Fix: moav switch-dns <name>${NC}"
-        pass=false
-    fi
-
-    # 3) Config vs runtime drift: a disabled tunnel has containers running
+    # 2) Config vs runtime drift: a disabled tunnel has containers running
     for t in $running; do
         if ! echo " $enabled " | grep -q " $t "; then
             local svcs
@@ -4718,7 +4673,7 @@ show_usage() {
     echo "  regenerate-users      Regenerate all user bundles with current .env"
     echo "  conduit-offsets CMD   Manage Conduit lifetime-offset auto-updater (install/uninstall/status)"
     echo "  setup-dns             Free port 53 for DNS tunnels (disables systemd-resolved)"
-    echo "  switch-dns [NAME|off] Switch active DNS tunnel (xdns/dnstt/slipstream)"
+    echo "  switch-dns [NAME|off] Enable/disable DNS tunnel daemons (dnstt/slipstream/masterdns/xdns)"
     echo ""
     echo "Profiles: proxy, wireguard, amneziawg, dnstunnel, trusttunnel, xhttp, telegram,"
     echo "          admin, conduit, snowflake, monitoring, client, all"
@@ -6197,53 +6152,13 @@ cmd_start() {
     local xdns_start_enabled
     xdns_start_enabled=$(get_env_val "ENABLE_XDNS" "$SCRIPT_DIR/.env" "false")
 
-    # Hard-block DNS tunnel port-group conflicts. Tunnels in the same group
-    # (e.g. dnstt+slipstream share dns-router) can coexist; different groups
-    # (xdns vs dns-router) cannot both own port 53.
-    local starting_tunnels="" running_tunnels
-    running_tunnels=$(dns_tunnels_running)
-
-    if echo "$profiles" | grep -qE "xhttp|dnstunnel|all" && [[ "$xdns_start_enabled" == "true" ]]; then
-        starting_tunnels+="xdns "
-    fi
-    if echo "$profiles" | grep -qE "dnstunnel|all" && [[ "$dnstt_enabled" == "true" ]]; then
-        starting_tunnels+="dnstt "
-    fi
-    if echo "$profiles" | grep -qE "dnstunnel|all" && [[ "$slipstream_enabled" == "true" ]]; then
-        starting_tunnels+="slipstream "
-    fi
-
-    local combined_groups
-    combined_groups=$(dns_tunnel_groups "$running_tunnels $starting_tunnels")
-    local group_count=0
-    for g in $combined_groups; do group_count=$((group_count + 1)); done
-
-    if [[ $group_count -gt 1 ]] && ! $force; then
-        echo ""
-        error "DNS tunnel port-group conflict — cannot start."
-        echo ""
-        echo "  Running:    ${running_tunnels:-none}"
-        echo "  Requested:  ${starting_tunnels:-none}"
-        echo "  Groups:     ${combined_groups}"
-        echo ""
-        echo "  Tunnels from different port groups cannot both bind port 53."
-        echo "  (Same-group tunnels like dnstt+slipstream share dns-router and coexist fine.)"
-        echo ""
-        echo "  Fix:"
-        echo "    moav switch-dns <xdns|dnstt|slipstream|dnstt+slipstream>"
-        echo "    moav switch-dns off                         # disable all"
-        echo "    moav doctor conflicts                       # diagnose"
-        echo ""
-        echo "  Or bypass this check with --force (not recommended; dns-router will crash-loop)."
-        exit 1
-    fi
-
-    # Check if any DNS tunnel needs port 53
+    # Check if any DNS tunnel needs port 53 (all go through dns-router now)
     local needs_port53=false
-    if echo "$profiles" | grep -qE "dnstunnel|all" && [[ "$dnstt_enabled" == "true" || "$slipstream_enabled" == "true" ]]; then
-        needs_port53=true
-    fi
-    if echo "$profiles" | grep -qE "xhttp|all" && [[ "$xdns_start_enabled" == "true" ]]; then
+    local masterdns_start_enabled
+    masterdns_start_enabled=$(get_env_val "ENABLE_MASTERDNS" "true")
+    if echo "$profiles" | grep -qE "dnstunnel|all" && \
+       [[ "$dnstt_enabled" == "true" || "$slipstream_enabled" == "true" || \
+          "$masterdns_start_enabled" == "true" || "$xdns_start_enabled" == "true" ]]; then
         needs_port53=true
     fi
 
@@ -6251,7 +6166,7 @@ cmd_start() {
         if ss -ulnp 2>/dev/null | grep -q ':53 ' || netstat -ulnp 2>/dev/null | grep -q ':53 '; then
             echo ""
             warn "Port 53 is in use (likely by systemd-resolved)"
-            echo "  DNS tunnels (dnstt/Slipstream/XDNS) require port 53 to be free."
+            echo "  DNS tunnels (dnstt/Slipstream/MasterDNS/XDNS) require port 53 to be free."
             echo ""
             if confirm "Disable systemd-resolved and configure direct DNS?" "y"; then
                 setup_dns_for_dnstt

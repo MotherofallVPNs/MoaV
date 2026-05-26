@@ -855,29 +855,23 @@ moav restart wireguard
 
 > **Quick check:** Run `moav doctor dns` to verify NS delegation for DNS tunnel subdomains, and `moav doctor ports` to check port 53 conflicts.
 
-**Port 53 conflict:** XDNS and dnstt/Slipstream both use port 53. Only one group can be active at a time. Use `moav switch-dns <name>` to swap safely, or edit `.env` directly:
+**Enabling/disabling individual tunnels:** All four DNS tunnels share port 53 via `dns-router` (queries fanned out by subdomain suffix). Enable or disable each independently in `.env`:
 ```bash
-# Default — dnstt + Slipstream (broader client ecosystem via standalone binaries):
-ENABLE_XDNS=false
+# Default — dnstt + Slipstream + MasterDNS on; XDNS opt-in (needs FinalMask-aware client):
 ENABLE_DNSTT=true
 ENABLE_SLIPSTREAM=true
-PORT_DNS=53
-PORT_XDNS=5353
-
-# OR XDNS (modern, per-user auth, requires FinalMask-aware client like Happ):
-ENABLE_XDNS=true
-ENABLE_DNSTT=false
-ENABLE_SLIPSTREAM=false
-PORT_XDNS=53
-PORT_DNS=5353
+ENABLE_MASTERDNS=true
+ENABLE_XDNS=false      # set true to add XDNS alongside the others
+PORT_DNS=53            # dns-router public port (owns port 53)
+PORT_XDNS=5356         # xray XDNS secondary host port
 ```
-Easier: `moav switch-dns xdns` or `moav switch-dns dnstt+slipstream`.
+Or use `moav switch-dns` to manage tunnel daemons: `moav switch-dns dnstt+slipstream+masterdns+xdns` (all four) or `moav switch-dns off`.
 
 **Check logs for domain issues:**
 ```bash
 docker compose logs dnstt        # dnstt
 docker compose logs xray         # XDNS (runs inside xray container)
-docker compose logs dns-router   # DNS routing (dnstt/Slipstream only)
+docker compose logs dns-router   # DNS routing (all tunnels)
 ```
 
 If you see `NXDOMAIN: not authoritative for example.com`, the domain wasn't set correctly during bootstrap:

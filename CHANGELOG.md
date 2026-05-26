@@ -10,8 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **All 4 DNS tunnels can now run in parallel on a single port 53** — `dns-router` routes queries to dnstt, Slipstream, MasterDNS, and XDNS by subdomain suffix (`t.` → dnstt, `s.` → Slipstream, `m.` → MasterDNS, `x.` → XDNS). No `moav switch-dns` is needed to combine them; the v1.7.5 port-group mutual exclusion model is retired. dnstt, Slipstream, and MasterDNS are on by default; XDNS remains opt-in (`ENABLE_XDNS=false` by default) because it requires a FinalMask-aware client. Set `ENABLE_XDNS=true` to add it to the mix.
 - **XDNS no longer binds host port 53 directly** — xray's XDNS inbound is now an internal dns-router backend (`xray:5355`). The host port for xray shifts to `PORT_XDNS` (default `5356`, was `53`). `PORT_DNS=53` is the single public-facing DNS port, owned by dns-router.
-- **`moav switch-dns` updated** — all four tunnels are in the `dns-router` group; any combination is valid. `moav switch-dns dnstt+slipstream+masterdns+xdns` activates all four simultaneously.
-- **`moav doctor conflicts`** updated — the crash-loop diagnostic no longer blames xray/XDNS (irrelevant now that XDNS is behind dns-router).
+- **`moav switch-dns` reframed** — all four tunnels are in the same group; any combination is valid. Command now described as "enable/disable tunnel daemons" rather than "pick which group owns port 53." Dead port-group conflict check removed. `moav switch-dns dnstt+slipstream+masterdns+xdns` activates all four simultaneously.
+- **`moav doctor conflicts`** updated — multi-group conflict checks removed (all tunnels same group); now reports enabled tunnels and checks port 53 availability cleanly.
+- **`moav start`** — removed hard-block port-group conflict guard; port 53 check now covers all four tunnels.
+- **`moav doctor env`** — removed stale XDNS-vs-dnstt conflict warning; port 53 check unified to cover any enabled tunnel.
+- **`docs/TROUBLESHOOTING.md`** — "Port 53 conflict" section rewritten to reflect all-four coexistence; `.env` snippet updated.
+- **`docs/DNS.md`** — "Which DNS tunnel" table updated with Default column; all remaining switch-dns/mutual-exclusion notes removed.
 
 ### Added
 - **`dns-router` XDNS routing** — `ENABLE_XDNS=true` adds an `x.<domain>` → `xray:5355` route to dns-router, enabling XDNS to coexist with the other three tunnels on port 53. Closes [#99](https://github.com/shayanb/MoaV/issues/99).
