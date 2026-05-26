@@ -105,6 +105,17 @@ func buildRoutes() ([]Route, error) {
 		log.Printf("[dns-router] Route: *.%s -> %s (slipstream)", domain, backend)
 	}
 
+	enableMasterdns := strings.ToLower(envOr("ENABLE_MASTERDNS", "true"))
+	if enableMasterdns == "true" {
+		domain := os.Getenv("MASTERDNS_DOMAIN")
+		if domain == "" {
+			return nil, fmt.Errorf("MASTERDNS_DOMAIN required when ENABLE_MASTERDNS=true")
+		}
+		backend := envOr("MASTERDNS_BACKEND", "masterdns:5355")
+		routes = append(routes, Route{Domain: strings.ToLower(domain), Backend: backend})
+		log.Printf("[dns-router] Route: *.%s -> %s (masterdns)", domain, backend)
+	}
+
 	return routes, nil
 }
 

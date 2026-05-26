@@ -17,6 +17,8 @@ MoaV deploys 13 protocols, each with different stealth characteristics, speed pr
 | [Telegram MTProxy](#telegram-mtproxy) | 993/tcp | High | Medium | No |
 | [dnstt](#dnstt) | 53/udp | Medium | Low | Yes |
 | [Slipstream](#slipstream) | 53/udp | Medium | Low-Medium | Yes |
+| [MasterDNS](#masterdns) | 53/udp | Medium | Medium | Yes |
+| [GooseRelay](#gooserelay) | 8444/tcp | Very High | Low-Medium | No |
 | [Psiphon Conduit](#psiphon-conduit) | dynamic | High | Medium | No |
 | [XHTTP (VLESS+XHTTP+Reality)](#xhttp-vlessxhttpreality) | 2096/tcp | Very High | High | No |
 | [XDNS (VLESS+mKCP+DNS)](#xdns-vlesmkcpdns) | 53/udp | Medium | Low | Yes |
@@ -161,6 +163,28 @@ QUIC-over-DNS tunnel. Similar to dnstt but uses QUIC for better throughput — t
 - **Engine:** [slipstream](https://github.com/Mygod/slipstream-rust) (Rust) / [pre-built binaries](https://github.com/net2share/slipstream-rust-build/releases)
 - **Requires:** Domain with NS delegation
 
+### MasterDNS
+
+Advanced DNS tunnel optimised beyond dnstt/Slipstream: low-overhead ARQ, resolver load-balancing, and high stability under packet loss. This is the **MasterDNS** component bundled in MahsaNG v16, so the MahsaNG Android app can connect directly. Faster than dnstt and more resilient on lossy links, but still a DNS tunnel (slow vs. real proxies) — use when little else works.
+
+- **Port:** 53/udp (via `dns-router`, on its own subdomain — coexists with dnstt/Slipstream)
+- **Engine:** [MasterDnsVPN](https://github.com/masterking32/MasterDnsVPN) (Go)
+- **Clients:** MahsaNG v16+, or the standalone MasterDnsVPN client (Linux/Windows/macOS/Termux)
+- **Encryption:** AES-256-GCM (`DATA_ENCRYPTION_METHOD=5`); the shared key is in each user's `masterdns-instructions.txt`
+- **Requires:** Domain with NS delegation (`MASTERDNS_SUBDOMAIN`, default `m`)
+- **Note:** Enabled by default (set `ENABLE_MASTERDNS=false` in `.env` to opt out). Egress is routed through sing-box like dnstt/Slipstream. Unlike XDNS, MasterDNS shares port 53 *with* dnstt/Slipstream (dns-router fans out by subdomain), so no `switch-dns` needed.
+
+### GooseRelay
+
+SOCKS5 tunnelled through a **Google Apps Script** web app that the user deploys in their own Google account, which forwards to this VPS exit server. On the wire the client only ever appears to make a domain-fronted HTTPS request to `google.com` — everything is end-to-end AES-256-GCM and Google never sees plaintext or the key. This is the **GooseRelay** component bundled in MahsaNG v16. Extremely stealthy (looks like Google traffic), but throughput is capped by the Apps Script ~20k-calls/day-per-account quota.
+
+- **Port:** `${PORT_GOOSE}`/tcp (default 8444 on the host → 8443 in the container; 8443 on the host is Trojan's)
+- **Engine:** [GooseRelayVPN](https://github.com/kianmhz/GooseRelayVPN) (Go), server built from source
+- **Clients:** MahsaNG v16+, or the standalone GooseRelay client + a user-deployed Apps Script forwarder
+- **Encryption:** AES-256-GCM, shared 64-hex `tunnel_key` (in each user's `gooserelay-instructions.txt`)
+- **Requires:** No domain. `PORT_GOOSE` must be reachable from Google's network. The user sets `RELAY_URL = http://SERVER_IP:PORT_GOOSE/tunnel` in their Apps Script.
+- **Note:** Opt-in — set `ENABLE_GOOSERELAY=true` in `.env`. Egress is routed through sing-box. Real-time apps (Telegram/X) drain the Apps Script quota fast; add more deployments under different Google accounts for capacity.
+
 ### XHTTP (VLESS+XHTTP+Reality)
 
 **Experimental.** VLESS over XHTTP transport with Reality TLS camouflage, powered by Xray-core. Uses the XHTTP (formerly splithttp) transport for multiplexed HTTP requests, making traffic look like regular web browsing. Reality handles TLS without needing a domain.
@@ -216,6 +240,43 @@ Bandwidth donation to the Psiphon network. Psiphon users worldwide route through
 
 - **Engine:** [Psiphon Conduit](https://github.com/Psiphon-Inc/conduit)
 - **Clients:** [Psiphon](https://psiphon.ca/) app (iOS, Android, Windows)
+
+#### How your Conduit helps people in Iran
+
+There are two ways your running Conduit reaches users:
+
+1. **Public pool — automatic, nothing to share.** The moment Conduit is
+   running it donates bandwidth to the Psiphon network. Psiphon app users —
+   including in Iran — are brokered through your server automatically. They
+   don't need a link, an invite, or any setup. This is the main way Conduit
+   helps and requires zero action on the user's side.
+
+2. **Personal Pairing — share a private path with specific people.** Psiphon's
+   Conduit lets you give friends/family a private, prioritized path through
+   your station. The Psiphon app has a "pairing URL" field for this. To set it
+   up: install Psiphon's **Ryve** app (the Conduit manager), import your
+   station with the claim link MoaV generates, then in Ryve enable Personal
+   Pairing and generate a pairing link to send to people in Iran.
+
+#### `moav conduit link`
+
+```bash
+moav conduit link      # Claim link + QR + step-by-step sharing guide
+moav conduit status    # Is it running + connected clients / bandwidth
+```
+
+This prints the **Ryve claim deep link** (`network.ryve.app://…claim=…`) and
+its QR code, plus the sharing walkthrough above.
+
+> **⚠ Security:** the claim link/QR embeds this Conduit's **private key** — it
+> is for importing the station into *your own* phone's Ryve app. Treat it like
+> a password; do **not** post it publicly (anyone with it can take over your
+> station). The public-safe link you give to users is the **Personal Pairing**
+> link generated *inside Ryve*, not the claim link. As of
+> [Psiphon-Inc/conduit#205](https://github.com/Psiphon-Inc/conduit/issues/205)
+> the pairing-URL export lives only in the Conduit/Ryve app UI, so MoaV
+> surfaces the claim link and the steps rather than minting a pairing URL
+> itself. (`moav donate info` is an alias for `moav conduit link`.)
 
 ### Tor Snowflake
 

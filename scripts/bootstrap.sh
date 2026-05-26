@@ -12,6 +12,8 @@ source /app/lib/wireguard.sh
 source /app/lib/amneziawg.sh
 source /app/lib/dnstt.sh
 source /app/lib/slipstream.sh
+source /app/lib/masterdns.sh
+source /app/lib/gooserelay.sh
 source /app/lib/telemt.sh
 
 log_info "Starting MoaV bootstrap..."
@@ -40,6 +42,7 @@ domain_required=false
 [[ "${ENABLE_HYSTERIA2:-true}" == "true" ]] && domain_required=true
 [[ "${ENABLE_DNSTT:-true}" == "true" ]] && domain_required=true
 [[ "${ENABLE_SLIPSTREAM:-true}" == "true" ]] && domain_required=true
+[[ "${ENABLE_MASTERDNS:-true}" == "true" ]] && domain_required=true
 [[ "${ENABLE_TRUSTTUNNEL:-true}" == "true" ]] && domain_required=true
 
 if [[ "$domain_required" == "true" ]] && [[ -z "${DOMAIN:-}" ]]; then
@@ -242,6 +245,9 @@ export ENABLE_AMNEZIAWG="${ENABLE_AMNEZIAWG:-true}"
 export ENABLE_DNSTT="${ENABLE_DNSTT:-true}"
 export ENABLE_SLIPSTREAM="${ENABLE_SLIPSTREAM:-true}"
 export SLIPSTREAM_SUBDOMAIN="${SLIPSTREAM_SUBDOMAIN:-s}"
+export ENABLE_MASTERDNS="${ENABLE_MASTERDNS:-true}"
+export MASTERDNS_SUBDOMAIN="${MASTERDNS_SUBDOMAIN:-m}"
+export ENABLE_GOOSERELAY="${ENABLE_GOOSERELAY:-false}"
 export ENABLE_TRUSTTUNNEL="${ENABLE_TRUSTTUNNEL:-true}"
 export ENABLE_XHTTP="${ENABLE_XHTTP:-true}"
 export PORT_XHTTP="${PORT_XHTTP:-2096}"
@@ -399,6 +405,44 @@ if [[ "${ENABLE_SLIPSTREAM:-true}" == "true" ]]; then
     fi
 else
     log_info "Slipstream is disabled, skipping configuration"
+fi
+
+# -----------------------------------------------------------------------------
+# Generate MasterDNS config (before creating users) — MahsaNG v16 component
+# -----------------------------------------------------------------------------
+if [[ "${ENABLE_MASTERDNS:-false}" == "true" ]]; then
+    log_info "Generating MasterDNS configuration..."
+    if generate_masterdns_config; then
+        log_info "MasterDNS configuration complete"
+        if [[ -s "$STATE_DIR/keys/masterdns-encrypt.key" ]]; then
+            log_info "MasterDNS encryption key verified"
+        else
+            log_error "MasterDNS encryption key NOT found after generation!"
+        fi
+    else
+        log_error "MasterDNS configuration FAILED"
+    fi
+else
+    log_info "MasterDNS is disabled, skipping configuration"
+fi
+
+# -----------------------------------------------------------------------------
+# Generate GooseRelay config (before creating users) — MahsaNG v16 component
+# -----------------------------------------------------------------------------
+if [[ "${ENABLE_GOOSERELAY:-false}" == "true" ]]; then
+    log_info "Generating GooseRelay configuration..."
+    if generate_gooserelay_config; then
+        log_info "GooseRelay configuration complete"
+        if [[ -s "$STATE_DIR/keys/gooserelay-tunnel.key" ]]; then
+            log_info "GooseRelay tunnel key verified"
+        else
+            log_error "GooseRelay tunnel key NOT found after generation!"
+        fi
+    else
+        log_error "GooseRelay configuration FAILED"
+    fi
+else
+    log_info "GooseRelay is disabled, skipping configuration"
 fi
 
 # -----------------------------------------------------------------------------

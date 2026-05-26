@@ -369,6 +369,41 @@ Create distributable zip for an existing user.
 moav user package john        # Creates outputs/bundles/john.zip
 ```
 
+#### `moav user mahsanet`
+Build a [MahsaNG](https://github.com/GFW-knocker/MahsaNG)-ready import package
+for an existing user (aliases: `mahsa`, `sub`, `subscription`).
+
+```bash
+moav user mahsanet john          # URIs + base64 subscription + QR codes
+moav user mahsanet john --no-qr  # Skip terminal QR rendering
+```
+
+Selects the MahsaNG-compatible configs (Reality, CDN, XHTTP, Trojan,
+Shadowsocks-2022, Hysteria2 — standard `vless://`/`trojan://`/`ss://`/
+`hysteria2://` URIs), ordered by reliability for Iran, then:
+
+- prints each individual URI (paste into MahsaNG)
+- prints a base64 **subscription body** (the standard V2Ray subscription
+  format) for one-shot import
+- renders a scannable QR per config in the terminal
+- writes `outputs/bundles/john/mahsanet-uris.txt` and `mahsanet-sub.txt`
+
+WireGuard/AmneziaWG/TrustTunnel/DNS-tunnel/GooseRelay/Telegram configs are intentionally
+excluded (not importable as MahsaNG subscription entries). Full walkthrough:
+[docs/mahsanet.md](mahsanet.md).
+
+#### `moav user gooserelay`
+Print GooseRelay setup instructions for a user (extracted from their bundle).
+
+```bash
+moav user gooserelay john     # Print tunnel_key + Apps Script setup guide
+```
+
+GooseRelay is opt-in (`ENABLE_GOOSERELAY=true` in `.env`). When enabled, each
+user bundle includes `gooserelay-instructions.txt` with the shared `tunnel_key`
+and a step-by-step guide for deploying the Google Apps Script forwarder. See
+[docs/protocols.md → GooseRelay](protocols.md#gooserelay) for full details.
+
 ---
 
 ### Testing & Client
@@ -387,7 +422,7 @@ moav test john --verbose      # Same as above
 - `--json` - Output results in JSON format
 - `-v`, `--verbose` - Show detailed debug output
 
-Tests: Reality, Trojan, Hysteria2, TrustTunnel, WireGuard, dnstt
+Tests: Reality, Trojan, Hysteria2, TrustTunnel, WireGuard, dnstt, Slipstream, MasterDNS
 
 **Sample output:**
 ```
@@ -404,6 +439,8 @@ Tests: Reality, Trojan, Hysteria2, TrustTunnel, WireGuard, dnstt
   ✓ hysteria2    Connected via Hysteria2
   ✓ wireguard    Config valid, endpoint reachable
   ○ dnstt        No dnstt config found in bundle
+  ○ slipstream   No slipstream config found in bundle
+  ○ masterdns    No masterdns config found in bundle
 
 ═══════════════════════════════════════════════════════════════
 ```
@@ -430,7 +467,7 @@ moav client connect john -p hysteria2       # Short form
 **Options:**
 - `--protocol`, `-p` - Specify protocol (default: auto)
 
-**Protocols:** `auto`, `reality`, `trojan`, `hysteria2`, `wireguard`, `tor`, `dnstt`
+**Protocols:** `auto`, `reality`, `trojan`, `hysteria2`, `wireguard`, `tor`, `dnstt`, `slipstream`, `masterdns`
 
 **Proxy endpoints (configurable in .env):**
 - SOCKS5: `localhost:10800` (CLIENT_SOCKS_PORT)
@@ -519,6 +556,27 @@ SNOWFLAKE_BANDWIDTH=5                # Bandwidth limit in Mbps
 SNOWFLAKE_CAPACITY=50                # Max concurrent clients
 ```
 
+#### `moav conduit`
+Show the Psiphon Conduit claim link, QR code, and sharing guide.
+
+```bash
+moav conduit              # Same as 'moav conduit link'
+moav conduit link         # Ryve claim deep link + QR + sharing walkthrough
+moav conduit status       # Running state + connected clients / bandwidth
+moav conduit help         # Usage
+```
+
+While Conduit runs it already serves Psiphon users (including in Iran) through
+the **public pool** — nothing needs to be shared for that. To give specific
+people a private path, use **Personal Pairing**: import the station into the
+Ryve app with the claim link this command prints, then generate a pairing
+link inside Ryve.
+
+> **⚠ Security:** the claim link/QR embeds this Conduit's **private key** (for
+> your own phone's Ryve app). Treat it like a password — do **not** post it
+> publicly. The link you share with users is the Personal Pairing link
+> generated inside Ryve, not the claim link. `moav donate info` is an alias.
+
 ---
 
 ### Migration
@@ -591,6 +649,8 @@ Profiles group related services together.
 | `proxy` | sing-box, decoy, certbot |
 | `wireguard` | wireguard, wstunnel |
 | `dnstt` | dnstt |
+| `slipstream` | slipstream |
+| `masterdns` | masterdns |
 | `trusttunnel` | trusttunnel |
 | `admin` | admin |
 | `conduit` | psiphon-conduit |
@@ -613,6 +673,8 @@ moav start all                # Start everything
 | sing-box | `proxy`, `singbox`, `reality` |
 | wireguard | `wg` |
 | dnstt | `dns` |
+| slipstream | `slip` |
+| masterdns | `mdns` |
 | psiphon-conduit | `conduit` |
 
 **Usage:**

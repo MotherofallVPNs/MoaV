@@ -38,6 +38,7 @@ nav:
     - VPS Deployment: DEPLOY.md
   - User Guides:
     - Client Apps: CLIENTS.md
+    - MahsaNG Import: mahsanet.md
     - CLI Reference: CLI.md
     - Monitoring: MONITORING.md
     - Troubleshooting: TROUBLESHOOTING.md

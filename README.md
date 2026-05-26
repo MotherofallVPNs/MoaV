@@ -8,7 +8,7 @@ Multi-protocol Internet censorship circumvention stack optimized for hostile net
 
 ## Features
 
-- **Multiple protocols** - Reality (VLESS), Trojan, Shadowsocks-2022, Hysteria2, XHTTP (VLESS+XHTTP+Reality), XDNS (mKCP DNS tunnel), TrustTunnel, AmneziaWG, WireGuard (direct & wstunnel), DNS tunnels (dnstt + Slipstream), Telegram MTProxy, CDN (VLESS+WS)
+- **Multiple protocols** - Reality (VLESS), Trojan, Shadowsocks-2022, Hysteria2, XHTTP (VLESS+XHTTP+Reality), XDNS (mKCP DNS tunnel), TrustTunnel, AmneziaWG, WireGuard (direct & wstunnel), DNS tunnels (dnstt + Slipstream + MasterDNS), GooseRelay (SOCKS5 over Google Apps Script), Telegram MTProxy, CDN (VLESS+WS)
 - **Stealth-first** - All traffic looks like normal HTTPS, WebSocket, DNS, or IMAPS
 - **Per-user credentials** - Create, revoke, and manage users independently
 - **Easy deployment** - Docker Compose based, single command setup
@@ -134,6 +134,8 @@ See the [Setup Guide](docs/SETUP.md) for complete instructions, the [CLI Referen
 | WireGuard (wstunnel) | 8080/tcp | ★★★★☆ | ★★★★☆ | VPN when UDP is blocked |
 | DNS Tunnel (dnstt) | 53/udp | ★★★☆☆ | ★☆☆☆☆ | Last resort, hard to block |
 | Slipstream | 53/udp | ★★★☆☆ | ★★☆☆☆ | QUIC-over-DNS, 1.5-5x faster than dnstt |
+| MasterDNS | 53/udp | ★★★☆☆ | ★★★☆☆ | Advanced DNS tunnel (ARQ + resolver LB), MahsaNG v16 (on by default) |
+| GooseRelay | 8444/tcp | ★★★★★ | ★★☆☆☆ | SOCKS5 via Google Apps Script, fronted as google.com, MahsaNG v16 (off by default) |
 | Telegram MTProxy | 993/tcp | ★★★★☆ | ★★★☆☆ | Fake-TLS V2, direct Telegram access |
 | XHTTP (VLESS+XHTTP+Reality) | 2096/tcp | ★★★★★ | ★★★★☆ | Xray-core, no domain needed |
 | XDNS (VLESS+mKCP+DNS) | 53/udp | ★★★☆☆ | ★☆☆☆☆ | DNS tunnel via Xray FinalMask, works during heavy shutdowns |
@@ -150,9 +152,12 @@ moav user add alice bob   # Add multiple users
 moav user add --batch 10 --prefix team  # Batch create team01..team10
 moav user revoke joe      # Revoke user
 moav user package joe     # Create zip bundle
+moav user mahsanet joe    # MahsaNG import: subscription URL + URIs + QR codes
 ```
 
 Each user gets a bundle in `outputs/bundles/<username>/` with config files, QR codes, and a README.html guide.
+
+**MahsaNG users (2M+ in Iran):** `moav user mahsanet <user>` emits a single base64 subscription plus the individual `vless://`/`trojan://`/`ss://`/`hysteria2://` URIs and QR codes ready to import into the [MahsaNG](https://github.com/GFW-knocker/MahsaNG) app. See [docs/mahsanet.md](docs/mahsanet.md).
 
 **Download bundles** from the admin dashboard at `https://your-server:9443` or via SCP.
 
@@ -175,7 +180,10 @@ moav logs sing-box        # View service logs
 moav doctor               # Run diagnostics
 moav doctor dns           # Check DNS configuration
 moav donate               # Donate configs to MahsaNet/Psiphon/Snowflake
+moav conduit link         # Psiphon Conduit claim link, QR & sharing guide
 ```
+
+**Psiphon Conduit:** once `conduit` is running it already serves Psiphon users (including in Iran) through the public pool — no link to share. To give specific people a private path, `moav conduit link` prints the Ryve claim link/QR and the Personal Pairing steps. The claim link embeds the private key — keep it secret; share with users only via Personal Pairing inside Ryve. See [Psiphon Conduit in docs/protocols.md](docs/protocols.md#psiphon-conduit).
 
 **Profiles:** `proxy`, `wireguard`, `amneziawg`, `dnstunnel`, `trusttunnel`, `telegram`, `xhttp`, `admin`, `conduit`, `snowflake`, `monitoring`, `all`
 
@@ -221,6 +229,7 @@ See [docs/CLIENTS.md](docs/CLIENTS.md) for complete list and setup instructions.
 - [CLI Reference](docs/CLI.md) - All moav commands and options
 - [DNS Configuration](docs/DNS.md) - DNS records setup
 - [Client Setup](docs/CLIENTS.md) - How to connect from devices
+- [MahsaNG Import](docs/mahsanet.md) - Import MoaV configs into the MahsaNG app (Iran)
 - [VPS Deployment](docs/DEPLOY.md) - One-click cloud deployment
 - [Monitoring](docs/MONITORING.md) - Grafana + Prometheus observability
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
@@ -248,9 +257,10 @@ See [docs/CLIENTS.md](docs/CLIENTS.md) for complete list and setup instructions.
 | 8080/tcp | TCP | wstunnel | No |
 | 993/tcp | TCP | Telegram MTProxy | No |
 | 2096/tcp | TCP | XHTTP (VLESS+XHTTP+Reality) | No |
+| 8444/tcp | TCP | GooseRelay exit (when `ENABLE_GOOSERELAY=true`) | No |
 | 9443/tcp | TCP | Admin dashboard | No |
 | 9444/tcp | TCP | Grafana (monitoring) | No |
-| 53/udp | UDP | DNS tunnel | Yes |
+| 53/udp | UDP | DNS tunnel (dnstt / Slipstream / MasterDNS) | Yes |
 | 80/tcp | TCP | Let's Encrypt | Yes (during setup) |
 
 ### Domainless Mode
@@ -261,6 +271,7 @@ Don't have a domain? MoaV can run in **domainless mode** with:
 - **WireGuard** (direct UDP + WebSocket tunnel)
 - **AmneziaWG** (obfuscated WireGuard, defeats DPI)
 - **Telegram MTProxy** (fake-TLS, direct Telegram access)
+- **GooseRelay** (SOCKS5 over Google Apps Script — no domain needed)
 - **Admin dashboard** (uses self-signed certificate)
 - **Conduit** (Psiphon bandwidth donation)
 - **Snowflake** (Tor bandwidth donation)
@@ -286,6 +297,8 @@ MoaV/
 │   ├── amneziawg/
 │   ├── trusttunnel/
 │   ├── dnstt/
+│   ├── masterdns/
+│   ├── gooserelay/
 │   ├── telemt/
 │   └── monitoring/
 ├── scripts/                # Management scripts

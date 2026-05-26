@@ -11,6 +11,8 @@ source /app/lib/wireguard.sh
 source /app/lib/amneziawg.sh
 source /app/lib/dnstt.sh
 source /app/lib/slipstream.sh
+source /app/lib/masterdns.sh
+source /app/lib/gooserelay.sh
 source /app/lib/telemt.sh
 
 # Default state directory if not set
@@ -598,6 +600,32 @@ if [[ "${ENABLE_SLIPSTREAM:-true}" == "true" ]]; then
         BUNDLE_CHANGED=true
         slipstream_generate_client_instructions "$USER_ID" "$OUTPUT_DIR"
         log_info "  - Slipstream instructions generated"
+    fi
+fi
+
+# -----------------------------------------------------------------------------
+# Generate MasterDNS instructions (if enabled) — MahsaNG v16 component
+# -----------------------------------------------------------------------------
+if [[ "${ENABLE_MASTERDNS:-true}" == "true" ]]; then
+    if [[ -f "$OUTPUT_DIR/masterdns-instructions.txt" ]] && [[ "$FORCE_REGENERATE" != "force" ]]; then
+        log_info "  - MasterDNS instructions exist, skipping"
+    else
+        BUNDLE_CHANGED=true
+        masterdns_generate_client_instructions "$USER_ID" "$OUTPUT_DIR"
+        log_info "  - MasterDNS instructions generated"
+    fi
+fi
+
+# -----------------------------------------------------------------------------
+# Generate GooseRelay instructions (if enabled) — MahsaNG v16 component
+# -----------------------------------------------------------------------------
+if [[ "${ENABLE_GOOSERELAY:-false}" == "true" ]]; then
+    if [[ -f "$OUTPUT_DIR/gooserelay-instructions.txt" ]] && [[ "$FORCE_REGENERATE" != "force" ]]; then
+        log_info "  - GooseRelay instructions exist, skipping"
+    else
+        BUNDLE_CHANGED=true
+        gooserelay_generate_client_instructions "$USER_ID" "$OUTPUT_DIR"
+        log_info "  - GooseRelay instructions generated"
     fi
 fi
 

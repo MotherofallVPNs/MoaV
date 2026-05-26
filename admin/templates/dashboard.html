@@ -289,6 +289,15 @@
             text-decoration: none;
         }
         .dl-link:hover { text-decoration: underline; }
+        .dl-mahsang {
+            margin-left: 0.5rem;
+            color: var(--green);
+            border: 1px solid var(--green);
+            border-radius: 3px;
+            padding: 0.05rem 0.35rem;
+            font-size: 0.65rem;
+        }
+        .dl-mahsang:hover { background: var(--green); color: #000; }
         .empty-msg {
             color: var(--text-dim);
             font-size: 0.85rem;
@@ -851,10 +860,13 @@
                             {% if user.has_telemt %}<span class="tag">MTProxy</span>{% endif %}
                             {% if user.has_dnstt %}<span class="tag">dnstt</span>{% endif %}
                             {% if user.has_slipstream %}<span class="tag">Slip</span>{% endif %}
+                            {% if user.has_masterdns %}<span class="tag">MDNS</span>{% endif %}
+                            {% if user.has_gooserelay %}<span class="tag">Goose</span>{% endif %}
                             {% if user.is_donated %}<span class="tag tag-donated">donated</span>{% endif %}
                         </td>
                         <td style="text-align:right;">
                             <a href="/download/{{ user.username }}" class="dl-link">.zip</a>
+                            {% if user.has_mahsang %}<a href="/download/mahsang/{{ user.username }}" class="dl-link dl-mahsang" title="Download MahsaNG import package (subscription + MasterDNS + GooseRelay)">MahsaNG</a>{% endif %}
                         </td>
                     </tr>
                     {% endfor %}

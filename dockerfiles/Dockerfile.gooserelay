@@ -1,0 +1,47 @@
+# =============================================================================
+# MoaV GooseRelay - exit server for SOCKS5-over-Google-Apps-Script tunnel
+# =============================================================================
+# GooseRelay (github.com/kianmhz/GooseRelayVPN) tunnels raw TCP through a
+# user-deployed Google Apps Script web app to this VPS exit server
+# (AES-256-GCM, domain-fronted via google.com). Bundled in MahsaNG v16
+# (GooseRelay v1.6.0).
+#
+# The Apps Script forwarder is a "dumb pipe" the client/user deploys in their
+# own Google account; this image is only the VPS-side decrypt+egress endpoint.
+# Built from source, mirroring Dockerfile.dnstt.
+# =============================================================================
+
+FROM golang:1.22-alpine AS builder
+
+ARG GOOSERELAY_VERSION=v1.6.0
+
+RUN apk add --no-cache git
+
+WORKDIR /src
+
+RUN git clone https://github.com/kianmhz/GooseRelayVPN.git . && \
+    git checkout ${GOOSERELAY_VERSION}
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -o /goose-server -trimpath \
+      -ldflags "-s -w -X main.version=${GOOSERELAY_VERSION}" ./cmd/server
+
+FROM alpine:3.21
+
+RUN apk add --no-cache ca-certificates tzdata bash
+
+RUN addgroup -S moav && adduser -S moav -G moav
+
+COPY --from=builder /goose-server /usr/local/bin/goose-server
+
+RUN mkdir -p /app /etc/gooserelay /state && \
+    chown -R moav:moav /app /etc/gooserelay /state
+
+COPY scripts/gooserelay-entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+EXPOSE 8443/tcp
+
+USER moav
+ENTRYPOINT ["/app/entrypoint.sh"]

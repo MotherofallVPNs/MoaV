@@ -13,7 +13,7 @@ _moav() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     cword=$COMP_CWORD
 
-    local commands="help version install uninstall check doctor bootstrap domainless profiles start stop restart status logs users user admin build test client donate export import migrate-ip regenerate-users setup-dns update"
+    local commands="help version install uninstall check doctor bootstrap domainless profiles start stop restart status logs users user admin build test client donate conduit export import migrate-ip regenerate-users setup-dns update"
     local services="sing-box decoy wstunnel wireguard amneziawg dns-router dnstt slipstream trusttunnel telemt xray admin psiphon-conduit snowflake grafana grafana-proxy prometheus cadvisor node-exporter clash-exporter singbox-exporter telemt-exporter xray-exporter wireguard-exporter amneziawg-exporter snowflake-exporter"
     local profiles="proxy wireguard amneziawg dnstunnel trusttunnel xhttp telegram admin conduit snowflake monitoring client all"
     local service_aliases="singbox sing proxy reality wg ws tunnel dns slip tg mtproxy telegram conduit psiphon snow tor grafana-cdn"
@@ -76,7 +76,7 @@ _moav() {
         user)
             local subcmd="${COMP_WORDS[2]:-}"
             if [[ $cword -eq 2 ]]; then
-                COMPREPLY=($(compgen -W "list ls add revoke rm remove delete package pkg" -- "$cur"))
+                COMPREPLY=($(compgen -W "list ls add revoke rm remove delete package pkg mahsanet mahsa sub subscription" -- "$cur"))
             else
                 case "$subcmd" in
                     add)
@@ -84,6 +84,9 @@ _moav() {
                         ;;
                     revoke|rm|remove|delete|package|pkg)
                         COMPREPLY=($(compgen -W "$(_moav_users)" -- "$cur"))
+                        ;;
+                    mahsanet|mahsa|sub|subscription)
+                        COMPREPLY=($(compgen -W "$(_moav_users) --no-qr" -- "$cur"))
                         ;;
                 esac
             fi
@@ -95,7 +98,12 @@ _moav() {
             ;;
         donate)
             if [[ $cword -eq 2 ]]; then
-                COMPREPLY=($(compgen -W "setup list delete status" -- "$cur"))
+                COMPREPLY=($(compgen -W "setup list delete status info" -- "$cur"))
+            fi
+            ;;
+        conduit)
+            if [[ $cword -eq 2 ]]; then
+                COMPREPLY=($(compgen -W "link status help" -- "$cur"))
             fi
             ;;
         test)

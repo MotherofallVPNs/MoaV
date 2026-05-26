@@ -182,8 +182,10 @@ services:
     environment:
       - DNSTT_DOMAIN=${DNSTT_SUBDOMAIN:-t}.${DOMAIN}
       - SLIPSTREAM_DOMAIN=${SLIPSTREAM_SUBDOMAIN:-s}.${DOMAIN}
+      - MASTERDNS_DOMAIN=${MASTERDNS_SUBDOMAIN:-m}.${DOMAIN}
       - ENABLE_DNSTT=${ENABLE_DNSTT:-true}
       - ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM:-true}
+      - ENABLE_MASTERDNS=${ENABLE_MASTERDNS:-true}
       - TZ=${TZ:-UTC}
     cap_drop:
       - ALL
@@ -263,6 +265,43 @@ services:
     tmpfs:
       - /tmp:rw,noexec,size=10m
     mem_limit: 128m
+    cpus: 0.5
+    profiles:
+      - dnstunnel
+      - all
+
+  # MasterDNS: advanced DNS tunnel (ARQ + resolver LB) — MahsaNG v16 component.
+  # Enabled by default (ENABLE_MASTERDNS=true). Coexists with dnstt/Slipstream
+  # on its own subdomain; dns-router fans queries out by domain suffix.
+  masterdns:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.masterdns
+      args:
+        MASTERDNS_VERSION: ${MASTERDNS_VERSION:-v2026.05.10.180256-27c7e11}
+    container_name: moav-masterdns
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - moav_net
+    expose:
+      - "5355"
+    volumes:
+      - ./configs/masterdns:/etc/masterdns:ro
+      - moav_state:/state
+      - ./outputs:/outputs
+    environment:
+      - ENABLE_MASTERDNS=${ENABLE_MASTERDNS:-true}
+      - MASTERDNS_SUBDOMAIN=${MASTERDNS_SUBDOMAIN:-m}
+      - TZ=${TZ:-UTC}
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,size=10m
+    mem_limit: 192m
     cpus: 0.5
     profiles:
       - dnstunnel
@@ -482,6 +521,46 @@ services:
     cpus: 0.5
     profiles:
       - snowflake
+      - all
+
+  # ===========================================================================
+  # GOOSERELAY: SOCKS5-over-Google-Apps-Script tunnel exit server
+  # MahsaNG v16 component. Opt-in (ENABLE_GOOSERELAY=true).
+  # The Apps Script forwarder + client are user-side; this is the VPS exit.
+  # ===========================================================================
+  gooserelay:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.gooserelay
+      args:
+        GOOSERELAY_VERSION: ${GOOSERELAY_VERSION:-v1.6.0}
+    container_name: moav-gooserelay
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - moav_net
+    ports:
+      # Host PORT_GOOSE -> container 8443 (8443 on the host is Trojan's).
+      # The Apps Script RELAY_URL must use http://SERVER_IP:PORT_GOOSE/tunnel.
+      - "${PORT_GOOSE:-8444}:8443/tcp"
+    volumes:
+      - ./configs/gooserelay:/etc/gooserelay:ro
+      - moav_state:/state
+      - ./outputs:/outputs
+    environment:
+      - ENABLE_GOOSERELAY=${ENABLE_GOOSERELAY:-false}
+      - TZ=${TZ:-UTC}
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,size=10m
+    mem_limit: 192m
+    cpus: 0.5
+    profiles:
+      - gooserelay
       - all
 
   # Snowflake Prometheus Exporter - parses snowflake logs for metrics

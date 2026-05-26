@@ -2276,34 +2276,41 @@ generate_dns_zone_file() {
 ${domain}.	1	IN	A	${server_ip}
 ZONEOF
 
-    # DNS tunnel nameserver (needed for dnstt/Slipstream/XDNS)
-    local dnstt_enabled slipstream_enabled xdns_enabled
+    # DNS tunnel nameserver (needed for dnstt/Slipstream/MasterDNS/XDNS)
+    local dnstt_enabled slipstream_enabled masterdns_enabled xdns_enabled
     dnstt_enabled=$(get_env_val "ENABLE_DNSTT" "$env_file" "true")
     slipstream_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
+    masterdns_enabled=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
     xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "false")
 
     # Always include DNS tunnel records (user can decide which to enable later)
-    local dnstt_sub slip_sub xdns_sub
+    local dnstt_sub slip_sub masterdns_sub xdns_sub
     dnstt_sub=$(get_env_val "DNSTT_SUBDOMAIN" "$env_file" "t")
     slip_sub=$(get_env_val "SLIPSTREAM_SUBDOMAIN" "$env_file" "s")
+    masterdns_sub=$(get_env_val "MASTERDNS_SUBDOMAIN" "$env_file" "m")
     xdns_sub=$(get_env_val "XDNS_SUBDOMAIN" "$env_file" "x")
 
-    local dnstt_status="enabled" slip_status="enabled" xdns_status="enabled"
+    local dnstt_status="enabled" slip_status="enabled" masterdns_status="enabled" xdns_status="disabled"
     [[ "$dnstt_enabled" != "true" ]] && dnstt_status="disabled"
     [[ "$slipstream_enabled" != "true" ]] && slip_status="disabled"
-    [[ "$xdns_enabled" != "true" ]] && xdns_status="disabled"
+    [[ "$masterdns_enabled" != "true" ]] && masterdns_status="disabled"
+    [[ "$xdns_enabled" == "true" ]] && xdns_status="enabled"
 
     cat >> "$output_file" << ZONEOF
 
 ;; DNS tunnel nameserver — required for NS delegation (DNS only, NOT proxied)
 dns.${domain}.	1	IN	A	${server_ip}
 
-;; DNS tunnel NS delegations (dnstt and XDNS use port 53 — enable one group at a time)
-;; dnstt DNS tunnel (currently ${dnstt_status})
+;; DNS tunnel NS delegations
+;; dnstt, Slipstream, and MasterDNS share port 53 via dns-router (run in parallel by default)
+;; XDNS is separate — needs sole ownership of port 53 (disabled by default)
+;; dnstt KCP+Noise DNS tunnel (currently ${dnstt_status})
 ${dnstt_sub}.${domain}.	1	IN	NS	dns.${domain}.
 ;; Slipstream QUIC-over-DNS tunnel (currently ${slip_status})
 ${slip_sub}.${domain}.	1	IN	NS	dns.${domain}.
-;; XDNS mKCP DNS tunnel (currently ${xdns_status})
+;; MasterDNS ARQ DNS tunnel — MahsaNG v16 native (currently ${masterdns_status})
+${masterdns_sub}.${domain}.	1	IN	NS	dns.${domain}.
+;; XDNS mKCP DNS tunnel — mutually exclusive with above (currently ${xdns_status})
 ${xdns_sub}.${domain}.	1	IN	NS	dns.${domain}.
 ZONEOF
 
@@ -2855,7 +2862,10 @@ doctor_check_dns() {
     local xdns_pre_enabled=""
     xdns_pre_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "false")
 
-    if [[ "$dnstt_enabled" == "true" || "$slipstream_enabled" == "true" || "$xdns_pre_enabled" == "true" ]]; then
+    local masterdns_pre_enabled=""
+    masterdns_pre_enabled=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
+
+    if [[ "$dnstt_enabled" == "true" || "$slipstream_enabled" == "true" || "$masterdns_pre_enabled" == "true" || "$xdns_pre_enabled" == "true" ]]; then
         local dns_host="dns.${domain}"
         if [[ -n "$server_ip" ]]; then
             if ! doctor_check_a_record "DNS nameserver A record" "$dns_host" "$server_ip" "set A dns -> ${server_ip} (DNS only)"; then
@@ -2881,6 +2891,16 @@ doctor_check_dns() {
             fi
         fi
 
+        local masterdns_enabled=""
+        masterdns_enabled=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
+        if [[ "$masterdns_enabled" == "true" ]]; then
+            local masterdns_subdomain=""
+            masterdns_subdomain=$(get_env_val "MASTERDNS_SUBDOMAIN" "$env_file" "m")
+            if ! doctor_check_ns_record "MasterDNS NS record" "${masterdns_subdomain}.${domain}" "$dns_host" "set NS ${masterdns_subdomain} -> ${dns_host}"; then
+                failures=$((failures + 1))
+            fi
+        fi
+
         local xdns_enabled=""
         xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "false")
         if [[ "$xdns_enabled" == "true" ]]; then
@@ -2891,7 +2911,7 @@ doctor_check_dns() {
             fi
         fi
     else
-        info "DNS tunnel checks skipped: dnstt, Slipstream, and XDNS are disabled."
+        info "DNS tunnel checks skipped: dnstt, Slipstream, MasterDNS, and XDNS are all disabled."
     fi
 
     cdn_subdomain=$(get_env_val "CDN_SUBDOMAIN" "$env_file" "")
@@ -4691,10 +4711,12 @@ show_usage() {
     echo "  user add --batch N [--prefix P]    Batch create (user01, user02...)"
     echo "  user revoke NAME      Revoke a user"
     echo "  user package NAME     Create zip bundle for existing user"
+    echo "  user mahsanet NAME    MahsaNG import: subscription URL, URIs & QR codes"
     echo "  admin password        Reset admin dashboard password"
     echo ""
     echo "Donate & Test:"
     echo "  donate                Donate VPN configs to MahsaNet/Psiphon/Snowflake"
+    echo "  conduit [link|status] Psiphon Conduit claim link, QR & sharing guide"
     echo "  test USERNAME [-v]    Test connectivity for a user"
     echo "  client connect USER   Client mode (connect as user, exposes local proxy)"
     echo ""
@@ -5735,6 +5757,100 @@ cmd_donate() {
     esac
 }
 
+_conduit_sharing_explainer() {
+    echo ""
+    echo -e "  ${WHITE}How your Conduit helps people in Iran${NC}"
+    echo ""
+    echo "  1. Public pool (automatic — nothing to share)"
+    echo "     While Conduit runs, it donates bandwidth to the Psiphon network."
+    echo "     Psiphon app users worldwide — including in Iran — are brokered"
+    echo "     through your server automatically. No link, no setup for them."
+    echo ""
+    echo "  2. Personal Pairing (share a private path with specific people)"
+    echo "     Psiphon's Conduit lets you give friends/family a private, direct"
+    echo "     path through your station. To do this:"
+    echo "       a. Install the Ryve app (Psiphon's Conduit manager) on your phone."
+    echo "       b. Import this station using the claim link below."
+    echo "       c. In Ryve, enable Personal Pairing and generate a pairing link."
+    echo "       d. Send that pairing link to people in Iran; they paste it into"
+    echo "          the Psiphon app's \"pairing URL\" field to route through you."
+    echo ""
+    echo -e "  ${YELLOW}⚠ Security:${NC} the claim link / QR below embeds this Conduit's"
+    echo -e "  ${YELLOW}  private key${NC} — it imports the station into YOUR OWN phone."
+    echo "  Treat it like a password. Do NOT post it publicly: anyone with it"
+    echo "  can take over your station. The public-safe link you share with"
+    echo "  users is the Personal Pairing link generated inside Ryve (step c),"
+    echo "  not this one. (Pairing-URL export lives in the Conduit/Ryve app; see"
+    echo "  github.com/Psiphon-Inc/conduit/issues/205 for its status.)"
+    echo ""
+}
+
+cmd_conduit() {
+    local action="${1:-}"
+
+    case "$action" in
+        ""|link|--link|info|--info|show)
+            print_section "Psiphon Conduit"
+            _conduit_sharing_explainer
+            cmd_donate_conduit_info
+            ;;
+        status|--status)
+            local env_file="$SCRIPT_DIR/.env"
+            print_section "Psiphon Conduit Status"
+            echo ""
+            local conduit_enabled
+            conduit_enabled=$(get_env_val "ENABLE_CONDUIT" "$env_file" "true")
+            if [[ "$conduit_enabled" != "true" ]]; then
+                echo -e "  ${DIM}○ Disabled — enable in .env: ENABLE_CONDUIT=true${NC}"
+                return 0
+            fi
+            local conduit_running=""
+            docker compose ps psiphon-conduit --status running 2>/dev/null | tail -n +2 | grep -q . && conduit_running="yes"
+            if [[ -n "$conduit_running" ]]; then
+                local conduit_bw conduit_clients
+                conduit_bw=$(get_env_val "CONDUIT_BANDWIDTH" "$env_file" "100")
+                conduit_clients=$(get_env_val "CONDUIT_MAX_COMMON_CLIENTS" "$env_file" "200")
+                echo -e "  ${GREEN}✓${NC} Running — ${conduit_bw} Mbps, ${conduit_clients} max clients"
+                local cm
+                cm=$(_query_conduit_metrics 2>/dev/null)
+                if [[ -n "$cm" ]]; then
+                    local c_conn c_up c_down
+                    c_conn=$(echo "$cm" | awk '{print $1}')
+                    c_up=$(echo "$cm" | awk '{print $2}')
+                    c_down=$(echo "$cm" | awk '{print $3}')
+                    echo -e "  Connected: ${CYAN}${c_conn}${NC} clients | Bandwidth: $(_format_bytes_sh "$c_up") ↑ / $(_format_bytes_sh "$c_down") ↓"
+                fi
+                echo -e "  ${DIM}Claim link: moav conduit link${NC}"
+            else
+                echo -e "  ${YELLOW}○${NC} Enabled but not running — start with: moav start conduit"
+            fi
+            ;;
+        help|--help|-h)
+            echo "Usage: moav conduit [command]"
+            echo ""
+            echo "Psiphon Conduit donates bandwidth to help people bypass censorship."
+            echo ""
+            echo "Commands:"
+            echo "  link       Show the Ryve claim link + QR and how to share (default)"
+            echo "  status     Show whether Conduit is running and live stats"
+            echo "  help       Show this help"
+            echo ""
+            echo "Notes:"
+            echo "  • Running Conduit already serves Psiphon users in Iran via the"
+            echo "    public pool — no link needs to be shared for that."
+            echo "  • The claim link embeds the private key (for your own phone's"
+            echo "    Ryve app). Share with users only via Personal Pairing in Ryve."
+            echo "  • Bandwidth/clients: moav donate setup. Status of all donation"
+            echo "    services: moav donate status."
+            ;;
+        *)
+            error "Unknown conduit command: $action"
+            echo "Run 'moav conduit help' for usage."
+            exit 1
+            ;;
+    esac
+}
+
 cmd_admin() {
     local action="${1:-}"
 
@@ -6170,6 +6286,11 @@ cmd_start() {
             echo -e "  ${CYAN}Grafana (CDN):${NC}   $grafana_cdn"
         fi
     fi
+    # Show Conduit sharing hint if conduit was started
+    if echo "$profiles" | grep -qE "conduit|all"; then
+        echo -e "  ${CYAN}Psiphon Conduit:${NC} serving Psiphon users (incl. Iran) via the public pool"
+        echo -e "  ${DIM}                  Claim link, QR & sharing guide: moav conduit link${NC}"
+    fi
 
     if echo "$profiles" | grep -qE "admin|monitoring|proxy|all"; then
         echo ""
@@ -6533,8 +6654,20 @@ cmd_user() {
                 exit 1
             fi
             ;;
+        mahsanet|mahsang|mahsa|sub|subscription)
+            if [[ -z "$username" ]]; then
+                error "Usage: moav user mahsanet USERNAME [--no-qr]"
+                exit 1
+            fi
+            if [[ -x "./scripts/user-mahsanet.sh" ]]; then
+                ./scripts/user-mahsanet.sh "$@"
+            else
+                error "User mahsanet script not found"
+                exit 1
+            fi
+            ;;
         *)
-            error "Usage: moav user [list|add|revoke|package] [USERNAME]"
+            error "Usage: moav user [list|add|revoke|package|mahsanet] [USERNAME]"
             exit 1
             ;;
     esac
@@ -8102,6 +8235,10 @@ main() {
         donate)
             shift
             cmd_donate "$@"
+            ;;
+        conduit)
+            shift
+            cmd_conduit "$@"
             ;;
         *)
             error "Unknown command: $cmd"

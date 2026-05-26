@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **All 3 DNS tunnels run in parallel by default** — `ENABLE_MASTERDNS` now defaults to `true` (matching `ENABLE_DNSTT` and `ENABLE_SLIPSTREAM`) in `.env.example`, `docker-compose.yml`, and the `dns-router` binary's built-in fallback. dnstt, Slipstream, and MasterDNS all share port 53 with no conflict: `dns-router` fans queries out by subdomain suffix (`t.` → dnstt:5353, `s.` → slipstream:5354, `m.` → masterdns:5355), and each tunnel uses its own NS-delegated subdomain so a query can never be misrouted. Set `ENABLE_MASTERDNS=false` to opt out. Each tunnel still needs its own NS record (`DNSTT_SUBDOMAIN` / `SLIPSTREAM_SUBDOMAIN` / `MASTERDNS_SUBDOMAIN`)
+
+### Added
+- **`dns-router` test suite** — `dns-router/main_test.go` proves no-conflict parallel operation: subdomain-suffix routing isolation across all 3 backends, DNS packet-name parsing (valid/unrelated/malformed), case-insensitive suffix matching, and `buildRoutes()` wiring with all 3 tunnels enabled. Pure stdlib, no external deps. Run with `cd dns-router && go test ./... -v`
+- **`dns-router/README.md`** — architecture note explaining subdomain-based fan-out and why parallel DNS tunnels never conflict on port 53
+
 ## [1.7.9] - 2026-05-26
 
 ### Fixed

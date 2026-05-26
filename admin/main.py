@@ -659,6 +659,9 @@ def list_users():
         has_xdns = (user_dir / "xdns-config.json").exists()
         has_dnstt = (user_dir / "dnstt-instructions.txt").exists()
         has_slipstream = (user_dir / "slipstream-instructions.txt").exists() or (user_dir / "slipstream-cert.pem").exists()
+        has_masterdns = (user_dir / "masterdns-instructions.txt").exists()
+        has_gooserelay = (user_dir / "gooserelay-instructions.txt").exists()
+        has_mahsang = (user_dir / "mahsanet-sub.txt").exists() or has_reality or has_trojan
 
         # Check if zip already exists
         zip_exists = (bundle_path / f"{username}.zip").exists()
@@ -680,6 +683,9 @@ def list_users():
             "has_telemt": has_telemt,
             "has_dnstt": has_dnstt,
             "has_slipstream": has_slipstream,
+            "has_masterdns": has_masterdns,
+            "has_gooserelay": has_gooserelay,
+            "has_mahsang": has_mahsang,
             "is_donated": username in donated_users,
             "zip_exists": zip_exists,
             "created_at": created_at,
@@ -731,6 +737,65 @@ async def download_bundle(username: str, _: str = Depends(verify_auth)):
         iter([zip_buffer.getvalue()]),
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename={username}.zip"}
+    )
+
+
+# Script paths
+MAHSANET_SCRIPT = PROJECT_DIR / "scripts" / "user-mahsanet.sh"
+
+@app.get("/download/mahsang/{username}")
+async def download_mahsang_package(username: str, _: str = Depends(verify_auth)):
+    """Run user-mahsanet.sh and serve a MahsaNG-ready zip for the user."""
+    if ".." in username or "/" in username or "\\" in username:
+        raise HTTPException(status_code=400, detail="Invalid username")
+
+    bundle_path = get_bundle_path()
+    user_dir = bundle_path / username
+    if not user_dir.exists() or not user_dir.is_dir():
+        raise HTTPException(status_code=404, detail="User bundle not found")
+
+    if MAHSANET_SCRIPT.exists():
+        try:
+            subprocess.run(
+                ["bash", str(MAHSANET_SCRIPT), username, "--no-qr"],
+                cwd=str(PROJECT_DIR),
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+        except subprocess.TimeoutExpired:
+            pass  # Use whatever files exist
+
+    # Files to include in the MahsaNG zip
+    mahsang_files = [
+        "mahsanet-uris.txt",
+        "mahsanet-sub.txt",
+        "masterdns-instructions.txt",
+        "gooserelay-instructions.txt",
+        "reality.txt",
+        "cdn-vless.txt",
+        "xhttp-vless.txt",
+        "trojan.txt",
+        "shadowsocks.txt",
+        "hysteria2.txt",
+    ]
+    # Also include QR PNGs if present
+    qr_files = list(user_dir.glob("*-qr.png"))
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for fname in mahsang_files:
+            fpath = user_dir / fname
+            if fpath.exists():
+                zf.write(fpath, fname)
+        for qr in qr_files:
+            zf.write(qr, qr.name)
+
+    zip_buffer.seek(0)
+    return StreamingResponse(
+        iter([zip_buffer.getvalue()]),
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={username}-mahsang.zip"},
     )
 
 

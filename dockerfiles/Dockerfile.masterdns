@@ -1,0 +1,65 @@
+# =============================================================================
+# MoaV MasterDNS - DNS tunnel server (MahsaNG v16 component)
+# =============================================================================
+# MasterDnsVPN is an advanced DNS tunnel optimized beyond dnstt/Slipstream:
+# low-overhead ARQ, resolver load-balancing, packet-loss stability.
+# Bundled in MahsaNG v16 (MasterDNS v2026.05.10).
+#
+# Uses pre-built Go binaries from masterking32/MasterDnsVPN releases
+# (same approach as Dockerfile.slipstream).
+# =============================================================================
+
+FROM debian:bookworm-slim
+
+ARG TARGETARCH
+
+# Version - read from .env via docker-compose build args, with fallback default.
+# Matches the MasterDNS build bundled in MahsaNG v16.
+ARG MASTERDNS_VERSION=v2026.05.10.180256-27c7e11
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    curl \
+    ca-certificates \
+    tar \
+    tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r moav && useradd -r -g moav moav
+
+# Architecture mapping and binary download.
+# masterking32/MasterDnsVPN release assets:
+#   MasterDnsVPN_Server_Linux_AMD64.tar.gz  -> binary MasterDnsVPN_Server_Linux_AMD64_v*
+#   MasterDnsVPN_Server_Linux_ARM64.tar.gz  -> binary MasterDnsVPN_Server_Linux_ARM64_v*
+RUN set -eux; \
+    case "${TARGETARCH:-amd64}" in \
+      amd64) SUFFIX="AMD64" ;; \
+      arm64) SUFFIX="ARM64" ;; \
+      *) echo "Unsupported TARGETARCH=${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    echo "Downloading MasterDnsVPN server ${MASTERDNS_VERSION} (${SUFFIX})..."; \
+    curl -fsSL --retry 3 --retry-delay 2 \
+      -o /tmp/masterdns.tar.gz \
+      "https://github.com/masterking32/MasterDnsVPN/releases/download/${MASTERDNS_VERSION}/MasterDnsVPN_Server_Linux_${SUFFIX}.tar.gz"; \
+    mkdir -p /tmp/masterdns; \
+    tar -xzf /tmp/masterdns.tar.gz -C /tmp/masterdns; \
+    BIN="$(find /tmp/masterdns -type f -name "MasterDnsVPN_Server_Linux_${SUFFIX}_v*" | sort -V | tail -n1)"; \
+    if [ -z "${BIN}" ]; then \
+      BIN="$(find /tmp/masterdns -type f -name 'MasterDnsVPN_Server_*' ! -name '*.txt' | sort -V | tail -n1)"; \
+    fi; \
+    if [ -z "${BIN}" ]; then echo "MasterDnsVPN server binary not found in archive" >&2; ls -laR /tmp/masterdns >&2; exit 1; fi; \
+    install -m 0755 "${BIN}" /usr/local/bin/masterdnsvpn; \
+    rm -rf /tmp/masterdns /tmp/masterdns.tar.gz; \
+    echo "masterdnsvpn ${MASTERDNS_VERSION} installed (${SUFFIX})"
+
+# Create directories
+RUN mkdir -p /app /etc/masterdns /state/keys && \
+    chown -R moav:moav /app /etc/masterdns /state
+
+COPY scripts/masterdns-entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+EXPOSE 5355/udp
+
+USER moav
+ENTRYPOINT ["/app/entrypoint.sh"]

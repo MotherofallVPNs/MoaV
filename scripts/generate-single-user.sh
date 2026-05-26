@@ -10,6 +10,8 @@ source /app/lib/wireguard.sh
 source /app/lib/amneziawg.sh
 source /app/lib/dnstt.sh
 source /app/lib/slipstream.sh
+source /app/lib/masterdns.sh
+source /app/lib/gooserelay.sh
 source /app/lib/telemt.sh
 
 USER_ID="${1:-}"
@@ -210,6 +212,8 @@ if [[ -n "$DONATE_ONLY" ]]; then
     export ENABLE_AMNEZIAWG=false
     export ENABLE_DNSTT=false
     export ENABLE_SLIPSTREAM=false
+    export ENABLE_MASTERDNS=false
+    export ENABLE_GOOSERELAY=false
     export ENABLE_TRUSTTUNNEL=false
     # Enable specific protocols only if in the donate list
     if echo " $DONATE_ONLY " | grep -q " reality "; then
@@ -251,6 +255,8 @@ else
     export ENABLE_AMNEZIAWG="${ENABLE_AMNEZIAWG:-true}"
     export ENABLE_DNSTT="${ENABLE_DNSTT:-true}"
     export ENABLE_SLIPSTREAM="${ENABLE_SLIPSTREAM:-true}"
+    export ENABLE_MASTERDNS="${ENABLE_MASTERDNS:-true}"
+    export ENABLE_GOOSERELAY="${ENABLE_GOOSERELAY:-false}"
     export ENABLE_HYSTERIA2="${ENABLE_HYSTERIA2:-true}"
     export ENABLE_TRUSTTUNNEL="${ENABLE_TRUSTTUNNEL:-true}"
     export ENABLE_XHTTP="${ENABLE_XHTTP:-true}"
@@ -270,6 +276,7 @@ export TELEMT_MAX_TCP_CONNS="${TELEMT_MAX_TCP_CONNS:-100}"
 export TELEMT_MAX_UNIQUE_IPS="${TELEMT_MAX_UNIQUE_IPS:-10}"
 export DNSTT_SUBDOMAIN="${DNSTT_SUBDOMAIN:-t}"
 export SLIPSTREAM_SUBDOMAIN="${SLIPSTREAM_SUBDOMAIN:-s}"
+export MASTERDNS_SUBDOMAIN="${MASTERDNS_SUBDOMAIN:-m}"
 # Construct CDN_DOMAIN from CDN_SUBDOMAIN + DOMAIN if not explicitly set
 if [[ -z "${CDN_DOMAIN:-}" && -n "${CDN_SUBDOMAIN:-}" && -n "${DOMAIN:-}" ]]; then
     export CDN_DOMAIN="${CDN_SUBDOMAIN}.${DOMAIN}"
