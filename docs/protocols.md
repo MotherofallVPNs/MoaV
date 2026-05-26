@@ -202,7 +202,7 @@ SOCKS5 tunnelled through a **Google Apps Script** web app that the user deploys 
 - **Engine:** [Xray-core](https://github.com/XTLS/Xray-core) (built from main branch for FinalMask support)
 - **Clients:** Apps with FinalMask support (Happ beta, Xray CLI). Standard v2rayNG does not support FinalMask yet.
 - **Requires:** Domain + NS record for the `x` subdomain (see DNS Setup Step 5)
-- **Note:** XDNS now runs behind `dns-router` alongside dnstt, Slipstream, and MasterDNS — all four can be active simultaneously on port 53, routed by subdomain suffix. Disabled by default (`ENABLE_XDNS=false`); set to `true` to enable. Best for Telegram and lightweight chat apps — not fast enough for web browsing.
+- **Note:** XDNS now runs behind `dns-router` alongside dnstt, Slipstream, and MasterDNS — all four can be active simultaneously on port 53, routed by subdomain suffix. Enabled by default; set `ENABLE_XDNS=false` to opt out. Best for Telegram and lightweight chat apps — not fast enough for web browsing.
 
 <details>
 <summary><strong>XDNS Tuning</strong></summary>

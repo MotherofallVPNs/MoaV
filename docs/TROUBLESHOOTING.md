@@ -857,11 +857,11 @@ moav restart wireguard
 
 **Enabling/disabling individual tunnels:** All four DNS tunnels share port 53 via `dns-router` (queries fanned out by subdomain suffix). Enable or disable each independently in `.env`:
 ```bash
-# Default — dnstt + Slipstream + MasterDNS on; XDNS opt-in (needs FinalMask-aware client):
+# All four DNS tunnels are on by default:
 ENABLE_DNSTT=true
 ENABLE_SLIPSTREAM=true
 ENABLE_MASTERDNS=true
-ENABLE_XDNS=false      # set true to add XDNS alongside the others
+ENABLE_XDNS=true       # needs FinalMask-aware client; set false to opt out
 PORT_DNS=53            # dns-router public port (owns port 53)
 PORT_XDNS=5356         # xray XDNS secondary host port
 ```

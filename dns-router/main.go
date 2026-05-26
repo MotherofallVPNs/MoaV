@@ -115,7 +115,7 @@ func buildRoutes() ([]Route, error) {
 		log.Printf("[dns-router] Route: *.%s -> %s (masterdns)", domain, backend)
 	}
 
-	enableXdns := strings.ToLower(envOr("ENABLE_XDNS", "false"))
+	enableXdns := strings.ToLower(envOr("ENABLE_XDNS", "true"))
 	if enableXdns == "true" {
 		domain := os.Getenv("XDNS_DOMAIN")
 		if domain == "" {

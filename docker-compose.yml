@@ -187,7 +187,7 @@ services:
       - ENABLE_DNSTT=${ENABLE_DNSTT:-true}
       - ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM:-true}
       - ENABLE_MASTERDNS=${ENABLE_MASTERDNS:-true}
-      - ENABLE_XDNS=${ENABLE_XDNS:-false}
+      - ENABLE_XDNS=${ENABLE_XDNS:-true}
       - XDNS_BACKEND=xray:5355
       - TZ=${TZ:-UTC}
     cap_drop:
@@ -790,7 +790,7 @@ services:
       - ADMIN_IP_WHITELIST=${ADMIN_IP_WHITELIST:-}
       - SERVER_IP=${SERVER_IP:-}
       - DOMAIN=${DOMAIN:-}
-      - ENABLE_XDNS=${ENABLE_XDNS:-false}
+      - ENABLE_XDNS=${ENABLE_XDNS:-true}
       - XDNS_SUBDOMAIN=${XDNS_SUBDOMAIN:-x}
       - XDNS_MTU=${XDNS_MTU:-35}
       - XDNS_RESOLVERS=${XDNS_RESOLVERS:-1.1.1.1,8.8.8.8}
@@ -1257,7 +1257,7 @@ services:
       - ENABLE_XHTTP=${ENABLE_XHTTP:-true}
       - PORT_XHTTP=${PORT_XHTTP:-2096}
       - XHTTP_REALITY_TARGET=${XHTTP_REALITY_TARGET:-dl.google.com:443}
-      - ENABLE_XDNS=${ENABLE_XDNS:-false}
+      - ENABLE_XDNS=${ENABLE_XDNS:-true}
       - XDNS_SUBDOMAIN=${XDNS_SUBDOMAIN:-x}
       - XDNS_MTU=${XDNS_MTU:-35}
       - XDNS_RESOLVERS=${XDNS_RESOLVERS:-1.1.1.1,8.8.8.8}

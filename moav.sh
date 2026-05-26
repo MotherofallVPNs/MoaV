@@ -1505,6 +1505,7 @@ print_post_update_apply_steps() {
 # Preserve DNS tunnel state before check_env_additions.
 #
 # v1.7.5 flipped DNS tunnel defaults (ENABLE_DNSTT/SLIPSTREAM: false→true, ENABLE_XDNS: true→false).
+# v1.7.9+ re-enabled XDNS by default (ENABLE_XDNS: false→true) — all 4 tunnels now default on.
 # If a pre-1.7.5 user's .env is missing any of these vars (sparse config), check_env_additions
 # would append the new defaults, putting their .env in a state that conflicts with their currently
 # running tunnel. This migration writes explicit values first — derived from what's actually
@@ -1535,7 +1536,7 @@ migrate_dns_tunnel_state() {
     if echo "$running" | grep -qw xray; then
         if $has_xdns; then
             local cur
-            cur=$(get_env_val "ENABLE_XDNS" "$env_file" "false")
+            cur=$(get_env_val "ENABLE_XDNS" "$env_file" "true")
             [[ "$cur" == "true" ]] && xdns_active=true
         else
             # Missing from .env — pre-1.7.5 default was true
@@ -1842,7 +1843,7 @@ check_dns_for_dnstunnel() {
 
     local dnstt_enabled=$(get_env_val "ENABLE_DNSTT" "$env_file" "true")
     local slip_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
-    local xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "false")
+    local xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "true")
     local masterdns_enabled=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
 
     # All DNS tunnels now coexist via dns-router on port 53 — no mutual exclusion needed.
@@ -1949,7 +1950,7 @@ dns_tunnels_enabled() {
         local var default
         var=$(dns_tunnel_field "$t" enable_var)
         default="true"
-        [[ "$t" == "xdns" ]] && default="false"
+        [[ "$t" == "xdns" ]] && default="true"
         [[ "$(get_env_val "$var" "$env_file" "$default")" == "true" ]] && out+="$t "
     done
     echo "${out% }"
@@ -1981,7 +1982,7 @@ dns_tunnels_running() {
             local var default enabled
             var=$(dns_tunnel_field "$t" enable_var)
             default="true"
-            [[ "$t" == "xdns" ]] && default="false"
+            [[ "$t" == "xdns" ]] && default="true"
             enabled=$(get_env_val "$var" "$env_file" "$default")
             [[ "$enabled" != "true" ]] && continue
         fi
@@ -2259,7 +2260,7 @@ ZONEOF
     dnstt_enabled=$(get_env_val "ENABLE_DNSTT" "$env_file" "true")
     slipstream_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
     masterdns_enabled=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
-    xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "false")
+    xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "true")
 
     # Always include DNS tunnel records (user can decide which to enable later)
     local dnstt_sub slip_sub masterdns_sub xdns_sub
@@ -2837,7 +2838,7 @@ doctor_check_dns() {
     fi
 
     local xdns_pre_enabled=""
-    xdns_pre_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "false")
+    xdns_pre_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "true")
 
     local masterdns_pre_enabled=""
     masterdns_pre_enabled=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
@@ -2879,7 +2880,7 @@ doctor_check_dns() {
         fi
 
         local xdns_enabled=""
-        xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "false")
+        xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "true")
         if [[ "$xdns_enabled" == "true" ]]; then
             local xdns_subdomain=""
             xdns_subdomain=$(get_env_val "XDNS_SUBDOMAIN" "$env_file" "x")
@@ -3047,7 +3048,7 @@ doctor_check_config() {
         local svc="${rest%%:*}"
         local paths="${rest#*:}"
         local default="true"
-        [[ "$var" == "ENABLE_XDNS" ]] && default="false"
+        [[ "$var" == "ENABLE_XDNS" ]] && default="true"
         local enabled
         enabled=$(get_env_val "$var" "$env_file" "$default")
         [[ "$enabled" != "true" ]] && continue
@@ -3092,7 +3093,7 @@ doctor_check_ports() {
     dnstt_enabled=$(get_env_val "ENABLE_DNSTT" "$env_file" "true")
     slip_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
     masterdns_enabled=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
-    xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "false")
+    xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "true")
 
     if [[ "$dnstt_enabled" == "true" || "$slip_enabled" == "true" || "$masterdns_enabled" == "true" || "$xdns_enabled" == "true" ]]; then
         if ss -ulnp 2>/dev/null | grep -q ':53 ' || netstat -ulnp 2>/dev/null | grep -q ':53 '; then
@@ -6150,7 +6151,7 @@ cmd_start() {
     local slipstream_enabled
     slipstream_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$SCRIPT_DIR/.env" "true")
     local xdns_start_enabled
-    xdns_start_enabled=$(get_env_val "ENABLE_XDNS" "$SCRIPT_DIR/.env" "false")
+    xdns_start_enabled=$(get_env_val "ENABLE_XDNS" "$SCRIPT_DIR/.env" "true")
 
     # Check if any DNS tunnel needs port 53 (all go through dns-router now)
     local needs_port53=false

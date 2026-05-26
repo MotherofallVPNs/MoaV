@@ -15,7 +15,7 @@ echo "================================================"
 ENABLE_DNSTT="${ENABLE_DNSTT:-true}"
 ENABLE_SLIPSTREAM="${ENABLE_SLIPSTREAM:-true}"
 ENABLE_MASTERDNS="${ENABLE_MASTERDNS:-true}"
-ENABLE_XDNS="${ENABLE_XDNS:-false}"
+ENABLE_XDNS="${ENABLE_XDNS:-true}"
 
 if [[ "$ENABLE_DNSTT" != "true" && "$ENABLE_SLIPSTREAM" != "true" && "$ENABLE_MASTERDNS" != "true" && "$ENABLE_XDNS" != "true" ]]; then
     echo "[ERROR] All DNS tunnel backends are disabled. Nothing to route."
