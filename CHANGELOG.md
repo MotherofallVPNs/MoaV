@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-05-26
+
 ### Upgrade Notes
 - **Re-bootstrap required; existing installs change behavior.** This release (PR [#102](https://github.com/shayanb/MoaV/pull/102)) adds two services and flips DNS-tunnel defaults, so upgrading an existing install is a breaking change in practice:
   - **MasterDNS and XDNS are now enabled by default** (`ENABLE_MASTERDNS=true`, `ENABLE_XDNS=true`). On `moav update`, an install that didn't have these set will pick up the new defaults via `check_env_additions` and start the new containers. To keep them off, set `ENABLE_MASTERDNS=false` / `ENABLE_XDNS=false` in `.env` before updating.
