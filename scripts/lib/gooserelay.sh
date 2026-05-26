@@ -3,8 +3,8 @@
 #
 # GooseRelay (github.com/kianmhz/GooseRelayVPN) tunnels raw TCP through a
 # user-deployed Google Apps Script web app to this VPS exit server, end-to-end
-# AES-256-GCM encrypted and domain-fronted via google.com. Bundled in
-# MahsaNG v16 (GooseRelay v1.6.0).
+# AES-256-GCM encrypted and domain-fronted via google.com. Interoperable with
+# the GooseRelay client in MahsaNG v16 (GooseRelay v1.7.1).
 #
 # Server egress is routed through sing-box's mixed inbound (sing-box:1080) for
 # parity with the rest of the MoaV stack.
@@ -72,7 +72,7 @@ gooserelay_generate_client_instructions() {
 # SOCKS5 over a Google Apps Script web app -> this VPS exit server.
 # To the network you only ever appear to talk TLS to google.com.
 # End-to-end AES-256-GCM; Google never sees plaintext or the key.
-# Bundled in MahsaNG v16 (GooseRelay v1.6.0).
+# Interoperable with the GooseRelay client in MahsaNG v16 (GooseRelay v1.7.1).
 #
 # Project: https://github.com/kianmhz/GooseRelayVPN
 # Bundled in: MahsaNG (https://github.com/GFW-knocker/MahsaNG)
@@ -80,20 +80,23 @@ gooserelay_generate_client_instructions() {
 # Shared tunnel key (keep SECRET — anyone with it can use your VPS as you):
 $tunnel_key
 
-# This server's exit endpoint (set as RELAY_URL in your Apps Script):
+# This server's exit endpoint (add to the RELAY_URLS array in your Apps Script):
 http://$srv_ip:$goose_port/tunnel
 
 # -------------------------
 # One-time setup (done on YOUR machine + YOUR Google account)
 # -------------------------
 # 1. Get the client + Apps Script from:
-#    https://github.com/kianmhz/GooseRelayVPN/releases  (tag v1.6.0)
+#    https://github.com/kianmhz/GooseRelayVPN/releases  (tag v1.7.1)
 #
 # 2. Deploy the Apps Script forwarder:
 #    - Open https://script.google.com  ->  New project
 #    - Paste the contents of apps_script/Code.gs from the repo
-#    - Edit the top line to:
-#        const RELAY_URL = 'http://$srv_ip:$goose_port/tunnel';
+#    - Set the RELAY_URLS array near the top to this server's endpoint
+#      (v1.7.x uses an array, not a single RELAY_URL):
+#        const RELAY_URLS = [
+#          'http://$srv_ip:$goose_port/tunnel',
+#        ];
 #    - Deploy -> New deployment -> type "Web app"
 #        Execute as: Me
 #        Who has access: Anyone

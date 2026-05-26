@@ -182,7 +182,7 @@ SOCKS5 tunnelled through a **Google Apps Script** web app that the user deploys 
 - **Engine:** [GooseRelayVPN](https://github.com/kianmhz/GooseRelayVPN) (Go), server built from source
 - **Clients:** MahsaNG v16+, or the standalone GooseRelay client + a user-deployed Apps Script forwarder
 - **Encryption:** AES-256-GCM, shared 64-hex `tunnel_key` (in each user's `gooserelay-instructions.txt`)
-- **Requires:** No domain. `PORT_GOOSE` must be reachable from Google's network. The user sets `RELAY_URL = http://SERVER_IP:PORT_GOOSE/tunnel` in their Apps Script.
+- **Requires:** No domain. `PORT_GOOSE` must be reachable from Google's network. The user sets `RELAY_URLS = ['http://SERVER_IP:PORT_GOOSE/tunnel']` in their Apps Script.
 - **Note:** Opt-in — set `ENABLE_GOOSERELAY=true` in `.env`. Egress is routed through sing-box. Real-time apps (Telegram/X) drain the Apps Script quota fast; add more deployments under different Google accounts for capacity.
 
 ### XHTTP (VLESS+XHTTP+Reality)

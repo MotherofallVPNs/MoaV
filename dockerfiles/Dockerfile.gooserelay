@@ -3,8 +3,8 @@
 # =============================================================================
 # GooseRelay (github.com/kianmhz/GooseRelayVPN) tunnels raw TCP through a
 # user-deployed Google Apps Script web app to this VPS exit server
-# (AES-256-GCM, domain-fronted via google.com). Bundled in MahsaNG v16
-# (GooseRelay v1.6.0).
+# (AES-256-GCM, domain-fronted via google.com). Interoperable with the
+# GooseRelay client in MahsaNG v16 (GooseRelay v1.7.1).
 #
 # The Apps Script forwarder is a "dumb pipe" the client/user deploys in their
 # own Google account; this image is only the VPS-side decrypt+egress endpoint.
@@ -13,7 +13,7 @@
 
 FROM golang:1.22-alpine AS builder
 
-ARG GOOSERELAY_VERSION=v1.6.0
+ARG GOOSERELAY_VERSION=v1.7.1
 
 RUN apk add --no-cache git
 

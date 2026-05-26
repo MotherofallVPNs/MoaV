@@ -39,7 +39,7 @@ while [[ ! -s "$CONFIG_FILE" ]]; do
 done
 
 echo "[gooserelay] Config: $CONFIG_FILE"
-echo "[gooserelay] Listening on :8443 (/tunnel). Apps Script RELAY_URL must"
+echo "[gooserelay] Listening on :8443 (/tunnel). Apps Script RELAY_URLS must"
 echo "[gooserelay] point at this server's public IP:PORT_GOOSE."
 echo "================================================"
 

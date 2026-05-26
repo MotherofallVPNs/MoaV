@@ -139,7 +139,8 @@ fallback.
 
 ## 6. GooseRelay — SOCKS5 fronted through Google
 
-MahsaNG v16 bundles the **GooseRelay** client (v1.6.0). GooseRelay tunnels
+MahsaNG v16 bundles the **GooseRelay** client; MoaV pins the server to
+GooseRelay **v1.7.1** (fully interoperable with v1.6.x). GooseRelay tunnels
 SOCKS5 through a Google Apps Script web app to your VPS — from Iran's
 perspective the entire connection looks like HTTPS to `google.com`, which is
 extremely hard to block.
@@ -162,8 +163,8 @@ Each user bundle includes `gooserelay-instructions.txt` with:
 **User setup (one-time):**
 
 1. Open <https://script.google.com> → New project
-2. Paste `Code.gs` from [GooseRelayVPN v1.6.0](https://github.com/kianmhz/GooseRelayVPN/releases/tag/v1.6.0)
-3. Set `RELAY_URL = 'http://YOUR_SERVER_IP:8444/tunnel'` at the top
+2. Paste `Code.gs` from [GooseRelayVPN v1.7.1](https://github.com/kianmhz/GooseRelayVPN/releases/tag/v1.7.1)
+3. Set the `RELAY_URLS` array near the top to `['http://YOUR_SERVER_IP:8444/tunnel']` (v1.7.x uses an array, not a single `RELAY_URL`)
 4. Deploy → Web app → Execute as: Me, Access: Anyone → copy Deployment ID
 5. Fill `client_config.json` with the Deployment ID + `tunnel_key` from the bundle
 6. In MahsaNG v16: **GooseRelay tab** → paste `client_config.json`
