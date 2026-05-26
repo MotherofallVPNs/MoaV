@@ -112,6 +112,11 @@ done
 
 # Load environment
 if [[ -f .env ]]; then
+    # Auto-heal: GOPROXY's value is pipe-separated (proxy|proxy|direct). If the
+    # line is unquoted (older .env files), `source` below parses the `|` as a
+    # shell pipe and tries to run the URLs as commands. Quote it in place first
+    # (idempotent — already-quoted lines are left alone).
+    sed -i.bak -E '/^GOPROXY=[^"]*\|/ s/^GOPROXY=(.*)$/GOPROXY="\1"/' .env && rm -f .env.bak
     set -a
     source .env
     set +a
