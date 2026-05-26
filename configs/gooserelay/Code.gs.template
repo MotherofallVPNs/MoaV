@@ -1,0 +1,147 @@
+// =============================================================================
+// GooseRelay Apps Script forwarder — vendored by MoaV from GooseRelayVPN v1.7.1
+// (apps_script/Code.gs).  Upstream: https://github.com/Kianmhz/GooseRelayVPN
+// License: MIT © 2026 Kian Haddad (see the GooseRelayVPN LICENSE).
+//
+// MoaV ships a per-user copy of this as `gooserelay-AppsScript.gs` in the user
+// bundle, with the RELAY_URLS endpoint ALREADY filled in for your server — no
+// editing needed.  To use it:
+//   1. Open https://script.google.com  →  New project
+//   2. Paste this entire file
+//   3. Deploy → New deployment → Web app (Execute as: Me, Access: Anyone)
+//   4. Copy the Deployment ID into gooserelay-client_config.json (script_keys)
+// Re-deploy as a NEW deployment whenever you change this file.
+// =============================================================================
+
+// GooseRelay forwarder.
+//
+// Apps Script web app deployed as: Execute as: Me, Access: Anyone (or Anyone with Google account).
+// All traffic is AES-GCM encrypted by the client; this script is a dumb pipe
+// and never sees plaintext or holds the key.
+//
+// Wire: client POSTs base64(encrypted batch). We forward the bytes verbatim
+// to one of RELAY_URLS and return its response body verbatim.
+//
+// Replace RELAY_URLS with your VPS address(es) before deploying.
+
+const RELAY_URLS = [
+  // Replace YOUR_SERVER_PORT with server_config.json's server_port.
+  // The dist/server_config.json used for the current test listens on 5443.
+  '__GOOSE_RELAY_ENDPOINT__',
+];
+const FORWARDER_VERSION = 1;
+const PROTOCOL_VERSION = 1;
+const ENABLE_INVOCATION_COUNTING = false;
+const GAS_RELAY_LOOP_RE = /^https?:\/\/script\.google\.com\/macros\//i;
+
+function doPost(e) {
+  for (let i = 0; i < RELAY_URLS.length; i++) {
+    if (GAS_RELAY_LOOP_RE.test(RELAY_URLS[i])) {
+      // Throw so Apps Script returns HTTP 500. Returning 200 with this
+      // diagnostic text would be parsed by the client as a base64 batch and
+      // fail at the colon — see the v1.7.0 → v1.7.1 fix in client.go.
+      throw new Error('relay_loop_detected: RELAY_URLS must point to your VPS /tunnel endpoint, not Apps Script');
+    }
+  }
+  if (ENABLE_INVOCATION_COUNTING) {
+    bumpInvocationCount_();
+  }
+  const payload = (e && e.postData && e.postData.contents) || '';
+  let lastError = 'no RELAY_URLS configured';
+  for (let i = 0; i < RELAY_URLS.length; i++) {
+    try {
+      const resp = UrlFetchApp.fetch(RELAY_URLS[i], {
+        method: 'post',
+        contentType: 'text/plain',
+        payload: payload,
+        muteHttpExceptions: true,
+        followRedirects: false,
+        deadline: 30,  // seconds; long-poll window is kept below this for Apps Script stability
+      });
+      const status = resp.getResponseCode();
+      const text = resp.getContentText();
+      if (status === 200) {
+        return ContentService
+          .createTextOutput(text)
+          .setMimeType(ContentService.MimeType.TEXT);
+      }
+      lastError = 'upstream status ' + status + ': ' + text.slice(0, 1024);
+    } catch (err) {
+      lastError = 'upstream fetch error: ' + String(err);
+    }
+  }
+  // All RELAY_URLS failed. Throw so Apps Script returns HTTP 500 with an
+  // HTML error page — the GooseRelay client's non-200 code path treats this
+  // as a clean endpoint failure and rotates to the next deployment. Returning
+  // 200 with a plain-text error body (as v1.7.0 did) was the cause of the
+  // "batch: base64 decode: illegal base64 data at input byte 9" client log
+  // spam: the client would try to base64-decode "upstream fetch error: …"
+  // and fail at the first colon.
+  throw new Error(lastError);
+}
+
+// doGet returns this deployment's per-day invocation count so the client can
+// log real per-deployment usage alongside its own client-side counter. The
+// day boundary tracks the Apps Script quota window (midnight Pacific). Format
+// is JSON so the client can parse without ambiguity:
+//   {"ok":true,"date":"2026-05-04","count":1234}
+function doGet(e) {
+  if (e && e.parameter && e.parameter.legacy === '1') {
+    return ContentService
+      .createTextOutput('GooseRelay forwarder OK')
+      .setMimeType(ContentService.MimeType.TEXT);
+  }
+  const props = PropertiesService.getScriptProperties();
+  const today = pacificDateKey_();
+  const count = parseInt(props.getProperty('count_' + today) || '0', 10);
+  const out = {
+    ok: true,
+    date: today,
+    count: count,
+    version: FORWARDER_VERSION,
+    protocol: PROTOCOL_VERSION,
+  };
+  return ContentService
+    .createTextOutput(JSON.stringify(out))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function pacificDateKey_() {
+  return Utilities.formatDate(new Date(), 'America/Los_Angeles', 'yyyy-MM-dd');
+}
+
+// bumpInvocationCount_ records one invocation in PropertiesService keyed by
+// today's PT date. Best-effort: under high concurrency two requests may read
+// the same value and write the same incremented number, slightly under-counting.
+// That's acceptable for an informational counter — adding a LockService gate
+// would add tens of ms to every tunnel request, which costs more than perfect
+// accuracy is worth.
+function bumpInvocationCount_() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const today = pacificDateKey_();
+    const key = 'count_' + today;
+    const raw = props.getProperty(key);
+    if (raw === null) {
+      // First request of a new day — purge yesterday's keys so the property
+      // store doesn't grow unbounded (capped at 9 KB / 500 entries by Google).
+      pruneStaleCounts_(props, today);
+    }
+    const cur = raw === null ? 0 : parseInt(raw, 10);
+    props.setProperty(key, String(cur + 1));
+  } catch (err) {
+    // Property writes can fail under contention; counting is informational
+    // so we swallow the error rather than break the tunnel request.
+  }
+}
+
+function pruneStaleCounts_(props, today) {
+  const keys = props.getKeys();
+  const keep = 'count_' + today;
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (k.indexOf('count_') === 0 && k !== keep) {
+      props.deleteProperty(k);
+    }
+  }
+}

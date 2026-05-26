@@ -65,6 +65,35 @@ gooserelay_generate_client_instructions() {
 
     local srv_ip="${SERVER_IP:-YOUR_SERVER_IP}"
     local goose_port="${PORT_GOOSE:-8444}"
+    local endpoint="http://$srv_ip:$goose_port/tunnel"
+
+    # Ready-to-paste Apps Script: the vendored v1.7.1 Code.gs with RELAY_URLS
+    # already pointed at this server (no hand-editing of the array).
+    local gs_template="$GOOSERELAY_CONFIG_DIR/Code.gs.template"
+    local have_gs=false
+    if [[ -f "$gs_template" ]]; then
+        sed "s|__GOOSE_RELAY_ENDPOINT__|$endpoint|g" "$gs_template" > "$output_dir/gooserelay-AppsScript.gs"
+        have_gs=true
+    fi
+
+    # Ready-to-use client config (matches GooseRelay v1.7.1's schema). Everything
+    # is pre-filled except the Apps Script Deployment ID, which only exists after
+    # the user deploys the script in their own Google account.
+    cat > "$output_dir/gooserelay-client_config.json" <<EOF
+{
+  "debug_timing": false,
+  "socks_host": "127.0.0.1",
+  "socks_port": 1080,
+  "google_host": "216.239.38.120",
+  "sni": ["www.google.com", "mail.google.com", "accounts.google.com"],
+  "script_keys": [
+    {"id": "REPLACE_WITH_YOUR_APPS_SCRIPT_DEPLOYMENT_ID", "account": "acct-a"}
+  ],
+  "tunnel_key": "$tunnel_key",
+  "coalesce_step_ms": 0,
+  "idle_slots_per_bucket": 2
+}
+EOF
 
     cat > "$output_dir/gooserelay-instructions.txt" <<EOF
 # GooseRelay Instructions
@@ -77,54 +106,48 @@ gooserelay_generate_client_instructions() {
 # Project: https://github.com/kianmhz/GooseRelayVPN
 # Bundled in: MahsaNG (https://github.com/GFW-knocker/MahsaNG)
 
-# Shared tunnel key (keep SECRET — anyone with it can use your VPS as you):
+# This bundle ships TWO ready-made files so you don't hand-edit anything:
+#   gooserelay-AppsScript.gs       -> paste into script.google.com; the
+#                                     RELAY_URLS array already points here
+#   gooserelay-client_config.json  -> ready for the GooseRelay / MahsaNG v16
+#                                     client; only the Deployment ID is blank
+
+# Shared tunnel key (already in the config; keep SECRET — anyone with it can
+# use your VPS as you):
 $tunnel_key
 
-# This server's exit endpoint (add to the RELAY_URLS array in your Apps Script):
-http://$srv_ip:$goose_port/tunnel
+# This server's exit endpoint (already wired into gooserelay-AppsScript.gs):
+$endpoint
 
 # -------------------------
-# One-time setup (done on YOUR machine + YOUR Google account)
+# Setup (one-time, in YOUR Google account)
 # -------------------------
-# 1. Get the client + Apps Script from:
-#    https://github.com/kianmhz/GooseRelayVPN/releases  (tag v1.7.1)
-#
-# 2. Deploy the Apps Script forwarder:
-#    - Open https://script.google.com  ->  New project
-#    - Paste the contents of apps_script/Code.gs from the repo
-#    - Set the RELAY_URLS array near the top to this server's endpoint
-#      (v1.7.x uses an array, not a single RELAY_URL):
-#        const RELAY_URLS = [
-#          'http://$srv_ip:$goose_port/tunnel',
-#        ];
-#    - Deploy -> New deployment -> type "Web app"
-#        Execute as: Me
-#        Who has access: Anyone
-#    - Copy the Deployment ID it shows.
-#    - (Re-deploy as a NEW deployment every time you edit Code.gs.)
-#
-# 3. Fill in client_config.json:
-#      {
-#        "socks_host": "127.0.0.1",
-#        "socks_port": 1080,
-#        "google_host": "216.239.38.120",
-#        "sni": ["www.google.com", "mail.google.com", "accounts.google.com"],
-#        "script_keys": [ { "id": "YOUR_DEPLOYMENT_ID", "account": "acct-a" } ],
-#        "tunnel_key": "$tunnel_key"
-#      }
-#
-# 4. Run the client, then point your apps at SOCKS5 127.0.0.1:1080.
+# 1. Open https://script.google.com  ->  New project
+# 2. Paste the WHOLE contents of  gooserelay-AppsScript.gs  (no edits needed)
+# 3. Deploy -> New deployment -> type "Web app"
+#       Execute as: Me
+#       Who has access: Anyone
+#    Copy the Deployment ID it shows.
+#    (Re-deploy as a NEW deployment whenever you change the script.)
+# 4. In gooserelay-client_config.json, replace
+#    REPLACE_WITH_YOUR_APPS_SCRIPT_DEPLOYMENT_ID with that Deployment ID.
+# 5. Load gooserelay-client_config.json into the GooseRelay client (or the
+#    MahsaNG v16 GooseRelay tab), then point apps at SOCKS5 127.0.0.1:1080.
 #    A pre-flight check confirms the relay is healthy and the key matches.
 
 # -------------------------
 # Notes:
 # -------------------------
 # - Apps Script quota is ~20,000 calls/day PER Google account. Deploy under
-#   several accounts and list all Deployment IDs in script_keys for capacity.
+#   several accounts and add each Deployment ID to "script_keys" for capacity.
 # - Real-time apps (Telegram/X) drain the quota fast due to constant polling.
 # - Traffic exits through the MoaV server (your IP appears as the server IP).
 # - All deployments forwarding here must use this exact tunnel_key.
 EOF
 
-    log_info "Generated GooseRelay instructions for $user_id"
+    if [[ "$have_gs" == true ]]; then
+        log_info "Generated GooseRelay bundle (AppsScript.gs + client_config.json) for $user_id"
+    else
+        log_info "GooseRelay Code.gs.template not found; emitted client_config.json + instructions only for $user_id"
+    fi
 }

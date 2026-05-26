@@ -154,20 +154,22 @@ PORT_GOOSE=8444    # must be reachable from Google's servers
 ```
 
 Rerun bootstrap; the server generates a shared `tunnel_key` (AES-256-GCM).
-Each user bundle includes `gooserelay-instructions.txt` with:
-- The `tunnel_key`
-- The relay URL: `http://YOUR_SERVER_IP:8444/tunnel`
-- Step-by-step Google Apps Script forwarder deployment
-- Pre-filled `client_config.json`
+Each user bundle then contains three ready-made GooseRelay files (nothing to
+hand-edit except pasting in one ID):
+- **`gooserelay-AppsScript.gs`** — the v1.7.1 Apps Script forwarder with the
+  `RELAY_URLS` array **already pointed at this server**. Paste as-is.
+- **`gooserelay-client_config.json`** — a complete client config (tunnel_key,
+  SNI, tuning) with only the Deployment ID left to fill.
+- **`gooserelay-instructions.txt`** — the short walkthrough below.
 
 **User setup (one-time):**
 
 1. Open <https://script.google.com> → New project
-2. Paste `Code.gs` from [GooseRelayVPN v1.7.1](https://github.com/kianmhz/GooseRelayVPN/releases/tag/v1.7.1)
-3. Set the `RELAY_URLS` array near the top to `['http://YOUR_SERVER_IP:8444/tunnel']` (v1.7.x uses an array, not a single `RELAY_URL`)
-4. Deploy → Web app → Execute as: Me, Access: Anyone → copy Deployment ID
-5. Fill `client_config.json` with the Deployment ID + `tunnel_key` from the bundle
-6. In MahsaNG v16: **GooseRelay tab** → paste `client_config.json`
+2. Paste the **whole** of `gooserelay-AppsScript.gs` (no editing — the
+   `RELAY_URLS` array is already filled in)
+3. Deploy → New deployment → Web app → Execute as: Me, Access: Anyone → copy the Deployment ID
+4. In `gooserelay-client_config.json`, replace `REPLACE_WITH_YOUR_APPS_SCRIPT_DEPLOYMENT_ID` with that Deployment ID
+5. Load `gooserelay-client_config.json` into the GooseRelay client, or paste it into MahsaNG v16's **GooseRelay tab**
 
 **Notes:**
 - No domain or DNS delegation needed — only the server IP + port 8444
