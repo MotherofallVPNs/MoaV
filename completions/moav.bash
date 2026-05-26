@@ -14,9 +14,9 @@ _moav() {
     cword=$COMP_CWORD
 
     local commands="help version install uninstall check doctor bootstrap domainless profiles start stop restart status logs users user admin build test client donate conduit export import migrate-ip regenerate-users setup-dns update"
-    local services="sing-box decoy wstunnel wireguard amneziawg dns-router dnstt slipstream trusttunnel telemt xray admin psiphon-conduit snowflake grafana grafana-proxy prometheus cadvisor node-exporter clash-exporter singbox-exporter telemt-exporter xray-exporter wireguard-exporter amneziawg-exporter snowflake-exporter"
-    local profiles="proxy wireguard amneziawg dnstunnel trusttunnel xhttp telegram admin conduit snowflake monitoring client all"
-    local service_aliases="singbox sing proxy reality wg ws tunnel dns slip tg mtproxy telegram conduit psiphon snow tor grafana-cdn"
+    local services="sing-box decoy wstunnel wireguard amneziawg dns-router dnstt slipstream masterdns gooserelay trusttunnel telemt xray admin psiphon-conduit snowflake grafana grafana-proxy prometheus cadvisor node-exporter clash-exporter singbox-exporter telemt-exporter xray-exporter wireguard-exporter amneziawg-exporter snowflake-exporter"
+    local profiles="proxy wireguard amneziawg dnstunnel trusttunnel xhttp telegram admin conduit snowflake gooserelay monitoring client all"
+    local service_aliases="singbox sing proxy reality wg ws tunnel dns slip mdns masterdns goose gooserelay relay tg mtproxy telegram conduit psiphon snow tor grafana-cdn"
     local protocols="auto reality trojan hysteria2 trusttunnel wireguard psiphon tor dnstt slipstream"
 
     # Resolve moav project directory (follow symlink)

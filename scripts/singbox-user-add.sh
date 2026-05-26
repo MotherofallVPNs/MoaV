@@ -612,7 +612,7 @@ XDNSEOF
         "vnext": [
           {
             "address": "${SERVER_IP}",
-            "port": ${PORT_XDNS:-53},
+            "port": ${PORT_XDNS:-5356},
             "users": [{"id": "${USER_UUID}", "encryption": "none"}]
           }
         ]

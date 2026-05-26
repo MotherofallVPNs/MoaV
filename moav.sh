@@ -1351,6 +1351,8 @@ check_component_versions() {
         "TELEMT_VERSION"
         "XRAY_VERSION"
         "DNSTT_VERSION"
+        "MASTERDNS_VERSION"
+        "GOOSERELAY_VERSION"
     )
 
     local updates_available=()
@@ -1384,6 +1386,8 @@ check_component_versions() {
                 TELEMT_VERSION) services_to_rebuild+=("telemt") ;;
                 XRAY_VERSION) services_to_rebuild+=("xray") ;;
                 DNSTT_VERSION) services_to_rebuild+=("dnstt") ;;
+                MASTERDNS_VERSION) services_to_rebuild+=("masterdns") ;;
+                GOOSERELAY_VERSION) services_to_rebuild+=("gooserelay") ;;
             esac
         fi
     done
@@ -1926,20 +1930,6 @@ dns_tunnel_field() {
         masterdns:desc)          echo "ARQ DNS tunnel (up to 9× dnstt, MahsaNG v16 native)" ;;
         *) return 1 ;;
     esac
-}
-
-# Count distinct port groups in a space-separated tunnel list
-dns_tunnel_groups() {
-    local tunnels="$1"
-    local groups=""
-    for t in $tunnels; do
-        local g
-        g=$(dns_tunnel_field "$t" port_group) || continue
-        if ! echo " $groups " | grep -q " $g "; then
-            groups+="$g "
-        fi
-    done
-    echo "${groups% }"
 }
 
 # Which tunnels are enabled in .env (returns space-separated names)
@@ -6044,7 +6034,7 @@ cmd_profiles() {
 
 cmd_start() {
     local profiles=""
-    local valid_profiles="proxy wireguard amneziawg dnstunnel trusttunnel xhttp telegram admin conduit snowflake monitoring client all setup"
+    local valid_profiles="proxy wireguard amneziawg dnstunnel trusttunnel xhttp telegram admin conduit snowflake gooserelay monitoring client all setup"
     local force=false
     local args=()
     for arg in "$@"; do
@@ -6156,7 +6146,7 @@ cmd_start() {
     # Check if any DNS tunnel needs port 53 (all go through dns-router now)
     local needs_port53=false
     local masterdns_start_enabled
-    masterdns_start_enabled=$(get_env_val "ENABLE_MASTERDNS" "true")
+    masterdns_start_enabled=$(get_env_val "ENABLE_MASTERDNS" "$SCRIPT_DIR/.env" "true")
     if echo "$profiles" | grep -qE "dnstunnel|all" && \
        [[ "$dnstt_enabled" == "true" || "$slipstream_enabled" == "true" || \
           "$masterdns_start_enabled" == "true" || "$xdns_start_enabled" == "true" ]]; then
@@ -6241,6 +6231,8 @@ resolve_service() {
         ws|tunnel)                    echo "wstunnel" ;;
         dns)                          echo "dnstt" ;;
         slip)                         echo "slipstream" ;;
+        mdns|masterdns)               echo "masterdns" ;;
+        goose|gooserelay|relay)       echo "gooserelay" ;;
         dns-router|dnsrouter)         echo "dns-router" ;;
         tg|mtproxy|telegram)          echo "telemt" ;;
         snow|tor)                     echo "snowflake" ;;
@@ -6450,7 +6442,7 @@ cmd_logs() {
                 ;;
             *)
                 # Check if it's an exact profile name first
-                local valid_profiles="proxy wireguard amneziawg dnstunnel trusttunnel xhttp telegram admin conduit snowflake monitoring client all setup"
+                local valid_profiles="proxy wireguard amneziawg dnstunnel trusttunnel xhttp telegram admin conduit snowflake gooserelay monitoring client all setup"
                 if echo "$valid_profiles" | grep -qw "$1"; then
                     profile_flags="$profile_flags --profile $1"
                 else

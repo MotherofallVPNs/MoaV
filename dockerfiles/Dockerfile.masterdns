@@ -37,10 +37,23 @@ RUN set -eux; \
       arm64) SUFFIX="ARM64" ;; \
       *) echo "Unsupported TARGETARCH=${TARGETARCH}" >&2; exit 1 ;; \
     esac; \
+    ASSET="MasterDnsVPN_Server_Linux_${SUFFIX}.tar.gz"; \
+    BASE="https://github.com/masterking32/MasterDnsVPN/releases/download/${MASTERDNS_VERSION}"; \
     echo "Downloading MasterDnsVPN server ${MASTERDNS_VERSION} (${SUFFIX})..."; \
-    curl -fsSL --retry 3 --retry-delay 2 \
-      -o /tmp/masterdns.tar.gz \
-      "https://github.com/masterking32/MasterDnsVPN/releases/download/${MASTERDNS_VERSION}/MasterDnsVPN_Server_Linux_${SUFFIX}.tar.gz"; \
+    curl -fsSL --retry 3 --retry-delay 2 -o /tmp/masterdns.tar.gz "${BASE}/${ASSET}"; \
+    # Verify against the SHA256SUMS.txt published in the same release. Pinning by
+    # version tag alone trusts GitHub's CDN to serve untampered bytes; this
+    # confirms the download matches the checksum the upstream release published.
+    echo "Verifying SHA256 (${ASSET})..."; \
+    curl -fsSL --retry 3 --retry-delay 2 -o /tmp/SHA256SUMS.txt "${BASE}/SHA256SUMS.txt"; \
+    EXPECTED="$(grep -F "${ASSET}" /tmp/SHA256SUMS.txt | head -n1 | cut -d' ' -f1)"; \
+    if [ -z "${EXPECTED}" ]; then echo "No checksum for ${ASSET} in SHA256SUMS.txt" >&2; exit 1; fi; \
+    ACTUAL="$(sha256sum /tmp/masterdns.tar.gz | cut -d' ' -f1)"; \
+    if [ "${EXPECTED}" != "${ACTUAL}" ]; then \
+      echo "SHA256 mismatch for ${ASSET}: expected ${EXPECTED}, got ${ACTUAL}" >&2; exit 1; \
+    fi; \
+    echo "SHA256 OK (${ACTUAL})"; \
+    rm -f /tmp/SHA256SUMS.txt; \
     mkdir -p /tmp/masterdns; \
     tar -xzf /tmp/masterdns.tar.gz -C /tmp/masterdns; \
     BIN="$(find /tmp/masterdns -type f -name "MasterDnsVPN_Server_Linux_${SUFFIX}_v*" | sort -V | tail -n1)"; \

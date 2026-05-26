@@ -702,7 +702,7 @@ XDNSEOF
   "log": {"loglevel": "warning"},
   "inbounds": [{"listen": "127.0.0.1", "port": 7891, "protocol": "socks", "settings": {"auth": "noauth", "udp": true}}],
   "outbounds": [
-    {"tag": "proxy", "protocol": "vless", "settings": {"vnext": [{"address": "${SERVER_IP}", "port": ${PORT_XDNS:-53}, "users": [{"id": "$_xdns_uuid", "encryption": "none"}]}]}, "streamSettings": {"network": "kcp", "kcpSettings": {"mtu": $_xdns_mtu, "tti": 100, "uplinkCapacity": 0, "downlinkCapacity": 0, "congestion": true}, "finalmask": {"udp": [{"type": "xdns", "settings": ${_xdns_finalmask_settings_direct}}]}}},
+    {"tag": "proxy", "protocol": "vless", "settings": {"vnext": [{"address": "${SERVER_IP}", "port": ${PORT_XDNS:-5356}, "users": [{"id": "$_xdns_uuid", "encryption": "none"}]}]}, "streamSettings": {"network": "kcp", "kcpSettings": {"mtu": $_xdns_mtu, "tti": 100, "uplinkCapacity": 0, "downlinkCapacity": 0, "congestion": true}, "finalmask": {"udp": [{"type": "xdns", "settings": ${_xdns_finalmask_settings_direct}}]}}},
     {"tag": "direct", "protocol": "freedom"}
   ],
   "routing": {"rules": [{"type": "field", "ip": ["::/0"], "outboundTag": "direct"}]}
