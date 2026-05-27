@@ -20,10 +20,15 @@ WORKDIR /src
 
 COPY dns-router/ .
 
+# Keep the compile memory-frugal for low-RAM build hosts (1GB VPS): -p=1 builds
+# one package at a time and GOMAXPROCS=1 caps the toolchain's parallelism, so
+# peak RAM stays low regardless of how many cores the host has. GOFLAGS/-mod is
+# left default. (This binary is tiny; the cost is a slightly slower compile.)
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 \
-    go build -o /dns-router -trimpath -ldflags "-s -w" .
+    GOMAXPROCS=1 \
+    go build -p=1 -o /dns-router -trimpath -ldflags "-s -w" .
 
 FROM alpine:3.21
 
