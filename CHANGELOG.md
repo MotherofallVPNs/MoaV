@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.8.0] - 2026-05-26
+## [1.8.0] - 2026-05-27
 
 ### Upgrade Notes
 - **Re-bootstrap required; existing installs change behavior.** This release (PR [#102](https://github.com/shayanb/MoaV/pull/102)) adds two services and flips DNS-tunnel defaults, so upgrading an existing install is a breaking change in practice:
