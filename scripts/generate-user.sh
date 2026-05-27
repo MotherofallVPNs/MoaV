@@ -846,6 +846,26 @@ elif [[ -f "$TEMPLATE_FILE" ]]; then
     sed -i "s|{{DNSTT_PUBKEY}}|$DNSTT_PUBKEY|g" "$OUTPUT_HTML"
     sed -i "s|{{SLIPSTREAM_DOMAIN}}|$SLIPSTREAM_DOMAIN|g" "$OUTPUT_HTML"
 
+    # MahsaNG batch-import subscription: base64 of the newline-joined compatible
+    # share-links (mirrors scripts/user-mahsanet.sh) so a MahsaNG v16 user can
+    # paste once to import all proxy protocols. DNS tunnels + GooseRelay are
+    # configured separately and intentionally excluded. base64 has no '|', so it
+    # is safe in the sed replacement below.
+    _mahsanet_uris=""
+    for _f in reality cdn-vless xhttp-vless trojan shadowsocks hysteria2 \
+              reality-ipv6 trojan-ipv6 shadowsocks-ipv6 hysteria2-ipv6; do
+        [[ -f "$OUTPUT_DIR/$_f.txt" ]] || continue
+        _u=$(tr -d '\r' < "$OUTPUT_DIR/$_f.txt" | grep -aE '^(vless|trojan|ss|hysteria2|vmess)://' | head -1 || true)
+        [[ -n "$_u" ]] && _mahsanet_uris+="$_u"$'\n'
+    done
+    if [[ -n "$_mahsanet_uris" ]]; then
+        sed -i "s|{{MAHSANET_SUB}}|$(printf '%s' "$_mahsanet_uris" | base64 | tr -d '\n')|g" "$OUTPUT_HTML"
+        sed -i "s|{{MAHSANET_DISPLAY}}||g" "$OUTPUT_HTML"
+    else
+        sed -i "s|{{MAHSANET_SUB}}|No MahsaNG-compatible configs in this bundle|g" "$OUTPUT_HTML"
+        sed -i "s|{{MAHSANET_DISPLAY}}|display:none|g" "$OUTPUT_HTML"
+    fi
+
     # TrustTunnel password (same as user password) - escape special chars
     if [[ -n "${USER_PASSWORD:-}" ]]; then
         escaped_pw=$(printf '%s' "$USER_PASSWORD" | sed -e 's/[&\\/]/\\&/g')

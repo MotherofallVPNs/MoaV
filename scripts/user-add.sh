@@ -935,6 +935,25 @@ with open(html_path, 'w') as f: f.write(html)
         replace_placeholder "{{GOOSERELAY_DISPLAY}}" "display:none"
     fi
 
+    # MahsaNG batch-import subscription: base64 of the newline-joined compatible
+    # share-links (mirrors scripts/user-mahsanet.sh) so a MahsaNG v16 user can
+    # paste once to import all proxy protocols. DNS tunnels + GooseRelay are
+    # configured separately and intentionally excluded.
+    _mahsanet_uris=""
+    for _f in reality cdn-vless xhttp-vless trojan shadowsocks hysteria2 \
+              reality-ipv6 trojan-ipv6 shadowsocks-ipv6 hysteria2-ipv6; do
+        [[ -f "$OUTPUT_DIR/$_f.txt" ]] || continue
+        _u=$(tr -d '\r' < "$OUTPUT_DIR/$_f.txt" | grep -aE '^(vless|trojan|ss|hysteria2|vmess)://' | head -1 || true)
+        [[ -n "$_u" ]] && _mahsanet_uris+="$_u"$'\n'
+    done
+    if [[ -n "$_mahsanet_uris" ]]; then
+        replace_placeholder "{{MAHSANET_SUB}}" "$(printf '%s' "$_mahsanet_uris" | base64 | tr -d '\n')"
+        replace_placeholder "{{MAHSANET_DISPLAY}}" ""
+    else
+        replace_placeholder "{{MAHSANET_SUB}}" "No MahsaNG-compatible configs in this bundle"
+        replace_placeholder "{{MAHSANET_DISPLAY}}" "display:none"
+    fi
+
     # Clean up backup files
     rm -f "$OUTPUT_HTML.bak"
 
