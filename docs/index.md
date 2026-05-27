@@ -30,7 +30,7 @@ Read about [why MoaV exists and the mission behind it](philosophy.md).
 
 - **[OPSEC Guide](OPSEC.md)** — Security best practices for operators
 - **[Mission & Philosophy](philosophy.md)** — Why MoaV exists, internet freedom, and Iran's internet shutdowns
-- **[Supported Protocols](protocols.md)** — All 12 protocols with descriptions and links
+- **[Supported Protocols](protocols.md)** — All 16+ protocols with descriptions and links
 
 ## Developer
 
