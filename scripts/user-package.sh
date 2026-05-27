@@ -34,7 +34,7 @@ fi
 BUNDLE_DIR="outputs/bundles/$USERNAME"
 if [[ ! -d "$BUNDLE_DIR" ]]; then
     log_error "User bundle not found: $BUNDLE_DIR"
-    log_error "Create the user first with: ./scripts/user-add.sh $USERNAME"
+    log_error "Create the user first with: moav user add $USERNAME"
     exit 1
 fi
 
