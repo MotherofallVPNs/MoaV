@@ -18,8 +18,7 @@
       "type": "mixed",
       "tag": "mixed-in",
       "listen": "0.0.0.0",
-      "listen_port": 1080,
-      "sniff": true
+      "listen_port": 1080
     },
     {
       "type": "vless",
@@ -27,7 +26,6 @@
       "listen": "::",
       "listen_port": 443,
       "tcp_fast_open": true,
-      "sniff": true,
       "users": ${REALITY_USERS_JSON},
       "tls": {
         "enabled": true,
@@ -53,7 +51,6 @@
       "listen": "::",
       "listen_port": 8443,
       "tcp_fast_open": true,
-      "sniff": true,
       "users": ${TROJAN_USERS_JSON},
       "tls": {
         "enabled": true,
@@ -75,7 +72,6 @@
       "tag": "hysteria2-in",
       "listen": "::",
       "listen_port": 443,
-      "sniff": true,
       "users": ${HYSTERIA2_USERS_JSON},
       "obfs": {
         "type": "salamander",
@@ -95,7 +91,6 @@
       "tag": "vless-ws-in",
       "listen": "::",
       "listen_port": 2082,
-      "sniff": true,
       "users": ${VLESS_WS_USERS_JSON},
       "transport": {
         "type": "${CDN_TRANSPORT}",
@@ -111,7 +106,6 @@
       "tag": "shadowsocks-in",
       "listen": "::",
       "listen_port": ${PORT_SS},
-      "sniff": true,
       "method": "${SS_METHOD}",
       "password": "${SS_SERVER_PSK}",
       "users": ${SHADOWSOCKS_USERS_JSON},
@@ -125,14 +119,13 @@
     {
       "type": "direct",
       "tag": "direct"
-    },
-    {
-      "type": "block",
-      "tag": "block"
     }
   ],
   "route": {
     "rules": [
+      {
+        "action": "sniff"
+      },
       {
         "action": "hijack-dns",
         "protocol": "dns"
