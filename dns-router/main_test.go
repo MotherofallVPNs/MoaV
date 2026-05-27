@@ -324,6 +324,28 @@ func TestBuildRoutes(t *testing.T) {
 	}
 }
 
+// TestBackendFailureCounter verifies the self-heal threshold logic: consecutive
+// query failures accumulate (so a restarted/rebuilt backend gets evicted and
+// re-resolved), while any success resets the count (so normal intermittent DNS
+// loss never trips eviction).
+func TestBackendFailureCounter(t *testing.T) {
+	bc := &backendConn{}
+
+	for i := 1; i <= maxBackendFailures; i++ {
+		if got := bc.recordFailure(); got != i {
+			t.Fatalf("recordFailure() #%d = %d, want %d", i, got, i)
+		}
+	}
+	if bc.recordFailure() < maxBackendFailures {
+		t.Fatalf("failure count should have reached the eviction threshold (%d)", maxBackendFailures)
+	}
+
+	bc.resetFailures()
+	if got := bc.recordFailure(); got != 1 {
+		t.Fatalf("after resetFailures(), recordFailure() = %d, want 1", got)
+	}
+}
+
 // toLowerASCII mirrors the ASCII lowercasing the parser applies, kept local
 // to the test so expectations don't depend on production internals.
 func toLowerASCII(s string) string {

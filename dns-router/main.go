@@ -19,6 +19,15 @@ const (
 	maxPacketSize  = 4096
 	defaultTimeout = 5 * time.Second
 	dnsHeaderSize  = 12
+	// After this many consecutive failures (with no success in between), a
+	// cached backend connection is dropped so the next query re-resolves the
+	// hostname and reconnects. This lets the router recover on its own when a
+	// backend restarts or is rebuilt (Docker hands it a new IP) without needing
+	// the router itself restarted. Set above the transient-loss noise floor:
+	// any single success resets the counter, so only a genuinely dead/moved
+	// backend (all queries failing) reaches the threshold. The router is a
+	// stateless forwarder, so a reconnect is transparent to tunnel sessions.
+	maxBackendFailures = 5
 )
 
 // Route maps a domain suffix to a backend address.
@@ -41,14 +50,16 @@ type Router struct {
 }
 
 type backendConn struct {
-	addr    *net.UDPAddr
-	conn    *net.UDPConn
-	mu      sync.Mutex
-	pending map[uint16]chan []byte
-	ctx     context.Context
-	cancel  context.CancelFunc
-	wg      sync.WaitGroup
-	timeout time.Duration
+	addr      *net.UDPAddr
+	conn      *net.UDPConn
+	mu        sync.Mutex
+	pending   map[uint16]chan []byte
+	fails     int // consecutive query failures; reset on any success
+	ctx       context.Context
+	cancel    context.CancelFunc
+	wg        sync.WaitGroup
+	timeout   time.Duration
+	closeOnce sync.Once
 }
 
 func main() {
@@ -291,7 +302,45 @@ func (r *Router) forward(packet []byte, backend string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return bc.query(packet)
+	resp, err := bc.query(packet)
+	if err != nil {
+		// A backend that restarted (same IP, transient) or was rebuilt (new IP)
+		// leaves this cached connection dead. After a few consecutive failures,
+		// drop it so the next query re-resolves the hostname and reconnects.
+		if bc.recordFailure() >= maxBackendFailures {
+			r.evictBackend(backend, bc)
+		}
+		return nil, err
+	}
+	bc.resetFailures()
+	return resp, nil
+}
+
+// evictBackend drops a cached backend connection (if it's still the current one
+// for that address) so the next getBackend re-resolves and reconnects.
+func (r *Router) evictBackend(addr string, bc *backendConn) {
+	r.backendsMu.Lock()
+	if cur, ok := r.backends[addr]; ok && cur == bc {
+		delete(r.backends, addr)
+	}
+	r.backendsMu.Unlock()
+	bc.close()
+	log.Printf("[dns-router] Backend %s unresponsive after %d failures; reconnecting on next query", addr, maxBackendFailures)
+}
+
+// recordFailure increments the consecutive-failure counter and returns it.
+func (bc *backendConn) recordFailure() int {
+	bc.mu.Lock()
+	defer bc.mu.Unlock()
+	bc.fails++
+	return bc.fails
+}
+
+// resetFailures clears the consecutive-failure counter after a success.
+func (bc *backendConn) resetFailures() {
+	bc.mu.Lock()
+	defer bc.mu.Unlock()
+	bc.fails = 0
 }
 
 func (bc *backendConn) query(packet []byte) ([]byte, error) {
@@ -396,9 +445,11 @@ func (bc *backendConn) readLoop() {
 }
 
 func (bc *backendConn) close() {
-	bc.cancel()
-	bc.conn.Close()
-	bc.wg.Wait()
+	bc.closeOnce.Do(func() {
+		bc.cancel()
+		bc.conn.Close()
+		bc.wg.Wait()
+	})
 }
 
 // --- DNS packet parsing ---
