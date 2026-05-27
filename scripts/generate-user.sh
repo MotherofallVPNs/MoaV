@@ -659,15 +659,22 @@ if [[ "${ENABLE_XDNS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
 import os, json
 domain = os.environ["XDNS_DOMAIN"]
 csv = os.environ.get("XDNS_RESOLVERS_CSV", "").strip()
-resolvers = [x.strip() for x in csv.split(",") if x.strip()] if csv else []
-settings = {"domain": domain}
-if resolvers:
-    settings["resolvers"] = resolvers
-print(json.dumps(settings))
+ips = [x.strip() for x in csv.split(",") if x.strip()] if csv else []
+if not ips:
+    ips = ["1.1.1.1"]
+# Xray v26.x finalmask: the client side uses "resolvers", each formatted as
+# "domain[:method]+udp://server:port" (method defaults to txt). The old singular
+# "domain" field was removed; "domains" is server-side only.
+resolvers = [domain + "+udp://" + (ip if ":" in ip else ip + ":53") for ip in ips]
+print(json.dumps({"resolvers": resolvers}))
 ')
-        _xdns_finalmask_settings_direct=$(XDNS_DOMAIN="$_xdns_domain" python3 -c '
+        _xdns_finalmask_settings_direct=$(XDNS_DOMAIN="$_xdns_domain" XDNS_DIRECT_TARGET="${SERVER_IP}:${PORT_XDNS:-5356}" python3 -c '
 import os, json
-print(json.dumps({"domain": os.environ["XDNS_DOMAIN"]}))
+domain = os.environ["XDNS_DOMAIN"]
+target = os.environ["XDNS_DIRECT_TARGET"]
+# Direct mode: send xdns-encoded queries straight to the server XDNS port
+# (host PORT_XDNS -> xray:5355), with no public recursive resolver in between.
+print(json.dumps({"resolvers": [domain + "+udp://" + target]}))
 ')
 
         # Load user UUID. credentials.env (sourced above) already provides

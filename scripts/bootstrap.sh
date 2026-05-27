@@ -785,7 +785,10 @@ xdns_inbound = {
             'congestion': True
         },
         'finalmask': {
-            'udp': [{'type': 'xdns', 'settings': {'domain': '$xdns_domain'}}]
+            # Xray v26.x finalmask: server side uses 'domains' (array). The old
+            # singular 'domain' field was removed (split into domains=server /
+            # resolvers=client) — using it makes xray refuse to start.
+            'udp': [{'type': 'xdns', 'settings': {'domains': ['$xdns_domain']}}]
         }
     }
 }
