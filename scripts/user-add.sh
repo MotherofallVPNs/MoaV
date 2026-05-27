@@ -531,6 +531,158 @@ EOF
 fi
 
 # -----------------------------------------------------------------------------
+# Generate MasterDNS instructions (shared per-server tunnel key)
+# -----------------------------------------------------------------------------
+# Mirrors lib/masterdns.sh::masterdns_generate_client_instructions so a fast
+# host-side `moav user add` yields a complete bundle (no follow-up
+# `moav regenerate-users` needed). The host can't read the /state volume, so
+# the shared key is taken from outputs/masterdns/encrypt_key.txt (published by
+# bootstrap). Keep the text in sync with lib/masterdns.sh.
+if [[ "${ENABLE_MASTERDNS:-true}" == "true" ]] && [[ -f "outputs/masterdns/encrypt_key.txt" ]]; then
+    MASTERDNS_DOMAIN="${MASTERDNS_SUBDOMAIN:-m}.${DOMAIN}"
+    MD_ENC_METHOD="${MASTERDNS_ENC_METHOD:-5}"
+    MD_KEY=$(tr -d '\n\r ' < "outputs/masterdns/encrypt_key.txt")
+    [[ -z "$MD_KEY" ]] && MD_KEY="KEY_NOT_GENERATED"
+
+    cat > "$OUTPUT_DIR/masterdns-instructions.txt" <<EOF
+# MasterDNS Tunnel Instructions
+# =============================
+# Advanced DNS tunnel (low-overhead ARQ + resolver load-balancing).
+# Faster and more loss-tolerant than dnstt; bundled in MahsaNG v16.
+# Use when other methods are blocked — DNS tunnels work when little else does.
+#
+# Project: https://github.com/masterking32/MasterDnsVPN
+# Bundled in: MahsaNG (https://github.com/GFW-knocker/MahsaNG)
+
+# Tunnel Domain:
+$MASTERDNS_DOMAIN
+
+# Data encryption method (must match server):
+$MD_ENC_METHOD   # 5 = AES-256-GCM
+
+# Encryption key (keep secret — anyone with this key can use the tunnel):
+$MD_KEY
+
+# -------------------------
+# Option A: MahsaNG (Android) — easiest
+# -------------------------
+# 1. Install MahsaNG v16+ from https://github.com/GFW-knocker/MahsaNG/releases
+# 2. Add a MasterDNS config with the domain, encryption method and key above.
+
+# -------------------------
+# Option B: MasterDnsVPN standalone client
+# -------------------------
+# Download the client for your OS from:
+#   https://github.com/masterking32/MasterDnsVPN/releases
+#
+# Minimal client_config.toml:
+#   DOMAINS = ["$MASTERDNS_DOMAIN"]
+#   DATA_ENCRYPTION_METHOD = $MD_ENC_METHOD
+#   ENCRYPTION_KEY = "$MD_KEY"
+#   PROTOCOL_TYPE = "SOCKS5"
+#   LISTEN_IP = "127.0.0.1"
+#   LISTEN_PORT = 18000
+#
+# Run the client, then point your apps at SOCKS5 127.0.0.1:18000.
+# The client also needs a resolver list (client_resolvers) — use the sample
+# bundled with the client and/or public resolvers (1.1.1.1:53, 8.8.8.8:53).
+
+# -------------------------
+# Notes:
+# -------------------------
+# - DNS tunneling is slow by design but extremely hard to block.
+# - Faster and more stable under packet loss than dnstt/Slipstream.
+# - Traffic exits through the MoaV server (your IP appears as the server IP).
+# - The NS record for $MASTERDNS_DOMAIN must delegate to this server (see docs/DNS.md).
+EOF
+    log_info "✓ MasterDNS instructions generated"
+fi
+
+# -----------------------------------------------------------------------------
+# Generate GooseRelay bundle (shared per-server tunnel key + ready Apps Script)
+# -----------------------------------------------------------------------------
+# Mirrors lib/gooserelay.sh::gooserelay_generate_client_instructions. Off by
+# default; only emitted when ENABLE_GOOSERELAY=true and bootstrap has published
+# the tunnel key. Keep the text/JSON in sync with lib/gooserelay.sh.
+if [[ "${ENABLE_GOOSERELAY:-false}" == "true" ]] && [[ -f "outputs/gooserelay/tunnel_key.txt" ]]; then
+    GR_KEY=$(tr -d '\n\r ' < "outputs/gooserelay/tunnel_key.txt")
+    [[ -z "$GR_KEY" ]] && GR_KEY="KEY_NOT_GENERATED"
+    GR_ENDPOINT="http://${SERVER_IP:-YOUR_SERVER_IP}:${PORT_GOOSE:-8444}/tunnel"
+
+    if [[ -f "configs/gooserelay/Code.gs.template" ]]; then
+        sed "s|__GOOSE_RELAY_ENDPOINT__|$GR_ENDPOINT|g" \
+            "configs/gooserelay/Code.gs.template" > "$OUTPUT_DIR/gooserelay-AppsScript.gs"
+    fi
+
+    cat > "$OUTPUT_DIR/gooserelay-client_config.json" <<EOF
+{
+  "debug_timing": false,
+  "socks_host": "127.0.0.1",
+  "socks_port": 1080,
+  "google_host": "216.239.38.120",
+  "sni": ["www.google.com", "mail.google.com", "accounts.google.com"],
+  "script_keys": [
+    {"id": "REPLACE_WITH_YOUR_APPS_SCRIPT_DEPLOYMENT_ID", "account": "acct-a"}
+  ],
+  "tunnel_key": "$GR_KEY",
+  "coalesce_step_ms": 0,
+  "idle_slots_per_bucket": 2
+}
+EOF
+
+    cat > "$OUTPUT_DIR/gooserelay-instructions.txt" <<EOF
+# GooseRelay Instructions
+# =======================
+# SOCKS5 over a Google Apps Script web app -> this VPS exit server.
+# To the network you only ever appear to talk TLS to google.com.
+# End-to-end AES-256-GCM; Google never sees plaintext or the key.
+# Interoperable with the GooseRelay client in MahsaNG v16 (GooseRelay v1.7.1).
+#
+# Project: https://github.com/kianmhz/GooseRelayVPN
+# Bundled in: MahsaNG (https://github.com/GFW-knocker/MahsaNG)
+
+# This bundle ships TWO ready-made files so you don't hand-edit anything:
+#   gooserelay-AppsScript.gs       -> paste into script.google.com; the
+#                                     RELAY_URLS array already points here
+#   gooserelay-client_config.json  -> ready for the GooseRelay / MahsaNG v16
+#                                     client; only the Deployment ID is blank
+
+# Shared tunnel key (already in the config; keep SECRET — anyone with it can
+# use your VPS as you):
+$GR_KEY
+
+# This server's exit endpoint (already wired into gooserelay-AppsScript.gs):
+$GR_ENDPOINT
+
+# -------------------------
+# Setup (one-time, in YOUR Google account)
+# -------------------------
+# 1. Open https://script.google.com  ->  New project
+# 2. Paste the WHOLE contents of  gooserelay-AppsScript.gs  (no edits needed)
+# 3. Deploy -> New deployment -> type "Web app"
+#       Execute as: Me
+#       Who has access: Anyone
+#    Copy the Deployment ID it shows.
+#    (Re-deploy as a NEW deployment whenever you change the script.)
+# 4. In gooserelay-client_config.json, replace
+#    REPLACE_WITH_YOUR_APPS_SCRIPT_DEPLOYMENT_ID with that Deployment ID.
+# 5. Load gooserelay-client_config.json into the GooseRelay client (or the
+#    MahsaNG v16 GooseRelay tab), then point apps at SOCKS5 127.0.0.1:1080.
+#    A pre-flight check confirms the relay is healthy and the key matches.
+
+# -------------------------
+# Notes:
+# -------------------------
+# - Apps Script quota is ~20,000 calls/day PER Google account. Deploy under
+#   several accounts and add each Deployment ID to "script_keys" for capacity.
+# - Real-time apps (Telegram/X) drain the quota fast due to constant polling.
+# - Traffic exits through the MoaV server (your IP appears as the server IP).
+# - All deployments forwarding here must use this exact tunnel_key.
+EOF
+    log_info "✓ GooseRelay bundle generated"
+fi
+
+# -----------------------------------------------------------------------------
 # Generate README.html from template
 # -----------------------------------------------------------------------------
 TEMPLATE_FILE="docs/client-guide-template.html"
