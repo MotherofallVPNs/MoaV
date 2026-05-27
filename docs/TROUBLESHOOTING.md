@@ -938,6 +938,19 @@ Watch `moav logs -f dnstt` alongside it: if you see `begin stream` (not just `be
 
 > The same "session opens, nothing flows" logic applies to any DNS tunnel: the server side is almost never the culprit if the isolation test above passes — check the client's MTU/transport (UDP vs DoH) settings.
 
+#### dnstt stream opens but resets immediately (`connection reset by peer` on `:1080`)
+
+**Symptom:** the dnstt log shows `begin stream` followed immediately by `copy stream←upstream: … ->…:1080: read: connection reset by peer` and `end stream`, repeating. The client app reports something like `SSH Tunnel established` then `Handshake timeout`.
+
+**Cause — client-type mismatch, by design (not a bug):** the client is an **SSH-over-DNS app** (HTTP Injector / Dark Tunnel / "SSH + DNSTT" style) that expects an **SSH server** at the far end of the tunnel. MoaV's DNS tunnels forward to **sing-box's SOCKS5 inbound** (`sing-box:1080`), *not* an SSH host — so sing-box receives SSH handshake bytes it can't parse and resets the connection.
+
+**MoaV's DNS tunnels (dnstt, Slipstream, MasterDNS) are a SOCKS5 transport, not an SSH host.** Use a client that speaks SOCKS5 to the tunnel endpoint:
+- the standalone **dnstt-client**, with your app pointing SOCKS5 at its local listener;
+- **MahsaNG v16** (use its native **MasterDNS** tunnel);
+- **v2ray / sing-box / Xray** clients using the local dnstt port as a SOCKS proxy.
+
+SSH-tunnel apps that require an SSH account behind dnstt are **not supported** — there is no SSH server behind MoaV's DNS tunnels.
+
 ---
 
 ## Registry/Build Issues
