@@ -89,16 +89,38 @@ USER_PASSWORD=$USER_PASSWORD
 CREATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
 
-# Shadowsocks-2022 per-user PSK (only if SS is enabled)
+# Shadowsocks-2022 per-user PSK (only if SS is enabled AND the server is
+# bootstrapped for it). If the operator just flipped ENABLE_SS in .env without
+# re-bootstrapping, neither the server PSK nor the 'shadowsocks-in' inbound is
+# in place — we'd otherwise silently emit a key that's not registered with any
+# inbound. Fail loudly with the exact remediation instead.
 if [[ "${ENABLE_SS:-false}" == "true" ]]; then
-    case "${SS_METHOD:-2022-blake3-aes-128-gcm}" in
-        2022-blake3-aes-128-gcm) SS_PSK_BYTES=16 ;;
-        *)                       SS_PSK_BYTES=32 ;;
-    esac
-    SS_USER_PSK=$(openssl rand -base64 "$SS_PSK_BYTES")
-    cat > "$STATE_DIR/users/$USERNAME/shadowsocks.env" <<EOF
+    _ss_psk_path="$STATE_DIR/keys/shadowsocks-server.psk"
+    _ss_psk_present=false
+    if [[ -s "$_ss_psk_path" ]] \
+       || docker run --rm -v moav_moav_state:/state alpine test -s /state/keys/shadowsocks-server.psk 2>/dev/null; then
+        _ss_psk_present=true
+    fi
+    _ss_inbound_present=false
+    if [[ -f "$CONFIG_FILE" ]] && jq -e '.inbounds[] | select(.tag == "shadowsocks-in")' "$CONFIG_FILE" >/dev/null 2>&1; then
+        _ss_inbound_present=true
+    fi
+    if ! $_ss_psk_present || ! $_ss_inbound_present; then
+        log_error "ENABLE_SS=true in .env, but the server isn't bootstrapped for Shadowsocks yet:"
+        $_ss_psk_present     || log_error "  • missing server PSK at $_ss_psk_path"
+        $_ss_inbound_present || log_error "  • no 'shadowsocks-in' inbound in $CONFIG_FILE"
+        log_error "  Run 'moav bootstrap' first to apply the SS enablement, then re-run 'moav user add $USERNAME'."
+        log_warn "Skipping Shadowsocks for $USERNAME (other protocols will still be added)."
+    else
+        case "${SS_METHOD:-2022-blake3-aes-128-gcm}" in
+            2022-blake3-aes-128-gcm) SS_PSK_BYTES=16 ;;
+            *)                       SS_PSK_BYTES=32 ;;
+        esac
+        SS_USER_PSK=$(openssl rand -base64 "$SS_PSK_BYTES")
+        cat > "$STATE_DIR/users/$USERNAME/shadowsocks.env" <<EOF
 SS_USER_PSK=$SS_USER_PSK
 EOF
+    fi
 fi
 
 log_info "Generated credentials for $USERNAME"
