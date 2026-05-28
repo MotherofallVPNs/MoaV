@@ -1,17 +1,27 @@
-# Bootstrap container for first-run initialization
-FROM alpine:3.21
+# Bootstrap container for first-run initialization.
+#
+# Base: debian-slim (glibc). The prebuilt sing-box binary from SagerNet is
+# glibc-linked (PT_INTERP = /lib64/ld-linux-x86-64.so.2); running it on alpine
+# (musl) fails at exec time with
+#   /usr/local/bin/sing-box: cannot execute: required file not found
+# because the dynamic linker isn't there. Aligns with Dockerfile.sing-box,
+# which also uses debian-slim for the same binary.
+FROM debian:bookworm-slim
 
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
+    ca-certificates \
     curl \
     jq \
     openssl \
     pwgen \
-    gettext \
-    libqrencode-tools \
+    gettext-base \
+    qrencode \
     wireguard-tools \
     xxd \
-    python3
+    python3 \
+    tar \
+ && rm -rf /var/lib/apt/lists/*
 
 # Install sing-box for key generation (download binary directly to avoid
 # pulling the full container image, which hangs in censored networks)
