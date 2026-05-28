@@ -252,7 +252,7 @@ See [docs/CLIENTS.md](docs/CLIENTS.md) for complete list and setup instructions.
 | 443/tcp | TCP | Reality (VLESS) | Yes |
 | 443/udp | UDP | Hysteria2 | Yes |
 | 8443/tcp | TCP | Trojan | Yes |
-| 8388/tcp+udp | TCP+UDP | Shadowsocks-2022 (when `ENABLE_SS=true`) | No |
+| 8388/tcp+udp | TCP+UDP | Shadowsocks-2022 | No |
 | 4443/tcp+udp | TCP+UDP | TrustTunnel | Yes |
 | 2082/tcp | TCP | CDN WebSocket | Yes (Cloudflare) |
 | 51820/udp | UDP | WireGuard | No |

@@ -258,7 +258,7 @@ export XDNS_MTU="${XDNS_MTU:-35}"
 export PORT_XDNS="${PORT_XDNS:-5356}"
 export ENABLE_TELEMT="${ENABLE_TELEMT:-true}"
 export PORT_TELEMT="${PORT_TELEMT:-993}"
-export ENABLE_SS="${ENABLE_SS:-false}"
+export ENABLE_SS="${ENABLE_SS:-true}"
 export PORT_SS="${PORT_SS:-8388}"
 export SS_METHOD="${SS_METHOD:-2022-blake3-aes-128-gcm}"
 export TELEMT_TLS_DOMAIN="${TELEMT_TLS_DOMAIN:-dl.google.com}"
@@ -456,7 +456,7 @@ ss_psk_bytes() {
     esac
 }
 
-if [[ "${ENABLE_SS:-false}" == "true" ]]; then
+if [[ "${ENABLE_SS:-true}" == "true" ]]; then
     case "$SS_METHOD" in
         2022-blake3-aes-128-gcm|2022-blake3-aes-256-gcm) : ;;
         *)
@@ -549,7 +549,7 @@ EOF
     VLESS_WS_USERS_JSON+="{\"name\":\"$USER_ID\",\"uuid\":\"$USER_UUID\"}"
 
     # Shadowsocks-2022 per-user PSK — same length as the server PSK
-    if [[ "${ENABLE_SS:-false}" == "true" ]]; then
+    if [[ "${ENABLE_SS:-true}" == "true" ]]; then
         if [[ -f "$STATE_DIR/users/$USER_ID/shadowsocks.env" ]]; then
             source "$STATE_DIR/users/$USER_ID/shadowsocks.env"
         else
@@ -818,7 +818,7 @@ singbox_needed=false
 [[ "${ENABLE_REALITY:-true}" == "true" ]] && singbox_needed=true
 [[ "${ENABLE_TROJAN:-true}" == "true" ]] && singbox_needed=true
 [[ "${ENABLE_HYSTERIA2:-true}" == "true" ]] && singbox_needed=true
-[[ "${ENABLE_SS:-false}" == "true" ]] && singbox_needed=true
+[[ "${ENABLE_SS:-true}" == "true" ]] && singbox_needed=true
 
 if [[ "$singbox_needed" == "true" ]]; then
     log_info "Generating sing-box configuration (using existing keys)..."
@@ -862,7 +862,7 @@ if [[ "$singbox_needed" == "true" ]]; then
         jq 'del(.inbounds[] | select(.tag == "vless-reality-in"))' "$config_file" > "${config_file}.tmp" && mv -f "${config_file}.tmp" "$config_file"
         log_info "  Removed Reality inbound (disabled)"
     fi
-    if [[ "${ENABLE_SS:-false}" != "true" ]]; then
+    if [[ "${ENABLE_SS:-true}" != "true" ]]; then
         jq 'del(.inbounds[] | select(.tag == "shadowsocks-in"))' "$config_file" > "${config_file}.tmp" && mv -f "${config_file}.tmp" "$config_file"
         log_info "  Removed Shadowsocks inbound (disabled)"
     fi

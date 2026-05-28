@@ -281,7 +281,7 @@ moav client connect user1 # اتصال به عنوان کاربر (پراکسی 
 | 443/tcp | TCP | Reality (VLESS) | بله |
 | 443/udp | UDP | Hysteria2 | بله |
 | 8443/tcp | TCP | Trojan | بله |
-| 8388/tcp+udp | TCP+UDP | Shadowsocks-2022 (وقتی `ENABLE_SS=true`) | خیر |
+| 8388/tcp+udp | TCP+UDP | Shadowsocks-2022 | خیر |
 | 4443/tcp+udp | TCP+UDP | TrustTunnel | بله |
 | 2082/tcp | TCP | CDN WebSocket | بله (Cloudflare) |
 | 51820/udp | UDP | WireGuard | خیر |

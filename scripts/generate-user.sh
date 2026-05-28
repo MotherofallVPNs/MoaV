@@ -254,7 +254,7 @@ fi
 # -----------------------------------------------------------------------------
 # Generate Shadowsocks-2022 client config (sing-box compatible URI format)
 # -----------------------------------------------------------------------------
-if [[ "${ENABLE_SS:-false}" == "true" ]]; then
+if [[ "${ENABLE_SS:-true}" == "true" ]]; then
   if [[ -f "$OUTPUT_DIR/shadowsocks.txt" ]] && [[ "$FORCE_REGENERATE" != "force" ]]; then
     log_info "  - Shadowsocks config exists, skipping"
   else

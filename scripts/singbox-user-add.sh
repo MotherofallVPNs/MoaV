@@ -94,7 +94,7 @@ EOF
 # re-bootstrapping, neither the server PSK nor the 'shadowsocks-in' inbound is
 # in place — we'd otherwise silently emit a key that's not registered with any
 # inbound. Fail loudly with the exact remediation instead.
-if [[ "${ENABLE_SS:-false}" == "true" ]]; then
+if [[ "${ENABLE_SS:-true}" == "true" ]]; then
     _ss_psk_path="$STATE_DIR/keys/shadowsocks-server.psk"
     _ss_psk_present=false
     if [[ -s "$_ss_psk_path" ]] \
@@ -153,7 +153,7 @@ jq --arg name "$USERNAME" --arg uuid "$USER_UUID" \
 mv -f "${TEMP_CONFIG}.2" "$TEMP_CONFIG"
 
 # Add to Shadowsocks-2022 users (only if the inbound exists in the current config)
-if [[ "${ENABLE_SS:-false}" == "true" ]] && [[ -n "${SS_USER_PSK:-}" ]] \
+if [[ "${ENABLE_SS:-true}" == "true" ]] && [[ -n "${SS_USER_PSK:-}" ]] \
         && jq -e '.inbounds[] | select(.tag == "shadowsocks-in")' "$TEMP_CONFIG" >/dev/null 2>&1; then
     jq --arg name "$USERNAME" --arg pass "$SS_USER_PSK" \
         '.inbounds |= map(if .tag == "shadowsocks-in" then .users += [{"name": $name, "password": $pass}] else . end)' \
@@ -315,7 +315,7 @@ if [[ -n "$CDN_DOMAIN" ]]; then
 fi
 
 # Generate Shadowsocks-2022 bundle (only if SS is enabled and we have the PSKs)
-if [[ "${ENABLE_SS:-false}" == "true" ]] && [[ -n "${SS_USER_PSK:-}" ]]; then
+if [[ "${ENABLE_SS:-true}" == "true" ]] && [[ -n "${SS_USER_PSK:-}" ]]; then
     # Load server PSK from host state (via docker volume since the canonical copy is in the container)
     SS_SERVER_PSK=""
     if [[ -f "$STATE_DIR/keys/shadowsocks-server.psk" ]]; then
