@@ -4071,8 +4071,9 @@ filter_disabled_profiles() {
 # Echoes: start-and-enable | skip | start-once
 confirm_disabled_profile() {
     local profile="$1" env_file="${2:-$SCRIPT_DIR/.env}"
-    # Single-flag profiles can be auto-flipped; multi-flag (proxy/dnstunnel) can't.
-    local enable_var=""
+    # Single-flag profiles can be auto-flipped; multi-flag (proxy/dnstunnel)
+    # need the operator to pick which sub-flag to enable.
+    local enable_var="" multi_flag_hint=""
     case "$profile" in
         wireguard)   enable_var="ENABLE_WIREGUARD" ;;
         amneziawg)   enable_var="ENABLE_AMNEZIAWG" ;;
@@ -4083,19 +4084,23 @@ confirm_disabled_profile() {
         conduit)     enable_var="ENABLE_CONDUIT" ;;
         snowflake)   enable_var="ENABLE_SNOWFLAKE" ;;
         gooserelay)  enable_var="ENABLE_GOOSERELAY" ;;
+        monitoring)  enable_var="ENABLE_MONITORING" ;;
+        proxy)       multi_flag_hint="ENABLE_REALITY, ENABLE_TROJAN, ENABLE_HYSTERIA2, ENABLE_SS" ;;
+        dnstunnel)   multi_flag_hint="ENABLE_DNSTT, ENABLE_SLIPSTREAM, ENABLE_MASTERDNS, ENABLE_XDNS" ;;
     esac
 
     echo "" >&2
-    warn "Profile '$profile' is disabled in .env (matching ENABLE_* is false)." >&2
+    warn "Profile '$profile' is disabled in .env." >&2
     echo "" >&2
     echo -e "  ${WHITE}What would you like to do?${NC}" >&2
     if [[ -n "$enable_var" ]]; then
-        echo "    1) Enable in .env and start (persists: $enable_var=true)" >&2
+        echo "    1) Enable + start  — set ${enable_var}=true in .env and start now (persists)" >&2
     else
-        echo "    1) (n/a — '$profile' covers multiple ENABLE_* flags)" >&2
+        echo "    1) Enable manually — '$profile' covers $multi_flag_hint;" >&2
+        echo "                          set one to true in .env, then re-run" >&2
     fi
-    echo "    2) Skip — don't start" >&2
-    echo "    3) Start once without persisting (.env stays as-is)" >&2
+    echo "    2) Skip            — don't start; leave .env unchanged" >&2
+    echo "    3) Start once      — start now without touching .env (won't auto-start next time)" >&2
     echo "" >&2
 
     local choice=""
@@ -4108,8 +4113,11 @@ confirm_disabled_profile() {
     case "$choice" in
         1)
             if [[ -z "$enable_var" ]]; then
-                warn "Can't auto-enable '$profile' (multi-flag profile); falling through to start-once." >&2
-                echo "start-once"
+                # Multi-flag — can't auto-flip. Direct the operator and skip
+                # (don't silently fall through to start-once; they explicitly
+                # asked for the persistent path).
+                warn "Skipping — flip one of [$multi_flag_hint] in .env, then re-run." >&2
+                echo "skip"
                 return 0
             fi
             if grep -q "^${enable_var}=" "$env_file" 2>/dev/null; then
