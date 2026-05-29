@@ -598,8 +598,12 @@ services:
     mem_limit: 64m
     cpus: 0.25
     # Note: No depends_on as snowflake may not be running; exporter handles retry
+    # Profile membership follows the relay it observes (issue #106) — when
+    # ENABLE_SNOWFLAKE=false the exporter stays off too, so the Snowflake
+    # Grafana panels don't keep showing stale numbers. The exporter remains
+    # in `all` for enumeration ops (build/logs/down via --profile all).
     profiles:
-      - monitoring
+      - snowflake
       - all
 
   # ===========================================================================
