@@ -623,11 +623,7 @@ check_prerequisites() {
                         # profile) doesn't fight systemd-resolved for port 53 with
                         # nothing to route; direct-mode XDNS can be re-enabled manually.
                         for var in ENABLE_TROJAN ENABLE_HYSTERIA2 ENABLE_DNSTT ENABLE_SLIPSTREAM ENABLE_MASTERDNS ENABLE_XDNS ENABLE_TRUSTTUNNEL; do
-                            if grep -q "^${var}=" .env 2>/dev/null; then
-                                sed -i "s|^${var}=.*|${var}=false|" .env
-                            else
-                                echo "${var}=false" >> .env
-                            fi
+                            update_env_var ".env" "$var" "false"
                         done
                         # Derive DEFAULT_PROFILES from the mutated ENABLE_* set (issue #106).
                         local _dl_profiles
@@ -3875,24 +3871,12 @@ select_profiles() {
             echo ""
             warn "Monitoring stack (Grafana + Prometheus) requires at least 2GB RAM."
             if confirm "Enable monitoring?" "n"; then
-                # Update .env to enable monitoring
-                if grep -q "^ENABLE_MONITORING=" "$env_file" 2>/dev/null; then
-                    sed -i.bak "s/^ENABLE_MONITORING=.*/ENABLE_MONITORING=true/" "$env_file"
-                    rm -f "$env_file.bak"
-                else
-                    # Add if not present
-                    echo "ENABLE_MONITORING=true" >> "$env_file"
-                fi
+                update_env_var "$env_file" "ENABLE_MONITORING" "true"
                 SELECTED_PROFILES+=("monitoring")
                 success "Monitoring enabled"
             else
                 # Explicitly disable to avoid asking again
-                if grep -q "^ENABLE_MONITORING=" "$env_file" 2>/dev/null; then
-                    sed -i.bak "s/^ENABLE_MONITORING=.*/ENABLE_MONITORING=false/" "$env_file"
-                    rm -f "$env_file.bak"
-                else
-                    echo "ENABLE_MONITORING=false" >> "$env_file"
-                fi
+                update_env_var "$env_file" "ENABLE_MONITORING" "false"
                 info "Monitoring skipped. Enable later with: moav start monitoring"
             fi
         fi
@@ -4120,15 +4104,7 @@ confirm_disabled_profile() {
                 echo "skip"
                 return 0
             fi
-            if grep -q "^${enable_var}=" "$env_file" 2>/dev/null; then
-                if [[ "$OSTYPE" == "darwin"* ]]; then
-                    sed -i '' "s|^${enable_var}=.*|${enable_var}=true|" "$env_file"
-                else
-                    sed -i "s|^${enable_var}=.*|${enable_var}=true|" "$env_file"
-                fi
-            else
-                echo "${enable_var}=true" >> "$env_file"
-            fi
+            update_env_var "$env_file" "$enable_var" "true"
             success "Set ${enable_var}=true in .env" >&2
             echo "start-and-enable"
             ;;
@@ -4178,9 +4154,7 @@ ensure_clash_api_secret() {
         echo ""
         warn "Monitoring is currently disabled in .env (ENABLE_MONITORING=false)"
         if confirm "Enable monitoring?" "y"; then
-            # Update ENABLE_MONITORING to true in .env
-            sed -i.bak "s/^ENABLE_MONITORING=false/ENABLE_MONITORING=true/" "$env_file"
-            rm -f "$env_file.bak"
+            update_env_var "$env_file" "ENABLE_MONITORING" "true"
             success "ENABLE_MONITORING set to true"
         else
             info "Skipping monitoring. Starting other services..."
@@ -6158,11 +6132,7 @@ cmd_domainless() {
     # bootstrap.sh:41-46; XDNS is added to keep dns-router off port 53 in
     # domainless mode (direct-mode XDNS can be re-enabled manually).
     for var in ENABLE_TROJAN ENABLE_HYSTERIA2 ENABLE_DNSTT ENABLE_SLIPSTREAM ENABLE_MASTERDNS ENABLE_XDNS ENABLE_TRUSTTUNNEL; do
-        if grep -q "^${var}=" .env; then
-            sed -i "s/^${var}=.*/${var}=false/" .env
-        else
-            echo "${var}=false" >> .env
-        fi
+        update_env_var ".env" "$var" "false"
     done
 
     # Clear DOMAIN (add if not present)
@@ -7159,7 +7129,8 @@ build_local_images() {
     echo "  moav build --local --list"
 }
 
-# Helper: update or add environment variable in .env
+# Helper: set <var>=<value> in .env. Prefers replacing an existing line
+# (active or commented `#X=` / `# X=`); appends only if neither exists.
 update_env_var() {
     local env_file="$1"
     local var_name="$2"
@@ -7167,8 +7138,9 @@ update_env_var() {
 
     if grep -q "^${var_name}=" "$env_file" 2>/dev/null; then
         sed -i.bak "s|^${var_name}=.*|${var_name}=${var_value}|" "$env_file"
-    elif grep -q "^# ${var_name}=" "$env_file" 2>/dev/null; then
-        sed -i.bak "s|^# ${var_name}=.*|${var_name}=${var_value}|" "$env_file"
+    elif grep -qE "^#[[:space:]]*${var_name}=" "$env_file" 2>/dev/null; then
+        # Uncomment + set — .env.example has both "#X=" and "# X=" styles.
+        sed -i.bak "s|^#[[:space:]]*${var_name}=.*|${var_name}=${var_value}|" "$env_file"
     else
         echo "${var_name}=${var_value}" >> "$env_file"
     fi
