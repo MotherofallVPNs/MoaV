@@ -502,6 +502,45 @@ check_prerequisites() {
     # Check .env file
     if [[ -f ".env" ]]; then
         success ".env file exists"
+        # Validate critical fields — covers the case where a previous
+        # interactive bootstrap was aborted mid-prompt (e.g. user typed
+        # DOMAIN, Ctrl-C'd before ACME_EMAIL / ADMIN_PASSWORD). Without
+        # this we'd silently skip every missing field on the next run.
+        local _existing_domain
+        _existing_domain=$(get_env_val "DOMAIN" ".env" "")
+        if [[ -n "$_existing_domain" ]]; then
+            # Auto-clean a malformed DOMAIN (e.g. "https://t7d.my/" → "t7d.my").
+            if [[ "$_existing_domain" =~ ^https?:// ]] || [[ "$_existing_domain" == */* ]] || [[ "$_existing_domain" == *:* ]]; then
+                local _cleaned
+                _cleaned=$(sanitize_domain "$_existing_domain")
+                if is_valid_domain "$_cleaned"; then
+                    warn "DOMAIN in .env was malformed: '$_existing_domain' → cleaning to '$_cleaned'"
+                    update_env_var ".env" "DOMAIN" "\"$_cleaned\""
+                    _existing_domain="$_cleaned"
+                else
+                    warn "DOMAIN in .env looks invalid: '$_existing_domain' — edit .env or re-run with an empty .env to re-prompt."
+                fi
+            fi
+            # DOMAIN set → ACME_EMAIL is needed for Let's Encrypt.
+            local _existing_email
+            _existing_email=$(get_env_val "ACME_EMAIL" ".env" "")
+            if [[ -z "$_existing_email" ]]; then
+                echo ""
+                warn "ACME_EMAIL is not set (required for Let's Encrypt TLS certificate)."
+                echo -e "${WHITE}Email address${NC} (for Let's Encrypt TLS certificate)"
+                printf "  Email: "
+                local input_email_resume=""
+                read -r -e input_email_resume
+                if [[ -n "$input_email_resume" ]]; then
+                    update_env_var ".env" "ACME_EMAIL" "\"$input_email_resume\""
+                    success "Email set to: $input_email_resume"
+                else
+                    warn "No email set — edit .env later or run bootstrap again."
+                fi
+            fi
+        fi
+        # Always check admin password (idempotent — no-op if already set securely).
+        ensure_admin_password
     else
         warn ".env file not found"
         if [[ -f ".env.example" ]]; then
@@ -517,20 +556,29 @@ check_prerequisites() {
                 echo "  Example: vpn.example.com"
                 echo "  Leave empty to run only domainless services"
                 printf "  Domain: "
-                read -r input_domain
+                read -r -e input_domain
 
                 local domainless_mode=false
                 if [[ -n "$input_domain" ]]; then
-                    sed -i "s|^DOMAIN=.*|DOMAIN=\"$input_domain\"|" .env
+                    # Strip scheme/path/port (e.g. "https://t7d.my/" → "t7d.my").
+                    local raw_domain="$input_domain"
+                    input_domain=$(sanitize_domain "$input_domain")
+                    if [[ "$input_domain" != "$raw_domain" ]]; then
+                        info "Cleaned input: '$raw_domain' → '$input_domain'"
+                    fi
+                    if ! is_valid_domain "$input_domain"; then
+                        warn "'$input_domain' doesn't look like a valid hostname (need at least one dot, no spaces/special chars). Saving anyway — edit .env if it's wrong."
+                    fi
+                    update_env_var ".env" "DOMAIN" "\"$input_domain\""
                     success "Domain set to: $input_domain"
                     echo ""
 
                     # Ask for email (only if domain is set)
                     echo -e "${WHITE}Email address${NC} (for Let's Encrypt TLS certificate)"
                     printf "  Email: "
-                    read -r input_email
+                    read -r -e input_email
                     if [[ -n "$input_email" ]]; then
-                        sed -i "s|^ACME_EMAIL=.*|ACME_EMAIL=\"$input_email\"|" .env
+                        update_env_var ".env" "ACME_EMAIL" "\"$input_email\""
                         success "Email set to: $input_email"
                     else
                         warn "No email set - you can edit .env later"
@@ -7127,6 +7175,39 @@ build_local_images() {
     echo ""
     echo "To see all available images for local build:"
     echo "  moav build --local --list"
+}
+
+# Strip scheme / user@ / path / port / whitespace from a domain input; lowercase.
+# Echoes the bare hostname (or "" if nothing usable remains).
+sanitize_domain() {
+    local d="$1"
+    # Scheme
+    d="${d#http://}"; d="${d#https://}"
+    d="${d#HTTP://}"; d="${d#HTTPS://}"
+    # user@host
+    d="${d##*@}"
+    # /path
+    d="${d%%/*}"
+    # :port
+    d="${d%%:*}"
+    # Strip all whitespace (hostnames have none).
+    d="${d// /}"
+    d="${d//$'\t'/}"
+    # lowercase
+    echo "$d" | tr '[:upper:]' '[:lower:]'
+}
+
+# True if $1 looks like a hostname (has a dot, only [a-z0-9.-], no leading/
+# trailing punctuation, no consecutive dots).
+is_valid_domain() {
+    local d="$1"
+    [[ -n "$d" ]] || return 1
+    [[ "$d" == *.* ]] || return 1
+    [[ "$d" =~ ^[a-z0-9.-]+$ ]] || return 1
+    [[ "$d" != *..* ]] || return 1
+    [[ "${d:0:1}" =~ [a-z0-9] ]] || return 1
+    [[ "${d: -1}" =~ [a-z0-9] ]] || return 1
+    return 0
 }
 
 # Helper: set <var>=<value> in .env. Prefers replacing an existing line
