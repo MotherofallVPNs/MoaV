@@ -460,7 +460,7 @@ ensure_admin_password() {
         echo ""
         return 0
     fi
-    return 1  # password already set (no change needed)
+    return 0  # already set — no-op, not an error (returning 1 here aborts under `set -e`)
 }
 
 check_prerequisites() {
@@ -502,6 +502,45 @@ check_prerequisites() {
     # Check .env file
     if [[ -f ".env" ]]; then
         success ".env file exists"
+        # Validate critical fields — covers the case where a previous
+        # interactive bootstrap was aborted mid-prompt (e.g. user typed
+        # DOMAIN, Ctrl-C'd before ACME_EMAIL / ADMIN_PASSWORD). Without
+        # this we'd silently skip every missing field on the next run.
+        local _existing_domain
+        _existing_domain=$(get_env_val "DOMAIN" ".env" "")
+        if [[ -n "$_existing_domain" ]]; then
+            # Auto-clean a malformed DOMAIN (e.g. "https://t7d.my/" → "t7d.my").
+            if [[ "$_existing_domain" =~ ^https?:// ]] || [[ "$_existing_domain" == */* ]] || [[ "$_existing_domain" == *:* ]]; then
+                local _cleaned
+                _cleaned=$(sanitize_domain "$_existing_domain")
+                if is_valid_domain "$_cleaned"; then
+                    warn "DOMAIN in .env was malformed: '$_existing_domain' → cleaning to '$_cleaned'"
+                    update_env_var ".env" "DOMAIN" "\"$_cleaned\""
+                    _existing_domain="$_cleaned"
+                else
+                    warn "DOMAIN in .env looks invalid: '$_existing_domain' — edit .env or re-run with an empty .env to re-prompt."
+                fi
+            fi
+            # DOMAIN set → ACME_EMAIL is needed for Let's Encrypt.
+            local _existing_email
+            _existing_email=$(get_env_val "ACME_EMAIL" ".env" "")
+            if [[ -z "$_existing_email" ]]; then
+                echo ""
+                warn "ACME_EMAIL is not set (required for Let's Encrypt TLS certificate)."
+                echo -e "${WHITE}Email address${NC} (for Let's Encrypt TLS certificate)"
+                printf "  Email: "
+                local input_email_resume=""
+                read -r -e input_email_resume
+                if [[ -n "$input_email_resume" ]]; then
+                    update_env_var ".env" "ACME_EMAIL" "\"$input_email_resume\""
+                    success "Email set to: $input_email_resume"
+                else
+                    warn "No email set — edit .env later or run bootstrap again."
+                fi
+            fi
+        fi
+        # Always check admin password (idempotent — no-op if already set securely).
+        ensure_admin_password
     else
         warn ".env file not found"
         if [[ -f ".env.example" ]]; then
@@ -517,20 +556,29 @@ check_prerequisites() {
                 echo "  Example: vpn.example.com"
                 echo "  Leave empty to run only domainless services"
                 printf "  Domain: "
-                read -r input_domain
+                read -r -e input_domain
 
                 local domainless_mode=false
                 if [[ -n "$input_domain" ]]; then
-                    sed -i "s|^DOMAIN=.*|DOMAIN=\"$input_domain\"|" .env
+                    # Strip scheme/path/port (e.g. "https://t7d.my/" → "t7d.my").
+                    local raw_domain="$input_domain"
+                    input_domain=$(sanitize_domain "$input_domain")
+                    if [[ "$input_domain" != "$raw_domain" ]]; then
+                        info "Cleaned input: '$raw_domain' → '$input_domain'"
+                    fi
+                    if ! is_valid_domain "$input_domain"; then
+                        warn "'$input_domain' doesn't look like a valid hostname (need at least one dot, no spaces/special chars). Saving anyway — edit .env if it's wrong."
+                    fi
+                    update_env_var ".env" "DOMAIN" "\"$input_domain\""
                     success "Domain set to: $input_domain"
                     echo ""
 
                     # Ask for email (only if domain is set)
                     echo -e "${WHITE}Email address${NC} (for Let's Encrypt TLS certificate)"
                     printf "  Email: "
-                    read -r input_email
+                    read -r -e input_email
                     if [[ -n "$input_email" ]]; then
-                        sed -i "s|^ACME_EMAIL=.*|ACME_EMAIL=\"$input_email\"|" .env
+                        update_env_var ".env" "ACME_EMAIL" "\"$input_email\""
                         success "Email set to: $input_email"
                     else
                         warn "No email set - you can edit .env later"
@@ -601,10 +649,12 @@ check_prerequisites() {
                     echo -e "  ${YELLOW}Services that require a domain (will be disabled):${NC}"
                     echo "    • Trojan, Hysteria2, CDN VLESS (need TLS certificates)"
                     echo "    • TrustTunnel"
-                    echo "    • DNS tunnels (dnstt + Slipstream)"
+                    echo "    • DNS tunnels (dnstt, Slipstream, MasterDNS, XDNS)"
                     echo ""
                     echo -e "  ${GREEN}Services that work without a domain:${NC}"
                     echo "    • Reality (VLESS) — uses dl.google.com for TLS camouflage"
+                    echo "    • XHTTP (VLESS+Reality)"
+                    echo "    • Shadowsocks-2022"
                     echo "    • WireGuard (direct UDP)"
                     echo "    • AmneziaWG (DPI-resistant WireGuard)"
                     echo "    • Telegram MTProxy (fake-TLS, IP only)"
@@ -615,19 +665,20 @@ check_prerequisites() {
 
                     if confirm "Continue with domainless mode?" "y"; then
                         domainless_mode=true
-                        # Set default profiles to include all domainless services (proxy = Reality)
-                        sed -i "s|^DEFAULT_PROFILES=.*|DEFAULT_PROFILES=\"proxy xhttp wireguard amneziawg telegram admin conduit snowflake\"|" .env
-                        # Disable cert-based protocols (Reality stays — works without domain)
-                        # Use grep to check if line exists, then sed to replace, or append if missing
-                        for var in ENABLE_TROJAN ENABLE_HYSTERIA2 ENABLE_DNSTT ENABLE_SLIPSTREAM ENABLE_TRUSTTUNNEL; do
-                            if grep -q "^${var}=" .env 2>/dev/null; then
-                                sed -i "s|^${var}=.*|${var}=false|" .env
-                            else
-                                echo "${var}=false" >> .env
-                            fi
+                        # Disable cert-needing protocols. The TROJAN/HYSTERIA2/DNSTT/
+                        # SLIPSTREAM/MASTERDNS/TRUSTTUNNEL set must match bootstrap.sh:
+                        # 41-46. XDNS is added here so dns-router (in the dnstunnel
+                        # profile) doesn't fight systemd-resolved for port 53 with
+                        # nothing to route; direct-mode XDNS can be re-enabled manually.
+                        for var in ENABLE_TROJAN ENABLE_HYSTERIA2 ENABLE_DNSTT ENABLE_SLIPSTREAM ENABLE_MASTERDNS ENABLE_XDNS ENABLE_TRUSTTUNNEL; do
+                            update_env_var ".env" "$var" "false"
                         done
+                        # Derive DEFAULT_PROFILES from the mutated ENABLE_* set (issue #106).
+                        local _dl_profiles
+                        _dl_profiles=$(derive_enabled_profiles ".env")
+                        sed -i "s|^DEFAULT_PROFILES=.*|DEFAULT_PROFILES=\"${_dl_profiles}\"|" .env
                         success "Domain-less mode enabled"
-                        info "Reality, WireGuard, AmneziaWG, Telegram MTProxy, Admin, Conduit, and Snowflake will be available"
+                        info "Reality, XHTTP, Shadowsocks-2022, WireGuard, AmneziaWG, Telegram MTProxy, Admin, Conduit, and Snowflake will be available"
                     else
                         echo ""
                         info "Please enter a domain to use all services."
@@ -3848,9 +3899,16 @@ select_profiles() {
             SELECTED_PROFILES+=("admin")
         fi
 
-        # Always include donation services when selecting "all"
-        SELECTED_PROFILES+=("conduit")
-        SELECTED_PROFILES+=("snowflake")
+        # Donation services follow their ENABLE_* flags too (issue #106).
+        # Pre-#106 these were appended unconditionally on the "all" path —
+        # which started conduit/snowflake even when ENABLE_CONDUIT=false /
+        # ENABLE_SNOWFLAKE=false was set in .env.
+        local enable_conduit=$(get_env_val "ENABLE_CONDUIT" "$env_file" "true")
+        local enable_snowflake=$(get_env_val "ENABLE_SNOWFLAKE" "$env_file" "true")
+        local enable_gooserelay=$(get_env_val "ENABLE_GOOSERELAY" "$env_file" "false")
+        [[ "$enable_conduit"    == "true" ]] && SELECTED_PROFILES+=("conduit")
+        [[ "$enable_snowflake"  == "true" ]] && SELECTED_PROFILES+=("snowflake")
+        [[ "$enable_gooserelay" == "true" ]] && SELECTED_PROFILES+=("gooserelay")
 
         # Check if monitoring should be included
         local enable_monitoring=$(get_env_val "ENABLE_MONITORING" "$env_file" "")
@@ -3861,32 +3919,25 @@ select_profiles() {
             echo ""
             warn "Monitoring stack (Grafana + Prometheus) requires at least 2GB RAM."
             if confirm "Enable monitoring?" "n"; then
-                # Update .env to enable monitoring
-                if grep -q "^ENABLE_MONITORING=" "$env_file" 2>/dev/null; then
-                    sed -i.bak "s/^ENABLE_MONITORING=.*/ENABLE_MONITORING=true/" "$env_file"
-                    rm -f "$env_file.bak"
-                else
-                    # Add if not present
-                    echo "ENABLE_MONITORING=true" >> "$env_file"
-                fi
+                update_env_var "$env_file" "ENABLE_MONITORING" "true"
                 SELECTED_PROFILES+=("monitoring")
                 success "Monitoring enabled"
             else
                 # Explicitly disable to avoid asking again
-                if grep -q "^ENABLE_MONITORING=" "$env_file" 2>/dev/null; then
-                    sed -i.bak "s/^ENABLE_MONITORING=.*/ENABLE_MONITORING=false/" "$env_file"
-                    rm -f "$env_file.bak"
-                else
-                    echo "ENABLE_MONITORING=false" >> "$env_file"
-                fi
+                update_env_var "$env_file" "ENABLE_MONITORING" "false"
                 info "Monitoring skipped. Enable later with: moav start monitoring"
             fi
         fi
         # If explicitly false, don't include monitoring
 
-        # If nothing enabled (shouldn't happen), fall back to donation-only
+        # If nothing enabled, error out — auto-forcing donation services
+        # on (pre-#106 behavior: SELECTED_PROFILES=("conduit" "snowflake")) is
+        # exactly the bug the issue describes. The operator should pick
+        # something or flip an ENABLE_* flag.
         if [[ ${#SELECTED_PROFILES[@]} -eq 0 ]]; then
-            SELECTED_PROFILES=("conduit" "snowflake")
+            warn "No services are enabled in .env (every ENABLE_* is false)."
+            echo "  Set at least one ENABLE_*=true in .env, or pick a specific profile."
+            return 1
         fi
 
         # Show what "all enabled" actually means
@@ -3975,8 +4026,143 @@ save_default_profiles() {
 get_default_profiles() {
     local env_file="$SCRIPT_DIR/.env"
     if [[ -f "$env_file" ]]; then
-        grep "^DEFAULT_PROFILES=" "$env_file" 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'"
+        grep "^DEFAULT_PROFILES=" "$env_file" 2>/dev/null | cut -d'=' -f2 | sed 's/#.*//' | tr -d '"' | tr -d "'" | xargs
     fi
+}
+
+# Profile ↔ ENABLE_* mapping (issue #106) — Compose profiles don't know
+# about MoaV's ENABLE_* flags. These helpers are the bridge.
+
+# Is <profile> enabled in .env? Multi-flag profiles survive if any flag is on.
+profile_enabled() {
+    local profile="$1" env_file="${2:-$SCRIPT_DIR/.env}"
+    case "$profile" in
+        proxy)
+            local _r _t _h _s
+            _r=$(get_env_val "ENABLE_REALITY"   "$env_file" "true")
+            _t=$(get_env_val "ENABLE_TROJAN"    "$env_file" "true")
+            _h=$(get_env_val "ENABLE_HYSTERIA2" "$env_file" "true")
+            _s=$(get_env_val "ENABLE_SS"        "$env_file" "true")
+            [[ "$_r" == "true" || "$_t" == "true" || "$_h" == "true" || "$_s" == "true" ]] \
+                && echo true || echo false ;;
+        wireguard)   [[ "$(get_env_val "ENABLE_WIREGUARD"   "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
+        amneziawg)   [[ "$(get_env_val "ENABLE_AMNEZIAWG"   "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
+        dnstunnel)
+            local _d _s _m _x
+            _d=$(get_env_val "ENABLE_DNSTT"     "$env_file" "true")
+            _s=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
+            _m=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
+            _x=$(get_env_val "ENABLE_XDNS"      "$env_file" "true")
+            [[ "$_d" == "true" || "$_s" == "true" || "$_m" == "true" || "$_x" == "true" ]] \
+                && echo true || echo false ;;
+        trusttunnel) [[ "$(get_env_val "ENABLE_TRUSTTUNNEL" "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
+        xhttp)       [[ "$(get_env_val "ENABLE_XHTTP"       "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
+        telegram)    [[ "$(get_env_val "ENABLE_TELEMT"      "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
+        admin)       [[ "$(get_env_val "ENABLE_ADMIN_UI"    "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
+        conduit)     [[ "$(get_env_val "ENABLE_CONDUIT"     "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
+        snowflake)   [[ "$(get_env_val "ENABLE_SNOWFLAKE"   "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
+        gooserelay)  [[ "$(get_env_val "ENABLE_GOOSERELAY"  "$env_file" "false")" == "true" ]] && echo true || echo false ;;
+        monitoring)
+            # Opt-in via interactive prompt; explicit false drops, anything else passes.
+            local _m=$(get_env_val "ENABLE_MONITORING" "$env_file" "")
+            [[ "$_m" == "false" ]] && echo false || echo true ;;
+        *) echo true ;;   # setup, client, all, unknown — pass through.
+    esac
+}
+
+# Canonical space-separated list to write into DEFAULT_PROFILES.
+derive_enabled_profiles() {
+    local env_file="${1:-$SCRIPT_DIR/.env}"
+    local out=()
+    local p
+    for p in proxy xhttp wireguard amneziawg dnstunnel trusttunnel telegram admin conduit snowflake gooserelay; do
+        [[ "$(profile_enabled "$p" "$env_file")" == "true" ]] && out+=("$p")
+    done
+    echo "${out[*]}"
+}
+
+# Drop disabled profiles from $1; print one info line if anything dropped.
+filter_disabled_profiles() {
+    local profiles="$1" env_file="${2:-$SCRIPT_DIR/.env}"
+    local kept=() dropped=()
+    local p
+    for p in $profiles; do
+        if [[ "$(profile_enabled "$p" "$env_file")" == "true" ]]; then
+            kept+=("$p")
+        else
+            dropped+=("$p")
+        fi
+    done
+    if [[ ${#dropped[@]} -gt 0 ]]; then
+        info "Skipping disabled profiles (set ENABLE_*=true in .env to enable): ${dropped[*]}" >&2
+    fi
+    echo "${kept[*]}"
+}
+
+# 3-option prompt for explicit `moav start <name>` when ENABLE_* is false.
+# Echoes: start-and-enable | skip | start-once
+confirm_disabled_profile() {
+    local profile="$1" env_file="${2:-$SCRIPT_DIR/.env}"
+    # Single-flag profiles can be auto-flipped; multi-flag (proxy/dnstunnel)
+    # need the operator to pick which sub-flag to enable.
+    local enable_var="" multi_flag_hint=""
+    case "$profile" in
+        wireguard)   enable_var="ENABLE_WIREGUARD" ;;
+        amneziawg)   enable_var="ENABLE_AMNEZIAWG" ;;
+        trusttunnel) enable_var="ENABLE_TRUSTTUNNEL" ;;
+        xhttp)       enable_var="ENABLE_XHTTP" ;;
+        telegram)    enable_var="ENABLE_TELEMT" ;;
+        admin)       enable_var="ENABLE_ADMIN_UI" ;;
+        conduit)     enable_var="ENABLE_CONDUIT" ;;
+        snowflake)   enable_var="ENABLE_SNOWFLAKE" ;;
+        gooserelay)  enable_var="ENABLE_GOOSERELAY" ;;
+        monitoring)  enable_var="ENABLE_MONITORING" ;;
+        proxy)       multi_flag_hint="ENABLE_REALITY, ENABLE_TROJAN, ENABLE_HYSTERIA2, ENABLE_SS" ;;
+        dnstunnel)   multi_flag_hint="ENABLE_DNSTT, ENABLE_SLIPSTREAM, ENABLE_MASTERDNS, ENABLE_XDNS" ;;
+    esac
+
+    echo "" >&2
+    warn "Profile '$profile' is disabled in .env." >&2
+    echo "" >&2
+    echo -e "  ${WHITE}What would you like to do?${NC}" >&2
+    if [[ -n "$enable_var" ]]; then
+        echo "    1) Enable + start  — set ${enable_var}=true in .env and start now (persists)" >&2
+    else
+        echo "    1) Enable manually — '$profile' covers $multi_flag_hint;" >&2
+        echo "                          set one to true in .env, then re-run" >&2
+    fi
+    echo "    2) Skip            — don't start; leave .env unchanged" >&2
+    echo "    3) Start once      — start now without touching .env (won't auto-start next time)" >&2
+    echo "" >&2
+
+    local choice=""
+    if [[ ! -t 0 ]]; then
+        info "Non-interactive shell, skipping '$profile'." >&2
+        echo "skip"
+        return 0
+    fi
+    read -p "  Choice [1/2/3] (default 2): " choice >&2
+    case "$choice" in
+        1)
+            if [[ -z "$enable_var" ]]; then
+                # Multi-flag — can't auto-flip. Direct the operator and skip
+                # (don't silently fall through to start-once; they explicitly
+                # asked for the persistent path).
+                warn "Skipping — flip one of [$multi_flag_hint] in .env, then re-run." >&2
+                echo "skip"
+                return 0
+            fi
+            update_env_var "$env_file" "$enable_var" "true"
+            success "Set ${enable_var}=true in .env" >&2
+            echo "start-and-enable"
+            ;;
+        3)
+            echo "start-once"
+            ;;
+        *)
+            echo "skip"
+            ;;
+    esac
 }
 
 # Ensure CLASH_API_SECRET is set in .env for monitoring
@@ -4016,9 +4202,7 @@ ensure_clash_api_secret() {
         echo ""
         warn "Monitoring is currently disabled in .env (ENABLE_MONITORING=false)"
         if confirm "Enable monitoring?" "y"; then
-            # Update ENABLE_MONITORING to true in .env
-            sed -i.bak "s/^ENABLE_MONITORING=false/ENABLE_MONITORING=true/" "$env_file"
-            rm -f "$env_file.bak"
+            update_env_var "$env_file" "ENABLE_MONITORING" "true"
             success "ENABLE_MONITORING set to true"
         else
             info "Skipping monitoring. Starting other services..."
@@ -4130,14 +4314,14 @@ start_services() {
     local skip_monitoring=0
     ensure_clash_api_secret "$profiles" || skip_monitoring=1
     if [[ $skip_monitoring -eq 1 ]]; then
-        # Replace 'all' with individual profiles excluding monitoring
-        # Respect ENABLE_* flags to avoid starting disabled services
-        profiles="--profile proxy --profile wireguard --profile trusttunnel --profile xhttp --profile telegram --profile admin --profile conduit --profile snowflake"
-        local _dnstt_f=$(get_env_val "ENABLE_DNSTT" "$SCRIPT_DIR/.env" "false")
-        local _slip_f=$(get_env_val "ENABLE_SLIPSTREAM" "$SCRIPT_DIR/.env" "false")
-        [[ "$_dnstt_f" == "true" || "$_slip_f" == "true" ]] && profiles="$profiles --profile dnstunnel"
-        local _amneziawg_f=$(get_env_val "ENABLE_AMNEZIAWG" "$SCRIPT_DIR/.env" "true")
-        [[ "$_amneziawg_f" == "true" ]] && profiles="$profiles --profile amneziawg"
+        # User declined monitoring — replace 'all' with derived enabled set (issue #106).
+        local _enabled
+        _enabled=$(derive_enabled_profiles "$SCRIPT_DIR/.env")
+        profiles=""
+        local _p
+        for _p in $_enabled; do
+            profiles+="--profile $_p "
+        done
     fi
 
     echo ""
@@ -5962,10 +6146,12 @@ cmd_domainless() {
     echo -e "  ${YELLOW}Will be disabled:${NC}"
     echo "    • Trojan, Hysteria2, CDN VLESS (need TLS certificates)"
     echo "    • TrustTunnel"
-    echo "    • DNS tunnels (dnstt + Slipstream)"
+    echo "    • DNS tunnels (dnstt, Slipstream, MasterDNS, XDNS)"
     echo ""
     echo -e "  ${GREEN}Will remain available:${NC}"
     echo "    • Reality (VLESS) — uses dl.google.com for TLS camouflage"
+    echo "    • XHTTP (VLESS+Reality)"
+    echo "    • Shadowsocks-2022"
     echo "    • WireGuard (direct UDP)"
     echo "    • AmneziaWG (DPI-resistant WireGuard)"
     echo "    • Telegram MTProxy (fake-TLS, IP only)"
@@ -5990,13 +6176,11 @@ cmd_domainless() {
         fi
     fi
 
-    # Disable cert-based protocols (Reality stays — works without domain)
-    for var in ENABLE_TROJAN ENABLE_HYSTERIA2 ENABLE_DNSTT ENABLE_SLIPSTREAM ENABLE_TRUSTTUNNEL; do
-        if grep -q "^${var}=" .env; then
-            sed -i "s/^${var}=.*/${var}=false/" .env
-        else
-            echo "${var}=false" >> .env
-        fi
+    # Disable cert-needing protocols. TROJAN..TRUSTTUNNEL must match
+    # bootstrap.sh:41-46; XDNS is added to keep dns-router off port 53 in
+    # domainless mode (direct-mode XDNS can be re-enabled manually).
+    for var in ENABLE_TROJAN ENABLE_HYSTERIA2 ENABLE_DNSTT ENABLE_SLIPSTREAM ENABLE_MASTERDNS ENABLE_XDNS ENABLE_TRUSTTUNNEL; do
+        update_env_var ".env" "$var" "false"
     done
 
     # Clear DOMAIN (add if not present)
@@ -6006,11 +6190,13 @@ cmd_domainless() {
         echo "DOMAIN=" >> .env
     fi
 
-    # Set default profiles (add if not present)
+    # Derive DEFAULT_PROFILES from the mutated ENABLE_* set (issue #106).
+    local _dl_profiles
+    _dl_profiles=$(derive_enabled_profiles ".env")
     if grep -q "^DEFAULT_PROFILES=" .env; then
-        sed -i 's/^DEFAULT_PROFILES=.*/DEFAULT_PROFILES="proxy xhttp wireguard amneziawg telegram admin conduit snowflake"/' .env
+        sed -i "s|^DEFAULT_PROFILES=.*|DEFAULT_PROFILES=\"${_dl_profiles}\"|" .env
     else
-        echo 'DEFAULT_PROFILES="proxy xhttp wireguard amneziawg telegram admin conduit snowflake"' >> .env
+        echo "DEFAULT_PROFILES=\"${_dl_profiles}\"" >> .env
     fi
 
     # Ensure admin password is set (not the insecure default)
@@ -6150,8 +6336,19 @@ cmd_start() {
         local defaults
         defaults=$(get_default_profiles)
         if [[ -n "$defaults" ]]; then
-            info "Using default profiles from .env: $defaults"
-            for p in $defaults; do
+            # Drop stale entries whose ENABLE_* has since been flipped off (issue #106).
+            local _filtered
+            _filtered=$(filter_disabled_profiles "$defaults")
+            if [[ "$_filtered" != "$defaults" ]]; then
+                info "Using default profiles from .env: $_filtered"
+            else
+                info "Using default profiles from .env: $defaults"
+            fi
+            if [[ -z "$_filtered" ]]; then
+                error "Every profile in DEFAULT_PROFILES is disabled in .env. Set at least one ENABLE_*=true or edit DEFAULT_PROFILES."
+                return 1
+            fi
+            for p in $_filtered; do
                 profiles+="--profile $p "
             done
         else
@@ -6172,8 +6369,37 @@ cmd_start() {
             local resolved
             resolved=$(resolve_profile "$p")
 
+            # `all` → expand to the ENABLE_*-derived enabled set (issue #106);
+            # the `all` profile membership stays for build/logs/down enumeration.
+            if [[ "$resolved" == "all" ]]; then
+                local _all_expanded
+                _all_expanded=$(derive_enabled_profiles "$SCRIPT_DIR/.env")
+                if [[ -z "$_all_expanded" ]]; then
+                    error "'all' resolved to an empty profile list — every ENABLE_* is false in .env."
+                    return 1
+                fi
+                info "Expanding 'all' to enabled profiles: $_all_expanded"
+                local _ap
+                for _ap in $_all_expanded; do
+                    profiles+="--profile $_ap "
+                done
+                continue
+            fi
+
             # Check if it's a valid profile
             if echo "$valid_profiles" | grep -qw "$resolved"; then
+                # Explicit name + ENABLE_*=false → 3-option prompt (--force bypasses).
+                if ! $force && [[ "$(profile_enabled "$resolved" "$SCRIPT_DIR/.env")" != "true" ]]; then
+                    local _decision
+                    _decision=$(confirm_disabled_profile "$resolved" "$SCRIPT_DIR/.env")
+                    case "$_decision" in
+                        skip)
+                            info "Skipped: $resolved"
+                            continue
+                            ;;
+                        start-once|start-and-enable) ;;
+                    esac
+                fi
                 profiles+="--profile $resolved "
             else
                 # Try resolving as individual service name
@@ -6225,14 +6451,14 @@ cmd_start() {
     local skip_monitoring=0
     ensure_clash_api_secret "$profiles" || skip_monitoring=1
     if [[ $skip_monitoring -eq 1 ]]; then
-        # Replace 'all' with individual profiles excluding monitoring
-        # Respect ENABLE_* flags to avoid starting disabled services
-        profiles="--profile proxy --profile wireguard --profile trusttunnel --profile xhttp --profile telegram --profile admin --profile conduit --profile snowflake"
-        local _dnstt_s=$(get_env_val "ENABLE_DNSTT" "$SCRIPT_DIR/.env" "true")
-        local _slip_s=$(get_env_val "ENABLE_SLIPSTREAM" "$SCRIPT_DIR/.env" "true")
-        [[ "$_dnstt_s" == "true" || "$_slip_s" == "true" ]] && profiles="$profiles --profile dnstunnel"
-        local _amneziawg_s=$(get_env_val "ENABLE_AMNEZIAWG" "$SCRIPT_DIR/.env" "true")
-        [[ "$_amneziawg_s" == "true" ]] && profiles="$profiles --profile amneziawg"
+        # User declined monitoring — replace 'all' with derived enabled set (issue #106).
+        local _enabled_s
+        _enabled_s=$(derive_enabled_profiles "$SCRIPT_DIR/.env")
+        profiles=""
+        local _ps
+        for _ps in $_enabled_s; do
+            profiles+="--profile $_ps "
+        done
     fi
 
     # Check port 53 conflicts for DNS tunnels
@@ -6951,7 +7177,41 @@ build_local_images() {
     echo "  moav build --local --list"
 }
 
-# Helper: update or add environment variable in .env
+# Strip scheme / user@ / path / port / whitespace from a domain input; lowercase.
+# Echoes the bare hostname (or "" if nothing usable remains).
+sanitize_domain() {
+    local d="$1"
+    # Scheme
+    d="${d#http://}"; d="${d#https://}"
+    d="${d#HTTP://}"; d="${d#HTTPS://}"
+    # user@host
+    d="${d##*@}"
+    # /path
+    d="${d%%/*}"
+    # :port
+    d="${d%%:*}"
+    # Strip all whitespace (hostnames have none).
+    d="${d// /}"
+    d="${d//$'\t'/}"
+    # lowercase
+    echo "$d" | tr '[:upper:]' '[:lower:]'
+}
+
+# True if $1 looks like a hostname (has a dot, only [a-z0-9.-], no leading/
+# trailing punctuation, no consecutive dots).
+is_valid_domain() {
+    local d="$1"
+    [[ -n "$d" ]] || return 1
+    [[ "$d" == *.* ]] || return 1
+    [[ "$d" =~ ^[a-z0-9.-]+$ ]] || return 1
+    [[ "$d" != *..* ]] || return 1
+    [[ "${d:0:1}" =~ [a-z0-9] ]] || return 1
+    [[ "${d: -1}" =~ [a-z0-9] ]] || return 1
+    return 0
+}
+
+# Helper: set <var>=<value> in .env. Prefers replacing an existing line
+# (active or commented `#X=` / `# X=`); appends only if neither exists.
 update_env_var() {
     local env_file="$1"
     local var_name="$2"
@@ -6959,8 +7219,9 @@ update_env_var() {
 
     if grep -q "^${var_name}=" "$env_file" 2>/dev/null; then
         sed -i.bak "s|^${var_name}=.*|${var_name}=${var_value}|" "$env_file"
-    elif grep -q "^# ${var_name}=" "$env_file" 2>/dev/null; then
-        sed -i.bak "s|^# ${var_name}=.*|${var_name}=${var_value}|" "$env_file"
+    elif grep -qE "^#[[:space:]]*${var_name}=" "$env_file" 2>/dev/null; then
+        # Uncomment + set — .env.example has both "#X=" and "# X=" styles.
+        sed -i.bak "s|^#[[:space:]]*${var_name}=.*|${var_name}=${var_value}|" "$env_file"
     else
         echo "${var_name}=${var_value}" >> "$env_file"
     fi

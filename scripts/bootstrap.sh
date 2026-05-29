@@ -52,20 +52,32 @@ if [[ "$domain_required" == "true" ]] && [[ -z "${DOMAIN:-}" ]]; then
     log_error "  DOMAIN=your-domain.com"
     log_error ""
     log_error "Option 2: Run in domainless mode"
-    log_error "  Disable cert-based protocols (Reality still works without domain):"
+    log_error "  Disable cert-based protocols (Reality, XHTTP, Shadowsocks-2022,"
+    log_error "  WireGuard, AmneziaWG, Telegram, Admin, Conduit, Snowflake still"
+    log_error "  work without a domain):"
     log_error "    ENABLE_TROJAN=false"
     log_error "    ENABLE_HYSTERIA2=false"
     log_error "    ENABLE_DNSTT=false"
+    log_error "    ENABLE_SLIPSTREAM=false"
+    log_error "    ENABLE_MASTERDNS=false"
     log_error "    ENABLE_TRUSTTUNNEL=false"
     log_error ""
     log_error "  Or run: moav domainless"
     exit 1
 fi
 
-# Domainless mode notice
+# Domainless mode notice — list derived from ENABLE_* so toggles stay accurate.
 if [[ -z "${DOMAIN:-}" ]]; then
-    _domainless_protos="Reality, WireGuard, AmneziaWG, Telegram MTProxy, Admin, Conduit, Snowflake"
-    [[ "${ENABLE_XHTTP:-true}" == "true" ]] && _domainless_protos="Reality, XHTTP, WireGuard, AmneziaWG, Telegram MTProxy, Admin, Conduit, Snowflake"
+    _domainless_protos="Reality"
+    [[ "${ENABLE_XHTTP:-true}"     == "true" ]] && _domainless_protos="$_domainless_protos, XHTTP"
+    [[ "${ENABLE_SS:-true}"        == "true" ]] && _domainless_protos="$_domainless_protos, Shadowsocks-2022"
+    [[ "${ENABLE_WIREGUARD:-true}" == "true" ]] && _domainless_protos="$_domainless_protos, WireGuard"
+    [[ "${ENABLE_AMNEZIAWG:-true}" == "true" ]] && _domainless_protos="$_domainless_protos, AmneziaWG"
+    [[ "${ENABLE_TELEMT:-true}"    == "true" ]] && _domainless_protos="$_domainless_protos, Telegram MTProxy"
+    [[ "${ENABLE_ADMIN_UI:-true}"  == "true" ]] && _domainless_protos="$_domainless_protos, Admin"
+    [[ "${ENABLE_CONDUIT:-true}"   == "true" ]] && _domainless_protos="$_domainless_protos, Conduit"
+    [[ "${ENABLE_SNOWFLAKE:-true}" == "true" ]] && _domainless_protos="$_domainless_protos, Snowflake"
+    [[ "${ENABLE_GOOSERELAY:-false}" == "true" ]] && _domainless_protos="$_domainless_protos, GooseRelay"
     log_info "Running in domainless mode ($_domainless_protos)"
 
     # Generate self-signed certificate for admin UI (if not exists)

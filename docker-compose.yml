@@ -597,9 +597,9 @@ services:
       - /tmp:rw,noexec,size=10m
     mem_limit: 64m
     cpus: 0.25
-    # Note: No depends_on as snowflake may not be running; exporter handles retry
+    # No depends_on; exporter handles retry. Follows the relay (issue #106).
     profiles:
-      - monitoring
+      - snowflake
       - all
 
   # ===========================================================================
