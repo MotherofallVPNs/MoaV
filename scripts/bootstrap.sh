@@ -66,11 +66,8 @@ if [[ "$domain_required" == "true" ]] && [[ -z "${DOMAIN:-}" ]]; then
     exit 1
 fi
 
-# Domainless mode notice
+# Domainless mode notice — list derived from ENABLE_* so toggles stay accurate.
 if [[ -z "${DOMAIN:-}" ]]; then
-    # Build the list of running protocols from the actual ENABLE_* flags
-    # rather than a hand-curated literal — keeps the message accurate as
-    # new protocols are added or toggled off.
     _domainless_protos="Reality"
     [[ "${ENABLE_XHTTP:-true}"     == "true" ]] && _domainless_protos="$_domainless_protos, XHTTP"
     [[ "${ENABLE_SS:-true}"        == "true" ]] && _domainless_protos="$_domainless_protos, Shadowsocks-2022"
