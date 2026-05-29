@@ -460,7 +460,7 @@ ensure_admin_password() {
         echo ""
         return 0
     fi
-    return 1  # password already set (no change needed)
+    return 0  # already set — no-op, not an error (returning 1 here aborts under `set -e`)
 }
 
 check_prerequisites() {
