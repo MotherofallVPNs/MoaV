@@ -236,37 +236,37 @@ press_enter() {
 }
 
 get_admin_url() {
-    # Get admin URL using DOMAIN or SERVER_IP from .env
-    local admin_port=$(grep -E '^PORT_ADMIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
-    admin_port="${admin_port:-9443}"
-    local domain=$(grep -E '^DOMAIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
-    local server_ip=$(grep -E '^SERVER_IP=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+    # Get admin URL using DOMAIN or SERVER_IP from .env.
+    # Use get_env_val (which strips trailing `# comments`) so PORT_ADMIN=9443
+    # doesn't render as "https://host:9443      # Admin dashboard".
+    local admin_port=$(get_env_val "PORT_ADMIN" .env "9443")
+    local domain=$(get_env_val "DOMAIN" .env "")
+    local server_ip=$(get_env_val "SERVER_IP" .env "")
     local admin_host="${domain:-${server_ip:-localhost}}"
     echo "https://${admin_host}:${admin_port}"
 }
 
 get_grafana_url() {
-    # Get Grafana URL using DOMAIN or SERVER_IP from .env
-    local grafana_port="${PORT_GRAFANA:-9444}"
-    local domain=$(grep -E '^DOMAIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
-    local server_ip=$(grep -E '^SERVER_IP=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+    # Get Grafana URL using DOMAIN or SERVER_IP from .env (get_env_val strips
+    # trailing `# comments` from values like `PORT_GRAFANA=9444  # comment`).
+    local grafana_port=$(get_env_val "PORT_GRAFANA" .env "9444")
+    local domain=$(get_env_val "DOMAIN" .env "")
+    local server_ip=$(get_env_val "SERVER_IP" .env "")
     local grafana_host="${domain:-${server_ip:-localhost}}"
     echo "https://${grafana_host}:${grafana_port}"
 }
 
 get_grafana_cdn_url() {
-    # Get Grafana CDN URL from GRAFANA_SUBDOMAIN + DOMAIN
-    local grafana_subdomain=$(grep -E '^GRAFANA_SUBDOMAIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
-    local domain=$(grep -E '^DOMAIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+    local grafana_subdomain=$(get_env_val "GRAFANA_SUBDOMAIN" .env "")
+    local domain=$(get_env_val "DOMAIN" .env "")
     if [[ -n "$grafana_subdomain" ]] && [[ -n "$domain" ]]; then
         echo "https://${grafana_subdomain}.${domain}:2083"
     fi
 }
 
 get_cdn_url() {
-    # Get CDN URL for VLESS+WS from CDN_SUBDOMAIN + DOMAIN
-    local cdn_subdomain=$(grep -E '^CDN_SUBDOMAIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
-    local domain=$(grep -E '^DOMAIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+    local cdn_subdomain=$(get_env_val "CDN_SUBDOMAIN" .env "")
+    local domain=$(get_env_val "DOMAIN" .env "")
     if [[ -n "$cdn_subdomain" ]] && [[ -n "$domain" ]]; then
         echo "https://${cdn_subdomain}.${domain}"
     fi
@@ -4894,7 +4894,7 @@ main_menu() {
         echo ""
         echo -e "  ${DIM}System${NC}"
         echo -e "  ${WHITE}8)${NC}  Doctor — diagnose problems"
-        echo -e "  ${WHITE}9)${NC}  Admin dashboard — URL, password"
+        echo -e "  ${WHITE}9)${NC}  Admin password reset"
         echo -e "  ${WHITE}10)${NC} Update MoaV"
         echo -e "  ${WHITE}11)${NC} Build/rebuild services"
         echo -e "  ${WHITE}12)${NC} Export/Import (migration)"
@@ -4914,7 +4914,7 @@ main_menu() {
             6) user_management ;;  # user_management has its own loop
             7) cmd_donate; press_enter ;;
             8) cmd_doctor; press_enter ;;
-            9) cmd_admin; press_enter ;;
+            9) cmd_admin password; press_enter ;;
             10) cmd_update; press_enter ;;
             11) build_services; press_enter ;;
             12) migration_menu; press_enter ;;
