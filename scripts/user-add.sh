@@ -110,6 +110,17 @@ for USERNAME in "${USERNAMES[@]}"; do
     fi
 done
 
+# Repair config-file perms — previous runs (especially sudo'd CLI) may have
+# left files root-owned with restrictive perms, which then blocks the admin
+# container from writing on subsequent ops. cat-overwrite-style writes (used
+# everywhere since the wg/awg fix) preserve perms once they're right, but
+# this sweep heals any historical breakage on every invocation.
+for _f in configs/sing-box/config.json configs/xray/config.json \
+          configs/wireguard/wg0.conf configs/amneziawg/awg0.conf \
+          configs/trusttunnel/credentials.toml configs/telemt/config.toml; do
+    [[ -f "$_f" ]] && chmod a+rw "$_f" 2>/dev/null || true
+done
+
 # Load environment
 if [[ -f .env ]]; then
     # Auto-heal: GOPROXY's value is pipe-separated (proxy|proxy|direct). If the

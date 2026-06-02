@@ -104,8 +104,16 @@ echo ""
 # -----------------------------------------------------------------------------
 echo "=== Xray Users (XHTTP + XDNS) ==="
 if [[ -f configs/xray/config.json ]]; then
-    # Xray uses email "USERNAME@moav" as the per-user identifier across inbounds.
-    XRAY_USERS=$(jq -r '.inbounds[]? | select(.settings.clients != null) | .settings.clients[]?.email' configs/xray/config.json 2>/dev/null | sed 's/@moav$//' | sort -u | grep -v '^$' || true)
+    # Xray uses email "USERNAME@moav" as the per-user identifier. The schema
+    # rename in Xray v26.5.9 (#6083) kept `clients` as an alias of the new
+    # `users` field, so MoaV configs can end up with users in EITHER array
+    # depending on which write path created them (bootstrap writes `users`
+    # via template; legacy add wrote `clients`). Check both.
+    XRAY_USERS=$(jq -r '
+        .inbounds[]? |
+        (.settings.clients[]?, .settings.users[]?) |
+        .email // empty
+    ' configs/xray/config.json 2>/dev/null | sed 's/@moav$//' | sort -u | grep -v '^$' || true)
     if [[ -n "$XRAY_USERS" ]]; then
         echo "$XRAY_USERS" | while read -r user; do
             echo "  • $user"

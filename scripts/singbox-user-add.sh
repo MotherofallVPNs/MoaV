@@ -478,16 +478,21 @@ XRAY_CONFIG="configs/xray/config.json"
 if [[ "${ENABLE_XHTTP:-true}" == "true" ]] && [[ -f "$XRAY_CONFIG" ]]; then
     log_info "Adding $USERNAME to Xray (XHTTP)..."
 
-    # Check if user already exists (search by UUID in the vless-xhttp-reality inbound)
-    if jq -e --arg uuid "$USER_UUID" \
-        '[.inbounds[] | select(.tag == "vless-xhttp-reality")] | .[0].settings.clients[] | select(.id == $uuid)' \
-        "$XRAY_CONFIG" >/dev/null 2>&1; then
+    # Check if user already exists. Xray's v26.5.9 schema kept `clients` as an
+    # alias of the new `users` field — bootstrap writes via template put users
+    # under `settings.users`, legacy add wrote `settings.clients`. Match either.
+    if jq -e --arg uuid "$USER_UUID" '
+            .inbounds[]? |
+            (.settings.clients[]?, .settings.users[]?) |
+            select(.id == $uuid)
+        ' "$XRAY_CONFIG" >/dev/null 2>&1; then
         log_info "User '$USERNAME' already exists in Xray config, skipping..."
     else
-        # Add new client entry to the vless-xhttp-reality inbound (flow MUST be empty for XHTTP)
-        # Add to ALL vless inbounds (xhttp-reality AND xdns)
+        # Add to the canonical `settings.users` field (the new Xray schema name
+        # since v26.5.9; older clients/`clients` alias still works). Adding to
+        # `users` keeps the template's path and the add-path consistent.
         jq --arg id "$USER_UUID" --arg email "${USERNAME}@moav" \
-            '(.inbounds[] | select(.protocol == "vless" and .tag != null and (.tag | startswith("vless-")))).settings.clients += [{"id": $id, "email": $email, "flow": ""}]' \
+            '(.inbounds[] | select(.protocol == "vless" and .tag != null and (.tag | startswith("vless-")))).settings.users += [{"id": $id, "email": $email, "flow": ""}]' \
             "$XRAY_CONFIG" > /tmp/xray.tmp
         # Preserve original config's perms/owner (cat-overwrite, not mv-replace) so
         # admin container keeps write access on subsequent operations.

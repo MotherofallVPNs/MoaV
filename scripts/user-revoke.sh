@@ -36,6 +36,15 @@ if [[ -z "$USERNAME" ]]; then
     exit 1
 fi
 
+# Repair config-file perms — see user-add.sh for rationale. Run on every
+# revoke too so admin-container access stays repaired regardless of which
+# script last touched things.
+for _f in configs/sing-box/config.json configs/xray/config.json \
+          configs/wireguard/wg0.conf configs/amneziawg/awg0.conf \
+          configs/trusttunnel/credentials.toml configs/telemt/config.toml; do
+    [[ -f "$_f" ]] && chmod a+rw "$_f" 2>/dev/null || true
+done
+
 # Load environment
 if [[ -f .env ]]; then
     set -a
