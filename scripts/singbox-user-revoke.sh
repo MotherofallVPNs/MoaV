@@ -51,7 +51,12 @@ if ! jq empty "$TEMP_CONFIG" 2>/dev/null; then
     exit 1
 fi
 
-mv -f "$TEMP_CONFIG" "$CONFIG_FILE"
+# Preserve original file's inode/mode/owner (mv -f would replace them — see
+# wg-user-revoke.sh history). Especially matters when CLI revoke runs as root
+# (sudo) while the admin container is non-root: a swapped inode would lock the
+# dashboard out of the next user-add.
+cat "$TEMP_CONFIG" > "$CONFIG_FILE"
+rm -f "$TEMP_CONFIG"
 
 log_info "Removed $USERNAME from sing-box config"
 
@@ -83,9 +88,37 @@ if [[ -f "$TRUSTTUNNEL_CREDS" ]]; then
         }
         { print }
         END { if (in_block && !skip) { printf "%s", buffer } }
-        ' "$TRUSTTUNNEL_CREDS" > "${TRUSTTUNNEL_CREDS}.tmp" && mv -f "${TRUSTTUNNEL_CREDS}.tmp" "$TRUSTTUNNEL_CREDS"
+        ' "$TRUSTTUNNEL_CREDS" > "${TRUSTTUNNEL_CREDS}.tmp"
+        # Preserve original perms/owner (cat-overwrite, not mv-replace).
+        cat "${TRUSTTUNNEL_CREDS}.tmp" > "$TRUSTTUNNEL_CREDS"
+        rm -f "${TRUSTTUNNEL_CREDS}.tmp"
 
         log_info "Removed $USERNAME from TrustTunnel credentials"
+    fi
+fi
+
+# Remove from Xray (XHTTP + XDNS inbounds — vless-xhttp-reality, vless-xdns)
+# Symmetric to the singbox-user-add.sh xray block. Xray accepts users in
+# .inbounds[].settings.clients[] (keyed by UUID and email "USERNAME@moav").
+XRAY_CONFIG="configs/xray/config.json"
+if [[ -f "$XRAY_CONFIG" ]]; then
+    # Match by email so we don't have to know the UUID (also handles cases
+    # where state files were cleaned but xray config retained the user).
+    if jq -e --arg email "${USERNAME}@moav" \
+            '.inbounds[]? | select(.settings.clients != null) | .settings.clients[]? | select(.email == $email)' \
+            "$XRAY_CONFIG" >/dev/null 2>&1; then
+        log_info "Removing $USERNAME from Xray (XHTTP + XDNS)..."
+        XRAY_TMP=$(mktemp)
+        jq --arg email "${USERNAME}@moav" \
+            '(.inbounds[]? | select(.settings.clients != null)).settings.clients |= map(select(.email != $email))' \
+            "$XRAY_CONFIG" > "$XRAY_TMP"
+        if jq empty "$XRAY_TMP" 2>/dev/null; then
+            cat "$XRAY_TMP" > "$XRAY_CONFIG"
+            log_info "Removed $USERNAME from Xray config"
+        else
+            log_error "Failed to generate valid Xray config — skipping Xray revoke"
+        fi
+        rm -f "$XRAY_TMP"
     fi
 fi
 
@@ -112,6 +145,14 @@ if docker compose ps sing-box --status running 2>/dev/null | tail -n +2 | grep -
         log_info "sing-box reloaded"
     else
         docker compose restart sing-box
+    fi
+fi
+
+# Reload Xray (XHTTP + XDNS — picks up the revoked-user removal)
+if [[ -f "$XRAY_CONFIG" ]]; then
+    if docker compose --profile xhttp ps xray --status running 2>/dev/null | tail -n +2 | grep -q .; then
+        log_info "Restarting Xray..."
+        docker compose --profile xhttp restart xray
     fi
 fi
 

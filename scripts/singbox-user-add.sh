@@ -172,8 +172,10 @@ if ! jq empty "$TEMP_CONFIG" 2>/dev/null; then
     exit 1
 fi
 
-# Apply the config
-mv -f "$TEMP_CONFIG" "$CONFIG_FILE"
+# Apply the config — cat-overwrite (not mv-replace) so the original file's
+# inode/mode/owner survive across sudo'd CLI vs admin-container user mismatches.
+cat "$TEMP_CONFIG" > "$CONFIG_FILE"
+rm -f "$TEMP_CONFIG"
 
 log_info "Added $USERNAME to sing-box config"
 
@@ -486,7 +488,11 @@ if [[ "${ENABLE_XHTTP:-true}" == "true" ]] && [[ -f "$XRAY_CONFIG" ]]; then
         # Add to ALL vless inbounds (xhttp-reality AND xdns)
         jq --arg id "$USER_UUID" --arg email "${USERNAME}@moav" \
             '(.inbounds[] | select(.protocol == "vless" and .tag != null and (.tag | startswith("vless-")))).settings.clients += [{"id": $id, "email": $email, "flow": ""}]' \
-            "$XRAY_CONFIG" > /tmp/xray.tmp && mv -f /tmp/xray.tmp "$XRAY_CONFIG"
+            "$XRAY_CONFIG" > /tmp/xray.tmp
+        # Preserve original config's perms/owner (cat-overwrite, not mv-replace) so
+        # admin container keeps write access on subsequent operations.
+        cat /tmp/xray.tmp > "$XRAY_CONFIG"
+        rm -f /tmp/xray.tmp
         log_info "Added $USERNAME to Xray config (all VLESS inbounds)"
     fi
 
