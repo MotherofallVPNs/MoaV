@@ -110,16 +110,33 @@ for USERNAME in "${USERNAMES[@]}"; do
     fi
 done
 
+# Repair config-file perms — previous runs (especially sudo'd CLI) may have
+# left files root-owned with restrictive perms, which then blocks the admin
+# container from writing on subsequent ops. cat-overwrite-style writes (used
+# everywhere since the wg/awg fix) preserve perms once they're right, but
+# this sweep heals any historical breakage on every invocation.
+for _f in configs/sing-box/config.json configs/xray/config.json \
+          configs/wireguard/wg0.conf configs/amneziawg/awg0.conf \
+          configs/trusttunnel/credentials.toml configs/telemt/config.toml; do
+    [[ -f "$_f" ]] && chmod a+rw "$_f" 2>/dev/null || true
+done
+
 # Load environment
 if [[ -f .env ]]; then
     # Auto-heal: GOPROXY's value is pipe-separated (proxy|proxy|direct). If the
     # line is unquoted (older .env files), `source` below parses the `|` as a
-    # shell pipe and tries to run the URLs as commands. Quote it in place first
-    # (idempotent — already-quoted lines are left alone).
-    sed -i.bak -E '/^GOPROXY=[^"]*\|/ s/^GOPROXY=(.*)$/GOPROXY="\1"/' .env && rm -f .env.bak
+    # shell pipe and tries to run the URLs as commands. Heal in a tempfile —
+    # works even when .env is on a RO mount (admin container), and we only
+    # persist the heal back to .env when it's writable (CLI on the host).
+    _ENV_TMP=$(mktemp)
+    sed -E '/^GOPROXY=[^"]*\|/ s/^GOPROXY=(.*)$/GOPROXY="\1"/' .env > "$_ENV_TMP"
+    if [[ -w .env ]] && ! cmp -s "$_ENV_TMP" .env; then
+        cat "$_ENV_TMP" > .env
+    fi
     set -a
-    source .env
+    source "$_ENV_TMP"
     set +a
+    rm -f "$_ENV_TMP"
 fi
 
 # DONATE_ONLY_PROTOCOLS: lightweight user creation for config donation
