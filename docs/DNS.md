@@ -232,42 +232,40 @@ TTL: 300
 >
 > All other records **must** be DNS only (gray cloud).
 
-#### CDN Origin Rule (Required for CDN Mode)
+#### CDN settings (required for CDN Mode)
 
-If you added the `cdn` record above, you **must** also create an Origin Rule to redirect traffic to port 2082. By default, Cloudflare's Flexible SSL connects to origin port 80, but MoaV's CDN listener runs on port 2082.
+If you added the `cdn` record above, CDN mode needs **two** Cloudflare settings — both are required, neither is optional:
 
-**Step 1: Go to Rules → Origin Rules**
+**1. Origin Rule** — rewrites Cloudflare → origin port to 2082, because MoaV's CDN listener doesn't bind 80 or 443.
 
-1. In Cloudflare Dashboard, select your domain
-2. Navigate to **Rules** → **Origin Rules**
-3. Click **Create rule**
-
-**Step 2: Configure the Rule**
+In Cloudflare Dashboard → **Rules → Origin Rules → Create rule**:
 
 | Field | Value |
 |-------|-------|
 | Rule name | `CDN to port 2082` |
-| When incoming requests match... | **Hostname** equals `cdn.yourdomain.com` |
-| Then... | **Destination Port** → Rewrite to `2082` |
+| When incoming requests match… | **Hostname** equals `cdn.yourdomain.com` |
+| Then… | **Destination Port** → Rewrite to `2082` |
 
-**Step 3: Deploy**
+Click **Deploy**.
 
-Click **Deploy** to activate the rule.
+**2. SSL/TLS encryption mode** — set to **Flexible**, because MoaV's CDN inbound on 2082 is plain HTTP (Cloudflare terminates TLS for the client).
 
-**Verify it works:**
+In Cloudflare Dashboard → **SSL/TLS → Overview**: choose **Flexible**.
+
+If you need Full / Full (Strict) for *other* subdomains, leave the global setting alone and add a **Configuration Rule** scoped to `cdn.yourdomain.com` only with SSL/TLS mode = Flexible.
+
+**Verify both are working:**
 ```bash
-# Should return HTTP 400 (sing-box responding, not Cloudflare 521)
-# Use any path - the CDN WS path is auto-generated during bootstrap
-curl -s -o /dev/null -w "%{http_code}" https://cdn.yourdomain.com/test
+curl -s -o /dev/null -w "%{http_code}" https://cdn.yourdomain.com/anything
 ```
 
-A `400` or `404` response means sing-box is receiving the request.
-- `521` = Origin Rule is missing or misconfigured
-- `525` = SSL mode is wrong — set Cloudflare SSL/TLS to **Flexible** (not Full/Strict), because MoaV's CDN port 2082 is plain HTTP
+| Response | Meaning |
+|---|---|
+| `400` or `404` | sing-box is responding — CDN is working |
+| `521` | Origin Rule is missing — Cloudflare can't reach origin port 2082 |
+| `525` | SSL mode is wrong — set Cloudflare SSL/TLS to Flexible |
 
-> **Important:** Cloudflare SSL/TLS mode must be set to **Flexible** for CDN mode. MoaV's CDN inbound on port 2082 is plain HTTP (Cloudflare terminates TLS). If you need Full SSL for other subdomains, use a Configuration Rule to set Flexible for just `cdn.yourdomain.com`.
-
-See [CDN Setup Guide](SETUP.md#cdn-fronted-vlesswebsocket-cloudflare) for complete CDN configuration.
+See [CDN Setup Guide](SETUP.md#cdn-fronted-vlesswebsocket-cloudflare) for end-to-end configuration.
 
 ### AWS CloudFront (Alternative CDN)
 
