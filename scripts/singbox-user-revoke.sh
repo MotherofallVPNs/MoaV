@@ -25,8 +25,11 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
     exit 1
 fi
 
-# Check if user exists
-if ! grep -q "\"name\":\"$USERNAME\"" "$CONFIG_FILE" 2>/dev/null; then
+# Check if user exists (use jq so we don't trip on JSON-formatting whitespace —
+# `jq -S` emits "name": "X" with a space, the grep version required "name":"X").
+if ! jq -e --arg n "$USERNAME" \
+        '.inbounds[]? | select(.users != null) | .users[]? | select(.name == $n)' \
+        "$CONFIG_FILE" >/dev/null 2>&1; then
     log_error "User '$USERNAME' not found in sing-box config"
     exit 1
 fi

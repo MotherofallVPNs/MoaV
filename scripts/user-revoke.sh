@@ -56,7 +56,9 @@ REVOKED=false
 # -----------------------------------------------------------------------------
 # Revoke from sing-box
 # -----------------------------------------------------------------------------
-if [[ -f "configs/sing-box/config.json" ]] && grep -q "\"name\":\"$USERNAME\"" "configs/sing-box/config.json" 2>/dev/null; then
+if [[ -f "configs/sing-box/config.json" ]] && jq -e --arg n "$USERNAME" \
+        '.inbounds[]? | select(.users != null) | .users[]? | select(.name == $n)' \
+        "configs/sing-box/config.json" >/dev/null 2>&1; then
     log_info "[1/3] Revoking from sing-box..."
     if "$SCRIPT_DIR/singbox-user-revoke.sh" "$USERNAME"; then
         log_info "✓ Revoked from sing-box"

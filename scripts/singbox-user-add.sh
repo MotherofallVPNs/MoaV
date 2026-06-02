@@ -69,8 +69,12 @@ if [[ ! -w "$STATE_DIR/users/$USERNAME" ]]; then
     sudo chmod 777 "$STATE_DIR/users/$USERNAME" 2>/dev/null || true
 fi
 
-# Check if user already exists in config
-if grep -q "\"name\":\"$USERNAME\"" "$CONFIG_FILE" 2>/dev/null; then
+# Check if user already exists in config (jq, whitespace-insensitive — the
+# legacy grep version required "name":"X" with no spaces, but jq -S writes
+# "name": "X" with a space, so the grep returned false-negative).
+if jq -e --arg n "$USERNAME" \
+        '.inbounds[]? | select(.users != null) | .users[]? | select(.name == $n)' \
+        "$CONFIG_FILE" >/dev/null 2>&1; then
     log_error "User '$USERNAME' already exists in sing-box config."
     exit 1
 fi
