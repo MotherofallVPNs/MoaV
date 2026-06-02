@@ -231,6 +231,8 @@ This will:
 4. Create initial users (default: 5)
 5. Generate user bundles with configs and QR codes
 
+> The domain prompt accepts your domain in any form (`example.com`, `https://example.com/`, `example.com:443` — all work). If you stop mid-way, re-running `moav bootstrap` picks up where you left off.
+
 **DNS Tunnel Preparation** (optional):
 
 If you want to use the DNS tunnel, free port 53 first:
@@ -257,19 +259,7 @@ moav start proxy admin wireguard # Add WireGuard
 moav start all                   # Everything
 ```
 
-**Available Profiles:**
-- `proxy` - Reality, Trojan, Hysteria2, CDN, Shadowsocks-2022 (sing-box + decoy)
-- `wireguard` - WireGuard VPN + wstunnel
-- `amneziawg` - AmneziaWG (obfuscated WireGuard)
-- `dnstt` - DNS tunnel
-- `trusttunnel` - TrustTunnel VPN
-- `telegram` - Telegram MTProxy (fake-TLS)
-- `xhttp` - XHTTP (VLESS+XHTTP+Reality via Xray-core)
-- `admin` - Admin dashboard
-- `conduit` - Psiphon bandwidth donation
-- `snowflake` - Tor bandwidth donation
-- `monitoring` - Grafana + Prometheus observability
-- `all` - Everything
+See [CLI Reference → Profiles](CLI.md#profiles) for the full profile/service/`ENABLE_*` matrix. Common profiles: `proxy`, `xhttp`, `wireguard`, `amneziawg`, `dnstunnel`, `trusttunnel`, `telegram`, `admin`, `conduit`, `snowflake`, `gooserelay`, `monitoring`. From 1.8.2, `moav start` filters profiles whose `ENABLE_*` is `false` in `.env` — disabled services never start by accident.
 
 **Open Firewall Ports:**
 ```bash

@@ -131,57 +131,29 @@ TTL: 300
 
 This creates `dns.yourdomain.com` pointing to your server (used as the nameserver for tunnel subdomains).
 
-#### Step 3: NS Delegation for dnstt
+#### Steps 3–6: NS Delegations for the four DNS tunnels
+
+All four tunnels — **dnstt** (`t.`), **Slipstream** (`s.`), **MasterDNS** (`m.`), and **XDNS** (`x.`) — are enabled by default and share port 53 via `dns-router`, which fans queries out by subdomain. Each needs its own NS delegation:
+
+| Tunnel | Subdomain | `ENABLE_*` |
+|--------|-----------|------------|
+| **dnstt** — KCP+Noise, broadest client support | `t.` | `ENABLE_DNSTT` |
+| **Slipstream** — QUIC-over-DNS, 1.5–5× faster than dnstt | `s.` | `ENABLE_SLIPSTREAM` |
+| **MasterDNS** — ARQ + resolver load-balancing, bundled in MahsaNG v16 | `m.` | `ENABLE_MASTERDNS` |
+| **XDNS** — Xray FinalMask mKCP, per-user auth (needs FinalMask client: Happ, Xray CLI) | `x.` | `ENABLE_XDNS` |
+
+Add one NS record per tunnel you want to expose, all pointing at the same nameserver host:
 
 ```
 Type: NS
-Name: t
+Name: t        # or s / m / x (one record per tunnel)
 Value: dns.yourdomain.com
 TTL: 300
 ```
 
-This tells DNS resolvers that queries for `*.t.yourdomain.com` should be sent to `dns.yourdomain.com` (your server). Used by dnstt.
+The container for any disabled tunnel stays down — `dns-router` just doesn't route to it. To opt a tunnel out, set its `ENABLE_*` to `false` in `.env`.
 
-#### Step 4: NS Delegation for Slipstream
-
-```
-Type: NS
-Name: s
-Value: dns.yourdomain.com
-TTL: 300
-```
-
-Same concept as dnstt, but for the Slipstream QUIC-over-DNS tunnel. Slipstream is 1.5-5x faster than dnstt. Enabled by default (`ENABLE_SLIPSTREAM=true`); set `false` to opt out.
-
-#### Step 5: NS Delegation for XDNS (Recommended)
-
-```
-Type: NS
-Name: x
-Value: dns.yourdomain.com
-TTL: 300
-```
-
-XDNS is a DNS tunnel protocol that uses Xray-core's FinalMask technology to encode VLESS traffic in DNS-like packets via mKCP transport, with per-user authentication. It requires a FinalMask-aware client (Happ, Xray CLI). Enabled by default (`ENABLE_XDNS=true`); set `false` to opt out.
-
-> **Note**: All four DNS tunnels — dnstt, Slipstream, MasterDNS, and XDNS — share port 53 simultaneously via `dns-router`, which fans queries out by subdomain suffix (`t.` → dnstt, `s.` → Slipstream, `m.` → MasterDNS, `x.` → XDNS). No `moav switch-dns` is needed; all four are **enabled by default**. XDNS requires a FinalMask-aware client (Happ, Xray CLI) — the container runs regardless, but only those clients can use it. Set `ENABLE_XDNS=false` to opt out.
-
-> **Client-side resolver choice**: All four DNS tunnels rely on a public DNS resolver the *client* can reach — `1.1.1.1` and `8.8.8.8` are commonly throttled or null-routed during shutdowns. XDNS round-robins across multiple resolvers via `XDNS_RESOLVERS` in `.env`; dnstt and Slipstream take a `--dns-server` / `-doh` flag at the client. See [protocols.md → Reachable DNS resolvers](protocols.md#reachable-dns-resolvers) for resolver-scanning guidance ([findns](https://github.com/SamNet-dev/findns), [dns-mns](https://gitlab.com/E-Gurl/dns-mns)).
-
-#### Step 6: NS Delegation for MasterDNS
-
-```
-Type: NS
-Name: m
-Value: dns.yourdomain.com
-TTL: 300
-```
-
-Same concept as dnstt, for the MasterDNS advanced DNS tunnel (the DNS tunnel
-bundled in MahsaNG v16). Enabled by default (`ENABLE_MASTERDNS=true`; set to
-`false` to opt out). MasterDNS shares port 53 *with* dnstt/Slipstream —
-`dns-router` fans queries out by subdomain (`m` → MasterDNS, `t` → dnstt,
-`s` → Slipstream), so no `switch-dns` is required to run all three together.
+> **Client-side resolver choice**: All four tunnels rely on a public DNS resolver the *client* can reach. `1.1.1.1` / `8.8.8.8` are commonly throttled or null-routed during shutdowns. XDNS round-robins across multiple resolvers via `XDNS_RESOLVERS` in `.env`; dnstt and Slipstream take a `--dns-server` / `-doh` flag at the client. See [protocols.md → Reachable DNS resolvers](protocols.md#reachable-dns-resolvers) for resolver-scanning ([findns](https://github.com/SamNet-dev/findns), [dns-mns](https://gitlab.com/E-Gurl/dns-mns)).
 
 #### Which DNS tunnel should I use?
 
@@ -247,6 +219,8 @@ TTL: 300
 | A | dns | YOUR_IP | DNS only |
 | NS | t | dns.yourdomain.com | — |
 | NS | s | dns.yourdomain.com | — |
+| NS | m | dns.yourdomain.com | — |
+| NS | x | dns.yourdomain.com | — |
 | A | cdn | YOUR_IP | **Proxied** (orange cloud) |
 | A | www | YOUR_IP | **Proxied** (orange cloud) |
 | A | grafana | YOUR_IP | **Proxied** (orange cloud) |
@@ -258,42 +232,40 @@ TTL: 300
 >
 > All other records **must** be DNS only (gray cloud).
 
-#### CDN Origin Rule (Required for CDN Mode)
+#### CDN settings (required for CDN Mode)
 
-If you added the `cdn` record above, you **must** also create an Origin Rule to redirect traffic to port 2082. By default, Cloudflare's Flexible SSL connects to origin port 80, but MoaV's CDN listener runs on port 2082.
+If you added the `cdn` record above, CDN mode needs **two** Cloudflare settings — both are required, neither is optional:
 
-**Step 1: Go to Rules → Origin Rules**
+**1. Origin Rule** — rewrites Cloudflare → origin port to 2082, because MoaV's CDN listener doesn't bind 80 or 443.
 
-1. In Cloudflare Dashboard, select your domain
-2. Navigate to **Rules** → **Origin Rules**
-3. Click **Create rule**
-
-**Step 2: Configure the Rule**
+In Cloudflare Dashboard → **Rules → Origin Rules → Create rule**:
 
 | Field | Value |
 |-------|-------|
 | Rule name | `CDN to port 2082` |
-| When incoming requests match... | **Hostname** equals `cdn.yourdomain.com` |
-| Then... | **Destination Port** → Rewrite to `2082` |
+| When incoming requests match… | **Hostname** equals `cdn.yourdomain.com` |
+| Then… | **Destination Port** → Rewrite to `2082` |
 
-**Step 3: Deploy**
+Click **Deploy**.
 
-Click **Deploy** to activate the rule.
+**2. SSL/TLS encryption mode** — set to **Flexible**, because MoaV's CDN inbound on 2082 is plain HTTP (Cloudflare terminates TLS for the client).
 
-**Verify it works:**
+In Cloudflare Dashboard → **SSL/TLS → Overview**: choose **Flexible**.
+
+If you need Full / Full (Strict) for *other* subdomains, leave the global setting alone and add a **Configuration Rule** scoped to `cdn.yourdomain.com` only with SSL/TLS mode = Flexible.
+
+**Verify both are working:**
 ```bash
-# Should return HTTP 400 (sing-box responding, not Cloudflare 521)
-# Use any path - the CDN WS path is auto-generated during bootstrap
-curl -s -o /dev/null -w "%{http_code}" https://cdn.yourdomain.com/test
+curl -s -o /dev/null -w "%{http_code}" https://cdn.yourdomain.com/anything
 ```
 
-A `400` or `404` response means sing-box is receiving the request.
-- `521` = Origin Rule is missing or misconfigured
-- `525` = SSL mode is wrong — set Cloudflare SSL/TLS to **Flexible** (not Full/Strict), because MoaV's CDN port 2082 is plain HTTP
+| Response | Meaning |
+|---|---|
+| `400` or `404` | sing-box is responding — CDN is working |
+| `521` | Origin Rule is missing — Cloudflare can't reach origin port 2082 |
+| `525` | SSL mode is wrong — set Cloudflare SSL/TLS to Flexible |
 
-> **Important:** Cloudflare SSL/TLS mode must be set to **Flexible** for CDN mode. MoaV's CDN inbound on port 2082 is plain HTTP (Cloudflare terminates TLS). If you need Full SSL for other subdomains, use a Configuration Rule to set Flexible for just `cdn.yourdomain.com`.
-
-See [CDN Setup Guide](SETUP.md#cdn-fronted-vlesswebsocket-cloudflare) for complete CDN configuration.
+See [CDN Setup Guide](SETUP.md#cdn-fronted-vlesswebsocket-cloudflare) for end-to-end configuration.
 
 ### AWS CloudFront (Alternative CDN)
 

@@ -232,15 +232,28 @@ Start services.
 
 ```bash
 moav start                    # Start DEFAULT_PROFILES from .env
-moav start all                # Start all services
+moav start all                # Start all services whose ENABLE_* is true
 moav start proxy              # Start proxy profile only
 moav start proxy admin        # Start multiple profiles
 moav start proxy wireguard admin  # Start three profiles
 ```
 
 **Arguments:**
-- No arguments: Uses `DEFAULT_PROFILES` from `.env`
-- Profile names: Start specific profiles (space-separated)
+- No arguments: uses `DEFAULT_PROFILES` from `.env`
+- Profile names: start specific profiles (space-separated)
+- `--force` / `-f`: bypass the profile-filtering prompt (see below)
+
+##### Disabled profiles
+
+`moav start` respects the `ENABLE_*` flags in `.env`:
+
+- **No args** or **`moav start all`**: starts only the profiles whose `ENABLE_*` is `true`. Anything disabled is skipped (you'll see `Skipping disabled profiles: <list>`).
+- **`moav start <name>`** for a profile that's disabled in `.env`: you get a prompt:
+  1. **Enable + start** — flips `ENABLE_*=true` in `.env`, then starts (persists for next time).
+  2. **Skip** — don't start; `.env` stays as-is.
+  3. **Start once** — start now without modifying `.env` (won't auto-start next time).
+
+  For profiles backed by multiple flags (`proxy`, `dnstunnel`), option 1 shows which flags to set manually. `--force` bypasses the prompt. Non-interactive shells default to skip.
 
 #### `moav stop`
 Stop services.
@@ -567,6 +580,17 @@ link inside Ryve.
 > publicly. The link you share with users is the Personal Pairing link
 > generated inside Ryve, not the claim link. `moav donate info` is an alias.
 
+#### `moav conduit-offsets`
+Manage the watcher that keeps Conduit's **lifetime bandwidth** Grafana panels accurate across container restarts.
+
+```bash
+moav conduit-offsets install    # Install the systemd watcher
+moav conduit-offsets status     # Show watcher state (enabled/disabled, last run)
+moav conduit-offsets uninstall  # Remove the watcher
+```
+
+The watcher installs itself automatically the first time Conduit and monitoring run together — you usually don't need to touch this. Set `CONDUIT_OFFSETS_AUTOUPDATE=false` in `.env` to opt out. Hosts without systemd skip the watcher; run `scripts/update-conduit-offsets.sh` from cron instead. See [Monitoring → Conduit lifetime bandwidth](MONITORING.md#conduit-lifetime-bandwidth).
+
 ---
 
 ### Migration
@@ -632,26 +656,30 @@ Use this after:
 
 ## Profiles
 
-Profiles group related services together.
+Profiles group related services. Each maps to one or more `ENABLE_*` flags in `.env`; `moav start` filters disabled profiles automatically (see [Profile filtering](#moav-start)).
 
-| Profile | Services Included |
-|---------|-------------------|
-| `proxy` | sing-box, decoy, certbot |
-| `wireguard` | wireguard, wstunnel |
-| `dnstt` | dnstt |
-| `slipstream` | slipstream |
-| `masterdns` | masterdns |
-| `trusttunnel` | trusttunnel |
-| `admin` | admin |
-| `conduit` | psiphon-conduit |
-| `snowflake` | snowflake |
-| `client` | client (for testing) |
-| `all` | All of the above |
+| Profile | Services | Controlled by |
+|---------|----------|---------------|
+| `proxy` | sing-box, decoy, certbot | `ENABLE_REALITY` / `ENABLE_TROJAN` / `ENABLE_HYSTERIA2` / `ENABLE_SS` (any) |
+| `xhttp` | xray | `ENABLE_XHTTP` |
+| `wireguard` | wireguard, wstunnel, decoy, certbot | `ENABLE_WIREGUARD` |
+| `amneziawg` | amneziawg | `ENABLE_AMNEZIAWG` |
+| `dnstunnel` | dns-router, dnstt, slipstream, masterdns, xray (XDNS) | `ENABLE_DNSTT` / `ENABLE_SLIPSTREAM` / `ENABLE_MASTERDNS` / `ENABLE_XDNS` (any) |
+| `trusttunnel` | trusttunnel | `ENABLE_TRUSTTUNNEL` |
+| `telegram` | telemt | `ENABLE_TELEMT` |
+| `admin` | admin, docker-proxy | `ENABLE_ADMIN_UI` |
+| `conduit` | psiphon-conduit | `ENABLE_CONDUIT` |
+| `snowflake` | snowflake, snowflake-exporter | `ENABLE_SNOWFLAKE` |
+| `gooserelay` | gooserelay | `ENABLE_GOOSERELAY` (opt-in) |
+| `monitoring` | prometheus, grafana, grafana-proxy, node-exporter, cadvisor + per-protocol exporters | `ENABLE_MONITORING` (opt-in) |
+| `setup` | bootstrap, geoip-updater | (lifecycle, not user-toggled) |
+| `client` | client | (for local testing) |
+| `all` | All services above | (used by `moav start all`, `moav build`, `moav logs`, etc.) |
 
 **Usage:**
 ```bash
 moav start proxy admin        # Start proxy and admin profiles
-moav start all                # Start everything
+moav start all                # Expands to every profile whose ENABLE_* is true
 ```
 
 ---

@@ -100,6 +100,22 @@ Tor donation metrics from Snowflake Exporter:
 - Connections over time
 - Bandwidth over time
 
+> The Snowflake exporter only runs when the Snowflake relay does. With `ENABLE_SNOWFLAKE=false`, no Snowflake panels emit data.
+
+### MoaV - Conduit
+
+Psiphon donation metrics:
+
+- **Live bandwidth** (`conduit_bytes_downloaded` / `conduit_bytes_uploaded`) — in-memory gauges, reset on every Conduit container restart.
+- **Lifetime bandwidth** (`conduit_bytes_downloaded_lifetime` / `conduit_bytes_uploaded_lifetime`) — Prometheus recording rule that adds a per-install offset to the live counters, so cumulative donation totals survive restarts.
+- **Connected clients** + per-region splits.
+
+## Conduit lifetime bandwidth
+
+Conduit's live bandwidth gauges reset every time the container restarts. The **Lifetime Download / Lifetime Upload** panels work around that by adding a persistent offset back — so your cumulative donation totals keep growing across restarts.
+
+This is automatic once monitoring and Conduit are both running. A systemd watcher banks the pre-restart total and reloads Prometheus the moment Conduit comes back up. Manage it with [`moav conduit-offsets`](CLI.md#moav-conduit-offsets); set `CONDUIT_OFFSETS_AUTOUPDATE=false` in `.env` to opt out. Hosts without systemd can run `scripts/update-conduit-offsets.sh` from cron.
+
 ## GeoIP Country Distribution
 
 All four protocol dashboards (sing-box, Xray, WireGuard, AmneziaWG) include a "Geographic Distribution" row showing user connections by country.

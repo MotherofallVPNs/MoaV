@@ -121,8 +121,8 @@ MasterDNS tab**, and MoaV can run the matching MasterDNS server:
 
 1. MasterDNS is **enabled by default** (`ENABLE_MASTERDNS=true`) — just add
    the `m` NS record (see
-   [DNS.md → Step 6](DNS.md#step-6-ns-delegation-for-masterdns)) and
-   rebootstrap. (Set `ENABLE_MASTERDNS=false` only if you want to opt out.)
+   [DNS.md → NS Delegations](DNS.md#steps-36-ns-delegations-for-the-four-dns-tunnels))
+   and rebootstrap. (Set `ENABLE_MASTERDNS=false` only if you want to opt out.)
 2. The user's bundle gets `masterdns-instructions.txt` with the domain +
    encryption key. Enter those in MahsaNG's MasterDNS section.
 
