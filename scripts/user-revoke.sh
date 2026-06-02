@@ -36,6 +36,15 @@ if [[ -z "$USERNAME" ]]; then
     exit 1
 fi
 
+# Repair config-file perms — see user-add.sh for rationale. Run on every
+# revoke too so admin-container access stays repaired regardless of which
+# script last touched things.
+for _f in configs/sing-box/config.json configs/xray/config.json \
+          configs/wireguard/wg0.conf configs/amneziawg/awg0.conf \
+          configs/trusttunnel/credentials.toml configs/telemt/config.toml; do
+    [[ -f "$_f" ]] && chmod a+rw "$_f" 2>/dev/null || true
+done
+
 # Load environment
 if [[ -f .env ]]; then
     set -a
@@ -56,7 +65,9 @@ REVOKED=false
 # -----------------------------------------------------------------------------
 # Revoke from sing-box
 # -----------------------------------------------------------------------------
-if [[ -f "configs/sing-box/config.json" ]] && grep -q "\"name\":\"$USERNAME\"" "configs/sing-box/config.json" 2>/dev/null; then
+if [[ -f "configs/sing-box/config.json" ]] && jq -e --arg n "$USERNAME" \
+        '.inbounds[]? | select(.users != null) | .users[]? | select(.name == $n)' \
+        "configs/sing-box/config.json" >/dev/null 2>&1; then
     log_info "[1/3] Revoking from sing-box..."
     if "$SCRIPT_DIR/singbox-user-revoke.sh" "$USERNAME"; then
         log_info "✓ Revoked from sing-box"
