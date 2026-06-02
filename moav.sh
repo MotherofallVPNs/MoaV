@@ -4680,9 +4680,15 @@ add_user() {
     fi
 
     echo ""
-    echo "This will add '$username' to:"
-    echo "  • sing-box (Reality, Trojan, Hysteria2, CDN VLESS+WS)"
-    echo "  • WireGuard"
+    echo "This will add '$username' to all enabled services:"
+    echo "  • Proxies — Reality, Trojan, Hysteria2, Shadowsocks-2022, XHTTP, CDN VLESS+WS"
+    echo "  • VPN — WireGuard (direct + wstunnel), AmneziaWG, TrustTunnel"
+    echo "  • DNS tunnels — dnstt, Slipstream, MasterDNS, XDNS"
+    echo "  • Telegram MTProxy"
+    echo "  • GooseRelay (if ENABLE_GOOSERELAY=true)"
+    echo ""
+    echo "  Bundle: outputs/bundles/$username/  (~40 files: configs, QR codes,"
+    echo "  V2Ray subscription, README.html)"
     echo ""
 
     if [[ -x "./scripts/user-add.sh" ]]; then
