@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
@@ -19,6 +20,9 @@ const (
 	maxPacketSize  = 4096
 	defaultTimeout = 5 * time.Second
 	dnsHeaderSize  = 12
+	qtypeNS        = 2
+	qtypeSOA       = 6
+	qclassIN       = 1
 	// After this many consecutive failures (with no success in between), a
 	// cached backend connection is dropped so the next query re-resolves the
 	// hostname and reconnects. This lets the router recover on its own when a
@@ -34,6 +38,13 @@ const (
 type Route struct {
 	Domain  string
 	Backend string
+}
+
+type questionInfo struct {
+	Name  string
+	Type  uint16
+	Class uint16
+	End   int
 }
 
 // Router is a DNS packet forwarder with domain-based routing.
@@ -117,13 +128,15 @@ func buildRoutes() ([]Route, error) {
 
 	enableMasterdns := strings.ToLower(envOr("ENABLE_MASTERDNS", "true"))
 	if enableMasterdns == "true" {
-		domain := os.Getenv("MASTERDNS_DOMAIN")
-		if domain == "" {
+		domains := splitDomains(os.Getenv("MASTERDNS_DOMAIN"))
+		if len(domains) == 0 {
 			return nil, fmt.Errorf("MASTERDNS_DOMAIN required when ENABLE_MASTERDNS=true")
 		}
 		backend := envOr("MASTERDNS_BACKEND", "masterdns:5355")
-		routes = append(routes, Route{Domain: strings.ToLower(domain), Backend: backend})
-		log.Printf("[dns-router] Route: *.%s -> %s (masterdns)", domain, backend)
+		for _, domain := range domains {
+			routes = append(routes, Route{Domain: strings.ToLower(domain), Backend: backend})
+			log.Printf("[dns-router] Route: *.%s -> %s (masterdns)", domain, backend)
+		}
 	}
 
 	enableXdns := strings.ToLower(envOr("ENABLE_XDNS", "true"))
@@ -145,6 +158,17 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func splitDomains(value string) []string {
+	var domains []string
+	for _, item := range strings.Split(value, ",") {
+		domain := strings.TrimSpace(item)
+		if domain != "" {
+			domains = append(domains, domain)
+		}
+	}
+	return domains
 }
 
 // --- Router ---
@@ -226,32 +250,38 @@ func (r *Router) serve() {
 }
 
 func (r *Router) handleQuery(packet []byte, clientAddr *net.UDPAddr) {
-	queryName, err := extractQueryName(packet)
+	question, err := parseQuestion(packet)
 	if err != nil {
 		return
 	}
 
-	backend := r.findBackend(queryName)
-	if backend == "" {
+	route := r.findRoute(question.Name)
+	if route == nil {
 		return
 	}
 
-	response, err := r.forward(packet, backend)
+	if response := authoritativeResponse(packet, question, *route); response != nil {
+		r.conn.WriteToUDP(response, clientAddr)
+		return
+	}
+
+	response, err := r.forward(packet, route.Backend)
 	if err != nil {
-		log.Printf("[dns-router] Forward error %s -> %s: %v", queryName, backend, err)
+		log.Printf("[dns-router] Forward error %s -> %s: %v", question.Name, route.Backend, err)
 		return
 	}
 
 	r.conn.WriteToUDP(response, clientAddr)
 }
 
-func (r *Router) findBackend(queryName string) string {
-	for _, route := range r.routes {
+func (r *Router) findRoute(queryName string) *Route {
+	for i := range r.routes {
+		route := &r.routes[i]
 		if matchDomainSuffix(queryName, route.Domain) {
-			return route.Backend
+			return route
 		}
 	}
-	return ""
+	return nil
 }
 
 // --- Backend connection pool ---
@@ -455,12 +485,20 @@ func (bc *backendConn) close() {
 // --- DNS packet parsing ---
 
 func extractQueryName(packet []byte) (string, error) {
+	question, err := parseQuestion(packet)
+	if err != nil {
+		return "", err
+	}
+	return question.Name, nil
+}
+
+func parseQuestion(packet []byte) (questionInfo, error) {
 	if len(packet) < dnsHeaderSize+1 {
-		return "", fmt.Errorf("packet too short")
+		return questionInfo{}, fmt.Errorf("packet too short")
 	}
 	// QDCOUNT at bytes 4-5
 	if int(packet[4])<<8|int(packet[5]) == 0 {
-		return "", fmt.Errorf("no questions")
+		return questionInfo{}, fmt.Errorf("no questions")
 	}
 
 	var labels []string
@@ -471,10 +509,10 @@ func extractQueryName(packet []byte) (string, error) {
 
 	for {
 		if offset >= len(packet) {
-			return "", fmt.Errorf("truncated")
+			return questionInfo{}, fmt.Errorf("truncated")
 		}
 		if visited[offset] {
-			return "", fmt.Errorf("pointer loop")
+			return questionInfo{}, fmt.Errorf("pointer loop")
 		}
 		visited[offset] = true
 
@@ -488,7 +526,7 @@ func extractQueryName(packet []byte) (string, error) {
 		// Pointer compression
 		if length&0xC0 == 0xC0 {
 			if offset+1 >= len(packet) {
-				return "", fmt.Errorf("truncated pointer")
+				return questionInfo{}, fmt.Errorf("truncated pointer")
 			}
 			ptr := int(packet[offset]&0x3F)<<8 | int(packet[offset+1])
 			if !jumped {
@@ -499,18 +537,26 @@ func extractQueryName(packet []byte) (string, error) {
 			continue
 		}
 		if length > 63 {
-			return "", fmt.Errorf("label too long")
+			return questionInfo{}, fmt.Errorf("label too long")
 		}
 		offset++
 		if offset+length > len(packet) {
-			return "", fmt.Errorf("truncated label")
+			return questionInfo{}, fmt.Errorf("truncated label")
 		}
 		labels = append(labels, string(packet[offset:offset+length]))
 		offset += length
 	}
-	_ = endOffset
 
-	return strings.ToLower(strings.Join(labels, ".")), nil
+	if endOffset+4 > len(packet) {
+		return questionInfo{}, fmt.Errorf("truncated question")
+	}
+
+	return questionInfo{
+		Name:  strings.ToLower(strings.Join(labels, ".")),
+		Type:  binary.BigEndian.Uint16(packet[endOffset : endOffset+2]),
+		Class: binary.BigEndian.Uint16(packet[endOffset+2 : endOffset+4]),
+		End:   endOffset,
+	}, nil
 }
 
 func matchDomainSuffix(queryName, suffix string) bool {
@@ -520,4 +566,100 @@ func matchDomainSuffix(queryName, suffix string) bool {
 		return true
 	}
 	return strings.HasSuffix(queryName, "."+suffix)
+}
+
+func authoritativeResponse(packet []byte, question questionInfo, route Route) []byte {
+	if question.Class != qclassIN || question.Name != route.Domain {
+		return nil
+	}
+	if question.Type != qtypeNS && question.Type != qtypeSOA {
+		return nil
+	}
+
+	nsName := envOr("AUTHORITATIVE_NS", defaultAuthoritativeNS(route.Domain))
+	parent := parentDomain(route.Domain)
+
+	var rdata []byte
+	switch question.Type {
+	case qtypeNS:
+		rdata = encodeDNSName(nsName)
+	case qtypeSOA:
+		rdata = append(rdata, encodeDNSName(nsName)...)
+		rdata = append(rdata, encodeDNSName("hostmaster."+parent)...)
+		rdata = appendUint32(rdata, 2026052401) // serial
+		rdata = appendUint32(rdata, 300)        // refresh
+		rdata = appendUint32(rdata, 60)         // retry
+		rdata = appendUint32(rdata, 86400)      // expire
+		rdata = appendUint32(rdata, 300)        // negative cache TTL
+	}
+
+	if question.End+4 > len(packet) {
+		return nil
+	}
+
+	resp := make([]byte, 0, question.End+4+32+len(rdata))
+	resp = append(resp, packet[0], packet[1])
+	resp = append(resp, 0x84|(packet[2]&0x01), 0x00) // response, authoritative, preserve RD
+	resp = append(resp, 0x00, 0x01)                  // QDCOUNT
+	resp = append(resp, 0x00, 0x01)                  // ANCOUNT
+	resp = append(resp, 0x00, 0x00)                  // NSCOUNT
+	resp = append(resp, 0x00, 0x00)                  // ARCOUNT
+	resp = append(resp, packet[dnsHeaderSize:question.End+4]...)
+	resp = append(resp, 0xc0, 0x0c) // answer name pointer to question
+	resp = appendUint16(resp, question.Type)
+	resp = appendUint16(resp, qclassIN)
+	resp = appendUint32(resp, 300)
+	resp = appendUint16(resp, uint16(len(rdata)))
+	resp = append(resp, rdata...)
+	return resp
+}
+
+func parentDomain(domain string) string {
+	parts := strings.Split(domain, ".")
+	if len(parts) <= 1 {
+		return domain
+	}
+	return strings.Join(parts[1:], ".")
+}
+
+func defaultAuthoritativeNS(routeDomain string) string {
+	rootDomain := strings.TrimSuffix(strings.TrimSpace(os.Getenv("DOMAIN")), ".")
+	if rootDomain != "" {
+		return "dns." + rootDomain
+	}
+
+	parent := parentDomain(routeDomain)
+	if parent == "" {
+		return "dns"
+	}
+	return "dns." + parent
+}
+
+func encodeDNSName(name string) []byte {
+	name = strings.TrimSuffix(name, ".")
+	parts := strings.Split(name, ".")
+	out := make([]byte, 0, len(name)+2)
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		if len(part) > 63 {
+			part = part[:63]
+		}
+		out = append(out, byte(len(part)))
+		out = append(out, part...)
+	}
+	return append(out, 0)
+}
+
+func appendUint16(out []byte, v uint16) []byte {
+	var buf [2]byte
+	binary.BigEndian.PutUint16(buf[:], v)
+	return append(out, buf[:]...)
+}
+
+func appendUint32(out []byte, v uint32) []byte {
+	var buf [4]byte
+	binary.BigEndian.PutUint32(buf[:], v)
+	return append(out, buf[:]...)
 }

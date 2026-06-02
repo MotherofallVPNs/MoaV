@@ -2089,6 +2089,50 @@ run_bootstrap() {
 # DNS Setup (for DNS tunnels - dnstt + Slipstream)
 # =============================================================================
 
+port53_conflict_detected() {
+    local listeners=""
+    listeners=$(ss -H -ulnp 'sport = :53' 2>/dev/null || true)
+
+    if [[ -z "$listeners" ]] && command -v netstat >/dev/null 2>&1; then
+        listeners=$(netstat -ulnp 2>/dev/null | awk '$4 ~ /:53$/ {print}' || true)
+    fi
+
+    [[ -z "$listeners" ]] && return 1
+
+    # If the current MoaV dns-router is already running, Docker's userland proxy
+    # owns host port 53 on its behalf. That is expected during bootstrap/start.
+    if echo "$listeners" | grep -q 'docker-proxy'; then
+        local dns_router_container
+        dns_router_container=$(docker compose -f "$SCRIPT_DIR/docker-compose.yml" ps -q dns-router 2>/dev/null || true)
+        if [[ -n "$dns_router_container" ]]; then
+            local non_docker_listeners
+            non_docker_listeners=$(echo "$listeners" | grep -v 'docker-proxy' || true)
+            [[ -z "$non_docker_listeners" ]] && return 1
+        fi
+    fi
+
+    return 0
+}
+
+handle_port53_conflict() {
+    echo ""
+    warn "Port 53 is in use by another process"
+    echo "  DNS tunnels (dnstt/Slipstream/MasterDNS/XDNS) require port 53 to be free."
+    echo ""
+
+    if systemctl is-active --quiet systemd-resolved 2>/dev/null; then
+        if confirm "Disable systemd-resolved and configure direct DNS?" "y"; then
+            setup_dns_for_dnstt
+        else
+            warn "DNS tunnels may not work until port 53 is freed."
+            echo "  Run 'moav setup-dns' later to fix this."
+        fi
+    else
+        warn "DNS tunnels may not work until port 53 is freed."
+        echo "  Stop the service using port 53, then run 'moav start' again."
+    fi
+}
+
 check_dns_for_dnstunnel() {
     # Check if any DNS tunnel protocol needs port 53
     local needs_port53=false
@@ -2122,19 +2166,9 @@ check_dns_for_dnstunnel() {
         return 0
     fi
 
-    # Check if port 53 is in use by systemd-resolved
-    if ss -ulnp 2>/dev/null | grep -q ':53 ' || netstat -ulnp 2>/dev/null | grep -q ':53 '; then
-        echo ""
-        warn "Port 53 is in use (likely by systemd-resolved)"
-        echo "  DNS tunnels (dnstt/Slipstream/MasterDNS/XDNS) require port 53 to be free."
-        echo ""
-
-        if confirm "Disable systemd-resolved and configure direct DNS?" "y"; then
-            setup_dns_for_dnstt
-        else
-            warn "DNS tunnels may not work until port 53 is freed."
-            echo "  Run 'moav setup-dns' later to fix this."
-        fi
+    # Check if port 53 is in use by a non-MoaV listener.
+    if port53_conflict_detected; then
+        handle_port53_conflict
     fi
 }
 
@@ -2514,10 +2548,11 @@ ZONEOF
     xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "true")
 
     # Always include DNS tunnel records (user can decide which to enable later)
-    local dnstt_sub slip_sub masterdns_sub xdns_sub
+    local dnstt_sub slip_sub masterdns_sub masterdns_public_sub xdns_sub
     dnstt_sub=$(get_env_val "DNSTT_SUBDOMAIN" "$env_file" "t")
     slip_sub=$(get_env_val "SLIPSTREAM_SUBDOMAIN" "$env_file" "s")
     masterdns_sub=$(get_env_val "MASTERDNS_SUBDOMAIN" "$env_file" "m")
+    masterdns_public_sub=$(get_env_val "MASTERDNS_PUBLIC_SUBDOMAIN" "$env_file" "")
     xdns_sub=$(get_env_val "XDNS_SUBDOMAIN" "$env_file" "x")
 
     local dnstt_status="enabled" slip_status="enabled" masterdns_status="enabled" xdns_status="disabled"
@@ -2539,6 +2574,16 @@ ${dnstt_sub}.${domain}.	1	IN	NS	dns.${domain}.
 ${slip_sub}.${domain}.	1	IN	NS	dns.${domain}.
 ;; MasterDNS ARQ DNS tunnel — MahsaNG v16 native (currently ${masterdns_status})
 ${masterdns_sub}.${domain}.	1	IN	NS	dns.${domain}.
+ZONEOF
+
+    if [[ -n "$masterdns_public_sub" && "$masterdns_public_sub" != "$masterdns_sub" ]]; then
+        cat >> "$output_file" << ZONEOF
+;; MasterDNS public delegation domain (currently ${masterdns_status})
+${masterdns_public_sub}.${domain}.	1	IN	NS	dns.${domain}.
+ZONEOF
+    fi
+
+    cat >> "$output_file" << ZONEOF
 ;; XDNS mKCP DNS tunnel — opt-in, shares port 53 via dns-router (currently ${xdns_status})
 ${xdns_sub}.${domain}.	1	IN	NS	dns.${domain}.
 ZONEOF
@@ -3368,7 +3413,8 @@ doctor_check_dns() {
         masterdns_enabled=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
         if [[ "$masterdns_enabled" == "true" ]]; then
             local masterdns_subdomain=""
-            masterdns_subdomain=$(get_env_val "MASTERDNS_SUBDOMAIN" "$env_file" "m")
+            masterdns_subdomain=$(get_env_val "MASTERDNS_PUBLIC_SUBDOMAIN" "$env_file" "")
+            [[ -z "$masterdns_subdomain" ]] && masterdns_subdomain=$(get_env_val "MASTERDNS_SUBDOMAIN" "$env_file" "m")
             if ! doctor_check_ns_record "MasterDNS NS record" "${masterdns_subdomain}.${domain}" "$dns_host" "set NS ${masterdns_subdomain} -> ${dns_host}"; then
                 failures=$((failures + 1))
             fi
@@ -3591,7 +3637,7 @@ doctor_check_ports() {
     xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "true")
 
     if [[ "$dnstt_enabled" == "true" || "$slip_enabled" == "true" || "$masterdns_enabled" == "true" || "$xdns_enabled" == "true" ]]; then
-        if ss -ulnp 2>/dev/null | grep -q ':53 ' || netstat -ulnp 2>/dev/null | grep -q ':53 '; then
+        if port53_conflict_detected; then
             if systemctl is-active systemd-resolved &>/dev/null; then
                 echo -e "    ${RED}✗${NC} Port 53 in use by systemd-resolved (DNS tunnels need it)"
                 echo -e "      ${DIM}Run: moav setup-dns${NC}"
@@ -3599,6 +3645,8 @@ doctor_check_ports() {
             else
                 echo -e "    ${YELLOW}○${NC} Port 53 in use — DNS tunnels may fail to bind"
             fi
+        elif ss -ulnp 2>/dev/null | grep -q ':53 ' || netstat -ulnp 2>/dev/null | grep -q ':53 '; then
+            echo -e "    ${GREEN}✓${NC} Port 53 bound by MoaV dns-router"
         else
             echo -e "    ${GREEN}✓${NC} Port 53 available for DNS tunnels"
         fi
@@ -6939,16 +6987,8 @@ cmd_start() {
     fi
 
     if $needs_port53; then
-        if ss -ulnp 2>/dev/null | grep -q ':53 ' || netstat -ulnp 2>/dev/null | grep -q ':53 '; then
-            echo ""
-            warn "Port 53 is in use (likely by systemd-resolved)"
-            echo "  DNS tunnels (dnstt/Slipstream/MasterDNS/XDNS) require port 53 to be free."
-            echo ""
-            if confirm "Disable systemd-resolved and configure direct DNS?" "y"; then
-                setup_dns_for_dnstt
-            else
-                warn "DNS tunnels may fail to start. Run 'moav setup-dns' later to fix this."
-            fi
+        if port53_conflict_detected; then
+            handle_port53_conflict
         fi
     fi
 
@@ -8591,6 +8631,7 @@ cmd_regenerate_users() {
     local slipstream_subdomain=$(get_env_val "SLIPSTREAM_SUBDOMAIN" .env "s")
     local enable_masterdns=$(get_env_val "ENABLE_MASTERDNS" .env "true")
     local masterdns_subdomain=$(get_env_val "MASTERDNS_SUBDOMAIN" .env "m")
+    local masterdns_public_subdomain=$(get_env_val "MASTERDNS_PUBLIC_SUBDOMAIN" .env "")
     local enable_gooserelay=$(get_env_val "ENABLE_GOOSERELAY" .env "false")
     local port_goose=$(get_env_val "PORT_GOOSE" .env "8444")
     local enable_trusttunnel=$(get_env_val "ENABLE_TRUSTTUNNEL" .env "true")
@@ -8642,6 +8683,7 @@ cmd_regenerate_users() {
             -e "SLIPSTREAM_SUBDOMAIN=${slipstream_subdomain:-s}" \
             -e "ENABLE_MASTERDNS=${enable_masterdns:-true}" \
             -e "MASTERDNS_SUBDOMAIN=${masterdns_subdomain:-m}" \
+            -e "MASTERDNS_PUBLIC_SUBDOMAIN=${masterdns_public_subdomain:-}" \
             -e "ENABLE_GOOSERELAY=${enable_gooserelay:-false}" \
             -e "PORT_GOOSE=${port_goose:-8444}" \
             -e "ENABLE_TRUSTTUNNEL=${enable_trusttunnel:-true}" \
