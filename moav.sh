@@ -426,6 +426,125 @@ get_env_val() {
     echo "${val:-$default}"
 }
 
+# -----------------------------------------------------------------------------
+# Reality fallback target — vetted lists + DNS validation (issue #115)
+#
+# Reality's `handshake.server` / `realitySettings.dest` is the host the inbound
+# proxies non-Reality TLS hellos to (the "you didn't auth, here's a real site"
+# fallback). If it doesn't resolve, every probe and every legitimate client
+# sees an RST. Operators historically picked plausible-sounding hostnames
+# (`update.samsung.com`, `swl.samsung.com`) that aren't public DNS names —
+# those bundles silently break.
+# -----------------------------------------------------------------------------
+REALITY_TARGETS_GLOBAL=(
+    "www.cloudflare.com:443"
+    "www.apple.com:443"
+    "cdn.kernel.org:443"
+    "www.microsoft.com:443"
+)
+# SNI cover for Iran-resident clients — Reality hello looks like normal traffic
+# to Iranian-domestic sites, which Iran DPI is less aggressive about than
+# Western corporate destinations.
+REALITY_TARGETS_IRAN=(
+    "www.aparat.com:443"
+    "digikala.com:443"
+    "taghche.com:443"
+)
+
+# Returns 0 if `host` resolves to at least one A or AAAA record. Tries getent,
+# then host, then nslookup — whichever is present. Empty host → fail.
+reality_target_resolves() {
+    local host="$1"
+    [[ -n "$host" ]] || return 1
+    if command -v getent >/dev/null 2>&1; then
+        getent hosts "$host" >/dev/null 2>&1 && return 0
+    fi
+    if command -v host >/dev/null 2>&1; then
+        host -W 4 "$host" >/dev/null 2>&1 && return 0
+    fi
+    if command -v nslookup >/dev/null 2>&1; then
+        nslookup -timeout=4 "$host" >/dev/null 2>&1 && return 0
+    fi
+    return 1
+}
+
+show_vetted_reality_targets() {
+    echo "  Vetted Reality fallback targets:"
+    echo ""
+    echo "    Global (real TLS 1.3, stable, won't go dark):"
+    for t in "${REALITY_TARGETS_GLOBAL[@]}"; do
+        echo "      • $t"
+    done
+    echo ""
+    echo "    Iran-friendly (better SNI cover for clients inside Iran):"
+    for t in "${REALITY_TARGETS_IRAN[@]}"; do
+        echo "      • $t"
+    done
+}
+
+# Validate REALITY_TARGET and XHTTP_REALITY_TARGET from .env resolve in DNS.
+# If a host is NXDOMAIN, prompt for a replacement (up to 3 attempts), rewrite
+# .env in place. Returns 0 on success / all valid, 1 if still invalid after
+# attempts and operator can't fix it. Skips disabled protocols.
+validate_reality_targets() {
+    local env_file="${1:-.env}"
+    [[ -f "$env_file" ]] || return 0  # nothing to validate yet
+
+    local enable_reality enable_xhttp
+    enable_reality=$(get_env_val "ENABLE_REALITY" "$env_file" "true")
+    enable_xhttp=$(get_env_val "ENABLE_XHTTP" "$env_file" "true")
+
+    local key host_port host default new_target new_host attempt failed=0
+    for key in REALITY_TARGET XHTTP_REALITY_TARGET; do
+        case "$key" in
+            REALITY_TARGET)        [[ "$enable_reality" == "true" ]] || continue ;;
+            XHTTP_REALITY_TARGET)  [[ "$enable_xhttp"    == "true" ]] || continue ;;
+        esac
+
+        host_port=$(get_env_val "$key" "$env_file" "www.cloudflare.com:443")
+        host="${host_port%%:*}"
+
+        if reality_target_resolves "$host"; then
+            info "$key host '$host' resolves ✓"
+            continue
+        fi
+
+        warn "$key host '$host' does NOT resolve (NXDOMAIN)"
+        echo "    Reality's fallback dial will fail for every TLS hello it can't auth,"
+        echo "    so the inbound RSTs every probe and every legitimate client (issue #115)."
+        echo ""
+        show_vetted_reality_targets
+        echo ""
+
+        default="www.cloudflare.com:443"
+        for attempt in 1 2 3; do
+            prompt "Enter a new $key (host:port) or press Enter for $default:"
+            if ! read -r new_target < /dev/tty 2>/dev/null; then
+                # Non-interactive run — accept the default and move on.
+                new_target=""
+            fi
+            new_target="${new_target:-$default}"
+            new_host="${new_target%%:*}"
+            if reality_target_resolves "$new_host"; then
+                if grep -qE "^${key}=" "$env_file" 2>/dev/null; then
+                    sed -i.bak "s|^${key}=.*|${key}=${new_target}|" "$env_file" && rm -f "${env_file}.bak"
+                else
+                    echo "${key}=${new_target}" >> "$env_file"
+                fi
+                success "$key set to $new_target"
+                break
+            fi
+            warn "'$new_host' also does not resolve."
+            if [[ "$attempt" == "3" ]]; then
+                error "$key still invalid after 3 attempts — bootstrap will fail until fixed."
+                failed=$((failed + 1))
+            fi
+        done
+    done
+
+    [[ "$failed" -eq 0 ]]
+}
+
 ensure_admin_password() {
     # Check if admin password is unset, empty, or still the insecure default
     local current_password=""
@@ -1874,6 +1993,14 @@ run_bootstrap() {
         fi
     fi
 
+    # Validate Reality fallback targets resolve in DNS — see issue #115.
+    # If a hostname is NXDOMAIN, prompt for a replacement and rewrite .env in
+    # place. Cheaper to catch here than at first client connect.
+    if ! validate_reality_targets ".env"; then
+        error "Reality target validation failed. Edit REALITY_TARGET / XHTTP_REALITY_TARGET in .env and re-run bootstrap."
+        return 1
+    fi
+
     # Only build if the bootstrap image doesn't exist yet
     if ! docker image inspect moav-bootstrap >/dev/null 2>&1; then
         info "Building bootstrap container (first time, may take a few minutes)..."
@@ -2453,6 +2580,7 @@ DOCTOR_CHECKS=(
     "config:Check config files and keys from bootstrap"
     "ports:Check required ports are available"
     "conflicts:Check for conflicting services (e.g. DNS tunnels on port 53)"
+    "reality:Check Reality fallback targets resolve and are reachable"
     "env:Compare .env with .env.example for missing vars"
     "updates:Check for MoaV updates"
 )
@@ -3289,6 +3417,70 @@ doctor_check_conflicts() {
         pass=false
     fi
 
+    $pass && return 0 || return 1
+}
+
+# Reality fallback target check (issue #115).
+# For each enabled Reality inbound, ask its container's resolver whether the
+# configured `dest` hostname resolves, then TCP-probe the port from inside the
+# same container. Falls back to the host resolver if the container isn't
+# running (still useful — operator hasn't started services yet).
+doctor_check_reality() {
+    local env_file="$SCRIPT_DIR/.env"
+    local enable_reality enable_xhttp
+    enable_reality=$(get_env_val "ENABLE_REALITY" "$env_file" "true")
+    enable_xhttp=$(get_env_val "ENABLE_XHTTP" "$env_file" "true")
+
+    if [[ "$enable_reality" != "true" && "$enable_xhttp" != "true" ]]; then
+        echo -e "    ${DIM}○${NC} Reality and XHTTP-Reality both disabled — skipping"
+        return 2
+    fi
+
+    local pass=true
+    _doctor_reality_one() {
+        local label="$1" container="$2" key="$3" default_target="$4"
+        local host_port host port resolver_label resolves=false container_running=false
+        host_port=$(get_env_val "$key" "$env_file" "$default_target")
+        host="${host_port%%:*}"
+        port="${host_port##*:}"
+        [[ "$port" == "$host_port" ]] && port=443  # no `:port` in value
+
+        if docker compose ps --status running --services 2>/dev/null | grep -qw "$container"; then
+            container_running=true
+            resolver_label="container $container"
+            if docker compose exec -T "$container" getent hosts "$host" >/dev/null 2>&1; then
+                resolves=true
+            fi
+        else
+            resolver_label="host (container $container not running)"
+            reality_target_resolves "$host" && resolves=true
+        fi
+
+        if [[ "$resolves" != "true" ]]; then
+            echo -e "    ${RED}✗${NC} $label: $host does NOT resolve ($resolver_label)"
+            echo -e "      ${DIM}NXDOMAIN — Reality fallback fails, inbound RSTs every TLS hello (issue #115).${NC}"
+            echo -e "      ${DIM}Fix: set $key in .env to a resolvable host. See: moav doctor reality --help${NC}"
+            pass=false
+            return
+        fi
+
+        if [[ "$container_running" == "true" ]]; then
+            if docker compose exec -T "$container" sh -c "exec 3<>/dev/tcp/$host/$port" 2>/dev/null; then
+                echo -e "    ${GREEN}✓${NC} $label: $host:$port resolves and reachable from $container"
+            else
+                echo -e "    ${YELLOW}!${NC} $label: $host resolves but TCP $port unreachable from $container"
+                echo -e "      ${DIM}Reality fallback will hang or RST. Check container egress / VPS firewall.${NC}"
+                pass=false
+            fi
+        else
+            echo -e "    ${GREEN}✓${NC} $label: $host resolves ($resolver_label, TCP probe skipped)"
+        fi
+    }
+
+    [[ "$enable_reality" == "true" ]] && _doctor_reality_one "VLESS Reality (:443)" "sing-box" "REALITY_TARGET" "www.cloudflare.com:443"
+    [[ "$enable_xhttp"    == "true" ]] && _doctor_reality_one "XHTTP-Reality (:2096)" "xray" "XHTTP_REALITY_TARGET" "www.cloudflare.com:443"
+
+    unset -f _doctor_reality_one
     $pass && return 0 || return 1
 }
 

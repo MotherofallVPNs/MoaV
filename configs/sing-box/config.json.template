@@ -25,7 +25,6 @@
       "tag": "vless-reality-in",
       "listen": "::",
       "listen_port": 443,
-      "tcp_fast_open": true,
       "users": ${REALITY_USERS_JSON},
       "tls": {
         "enabled": true,
@@ -50,7 +49,6 @@
       "tag": "trojan-tls-in",
       "listen": "::",
       "listen_port": 8443,
-      "tcp_fast_open": true,
       "users": ${TROJAN_USERS_JSON},
       "tls": {
         "enabled": true,
