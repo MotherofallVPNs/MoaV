@@ -62,7 +62,12 @@ awk -v user="$USERNAME" '
     { print }
 ' "$WG_CONFIG_FILE" > "$TEMP_CONFIG"
 
-mv -f "$TEMP_CONFIG" "$WG_CONFIG_FILE"
+# Copy content over (not `mv`) so the original file's mode + owner survive.
+# `mv -f tmp orig` would swap inodes, leaving wg0.conf owned by whoever ran
+# the revoke (root if sudo'd from CLI) with that user's umask — breaking
+# the admin container's writeability on the next user-add attempt.
+cat "$TEMP_CONFIG" > "$WG_CONFIG_FILE"
+rm -f "$TEMP_CONFIG"
 
 log_info "Removed peer from wg0.conf"
 

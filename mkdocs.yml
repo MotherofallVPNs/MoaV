@@ -47,6 +47,7 @@ nav:
   - About:
     - Mission & Philosophy: philosophy.md
     - Supported Protocols: protocols.md
+    - Architecture: architecture.md
   - Developer:
     - Protocol Integration: devdocs/PROTOCOL-INTEGRATION-CHECKLIST.md
     - Version Bump Checklist: devdocs/VERSION-BUMP-CHECKLIST.md

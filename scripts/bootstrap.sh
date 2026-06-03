@@ -324,7 +324,7 @@ if [[ -z "${CDN_WS_PATH:-}" || "${CDN_WS_PATH}" == "/ws" ]]; then
     echo "CDN_WS_PATH=$CDN_WS_PATH" > "$STATE_DIR/keys/cdn.env"
 fi
 export CDN_WS_PATH
-export CDN_TRANSPORT="${CDN_TRANSPORT:-httpupgrade}"
+export CDN_TRANSPORT="${CDN_TRANSPORT:-ws}"
 export CDN_SNI="${CDN_SNI:-${DOMAIN:-}}"
 export CDN_ADDRESS="${CDN_ADDRESS:-${CDN_DOMAIN:-}}"
 

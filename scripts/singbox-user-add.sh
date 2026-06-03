@@ -69,8 +69,12 @@ if [[ ! -w "$STATE_DIR/users/$USERNAME" ]]; then
     sudo chmod 777 "$STATE_DIR/users/$USERNAME" 2>/dev/null || true
 fi
 
-# Check if user already exists in config
-if grep -q "\"name\":\"$USERNAME\"" "$CONFIG_FILE" 2>/dev/null; then
+# Check if user already exists in config (jq, whitespace-insensitive — the
+# legacy grep version required "name":"X" with no spaces, but jq -S writes
+# "name": "X" with a space, so the grep returned false-negative).
+if jq -e --arg n "$USERNAME" \
+        '.inbounds[]? | select(.users != null) | .users[]? | select(.name == $n)' \
+        "$CONFIG_FILE" >/dev/null 2>&1; then
     log_error "User '$USERNAME' already exists in sing-box config."
     exit 1
 fi
@@ -168,8 +172,10 @@ if ! jq empty "$TEMP_CONFIG" 2>/dev/null; then
     exit 1
 fi
 
-# Apply the config
-mv -f "$TEMP_CONFIG" "$CONFIG_FILE"
+# Apply the config — cat-overwrite (not mv-replace) so the original file's
+# inode/mode/owner survive across sudo'd CLI vs admin-container user mismatches.
+cat "$TEMP_CONFIG" > "$CONFIG_FILE"
+rm -f "$TEMP_CONFIG"
 
 log_info "Added $USERNAME to sing-box config"
 
@@ -297,7 +303,7 @@ if [[ -z "${CDN_WS_PATH:-}" ]]; then
 fi
 CDN_WS_PATH="${CDN_WS_PATH:-/ws}"
 CDN_TRANSPORT="${CDN_TRANSPORT:-$(grep -E '^CDN_TRANSPORT=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || true)}"
-CDN_TRANSPORT="${CDN_TRANSPORT:-httpupgrade}"
+CDN_TRANSPORT="${CDN_TRANSPORT:-ws}"
 CDN_SNI="${CDN_SNI:-$(grep -E '^CDN_SNI=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || true)}"
 CDN_SNI="${CDN_SNI:-${DOMAIN_FROM_ENV:-}}"
 CDN_ADDRESS="${CDN_ADDRESS:-$(grep -E '^CDN_ADDRESS=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || true)}"
@@ -472,17 +478,26 @@ XRAY_CONFIG="configs/xray/config.json"
 if [[ "${ENABLE_XHTTP:-true}" == "true" ]] && [[ -f "$XRAY_CONFIG" ]]; then
     log_info "Adding $USERNAME to Xray (XHTTP)..."
 
-    # Check if user already exists (search by UUID in the vless-xhttp-reality inbound)
-    if jq -e --arg uuid "$USER_UUID" \
-        '[.inbounds[] | select(.tag == "vless-xhttp-reality")] | .[0].settings.clients[] | select(.id == $uuid)' \
-        "$XRAY_CONFIG" >/dev/null 2>&1; then
+    # Check if user already exists. Xray's v26.5.9 schema kept `clients` as an
+    # alias of the new `users` field — bootstrap writes via template put users
+    # under `settings.users`, legacy add wrote `settings.clients`. Match either.
+    if jq -e --arg uuid "$USER_UUID" '
+            .inbounds[]? |
+            (.settings.clients[]?, .settings.users[]?) |
+            select(.id == $uuid)
+        ' "$XRAY_CONFIG" >/dev/null 2>&1; then
         log_info "User '$USERNAME' already exists in Xray config, skipping..."
     else
-        # Add new client entry to the vless-xhttp-reality inbound (flow MUST be empty for XHTTP)
-        # Add to ALL vless inbounds (xhttp-reality AND xdns)
+        # Add to the canonical `settings.users` field (the new Xray schema name
+        # since v26.5.9; older clients/`clients` alias still works). Adding to
+        # `users` keeps the template's path and the add-path consistent.
         jq --arg id "$USER_UUID" --arg email "${USERNAME}@moav" \
-            '(.inbounds[] | select(.protocol == "vless" and .tag != null and (.tag | startswith("vless-")))).settings.clients += [{"id": $id, "email": $email, "flow": ""}]' \
-            "$XRAY_CONFIG" > /tmp/xray.tmp && mv -f /tmp/xray.tmp "$XRAY_CONFIG"
+            '(.inbounds[] | select(.protocol == "vless" and .tag != null and (.tag | startswith("vless-")))).settings.users += [{"id": $id, "email": $email, "flow": ""}]' \
+            "$XRAY_CONFIG" > /tmp/xray.tmp
+        # Preserve original config's perms/owner (cat-overwrite, not mv-replace) so
+        # admin container keeps write access on subsequent operations.
+        cat /tmp/xray.tmp > "$XRAY_CONFIG"
+        rm -f /tmp/xray.tmp
         log_info "Added $USERNAME to Xray config (all VLESS inbounds)"
     fi
 

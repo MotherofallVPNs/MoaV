@@ -2,6 +2,8 @@
 
 # MoaV
 
+[![Website](https://img.shields.io/badge/website-moav.sh-cyan.svg)](https://moav.sh)  [![Docs](https://img.shields.io/badge/docs-moav.sh%2Fdocs-cyan.svg)](https://moav.sh/docs/)  [![Version](https://img.shields.io/badge/version-1.8.2-blue.svg)](CHANGELOG.md)  [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 **[English](README.md)** | فارسی
 
 استک عبور از سانسور چند پروتکلی بهینه‌سازی شده برای محیط‌های شبکه‌ای خصمانه.
@@ -360,6 +362,10 @@ MoaV/
 ## مجوز
 
 MIT
+
+## تغییرات
+
+برای یادداشت‌های انتشار و تاریخچه نسخه‌ها به [CHANGELOG.md](CHANGELOG.md) مراجعه کنید.
 
 ## سلب مسئولیت
 

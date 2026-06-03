@@ -962,8 +962,11 @@
                 </div>
 
                 <!-- WireGuard over WebSocket (wstunnel) -->
-                <div class="extra-section" style="margin-top: 20px; border: 1px solid var(--accent-orange); background: rgba(210, 153, 34, 0.1);">
-                    <h4 style="color: var(--accent-orange);">WireGuard over WebSocket (For Censored Networks)</h4>
+                <details class="extra-section" style="margin-top: 20px; border: 1px solid var(--accent-orange); background: rgba(210, 153, 34, 0.1);">
+                    <summary style="cursor: pointer; list-style: none; padding-block: 6px;">
+                        <h4 style="color: var(--accent-orange); display: inline-block; margin: 0;">WireGuard over WebSocket (For Censored Networks)</h4>
+                        <span style="float: right; color: var(--accent-orange); font-size: 14px;">▸</span>
+                    </summary>
                     <p>If direct WireGuard is blocked (common in Iran, China, Russia), use wstunnel to wrap WireGuard traffic in a WebSocket connection that looks like normal HTTPS.</p>
 
                     <div style="margin-top: 12px;">
@@ -985,21 +988,21 @@
                         <strong>Mobile Setup:</strong>
                         <p style="color: var(--text-muted); font-size: 12px;">Mobile requires running wstunnel in Termux (Android) or using an app that supports WireGuard-over-WebSocket. For most users, we recommend using Reality or Hysteria2 on mobile instead.</p>
                     </div>
-                </div>
 
-                <div class="qr-section" style="margin-top: 16px;">
-                    <div class="qr-code">
-                        <img src="data:image/png;base64,{{QR_WIREGUARD_WSTUNNEL}}" alt="WireGuard wstunnel QR Code" onerror="this.parentElement.classList.add('qr-missing'); this.parentElement.innerHTML='QR not available<br>Use config below';">
+                    <div class="qr-section" style="margin-top: 16px;">
+                        <div class="qr-code">
+                            <img src="data:image/png;base64,{{QR_WIREGUARD_WSTUNNEL}}" alt="WireGuard wstunnel QR Code" onerror="this.parentElement.classList.add('qr-missing'); this.parentElement.innerHTML='QR not available<br>Use config below';">
+                        </div>
+                        <div class="qr-instructions">
+                            <h4>WireGuard-wstunnel Config</h4>
+                            <p style="font-size: 12px; color: var(--text-muted);">Use this config AFTER starting wstunnel client. Points to localhost instead of server.</p>
+                        </div>
                     </div>
-                    <div class="qr-instructions">
-                        <h4>WireGuard-wstunnel Config</h4>
-                        <p style="font-size: 12px; color: var(--text-muted);">Use this config AFTER starting wstunnel client. Points to localhost instead of server.</p>
+                    <div class="config-box">
+                        <h4>WireGuard-wstunnel Config File (save as .conf)</h4>
+                        <div class="config-value multiline">{{CONFIG_WIREGUARD_WSTUNNEL}}</div>
                     </div>
-                </div>
-                <div class="config-box">
-                    <h4>WireGuard-wstunnel Config File (save as .conf)</h4>
-                    <div class="config-value multiline">{{CONFIG_WIREGUARD_WSTUNNEL}}</div>
-                </div>
+                </details>
             </div>
         </div>
 
@@ -1240,6 +1243,10 @@
                 <div class="extra-section">
                     <h4>Quick Setup</h4>
                     <p>Tap/click the link below to add the proxy to your Telegram app:</p>
+                    <p style="margin: 8px 0 12px 0;">
+                        <a href="{{CONFIG_TELEMT}}" target="_blank" style="display: inline-block; padding: 10px 16px; background: var(--accent-primary); color: #fff; border-radius: 6px; text-decoration: none; font-weight: 600;">Open in Telegram</a>
+                    </p>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Or copy the link manually:</p>
                     <div class="config-value" onclick="copyConfig(this)">{{CONFIG_TELEMT}}</div>
                 </div>
 
@@ -1261,14 +1268,14 @@
         </div>
 
         <!-- Tor -->
-        <div class="protocol-section" id="tor-en">
-            <div class="protocol-header">
+        <details class="protocol-section" id="tor-en">
+            <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>10. Tor</h2>
                     <span class="protocol-badge badge-standalone">Standalone</span>
                 </div>
                 <span class="protocol-port">Various</span>
-            </div>
+            </summary>
             <div class="protocol-content">
                 <p class="protocol-desc">The Tor network provides anonymous access to the internet. Does not require your MoaV server - connects to the global Tor network.</p>
 
@@ -1287,17 +1294,17 @@
                     <p>Use <strong>bridges</strong> in Tor Browser settings. Select "Snowflake" or "obfs4" bridges which are harder to detect.</p>
                 </div>
             </div>
-        </div>
+        </details>
 
         <!-- Psiphon -->
-        <div class="protocol-section" id="psiphon-en">
-            <div class="protocol-header">
+        <details class="protocol-section" id="psiphon-en">
+            <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>11. Psiphon</h2>
                     <span class="protocol-badge badge-standalone">Standalone</span>
                 </div>
                 <span class="protocol-port">Various</span>
-            </div>
+            </summary>
             <div class="protocol-content">
                 <p class="protocol-desc">Free circumvention tool with its own network. Does not require your MoaV server - connects to Psiphon's global infrastructure.</p>
 
@@ -1321,7 +1328,7 @@
                     </ol>
                 </div>
             </div>
-        </div>
+        </details>
 
         <!-- Apps Section -->
         <div class="apps-section" id="apps-en">
@@ -1856,8 +1863,11 @@
                 </div>
 
                 <!-- WireGuard over WebSocket (wstunnel) -->
-                <div class="extra-section" style="margin-top: 20px; border: 1px solid var(--accent-orange); background: rgba(210, 153, 34, 0.1);">
-                    <h4 style="color: var(--accent-orange);">WireGuard از طریق WebSocket (برای شبکه‌های سانسور شده)</h4>
+                <details class="extra-section" style="margin-top: 20px; border: 1px solid var(--accent-orange); background: rgba(210, 153, 34, 0.1);">
+                    <summary style="cursor: pointer; list-style: none; padding-block: 6px;">
+                        <h4 style="color: var(--accent-orange); display: inline-block; margin: 0;">WireGuard از طریق WebSocket (برای شبکه‌های سانسور شده)</h4>
+                        <span style="float: left; color: var(--accent-orange); font-size: 14px;">▸</span>
+                    </summary>
                     <p>اگر WireGuard مستقیم مسدود است (رایج در ایران، چین، روسیه)، از wstunnel استفاده کنید تا ترافیک WireGuard را در یک اتصال WebSocket که شبیه HTTPS معمولی است پنهان کنید.</p>
 
                     <div style="margin-top: 12px;">
@@ -1879,21 +1889,21 @@
                         <strong>راه‌اندازی موبایل:</strong>
                         <p style="color: var(--text-muted); font-size: 12px;">برای موبایل نیاز به اجرای wstunnel در Termux (Android) است. برای اکثر کاربران، توصیه می‌کنیم در موبایل از Reality یا Hysteria2 استفاده کنید.</p>
                     </div>
-                </div>
 
-                <div class="qr-section" style="margin-top: 16px;">
-                    <div class="qr-code">
-                        <img src="data:image/png;base64,{{QR_WIREGUARD_WSTUNNEL}}" alt="QR Code WireGuard wstunnel" onerror="this.parentElement.classList.add('qr-missing'); this.parentElement.innerHTML='QR در دسترس نیست<br>از کانفیگ زیر استفاده کنید';">
+                    <div class="qr-section" style="margin-top: 16px;">
+                        <div class="qr-code">
+                            <img src="data:image/png;base64,{{QR_WIREGUARD_WSTUNNEL}}" alt="QR Code WireGuard wstunnel" onerror="this.parentElement.classList.add('qr-missing'); this.parentElement.innerHTML='QR در دسترس نیست<br>از کانفیگ زیر استفاده کنید';">
+                        </div>
+                        <div class="qr-instructions">
+                            <h4>کانفیگ WireGuard-wstunnel</h4>
+                            <p style="font-size: 12px; color: var(--text-muted);">این کانفیگ را بعد از اجرای wstunnel client استفاده کنید. به localhost اشاره می‌کند.</p>
+                        </div>
                     </div>
-                    <div class="qr-instructions">
-                        <h4>کانفیگ WireGuard-wstunnel</h4>
-                        <p style="font-size: 12px; color: var(--text-muted);">این کانفیگ را بعد از اجرای wstunnel client استفاده کنید. به localhost اشاره می‌کند.</p>
+                    <div class="config-box">
+                        <h4>فایل کانفیگ WireGuard-wstunnel (ذخیره با پسوند .conf)</h4>
+                        <div class="config-value multiline">{{CONFIG_WIREGUARD_WSTUNNEL}}</div>
                     </div>
-                </div>
-                <div class="config-box">
-                    <h4>فایل کانفیگ WireGuard-wstunnel (ذخیره با پسوند .conf)</h4>
-                    <div class="config-value multiline">{{CONFIG_WIREGUARD_WSTUNNEL}}</div>
-                </div>
+                </details>
             </div>
         </div>
 
@@ -2130,7 +2140,11 @@
 
                 <div class="extra-section">
                     <h4>راه‌اندازی سریع</h4>
-                    <p>روی لینک زیر بزنید تا پروکسی به اپلیکیشن تلگرام شما اضافه شود:</p>
+                    <p>روی دکمه زیر بزنید تا پروکسی به اپلیکیشن تلگرام شما اضافه شود:</p>
+                    <p style="margin: 8px 0 12px 0;">
+                        <a href="{{CONFIG_TELEMT}}" target="_blank" style="display: inline-block; padding: 10px 16px; background: var(--accent-primary); color: #fff; border-radius: 6px; text-decoration: none; font-weight: 600;">باز کردن در تلگرام</a>
+                    </p>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">یا لینک را به صورت دستی کپی کنید:</p>
                     <div class="config-value" onclick="copyConfig(this)">{{CONFIG_TELEMT}}</div>
                 </div>
 
@@ -2152,14 +2166,14 @@
         </div>
 
         <!-- Tor -->
-        <div class="protocol-section" id="tor-fa">
-            <div class="protocol-header">
+        <details class="protocol-section" id="tor-fa">
+            <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>۱۰. Tor</h2>
                     <span class="protocol-badge badge-standalone">مستقل</span>
                 </div>
                 <span class="protocol-port">مختلف</span>
-            </div>
+            </summary>
             <div class="protocol-content">
                 <p class="protocol-desc">شبکه Tor دسترسی ناشناس به اینترنت فراهم می‌کند. نیازی به سرور MoaV شما ندارد.</p>
 
@@ -2177,17 +2191,17 @@
                     <p>از <strong>پل‌ها (bridges)</strong> در تنظیمات استفاده کنید. پل‌های "Snowflake" یا "obfs4" را انتخاب کنید.</p>
                 </div>
             </div>
-        </div>
+        </details>
 
         <!-- Psiphon -->
-        <div class="protocol-section" id="psiphon-fa">
-            <div class="protocol-header">
+        <details class="protocol-section" id="psiphon-fa">
+            <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>۱۱. Psiphon</h2>
                     <span class="protocol-badge badge-standalone">مستقل</span>
                 </div>
                 <span class="protocol-port">مختلف</span>
-            </div>
+            </summary>
             <div class="protocol-content">
                 <p class="protocol-desc">ابزار رایگان دور زدن فیلترینگ با شبکه خودش. نیازی به سرور MoaV شما ندارد.</p>
 
@@ -2200,7 +2214,7 @@
                     </ul>
                 </div>
             </div>
-        </div>
+        </details>
 
         <!-- Apps Section -->
         <div class="apps-section" id="apps-fa">
