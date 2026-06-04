@@ -118,13 +118,7 @@ version_gt() {
 }
 
 print_header() {
-    # Guard `clear` against non-TTY stdout (cloud-init, nohup, setsid, CI):
-    # without TERM set, ncurses' clear exits non-zero AND prints
-    # "TERM environment variable not set." — under our `set -euo pipefail`
-    # that tears down the whole script (this is exactly what kills
-    # `setsid bash -c "./moav.sh domainless </dev/null"` mid-banner).
-    # Skip the clear when stdout isn't a TTY; there's no terminal state
-    # to wipe anyway.
+    # Only clear when stdout is a TTY (avoids "TERM not set" abort under setsid).
     if [[ -t 1 ]]; then
         clear 2>/dev/null || true
     fi
@@ -566,13 +560,8 @@ ensure_admin_password() {
         echo -e "${WHITE}Admin dashboard password${NC}"
         echo "  Press Enter to generate a random password, or type your own"
         printf "  Password: "
-        # Tolerate EOF / closed stdin (cloud-init / setsid / `</dev/null`
-        # callers). Without `|| true` the read returns non-zero on EOF and
-        # `set -e` aborts the whole script before we can fall through to
-        # auto-generation — meaning a non-interactive `moav domainless`
-        # never finishes, never invokes bootstrap, no keys are generated.
         input_password=""
-        read -r input_password || true
+        read -r input_password || true   # EOF on closed stdin → fall through to auto-gen
         if [[ -z "$input_password" ]]; then
             input_password=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 16)
         fi

@@ -2,13 +2,7 @@
 # Bash/Zsh completion for moav CLI
 # Installed automatically by 'moav install'
 
-# Zsh compatibility. Guard the var with :- so this file is safe to source
-# under `set -u` / `set -euo pipefail` (which moav.sh enables) — otherwise
-# `source completions/moav.bash` aborts with "ZSH_VERSION: unbound variable"
-# and the parent script dies before printing its tail. moav.sh's
-# install_completions tries `source ... 2>/dev/null || true` to recover,
-# but a nounset failure in the sourced file kills the parent shell before
-# `|| true` can run.
+# Zsh compatibility — guard for nounset (moav.sh runs under `set -u`).
 if [[ -n "${ZSH_VERSION:-}" ]]; then
     autoload -U +X bashcompinit && bashcompinit
 fi
