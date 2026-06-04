@@ -725,10 +725,10 @@ services:
     environment:
       - TZ=${TZ:-UTC}
     healthcheck:
-      # `xray test -c` parses the config and verifies the binary loads. Mirrors
-      # the sing-box healthcheck. Without this, the admin UI shows xray as
-      # "unknown" because Docker reports an empty Health.Status field (#117).
-      test: ["CMD", "/usr/local/bin/xray", "test", "-c", "/etc/xray/config.json"]
+      # `xray run -test -c` parses the config and exits 0 if valid. There is
+      # no `xray test` subcommand (it errors "unknown command"), which left
+      # the container permanently unhealthy even while serving fine (#117).
+      test: ["CMD", "/usr/local/bin/xray", "run", "-test", "-c", "/etc/xray/config.json"]
       interval: 30s
       timeout: 5s
       retries: 3
