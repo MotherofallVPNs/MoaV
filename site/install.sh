@@ -513,6 +513,104 @@ maybe_offer_swap() {
 maybe_offer_swap || true
 
 # =============================================================================
+# Offer BBR + kernel network tuning. Commonly 2–5× TCP throughput on long-RTT
+# or lossy paths (which the Iran-bound proxy use case very much is). Reversible
+# later via `moav net revert`. Same logic ships in moav.sh as `moav net apply`
+# so updates can re-trigger or revert this independently.
+# =============================================================================
+maybe_offer_net_tuning() {
+    [[ "$(uname -s)" == "Linux" ]] || return 0
+    [[ -t 0 || -e /dev/tty ]] || return 0   # skip in non-interactive runs
+
+    local NT_CONF=/etc/sysctl.d/99-moav-net.conf
+    # Already applied (re-install / re-run) — skip silently.
+    [[ -f "$NT_CONF" ]] && return 0
+
+    # Kernel must expose BBR (mainline since 4.9; OpenVZ doesn't).
+    local avail
+    avail=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null || echo "")
+    if [[ " $avail " != *" bbr "* ]]; then
+        # Quiet skip — operator can't do anything about a missing-BBR kernel.
+        return 0
+    fi
+
+    local current_cc
+    current_cc=$(cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null || echo "?")
+
+    echo ""
+    echo -e "${CYAN}Enable Linux network tuning (BBR + larger buffers)?${NC}"
+    echo "  Current: tcp_congestion_control=${current_cc}"
+    echo "  Real-world testing: 2–5× TCP throughput on long-RTT or lossy paths."
+    echo "  Helps UDP/QUIC too (Hysteria2, WireGuard need bigger UDP buffers)."
+    echo "  Reversible: ${WHITE}moav net revert${NC} removes the file + reloads sysctl."
+    echo ""
+    if ! confirm "Apply network tuning?" "y"; then
+        info "Skipping network tuning. You can apply later: moav net apply"
+        return 0
+    fi
+
+    local SUDO=""
+    if [[ "$(id -u)" -ne 0 ]]; then
+        if command -v sudo &>/dev/null; then SUDO="sudo"; else
+            warn "Need root or sudo to write $NT_CONF; skipping. Re-run later as root: moav net apply"
+            return 0
+        fi
+    fi
+
+    # Compute buffer max. 16 MiB on <2GB hosts, 32 MiB otherwise.
+    local total_mb bmax
+    total_mb=$(awk '/MemTotal/ {printf "%.0f", $2/1024}' /proc/meminfo 2>/dev/null || echo 0)
+    if [[ "$total_mb" -gt 0 && "$total_mb" -lt 2048 ]]; then
+        bmax=16777216
+    else
+        bmax=33554432
+    fi
+
+    local tmp
+    tmp=$(mktemp)
+    cat > "$tmp" <<EOF
+# MoaV network tuning — generated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+# Reversible: moav net revert (deletes this file + reloads sysctl)
+# Docs: docs/OPSEC.md → "Network tuning"
+
+net.ipv4.tcp_congestion_control = bbr
+net.core.default_qdisc          = fq
+
+net.core.rmem_max               = ${bmax}
+net.core.wmem_max               = ${bmax}
+net.ipv4.tcp_rmem               = 4096 131072 ${bmax}
+net.ipv4.tcp_wmem               = 4096 16384 ${bmax}
+
+net.core.rmem_default           = 1048576
+net.core.wmem_default           = 1048576
+
+net.core.netdev_max_backlog     = 16384
+net.core.somaxconn              = 8192
+
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_mtu_probing           = 1
+net.ipv4.tcp_notsent_lowat         = 131072
+
+# DELIBERATELY NOT SET: net.ipv4.tcp_fastopen
+# TFO server-side ADDS latency in heavily-censored networks because
+# middleboxes (notably China Mobile) drop SYN+data on ~5% of paths.
+EOF
+
+    if $SUDO install -m 0644 "$tmp" "$NT_CONF"; then
+        rm -f "$tmp"
+        if $SUDO sysctl -p "$NT_CONF" >/dev/null 2>&1; then
+            success "Network tuning applied → $NT_CONF (buffer max: $((bmax / 1048576)) MiB)"
+        else
+            warn "Wrote $NT_CONF but sysctl reload failed — will activate on next boot."
+        fi
+    else
+        rm -f "$tmp"
+        warn "Could not write $NT_CONF; skipping. Re-run later: moav net apply"
+    fi
+}
+maybe_offer_net_tuning || true
+
+# =============================================================================
 # Clone or Update MoaV
 # =============================================================================
 
