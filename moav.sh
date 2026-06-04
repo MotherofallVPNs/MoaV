@@ -566,7 +566,13 @@ ensure_admin_password() {
         echo -e "${WHITE}Admin dashboard password${NC}"
         echo "  Press Enter to generate a random password, or type your own"
         printf "  Password: "
-        read -r input_password
+        # Tolerate EOF / closed stdin (cloud-init / setsid / `</dev/null`
+        # callers). Without `|| true` the read returns non-zero on EOF and
+        # `set -e` aborts the whole script before we can fall through to
+        # auto-generation — meaning a non-interactive `moav domainless`
+        # never finishes, never invokes bootstrap, no keys are generated.
+        input_password=""
+        read -r input_password || true
         if [[ -z "$input_password" ]]; then
             input_password=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 16)
         fi
