@@ -118,7 +118,16 @@ version_gt() {
 }
 
 print_header() {
-    clear
+    # Guard `clear` against non-TTY stdout (cloud-init, nohup, setsid, CI):
+    # without TERM set, ncurses' clear exits non-zero AND prints
+    # "TERM environment variable not set." — under our `set -euo pipefail`
+    # that tears down the whole script (this is exactly what kills
+    # `setsid bash -c "./moav.sh domainless </dev/null"` mid-banner).
+    # Skip the clear when stdout isn't a TTY; there's no terminal state
+    # to wipe anyway.
+    if [[ -t 1 ]]; then
+        clear 2>/dev/null || true
+    fi
     # Get current branch
     local branch
     branch=$(git -C "$SCRIPT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
