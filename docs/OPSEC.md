@@ -180,6 +180,39 @@ sudo ufw-docker allow moav-admin 8443/tcp from YOUR_IP
 4. **Pay anonymously** — use crypto if available
 5. **Separate domain from identity** — don't use a domain linked to your name
 
+### Reality fallback target (`REALITY_TARGET`)
+
+Reality's `REALITY_TARGET` (and `XHTTP_REALITY_TARGET`) is the public TLS site the inbound proxies non-Reality TLS hellos to. Every probe and every misauthenticated client gets that site's real ServerHello back — so an outside observer sees a normal connection to a real CDN, not a closed port.
+
+**The hostname MUST resolve in public DNS and be reachable from your server's network.** If it doesn't, the inbound RSTs every TLS hello — including ones from your own users — and your `:443` looks visibly dead to passive scanners. This is exactly what issue #115 reported (`update.samsung.com` is not a real public hostname; Samsung's update infrastructure uses opaque internal names).
+
+Bootstrap now validates this and `moav doctor reality` re-checks it post-deployment.
+
+**Vetted targets:**
+
+| Audience | Hostname | Why it works |
+|---|---|---|
+| Global | `www.cloudflare.com:443` | Real TLS 1.3, ECH-capable, anycast, won't go dark |
+| Global | `www.apple.com:443` | Corporate, stable, real ECH support |
+| Global | `cdn.kernel.org:443` | Linux kernel CDN, real, neutral |
+| Iran users | `www.aparat.com:443` | Iranian video CDN — looks like normal domestic traffic to Iran DPI |
+| Iran users | `digikala.com:443` | Iran e-commerce, high-volume traffic profile |
+| Iran users | `taghche.com:443` | Iranian book platform, plausible browsing target |
+
+**Avoid:**
+
+- `dl.google.com:443` — throttled by Iran DPI; works elsewhere but bad for Iran-bound clients
+- Hostnames that *sound* like an update server but aren't real public DNS names (`update.samsung.com`, `swl.samsung.com`, `update.windows.com`, `cdn.tesla.com`) — verify with `getent hosts <host>` first
+- Hostnames behind country-specific blocks from your VPS region (some VPS providers throttle major CDNs)
+- Anything you wouldn't expect a real browser to talk to on a quiet Tuesday
+
+**If you change `REALITY_TARGET` after bootstrap**, you must re-issue client bundles so the SNI in their config matches:
+
+```bash
+docker compose restart sing-box xray
+moav regenerate-users
+```
+
 ### Credential Management
 
 1. **Never share master credentials** — each user gets unique credentials
