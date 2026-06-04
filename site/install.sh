@@ -526,9 +526,14 @@ maybe_offer_net_tuning() {
     # Already applied (re-install / re-run) — skip silently.
     [[ -f "$NT_CONF" ]] && return 0
 
-    # Kernel must expose BBR (mainline since 4.9; OpenVZ doesn't).
+    # Kernel must expose BBR (mainline since 4.9; OpenVZ doesn't). It's usually
+    # a module that's absent from the list until loaded — try modprobe first.
     local avail
     avail=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null || echo "")
+    if [[ " $avail " != *" bbr "* ]]; then
+        ${SUDO:-} modprobe tcp_bbr 2>/dev/null || sudo modprobe tcp_bbr 2>/dev/null || true
+        avail=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null || echo "")
+    fi
     if [[ " $avail " != *" bbr "* ]]; then
         # Quiet skip — operator can't do anything about a missing-BBR kernel.
         return 0

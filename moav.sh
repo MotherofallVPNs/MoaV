@@ -2590,11 +2590,20 @@ ZONEOF
 
 NT_CONF_PATH="/etc/sysctl.d/99-moav-net.conf"
 
-# Returns 0 if the running kernel exposes BBR in tcp_available_congestion_control.
-# OpenVZ guests + ancient kernels (<4.9) will fail this and we skip cleanly.
+# Returns 0 if the running kernel can use BBR. On most distro kernels tcp_bbr
+# ships as a module that isn't loaded until requested, so it's absent from
+# tcp_available_congestion_control on a fresh boot — try modprobe before
+# concluding it's unsupported. OpenVZ guests + ancient kernels (<4.9) still
+# fail cleanly.
 nt_kernel_supports_bbr() {
     local avail
     avail=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null || echo "")
+    if [[ " $avail " != *" bbr "* ]]; then
+        local SUDO=""
+        [[ "$(id -u)" -ne 0 ]] && command -v sudo &>/dev/null && SUDO="sudo"
+        $SUDO modprobe tcp_bbr 2>/dev/null || true
+        avail=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null || echo "")
+    fi
     [[ " $avail " == *" bbr "* ]]
 }
 
@@ -2678,6 +2687,10 @@ nt_apply() {
     fi
     rm -f "$tmp"
 
+    # Persist the module so bbr survives reboot even if nothing else pulls it
+    # in before sysctl runs.
+    echo "tcp_bbr" | $SUDO tee /etc/modules-load.d/moav-bbr.conf >/dev/null 2>&1 || true
+
     if $SUDO sysctl -p "$NT_CONF_PATH" >/dev/null 2>&1; then
         success "Network tuning applied → $NT_CONF_PATH (buffer max: $((bmax / 1048576)) MiB)"
         return 0
@@ -2704,6 +2717,7 @@ nt_revert() {
     fi
 
     $SUDO rm -f "$NT_CONF_PATH"
+    $SUDO rm -f /etc/modules-load.d/moav-bbr.conf 2>/dev/null || true
     # Re-load the rest of sysctl.d (and main sysctl.conf) so the kernel reverts
     # to distro defaults / whatever else is configured. Best-effort.
     $SUDO sysctl --system >/dev/null 2>&1 || true
