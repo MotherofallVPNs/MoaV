@@ -65,8 +65,14 @@ confirm() {
     local prompt="${1:-Continue?}"
     local default="${2:-n}"
 
-    # Check if we have a TTY for interactive input
-    if [[ ! -t 0 ]] && [[ ! -e /dev/tty ]]; then
+    # Check if we have a TTY for interactive input. We can't just stat
+    # /dev/tty with -e: under setsid (cloud-init, detached nohup, CI
+    # runners) the device node exists but opening it returns ENXIO,
+    # so the prompt then prints "bash: /dev/tty: No such device or
+    # address" and the read fallback runs anyway — but the error
+    # message leaks to the operator and confuses anything tailing the
+    # log. Actually try to OPEN the device in a subshell instead.
+    if [[ ! -t 0 ]] && ! { : < /dev/tty; } 2>/dev/null; then
         # Non-interactive: use default
         [[ "$default" == "y" ]]
         return
@@ -79,7 +85,11 @@ confirm() {
         printf "%s [y/N] " "$prompt"
     fi
 
-    if read -n 1 -r REPLY < /dev/tty 2>/dev/null; then
+    # The whole read+redirect is grouped in {…} so the redirect failure
+    # under setsid (where /dev/tty is unopenable) is captured by the
+    # surrounding stderr redirect — otherwise bash emits a redirect
+    # error message before the read even runs.
+    if { read -n 1 -r REPLY < /dev/tty; } 2>/dev/null; then
         echo ""
     else
         # Fallback if /dev/tty fails - use default
