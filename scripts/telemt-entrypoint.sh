@@ -39,6 +39,10 @@ echo "================================================"
 # Fix tmpfs directory ownership (mounted as root, telemt runs as moav)
 chown -R moav:moav /app/tlsfront /app/cache 2>/dev/null || true
 
-# Start telemt as moav user
-cd /app
+# Start telemt as moav user. cwd is /app/cache (an existing tmpfs) so the
+# runtime observability snapshot — `beobachten.txt`, written relative to cwd —
+# lands in a writable filesystem instead of failing every 15s against the
+# read-only / root (#117). Config uses an absolute path for tls_front_dir, so
+# the cwd change is safe.
+cd /app/cache
 exec su-exec moav telemt "$CONFIG_FILE"

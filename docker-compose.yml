@@ -724,6 +724,15 @@ services:
       - moav_state:/state:ro
     environment:
       - TZ=${TZ:-UTC}
+    healthcheck:
+      # `xray test -c` parses the config and verifies the binary loads. Mirrors
+      # the sing-box healthcheck. Without this, the admin UI shows xray as
+      # "unknown" because Docker reports an empty Health.Status field (#117).
+      test: ["CMD", "/usr/local/bin/xray", "test", "-c", "/etc/xray/config.json"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     cap_drop:
       - ALL
     security_opt:
