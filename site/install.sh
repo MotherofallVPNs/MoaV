@@ -65,9 +65,9 @@ confirm() {
     local prompt="${1:-Continue?}"
     local default="${2:-n}"
 
-    # Check if we have a TTY for interactive input
-    if [[ ! -t 0 ]] && [[ ! -e /dev/tty ]]; then
-        # Non-interactive: use default
+    # Detect interactivity by actually opening /dev/tty — under setsid the
+    # device node exists but opening returns ENXIO, so -e would lie.
+    if [[ ! -t 0 ]] && ! { : < /dev/tty; } 2>/dev/null; then
         [[ "$default" == "y" ]]
         return
     fi
@@ -79,10 +79,10 @@ confirm() {
         printf "%s [y/N] " "$prompt"
     fi
 
-    if read -n 1 -r REPLY < /dev/tty 2>/dev/null; then
+    # Group the redirect so bash's redirect error is captured by 2>/dev/null.
+    if { read -n 1 -r REPLY < /dev/tty; } 2>/dev/null; then
         echo ""
     else
-        # Fallback if /dev/tty fails - use default
         echo ""
         [[ "$default" == "y" ]]
         return
@@ -526,9 +526,14 @@ maybe_offer_net_tuning() {
     # Already applied (re-install / re-run) — skip silently.
     [[ -f "$NT_CONF" ]] && return 0
 
-    # Kernel must expose BBR (mainline since 4.9; OpenVZ doesn't).
+    # Kernel must expose BBR (mainline since 4.9; OpenVZ doesn't). It's usually
+    # a module that's absent from the list until loaded — try modprobe first.
     local avail
     avail=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null || echo "")
+    if [[ " $avail " != *" bbr "* ]]; then
+        ${SUDO:-} modprobe tcp_bbr 2>/dev/null || sudo modprobe tcp_bbr 2>/dev/null || true
+        avail=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null || echo "")
+    fi
     if [[ " $avail " != *" bbr "* ]]; then
         # Quiet skip — operator can't do anything about a missing-BBR kernel.
         return 0
