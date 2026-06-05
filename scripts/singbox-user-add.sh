@@ -303,7 +303,7 @@ if [[ -z "${CDN_WS_PATH:-}" ]]; then
 fi
 CDN_WS_PATH="${CDN_WS_PATH:-/ws}"
 CDN_TRANSPORT="${CDN_TRANSPORT:-$(grep -E '^CDN_TRANSPORT=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || true)}"
-CDN_TRANSPORT="${CDN_TRANSPORT:-httpupgrade}"
+CDN_TRANSPORT="${CDN_TRANSPORT:-ws}"
 CDN_SNI="${CDN_SNI:-$(grep -E '^CDN_SNI=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || true)}"
 CDN_SNI="${CDN_SNI:-${DOMAIN_FROM_ENV:-}}"
 CDN_ADDRESS="${CDN_ADDRESS:-$(grep -E '^CDN_ADDRESS=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || true)}"

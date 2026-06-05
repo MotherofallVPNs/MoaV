@@ -338,7 +338,7 @@ if [[ -n "${CDN_DOMAIN:-}" ]]; then
   else
     BUNDLE_CHANGED=true
     CDN_WS_PATH="${CDN_WS_PATH:-/ws}"
-    CDN_TRANSPORT="${CDN_TRANSPORT:-httpupgrade}"
+    CDN_TRANSPORT="${CDN_TRANSPORT:-ws}"
     CDN_SNI="${CDN_SNI:-${DOMAIN:-${CDN_DOMAIN}}}"
     CDN_ADDRESS="${CDN_ADDRESS:-${CDN_DOMAIN}}"
 
