@@ -146,11 +146,41 @@ def verify_auth(request: Request, credentials: HTTPBasicCredentials = Depends(se
     return credentials.username
 
 
+def _check_via_docker_proxy(container_name: str) -> str:
+    """Query the docker-socket-proxy for a container's running state.
+    Used for host-networked services like snowflake that can't be detected via
+    moav_net DNS. The admin container has DOCKER_HOST pointed at the proxy with
+    CONTAINERS=1 capability (see docker-compose.yml docker-proxy block)."""
+    base = os.environ.get("DOCKER_HOST", "tcp://docker-proxy:2375").replace("tcp://", "http://")
+    try:
+        resp = httpx.get(
+            f"{base}/containers/json",
+            params={"filters": json.dumps({"name": [container_name]})},
+            timeout=1.0,
+        )
+        if resp.status_code != 200:
+            return "unknown"
+        # /containers/json returns running containers by default. If empty,
+        # the container is either stopped or doesn't exist — either way "stopped".
+        for c in resp.json():
+            if c.get("State") == "running":
+                return "running"
+        return "stopped"
+    except Exception:
+        return "unknown"
+
+
 def check_service_status(name: str) -> str:
-    """Check if a Docker service is running by trying DNS resolution"""
+    """Check if a Docker service is running.
+
+    Strategy: DNS lookup the container hostname on moav_net (fast, sub-second).
+    For host-networked services there is no moav_net DNS record — fall back to
+    the docker-socket-proxy /containers/json endpoint.
+    """
     service_hosts = {
         "sing-box": "moav-sing-box",
         "decoy": "moav-decoy",
+        "xray": "moav-xray",
         "wstunnel": "moav-wstunnel",
         "wireguard": "moav-wireguard",
         "dnstt": "moav-dnstt",
@@ -162,24 +192,23 @@ def check_service_status(name: str) -> str:
         "grafana": "moav-grafana",
     }
 
-    # Snowflake uses host networking, can't detect from inside container
+    # Snowflake uses network_mode: host so it has no moav_net DNS record.
+    # Query the docker-socket-proxy for the actual container state.
     if name == "snowflake":
-        return "unknown"
+        return _check_via_docker_proxy("moav-snowflake")
 
     if name not in service_hosts:
         return "unknown"
 
     host = service_hosts[name]
     try:
-        # Try DNS resolution with a local timeout (not global)
-        # Create a socket just for the DNS check
+        # Local socket timeout so we don't disturb the global default.
         old_timeout = socket.getdefaulttimeout()
         socket.setdefaulttimeout(0.5)
         try:
             socket.gethostbyname(host)
             return "running"
         finally:
-            # Restore original timeout
             socket.setdefaulttimeout(old_timeout)
     except socket.gaierror:
         return "stopped"
