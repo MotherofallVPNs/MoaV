@@ -152,7 +152,9 @@ stun_tcp_fallback = ${stun_tcp_fallback}
 tls_domain = "${tls_domain}"
 mask = true
 tls_emulation = true
-tls_front_dir = "tlsfront"
+# Absolute path: telemt's cwd is /app/cache (entrypoint changed for #117), and
+# the TLS front cache lives in a separate tmpfs at /app/tlsfront.
+tls_front_dir = "/app/tlsfront"
 
 [access.users]
 ${TELEMT_USERS_TOML}

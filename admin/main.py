@@ -7,7 +7,6 @@ Simple stats viewer for the circumvention stack
 import os
 import json
 import asyncio
-import socket
 import zipfile
 import io
 import re
@@ -146,47 +145,71 @@ def verify_auth(request: Request, credentials: HTTPBasicCredentials = Depends(se
     return credentials.username
 
 
-def check_service_status(name: str) -> str:
-    """Check if a Docker service is running by trying DNS resolution"""
-    service_hosts = {
-        "sing-box": "moav-sing-box",
-        "decoy": "moav-decoy",
-        "wstunnel": "moav-wstunnel",
-        "wireguard": "moav-wireguard",
-        "dnstt": "moav-dnstt",
-        "slipstream": "moav-slipstream",
-        "conduit": "moav-conduit",
-        "trusttunnel": "moav-trusttunnel",
-        "telemt": "moav-telemt",
-        "amneziawg": "moav-amneziawg",
-        "grafana": "moav-grafana",
-    }
+# Dashboard service name → docker container name. One source of truth.
+# Keep in sync with all_services in get_services_status() and with
+# `container_name:` fields in docker-compose.yml.
+SERVICE_CONTAINERS = {
+    "sing-box":    "moav-sing-box",
+    "decoy":       "moav-decoy",
+    "xray":        "moav-xray",
+    "wireguard":   "moav-wireguard",
+    "wstunnel":    "moav-wstunnel",
+    "amneziawg":   "moav-amneziawg",
+    "trusttunnel": "moav-trusttunnel",
+    "telemt":      "moav-telemt",
+    "dnstt":       "moav-dnstt",
+    "slipstream":  "moav-slipstream",
+    "masterdns":   "moav-masterdns",
+    "dns-router":  "moav-dns-router",
+    "conduit":     "moav-conduit",
+    "snowflake":   "moav-snowflake",
+    "gooserelay":  "moav-gooserelay",
+    "grafana":     "moav-grafana",
+}
 
-    # Snowflake uses host networking, can't detect from inside container
-    if name == "snowflake":
-        return "unknown"
 
-    if name not in service_hosts:
-        return "unknown"
+def _fetch_running_containers():
+    """Query docker-socket-proxy for the set of currently-running container
+    names. Returns a set on success, or None on any error so callers can
+    surface "unknown" instead of mis-reporting everything as stopped.
 
-    host = service_hosts[name]
+    /containers/json returns only running containers by default (no `all=1`).
+    The admin container has DOCKER_HOST=tcp://docker-proxy:2375 set in
+    docker-compose.yml, and docker-proxy has CONTAINERS=1 capability.
+    """
+    base = os.environ.get("DOCKER_HOST", "tcp://docker-proxy:2375").replace("tcp://", "http://")
     try:
-        # Try DNS resolution with a local timeout (not global)
-        # Create a socket just for the DNS check
-        old_timeout = socket.getdefaulttimeout()
-        socket.setdefaulttimeout(0.5)
-        try:
-            socket.gethostbyname(host)
-            return "running"
-        finally:
-            # Restore original timeout
-            socket.setdefaulttimeout(old_timeout)
-    except socket.gaierror:
-        return "stopped"
-    except socket.timeout:
-        return "unknown"
+        resp = httpx.get(f"{base}/containers/json", timeout=1.5)
+        if resp.status_code != 200:
+            return None
+        names = set()
+        for c in resp.json():
+            # /containers/json returns names with a leading slash, e.g. "/moav-xray".
+            for n in c.get("Names", []):
+                names.add(n.lstrip("/"))
+        return names
     except Exception:
+        return None
+
+
+def check_service_status(name: str, _running=None) -> str:
+    """Check whether a service's container is running.
+
+    Uniform docker-socket-proxy lookup. One round-trip lists every running
+    container; we cross-reference against SERVICE_CONTAINERS. Works for both
+    bridge-networked (moav_net) and host-networked (snowflake) services
+    without per-service special cases.
+
+    `_running` lets get_services_status() pass a pre-fetched set so the dashboard
+    only makes one docker-proxy call per refresh, not one per service card.
+    """
+    running = _running if _running is not None else _fetch_running_containers()
+    if running is None:
         return "unknown"
+    container = SERVICE_CONTAINERS.get(name)
+    if container is None:
+        return "unknown"
+    return "running" if container in running else "stopped"
 
 
 async def fetch_singbox_stats():
@@ -429,23 +452,28 @@ def format_bytes(bytes_val):
 def get_services_status():
     """Get status of all services with live checks"""
     all_services = [
-        {"name": "sing-box", "ports": "443, 8443", "profile": "proxy"},
-        {"name": "decoy", "ports": "80", "profile": "proxy"},
-        {"name": "xray", "ports": "2096, 53/udp", "profile": "xhttp"},
-        {"name": "wireguard", "ports": "51820/udp", "profile": "wireguard"},
-        {"name": "wstunnel", "ports": "8080", "profile": "wireguard"},
-        {"name": "amneziawg", "ports": "51821/udp", "profile": "amneziawg"},
-        {"name": "trusttunnel", "ports": "4443", "profile": "trusttunnel"},
-        {"name": "telemt", "ports": "993", "profile": "telegram"},
-        {"name": "dnstt", "ports": "53/udp", "profile": "dnstunnel"},
-        {"name": "slipstream", "ports": "—", "profile": "dnstunnel"},
-        {"name": "conduit", "ports": "dynamic", "profile": "conduit"},
-        {"name": "snowflake", "ports": "dynamic", "profile": "snowflake"},
-        {"name": "grafana", "ports": "9444", "profile": "monitoring"},
+        {"name": "sing-box",    "ports": "443, 8443",    "profile": "proxy"},
+        {"name": "decoy",       "ports": "80",            "profile": "proxy"},
+        {"name": "xray",        "ports": "2096, 53/udp",  "profile": "xhttp"},
+        {"name": "wireguard",   "ports": "51820/udp",     "profile": "wireguard"},
+        {"name": "wstunnel",    "ports": "8080",          "profile": "wireguard"},
+        {"name": "amneziawg",   "ports": "51821/udp",     "profile": "amneziawg"},
+        {"name": "trusttunnel", "ports": "4443",          "profile": "trusttunnel"},
+        {"name": "telemt",      "ports": "993",           "profile": "telegram"},
+        {"name": "dns-router",  "ports": "53/udp",        "profile": "dnstunnel"},
+        {"name": "dnstt",       "ports": "via :53",       "profile": "dnstunnel"},
+        {"name": "slipstream",  "ports": "via :53",       "profile": "dnstunnel"},
+        {"name": "masterdns",   "ports": "via :53",       "profile": "dnstunnel"},
+        {"name": "conduit",     "ports": "dynamic",       "profile": "conduit"},
+        {"name": "snowflake",   "ports": "dynamic",       "profile": "snowflake"},
+        {"name": "gooserelay",  "ports": "8444",          "profile": "gooserelay"},
+        {"name": "grafana",     "ports": "9444",          "profile": "monitoring"},
     ]
+    # One docker-proxy call lists every running container; cross-reference each
+    # card against that set instead of N per-service checks.
+    running = _fetch_running_containers()
     for svc in all_services:
-        svc["status"] = check_service_status(svc["name"])
-    # Only return services that are running or were expected (not all stopped)
+        svc["status"] = check_service_status(svc["name"], _running=running)
     return all_services
 
 

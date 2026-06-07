@@ -118,7 +118,10 @@ version_gt() {
 }
 
 print_header() {
-    clear
+    # Only clear when stdout is a TTY (avoids "TERM not set" abort under setsid).
+    if [[ -t 1 ]]; then
+        clear 2>/dev/null || true
+    fi
     # Get current branch
     local branch
     branch=$(git -C "$SCRIPT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
@@ -426,6 +429,125 @@ get_env_val() {
     echo "${val:-$default}"
 }
 
+# -----------------------------------------------------------------------------
+# Reality fallback target — vetted lists + DNS validation (issue #115)
+#
+# Reality's `handshake.server` / `realitySettings.dest` is the host the inbound
+# proxies non-Reality TLS hellos to (the "you didn't auth, here's a real site"
+# fallback). If it doesn't resolve, every probe and every legitimate client
+# sees an RST. Operators historically picked plausible-sounding hostnames
+# (`update.samsung.com`, `swl.samsung.com`) that aren't public DNS names —
+# those bundles silently break.
+# -----------------------------------------------------------------------------
+REALITY_TARGETS_GLOBAL=(
+    "www.cloudflare.com:443"
+    "www.apple.com:443"
+    "cdn.kernel.org:443"
+    "www.microsoft.com:443"
+)
+# SNI cover for Iran-resident clients — Reality hello looks like normal traffic
+# to Iranian-domestic sites, which Iran DPI is less aggressive about than
+# Western corporate destinations.
+REALITY_TARGETS_IRAN=(
+    "www.aparat.com:443"
+    "digikala.com:443"
+    "taghche.com:443"
+)
+
+# Returns 0 if `host` resolves to at least one A or AAAA record. Tries getent,
+# then host, then nslookup — whichever is present. Empty host → fail.
+reality_target_resolves() {
+    local host="$1"
+    [[ -n "$host" ]] || return 1
+    if command -v getent >/dev/null 2>&1; then
+        getent hosts "$host" >/dev/null 2>&1 && return 0
+    fi
+    if command -v host >/dev/null 2>&1; then
+        host -W 4 "$host" >/dev/null 2>&1 && return 0
+    fi
+    if command -v nslookup >/dev/null 2>&1; then
+        nslookup -timeout=4 "$host" >/dev/null 2>&1 && return 0
+    fi
+    return 1
+}
+
+show_vetted_reality_targets() {
+    echo "  Vetted Reality fallback targets:"
+    echo ""
+    echo "    Global (real TLS 1.3, stable, won't go dark):"
+    for t in "${REALITY_TARGETS_GLOBAL[@]}"; do
+        echo "      • $t"
+    done
+    echo ""
+    echo "    Iran-friendly (better SNI cover for clients inside Iran):"
+    for t in "${REALITY_TARGETS_IRAN[@]}"; do
+        echo "      • $t"
+    done
+}
+
+# Validate REALITY_TARGET and XHTTP_REALITY_TARGET from .env resolve in DNS.
+# If a host is NXDOMAIN, prompt for a replacement (up to 3 attempts), rewrite
+# .env in place. Returns 0 on success / all valid, 1 if still invalid after
+# attempts and operator can't fix it. Skips disabled protocols.
+validate_reality_targets() {
+    local env_file="${1:-.env}"
+    [[ -f "$env_file" ]] || return 0  # nothing to validate yet
+
+    local enable_reality enable_xhttp
+    enable_reality=$(get_env_val "ENABLE_REALITY" "$env_file" "true")
+    enable_xhttp=$(get_env_val "ENABLE_XHTTP" "$env_file" "true")
+
+    local key host_port host default new_target new_host attempt failed=0
+    for key in REALITY_TARGET XHTTP_REALITY_TARGET; do
+        case "$key" in
+            REALITY_TARGET)        [[ "$enable_reality" == "true" ]] || continue ;;
+            XHTTP_REALITY_TARGET)  [[ "$enable_xhttp"    == "true" ]] || continue ;;
+        esac
+
+        host_port=$(get_env_val "$key" "$env_file" "www.cloudflare.com:443")
+        host="${host_port%%:*}"
+
+        if reality_target_resolves "$host"; then
+            info "$key host '$host' resolves ✓"
+            continue
+        fi
+
+        warn "$key host '$host' does NOT resolve (NXDOMAIN)"
+        echo "    Reality's fallback dial will fail for every TLS hello it can't auth,"
+        echo "    so the inbound RSTs every probe and every legitimate client (issue #115)."
+        echo ""
+        show_vetted_reality_targets
+        echo ""
+
+        default="www.cloudflare.com:443"
+        for attempt in 1 2 3; do
+            prompt "Enter a new $key (host:port) or press Enter for $default:"
+            if ! read -r new_target < /dev/tty 2>/dev/null; then
+                # Non-interactive run — accept the default and move on.
+                new_target=""
+            fi
+            new_target="${new_target:-$default}"
+            new_host="${new_target%%:*}"
+            if reality_target_resolves "$new_host"; then
+                if grep -qE "^${key}=" "$env_file" 2>/dev/null; then
+                    sed -i.bak "s|^${key}=.*|${key}=${new_target}|" "$env_file" && rm -f "${env_file}.bak"
+                else
+                    echo "${key}=${new_target}" >> "$env_file"
+                fi
+                success "$key set to $new_target"
+                break
+            fi
+            warn "'$new_host' also does not resolve."
+            if [[ "$attempt" == "3" ]]; then
+                error "$key still invalid after 3 attempts — bootstrap will fail until fixed."
+                failed=$((failed + 1))
+            fi
+        done
+    done
+
+    [[ "$failed" -eq 0 ]]
+}
+
 ensure_admin_password() {
     # Check if admin password is unset, empty, or still the insecure default
     local current_password=""
@@ -438,7 +560,8 @@ ensure_admin_password() {
         echo -e "${WHITE}Admin dashboard password${NC}"
         echo "  Press Enter to generate a random password, or type your own"
         printf "  Password: "
-        read -r input_password
+        input_password=""
+        read -r input_password || true   # EOF on closed stdin → fall through to auto-gen
         if [[ -z "$input_password" ]]; then
             input_password=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 16)
         fi
@@ -1874,6 +1997,14 @@ run_bootstrap() {
         fi
     fi
 
+    # Validate Reality fallback targets resolve in DNS — see issue #115.
+    # If a hostname is NXDOMAIN, prompt for a replacement and rewrite .env in
+    # place. Cheaper to catch here than at first client connect.
+    if ! validate_reality_targets ".env"; then
+        error "Reality target validation failed. Edit REALITY_TARGET / XHTTP_REALITY_TARGET in .env and re-run bootstrap."
+        return 1
+    fi
+
     # Only build if the bootstrap image doesn't exist yet
     if ! docker image inspect moav-bootstrap >/dev/null 2>&1; then
         info "Building bootstrap container (first time, may take a few minutes)..."
@@ -2440,6 +2571,263 @@ ZONEOF
 }
 
 # =============================================================================
+# Network tuning — BBR congestion control + buffers + queue depth
+#
+# Real-world Portugal→Vilnius test (Time4VPS, ~400 ms RTT with burst loss):
+# CUBIC 5.45 Mbps → BBR 14.8 Mbps single-flow TCP. Recovery from packet loss
+# went from "CUBIC stuck at 2 Mbps for seconds" to "BBR jumped to 43 Mbps in
+# the next second". UDP buffer bumps help Hysteria2 / WireGuard / quic-go even
+# though they don't use BBR (quic-go needs >=7.5 MiB).
+#
+# Sources: naiveproxy Performance Tuning wiki, Cloudflare TCP tuning blog,
+# Stony Brook IMC'19 "When to use BBR", quic-go UDP Buffer Sizes wiki.
+#
+# `tcp_fastopen` is deliberately NOT set — TFO is hostile in censored networks
+# (~5% of paths drop SYN+data; China Mobile firewalls). See Craig Andrews'
+# "Sad Story of TCP Fast Open" + the same reasoning that removed it from the
+# sing-box Reality / Trojan inbounds in v1.8.4.
+# =============================================================================
+
+NT_CONF_PATH="/etc/sysctl.d/99-moav-net.conf"
+
+# Returns 0 if the running kernel can use BBR. On most distro kernels tcp_bbr
+# ships as a module that isn't loaded until requested, so it's absent from
+# tcp_available_congestion_control on a fresh boot — try modprobe before
+# concluding it's unsupported. OpenVZ guests + ancient kernels (<4.9) still
+# fail cleanly.
+nt_kernel_supports_bbr() {
+    local avail
+    avail=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null || echo "")
+    if [[ " $avail " != *" bbr "* ]]; then
+        local SUDO=""
+        [[ "$(id -u)" -ne 0 ]] && command -v sudo &>/dev/null && SUDO="sudo"
+        $SUDO modprobe tcp_bbr 2>/dev/null || true
+        avail=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null || echo "")
+    fi
+    [[ " $avail " == *" bbr "* ]]
+}
+
+# 16 MiB on hosts <2 GB RAM, 32 MiB otherwise. quic-go needs >=7.5 MiB just for
+# its UDP buffer; 16 MiB headroom matters even on small VPSes.
+nt_buffer_max() {
+    local total_mb
+    total_mb=$(awk '/MemTotal/ {printf "%.0f", $2/1024}' /proc/meminfo 2>/dev/null || echo 0)
+    if [[ "$total_mb" -gt 0 && "$total_mb" -lt 2048 ]]; then
+        echo 16777216   # 16 MiB
+    else
+        echo 33554432   # 32 MiB
+    fi
+}
+
+# Render the sysctl bundle to stdout. Caller writes it to /etc/sysctl.d/.
+nt_render_config() {
+    local bmax="$1"
+    cat <<EOF
+# MoaV network tuning — generated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+# Reversible: moav net revert (deletes this file + reloads sysctl)
+# Docs: docs/OPSEC.md → "Network tuning"
+
+# Congestion control + queue discipline. BBR has been mainline since 4.9;
+# fq is required for BBR's pacing.
+net.ipv4.tcp_congestion_control = bbr
+net.core.default_qdisc          = fq
+
+# TCP buffers — auto-sized per host RAM.
+net.core.rmem_max               = ${bmax}
+net.core.wmem_max               = ${bmax}
+net.ipv4.tcp_rmem               = 4096 131072 ${bmax}
+net.ipv4.tcp_wmem               = 4096 16384 ${bmax}
+
+# UDP/QUIC defaults (Hysteria2, WireGuard, quic-go)
+net.core.rmem_default           = 1048576
+net.core.wmem_default           = 1048576
+
+# Queue depth — UDP drops hurt circumvention worse than TCP drops.
+net.core.netdev_max_backlog     = 16384
+net.core.somaxconn              = 8192
+
+# Long-lived proxy hygiene
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_mtu_probing           = 1
+net.ipv4.tcp_notsent_lowat         = 131072
+
+# DELIBERATELY NOT SET: net.ipv4.tcp_fastopen
+# TFO server-side ADDS latency in heavily-censored networks because
+# middleboxes drop the SYN+data and the client has to retry. See OPSEC.md.
+EOF
+}
+
+# Write the bundle to NT_CONF_PATH and reload. Returns 0 on success, 1 on any
+# error (missing perms, no BBR, sysctl reload failure).
+nt_apply() {
+    if ! nt_kernel_supports_bbr; then
+        warn "Kernel does not expose BBR in /proc/sys/net/ipv4/tcp_available_congestion_control"
+        echo "  Common reasons: kernel <4.9, or OpenVZ guest where the kernel is shared."
+        return 1
+    fi
+
+    local SUDO=""
+    if [[ "$(id -u)" -ne 0 ]]; then
+        if command -v sudo &>/dev/null; then SUDO="sudo"; else
+            error "Need root (or sudo) to write $NT_CONF_PATH"
+            return 1
+        fi
+    fi
+
+    local bmax
+    bmax=$(nt_buffer_max)
+    local tmp
+    tmp=$(mktemp)
+    nt_render_config "$bmax" > "$tmp"
+
+    if ! $SUDO install -m 0644 "$tmp" "$NT_CONF_PATH"; then
+        rm -f "$tmp"
+        error "Failed to write $NT_CONF_PATH"
+        return 1
+    fi
+    rm -f "$tmp"
+
+    # Persist the module so bbr survives reboot even if nothing else pulls it
+    # in before sysctl runs.
+    echo "tcp_bbr" | $SUDO tee /etc/modules-load.d/moav-bbr.conf >/dev/null 2>&1 || true
+
+    if $SUDO sysctl -p "$NT_CONF_PATH" >/dev/null 2>&1; then
+        success "Network tuning applied → $NT_CONF_PATH (buffer max: $((bmax / 1048576)) MiB)"
+        return 0
+    else
+        warn "Wrote $NT_CONF_PATH but sysctl reload failed — will activate on next boot."
+        return 0
+    fi
+}
+
+# Remove the moav tuning file and reload sysctl. Returns 0 even if the file
+# didn't exist (revert is idempotent).
+nt_revert() {
+    local SUDO=""
+    if [[ "$(id -u)" -ne 0 ]]; then
+        if command -v sudo &>/dev/null; then SUDO="sudo"; else
+            error "Need root (or sudo) to remove $NT_CONF_PATH"
+            return 1
+        fi
+    fi
+
+    if [[ ! -f "$NT_CONF_PATH" ]]; then
+        info "$NT_CONF_PATH not present — nothing to revert."
+        return 0
+    fi
+
+    $SUDO rm -f "$NT_CONF_PATH"
+    $SUDO rm -f /etc/modules-load.d/moav-bbr.conf 2>/dev/null || true
+    # Re-load the rest of sysctl.d (and main sysctl.conf) so the kernel reverts
+    # to distro defaults / whatever else is configured. Best-effort.
+    $SUDO sysctl --system >/dev/null 2>&1 || true
+    success "Network tuning reverted (removed $NT_CONF_PATH)."
+    echo "  Some settings (rmem_max, wmem_max, congestion_control) only fully reset on reboot."
+    return 0
+}
+
+# Print current vs desired values + applied/not-applied marker. Used by both
+# `moav net status` and `doctor_check_net`. Returns 0 if file exists AND core
+# values match, 1 if file present but drifted, 2 if not applied (skipped/unset).
+nt_status() {
+    local pass=true
+    local applied=false
+    if [[ -f "$NT_CONF_PATH" ]]; then
+        applied=true
+    fi
+
+    local cc qd
+    cc=$(cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null || echo "?")
+    qd=$(cat /proc/sys/net/core/default_qdisc          2>/dev/null || echo "?")
+
+    if ! nt_kernel_supports_bbr; then
+        echo -e "    ${YELLOW}○${NC} BBR not available on this kernel — tuning skipped"
+        echo -e "      ${DIM}Current: tcp_congestion_control=$cc default_qdisc=$qd${NC}"
+        echo -e "      ${DIM}Reason: kernel <4.9 or OpenVZ guest. Not actionable from here.${NC}"
+        return 2
+    fi
+
+    if [[ "$applied" == "true" ]]; then
+        echo -e "    ${GREEN}✓${NC} Tuning file present: $NT_CONF_PATH"
+    else
+        echo -e "    ${YELLOW}○${NC} Tuning file not present (run: moav net apply)"
+    fi
+
+    if [[ "$cc" == "bbr" ]]; then
+        echo -e "    ${GREEN}✓${NC} tcp_congestion_control = bbr"
+    else
+        echo -e "    ${YELLOW}!${NC} tcp_congestion_control = $cc (expected: bbr)"
+        [[ "$applied" == "true" ]] && pass=false
+    fi
+    if [[ "$qd" == "fq" ]]; then
+        echo -e "    ${GREEN}✓${NC} default_qdisc = fq"
+    else
+        echo -e "    ${YELLOW}!${NC} default_qdisc = $qd (expected: fq)"
+        [[ "$applied" == "true" ]] && pass=false
+    fi
+
+    local rmax wmax
+    rmax=$(cat /proc/sys/net/core/rmem_max 2>/dev/null || echo 0)
+    wmax=$(cat /proc/sys/net/core/wmem_max 2>/dev/null || echo 0)
+    local expected
+    expected=$(nt_buffer_max)
+    if [[ "$rmax" -ge "$expected" && "$wmax" -ge "$expected" ]]; then
+        echo -e "    ${GREEN}✓${NC} rmem_max=$((rmax / 1048576)) MiB  wmem_max=$((wmax / 1048576)) MiB (expected ≥ $((expected / 1048576)) MiB)"
+    else
+        echo -e "    ${YELLOW}!${NC} buffers below recommended: rmem_max=$((rmax / 1048576)) MiB wmem_max=$((wmax / 1048576)) MiB (expected ≥ $((expected / 1048576)) MiB)"
+        [[ "$applied" == "true" ]] && pass=false
+    fi
+
+    if [[ "$applied" == "true" ]]; then
+        $pass && return 0 || return 1
+    else
+        return 2  # not applied — treat as skip in doctor sweep
+    fi
+}
+
+# Top-level dispatcher for `moav net <subcommand>`.
+cmd_net() {
+    local sub="${1:-status}"
+    case "$sub" in
+        status|"")
+            print_section "Network tuning status"
+            nt_status
+            ;;
+        apply)
+            print_section "Applying network tuning"
+            nt_apply
+            ;;
+        revert)
+            print_section "Reverting network tuning"
+            nt_revert
+            ;;
+        help|--help|-h)
+            echo "Usage: moav net <command>"
+            echo ""
+            echo "Linux kernel network tuning for VPN / proxy hosts."
+            echo "Writes a single dedicated file ($NT_CONF_PATH) so revert is clean."
+            echo ""
+            echo "Commands:"
+            echo "  status   Show current vs recommended sysctl values (default)"
+            echo "  apply    Write BBR + buffer tuning bundle and reload sysctl"
+            echo "  revert   Remove the moav tuning file and reload sysctl"
+            echo ""
+            echo "What it tunes: BBR congestion control + fq qdisc + larger TCP/UDP"
+            echo "buffers + queue depth + 3 TCP hygiene flags. Does NOT enable TCP"
+            echo "Fast Open (hostile in censored networks)."
+            echo ""
+            echo "Docs: docs/OPSEC.md → \"Network tuning\""
+            ;;
+        *)
+            error "Unknown net command: $sub"
+            echo ""
+            cmd_net --help
+            return 1
+            ;;
+    esac
+}
+
+# =============================================================================
 # Doctor (Diagnostics)
 # =============================================================================
 
@@ -2453,9 +2841,17 @@ DOCTOR_CHECKS=(
     "config:Check config files and keys from bootstrap"
     "ports:Check required ports are available"
     "conflicts:Check for conflicting services (e.g. DNS tunnels on port 53)"
+    "reality:Check Reality fallback targets resolve and are reachable"
+    "net:Check BBR / kernel network tuning is applied"
     "env:Compare .env with .env.example for missing vars"
     "updates:Check for MoaV updates"
 )
+
+# Wrapper so the doctor dispatcher can call nt_status without leaking the
+# `net.*` namespace from /proc directly into the checks list.
+doctor_check_net() {
+    nt_status
+}
 
 doctor_is_enabled() {
     local value
@@ -3289,6 +3685,70 @@ doctor_check_conflicts() {
         pass=false
     fi
 
+    $pass && return 0 || return 1
+}
+
+# Reality fallback target check (issue #115).
+# For each enabled Reality inbound, ask its container's resolver whether the
+# configured `dest` hostname resolves, then TCP-probe the port from inside the
+# same container. Falls back to the host resolver if the container isn't
+# running (still useful — operator hasn't started services yet).
+doctor_check_reality() {
+    local env_file="$SCRIPT_DIR/.env"
+    local enable_reality enable_xhttp
+    enable_reality=$(get_env_val "ENABLE_REALITY" "$env_file" "true")
+    enable_xhttp=$(get_env_val "ENABLE_XHTTP" "$env_file" "true")
+
+    if [[ "$enable_reality" != "true" && "$enable_xhttp" != "true" ]]; then
+        echo -e "    ${DIM}○${NC} Reality and XHTTP-Reality both disabled — skipping"
+        return 2
+    fi
+
+    local pass=true
+    _doctor_reality_one() {
+        local label="$1" container="$2" key="$3" default_target="$4"
+        local host_port host port resolver_label resolves=false container_running=false
+        host_port=$(get_env_val "$key" "$env_file" "$default_target")
+        host="${host_port%%:*}"
+        port="${host_port##*:}"
+        [[ "$port" == "$host_port" ]] && port=443  # no `:port` in value
+
+        if docker compose ps --status running --services 2>/dev/null | grep -qw "$container"; then
+            container_running=true
+            resolver_label="container $container"
+            if docker compose exec -T "$container" getent hosts "$host" >/dev/null 2>&1; then
+                resolves=true
+            fi
+        else
+            resolver_label="host (container $container not running)"
+            reality_target_resolves "$host" && resolves=true
+        fi
+
+        if [[ "$resolves" != "true" ]]; then
+            echo -e "    ${RED}✗${NC} $label: $host does NOT resolve ($resolver_label)"
+            echo -e "      ${DIM}NXDOMAIN — Reality fallback fails, inbound RSTs every TLS hello (issue #115).${NC}"
+            echo -e "      ${DIM}Fix: set $key in .env to a resolvable host. See: moav doctor reality --help${NC}"
+            pass=false
+            return
+        fi
+
+        if [[ "$container_running" == "true" ]]; then
+            if docker compose exec -T "$container" sh -c "exec 3<>/dev/tcp/$host/$port" 2>/dev/null; then
+                echo -e "    ${GREEN}✓${NC} $label: $host:$port resolves and reachable from $container"
+            else
+                echo -e "    ${YELLOW}!${NC} $label: $host resolves but TCP $port unreachable from $container"
+                echo -e "      ${DIM}Reality fallback will hang or RST. Check container egress / VPS firewall.${NC}"
+                pass=false
+            fi
+        else
+            echo -e "    ${GREEN}✓${NC} $label: $host resolves ($resolver_label, TCP probe skipped)"
+        fi
+    }
+
+    [[ "$enable_reality" == "true" ]] && _doctor_reality_one "VLESS Reality (:443)" "sing-box" "REALITY_TARGET" "www.cloudflare.com:443"
+    [[ "$enable_xhttp"    == "true" ]] && _doctor_reality_one "XHTTP-Reality (:2096)" "xray" "XHTTP_REALITY_TARGET" "www.cloudflare.com:443"
+
+    unset -f _doctor_reality_one
     $pass && return 0 || return 1
 }
 
@@ -8542,6 +9002,10 @@ main() {
             ;;
         regenerate-users|regenerate_users|regen-users)
             cmd_regenerate_users
+            ;;
+        net|net-tuning|sysctl)
+            shift
+            cmd_net "$@"
             ;;
         conduit-offsets|conduit_offsets|conduit-lifetime)
             shift

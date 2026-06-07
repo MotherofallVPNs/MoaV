@@ -2,8 +2,8 @@
 # Bash/Zsh completion for moav CLI
 # Installed automatically by 'moav install'
 
-# Zsh compatibility
-if [[ -n "$ZSH_VERSION" ]]; then
+# Zsh compatibility — guard for nounset (moav.sh runs under `set -u`).
+if [[ -n "${ZSH_VERSION:-}" ]]; then
     autoload -U +X bashcompinit && bashcompinit
 fi
 

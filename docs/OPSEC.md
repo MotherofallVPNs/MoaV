@@ -180,6 +180,39 @@ sudo ufw-docker allow moav-admin 8443/tcp from YOUR_IP
 4. **Pay anonymously** — use crypto if available
 5. **Separate domain from identity** — don't use a domain linked to your name
 
+### Reality fallback target (`REALITY_TARGET`)
+
+Reality's `REALITY_TARGET` (and `XHTTP_REALITY_TARGET`) is the public TLS site the inbound proxies non-Reality TLS hellos to. Every probe and every misauthenticated client gets that site's real ServerHello back — so an outside observer sees a normal connection to a real CDN, not a closed port.
+
+**The hostname MUST resolve in public DNS and be reachable from your server's network.** If it doesn't, the inbound RSTs every TLS hello — including ones from your own users — and your `:443` looks visibly dead to passive scanners. This is exactly what issue #115 reported (`update.samsung.com` is not a real public hostname; Samsung's update infrastructure uses opaque internal names).
+
+Bootstrap now validates this and `moav doctor reality` re-checks it post-deployment.
+
+**Vetted targets:**
+
+| Audience | Hostname | Why it works |
+|---|---|---|
+| Global | `www.cloudflare.com:443` | Real TLS 1.3, ECH-capable, anycast, won't go dark |
+| Global | `www.apple.com:443` | Corporate, stable, real ECH support |
+| Global | `cdn.kernel.org:443` | Linux kernel CDN, real, neutral |
+| Iran users | `www.aparat.com:443` | Iranian video CDN — looks like normal domestic traffic to Iran DPI |
+| Iran users | `digikala.com:443` | Iran e-commerce, high-volume traffic profile |
+| Iran users | `taghche.com:443` | Iranian book platform, plausible browsing target |
+
+**Avoid:**
+
+- `dl.google.com:443` — throttled by Iran DPI; works elsewhere but bad for Iran-bound clients
+- Hostnames that *sound* like an update server but aren't real public DNS names (`update.samsung.com`, `swl.samsung.com`, `update.windows.com`, `cdn.tesla.com`) — verify with `getent hosts <host>` first
+- Hostnames behind country-specific blocks from your VPS region (some VPS providers throttle major CDNs)
+- Anything you wouldn't expect a real browser to talk to on a quiet Tuesday
+
+**If you change `REALITY_TARGET` after bootstrap**, you must re-issue client bundles so the SNI in their config matches:
+
+```bash
+docker compose restart sing-box xray
+moav regenerate-users
+```
+
 ### Credential Management
 
 1. **Never share master credentials** — each user gets unique credentials
@@ -237,6 +270,44 @@ MoaV applies these hardening measures to all containers (since v1.7.2):
 - `mem_limit` and `cpus` — resource limits per container
 - Non-root users — containers run as unprivileged `moav` user where possible
 - Docker socket proxy — admin uses `tecnativa/docker-socket-proxy` instead of mounting the raw Docker socket
+
+### Network tuning
+
+The installer offers a one-time kernel-level network tuning bundle aimed at the long-RTT / lossy paths that proxy traffic to censored regions actually traverses. Real-world Portugal→Vilnius testing (Time4VPS box, ~400 ms RTT with burst loss) showed BBR roughly 3× single-flow TCP throughput compared to the Linux default (CUBIC 5.45 Mbps → BBR 14.8 Mbps), and dramatically faster recovery from packet loss. Bigger UDP buffers help Hysteria2 and WireGuard even though they don't use BBR — quic-go alone needs ≥7.5 MiB to avoid drops at high throughput.
+
+**What it tunes** (written to a single dedicated file, `/etc/sysctl.d/99-moav-net.conf`, for clean rollback):
+
+| Knob | Value | Why |
+|---|---|---|
+| `net.ipv4.tcp_congestion_control` | `bbr` | RTT/bandwidth-based, recovers from loss faster than CUBIC |
+| `net.core.default_qdisc` | `fq` | Required for BBR's pacing |
+| `net.core.{r,w}mem_max` | 32 MiB (16 MiB if RAM < 2 GB) | Headroom for high-BDP TCP + QUIC |
+| `net.ipv4.tcp_{r,w}mem` | `4096 / 131072 / max` | TCP buffer auto-tune range |
+| `net.core.{r,w}mem_default` | 1 MiB | Default UDP socket buffer (Hysteria2 / WireGuard) |
+| `net.core.netdev_max_backlog` | 16384 | Queue depth — UDP drops hurt circumvention more than TCP drops |
+| `net.core.somaxconn` | 8192 | Listen backlog for high-concurrency inbounds |
+| `net.ipv4.tcp_slow_start_after_idle` | 0 | Avoid restarting at congestion-window 1 on idle long-lived proxies |
+| `net.ipv4.tcp_mtu_probing` | 1 | Recover gracefully if a path silently has a smaller MTU |
+| `net.ipv4.tcp_notsent_lowat` | 131072 | Smaller send buffers to reduce HOL latency for interactive flows |
+
+**What it deliberately does NOT set:** `net.ipv4.tcp_fastopen`. TFO server-side *adds* latency in heavily-censored networks because middleboxes (notably China Mobile) drop SYN+data on ~5% of paths and the client has to retry. The same reason MoaV v1.8.4 removed `tcp_fast_open: true` from the sing-box Reality and Trojan inbounds.
+
+**Commands:**
+
+```bash
+moav net status   # show current vs recommended values
+moav net apply    # write 99-moav-net.conf + reload sysctl
+moav net revert   # remove the file + reload sysctl (clean rollback)
+moav doctor net   # same check that runs in the full doctor sweep
+```
+
+**When it skips silently:** kernel <4.9 (no BBR), OpenVZ guests (shared kernel, no sysctl writes), or already-applied installs.
+
+**Compatibility notes:**
+
+- `net.ipv4.tcp_*` sysctls are network-namespaced, so they apply per-container. MoaV's sing-box runs in `network_mode: host` and inherits the host's BBR directly. Bridge-network containers (xray, telemt) use the host's settings as their default and pick up BBR on container restart after `moav net apply`.
+- BBR + fq are mainline since kernel 4.9 — Ubuntu 20.04+, Debian 11+, RHEL 9+, every supported modern distro.
+- Existing custom sysctl tweaks in `/etc/sysctl.conf` or other `/etc/sysctl.d/*.conf` files are not modified. If a later-numbered file (`99-moav-net.conf` is at 99) overrides something, it wins by sysctl-load order.
 
 ### If Server is Blocked
 
