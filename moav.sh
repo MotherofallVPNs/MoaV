@@ -2622,6 +2622,7 @@ net.core.wmem_default           = 1048576
 
 net.core.netdev_max_backlog     = 16384
 net.core.somaxconn              = 8192
+net.ipv4.tcp_max_syn_backlog    = 8192
 
 net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.tcp_mtu_probing           = 1
@@ -2666,11 +2667,12 @@ nt_apply() {
 
     if $SUDO sysctl -p "$NT_CONF_PATH" >/dev/null 2>&1; then
         success "Network tuning applied → $NT_CONF_PATH (buffer max: $((bmax / 1048576)) MiB)"
-        return 0
     else
         warn "Wrote $NT_CONF_PATH but sysctl reload failed — will activate on next boot."
-        return 0
     fi
+    echo ""
+    nt_status
+    return 0
 }
 
 # Idempotent — returns 0 even if NT_CONF_PATH doesn't exist.
@@ -2747,6 +2749,15 @@ nt_status() {
         [[ "$applied" == "true" ]] && pass=false
     fi
 
+    local syn_backlog
+    syn_backlog=$(cat /proc/sys/net/ipv4/tcp_max_syn_backlog 2>/dev/null || echo 0)
+    if [[ "$syn_backlog" -ge 8192 ]]; then
+        echo -e "    ${GREEN}✓${NC} tcp_max_syn_backlog = $syn_backlog"
+    else
+        echo -e "    ${YELLOW}!${NC} tcp_max_syn_backlog = $syn_backlog (expected ≥ 8192)"
+        [[ "$applied" == "true" ]] && pass=false
+    fi
+
     if [[ "$applied" == "true" ]]; then
         $pass && return 0 || return 1
     else
@@ -2810,13 +2821,150 @@ DOCTOR_CHECKS=(
     "ports:Check required ports are available"
     "conflicts:Check for conflicting services (e.g. DNS tunnels on port 53)"
     "reality:Check Reality fallback targets resolve and are reachable"
-    "net:Check BBR / kernel network tuning is applied"
+    "net:Check BBR/sysctl tuning + packet drops + PMTU + CGNAT + MTU"
     "env:Compare .env with .env.example for missing vars"
     "updates:Check for MoaV updates"
 )
 
+# Read a key from /proc/net/snmp or /proc/net/netstat. Returns 0 if not found.
+nt_proc_counter() {
+    local proto="$1" key="$2"
+    local v=""
+    v=$(awk -v p="$proto:" -v k="$key" '
+        $1 == p {
+            if ($0 ~ /[A-Za-z]/ && header == "") { header = $0; next }
+            if (header != "") {
+                n = split(header, h, " "); split($0, v, " ")
+                for (i = 2; i <= n; i++) if (h[i] == k) { print v[i]; exit }
+                header = ""
+            }
+        }' /proc/net/snmp /proc/net/netstat 2>/dev/null | head -1)
+    echo "${v:-0}"
+}
+
+nt_check_drops() {
+    local pass=true
+    local listen_drops syn_overflow rcvbuf_err sndbuf_err retrans
+    listen_drops=$(nt_proc_counter "TcpExt" "ListenDrops")
+    syn_overflow=$(nt_proc_counter "TcpExt" "ListenOverflows")
+    rcvbuf_err=$(nt_proc_counter   "Udp"    "RcvbufErrors")
+    sndbuf_err=$(nt_proc_counter   "Udp"    "SndbufErrors")
+    retrans=$(nt_proc_counter      "Tcp"    "RetransSegs")
+
+    # Counters are since-boot. Operator-actionable thresholds — anything non-trivial.
+    local report=()
+    [[ "$listen_drops" -gt 0   ]] && report+=("TCP ListenDrops=$listen_drops (somaxconn / tcp_max_syn_backlog too small or SYN flood)")
+    [[ "$syn_overflow" -gt 0   ]] && report+=("TCP ListenOverflows=$syn_overflow (accept queue overflow)")
+    [[ "$rcvbuf_err"   -gt 100 ]] && report+=("UDP RcvbufErrors=$rcvbuf_err (raise rmem_max — affects Hysteria2/WG)")
+    [[ "$sndbuf_err"   -gt 100 ]] && report+=("UDP SndbufErrors=$sndbuf_err (raise wmem_max)")
+
+    if [[ ${#report[@]} -eq 0 ]]; then
+        echo -e "    ${GREEN}✓${NC} No notable packet drops (TCP retrans=$retrans since boot)"
+    else
+        local line
+        for line in "${report[@]}"; do
+            echo -e "    ${YELLOW}!${NC} $line"
+            pass=false
+        done
+    fi
+    $pass && return 0 || return 1
+}
+
+nt_check_pmtu() {
+    local probing
+    probing=$(cat /proc/sys/net/ipv4/tcp_mtu_probing 2>/dev/null || echo "?")
+    if [[ "$probing" == "1" || "$probing" == "2" ]]; then
+        echo -e "    ${GREEN}✓${NC} tcp_mtu_probing = $probing (PMTU black-hole recovery enabled)"
+        return 0
+    fi
+    echo -e "    ${YELLOW}!${NC} tcp_mtu_probing = $probing (PMTU black holes will silently stall TCP)"
+    echo -e "      ${DIM}Fix: moav net apply${NC}"
+    return 1
+}
+
+nt_check_cgnat() {
+    # Local IP on the default route. Empty → no route → upstream broken, not our problem here.
+    local local_ip iface
+    local_ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '/src/ {for(i=1;i<=NF;i++) if($i=="src") {print $(i+1); exit}}')
+    iface=$(ip -4 route get 1.1.1.1 2>/dev/null   | awk '/dev/ {for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1); exit}}')
+    if [[ -z "$local_ip" ]]; then
+        echo -e "    ${DIM}○${NC} CGNAT/NAT check skipped (no default route detected)"
+        return 2
+    fi
+
+    local cgnat=false private=false
+    # CGNAT = 100.64.0.0/10
+    if [[ "$local_ip" =~ ^100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\. ]]; then cgnat=true; fi
+    # RFC1918: 10/8, 172.16/12, 192.168/16
+    if [[ "$local_ip" =~ ^10\. ]] || \
+       [[ "$local_ip" =~ ^192\.168\. ]] || \
+       [[ "$local_ip" =~ ^172\.(1[6-9]|2[0-9]|3[01])\. ]]; then private=true; fi
+
+    local public_ip
+    public_ip=$(get_env_val "SERVER_IP" "$SCRIPT_DIR/.env" "")
+
+    if $cgnat; then
+        echo -e "    ${RED}✗${NC} Default route uses CGNAT address ($local_ip on $iface)"
+        echo -e "      ${DIM}Inbound proxy traffic from the public internet can't reach this host directly.${NC}"
+        [[ -n "$public_ip" ]] && echo -e "      ${DIM}SERVER_IP=$public_ip — verify port-forwarding upstream.${NC}"
+        return 1
+    fi
+    if $private; then
+        if [[ -n "$public_ip" && "$public_ip" != "$local_ip" ]]; then
+            echo -e "    ${YELLOW}!${NC} Server is behind NAT (local=$local_ip, public=$public_ip on $iface)"
+            echo -e "      ${DIM}Make sure ports are forwarded from $public_ip to $local_ip.${NC}"
+            return 1
+        fi
+        echo -e "    ${DIM}○${NC} Local address $local_ip is RFC1918 but SERVER_IP not set — can't tell if NAT'd"
+        return 2
+    fi
+    echo -e "    ${GREEN}✓${NC} Default route uses public address ($local_ip on $iface)"
+    return 0
+}
+
+nt_check_mtu() {
+    local enable_wg enable_hy2
+    enable_wg=$(get_env_val  "ENABLE_WIREGUARD" "$SCRIPT_DIR/.env" "true")
+    enable_hy2=$(get_env_val "ENABLE_HYSTERIA2" "$SCRIPT_DIR/.env" "true")
+
+    # Default-egress MTU.
+    local egress_mtu="?"
+    local egress_iface
+    egress_iface=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '/dev/ {for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1); exit}}')
+    if [[ -n "$egress_iface" ]]; then
+        egress_mtu=$(ip link show "$egress_iface" 2>/dev/null | awk '/mtu/ {for(i=1;i<=NF;i++) if($i=="mtu") {print $(i+1); exit}}')
+    fi
+    echo -e "    ${DIM}○${NC} Egress MTU on ${egress_iface:-?}: ${egress_mtu:-?} (Hysteria2 best near 1450–1472, WireGuard 1420)"
+
+    if [[ "$enable_wg" == "true" ]]; then
+        if ip link show wg0 >/dev/null 2>&1; then
+            local wg_mtu
+            wg_mtu=$(ip link show wg0 2>/dev/null | awk '/mtu/ {for(i=1;i<=NF;i++) if($i=="mtu") {print $(i+1); exit}}')
+            if [[ "$wg_mtu" == "1420" ]]; then
+                echo -e "    ${GREEN}✓${NC} wg0 MTU = $wg_mtu (recommended)"
+            else
+                echo -e "    ${YELLOW}!${NC} wg0 MTU = $wg_mtu (recommend 1420 for IPv4-over-UDP overhead)"
+            fi
+        fi
+    fi
+}
+
 doctor_check_net() {
-    nt_status
+    local rc=0
+    nt_status || rc=$?
+    # rc=2 → bundle not applied or kernel unsupported. Skip extended checks.
+    [[ "$rc" -eq 2 ]] && return 2
+
+    local pass=true
+    [[ "$rc" -eq 1 ]] && pass=false
+    nt_check_pmtu  || pass=false
+    nt_check_drops || pass=false
+    # CGNAT returns 2 (unknown — no route or RFC1918 without SERVER_IP), don't fail on that
+    local cgnat=0; nt_check_cgnat || cgnat=$?
+    [[ "$cgnat" -eq 1 ]] && pass=false
+    nt_check_mtu   # informational only
+
+    $pass && return 0 || return 1
 }
 
 doctor_is_enabled() {

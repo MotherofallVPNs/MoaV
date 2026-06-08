@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Monitoring-stack opt-in default is now RAM-aware** — both confirm prompts (first-time + re-enable) default to `N` on hosts with `<2 GB` RAM, `Y` otherwise. Matches the doctor's existing "<2 GB + monitoring = hang risk" warning and the build-concurrency tier model. Operators on 2 GB+ hosts see no change; operators on small VPSes no longer get a default-yes monitoring stack competing for memory with the proxy containers
 
+### Added
+- **`net.ipv4.tcp_max_syn_backlog = 8192` in the network-tuning bundle** — Linux default is 1024 (128 on small hosts), which drops SYNs under coordinated reconnect bursts (post-censorship-blip waves) or Reality probe floods. Adding it to `/etc/sysctl.d/99-moav-net.conf` and to the installer's first-time bundle. Picked up on next `moav net apply`
+- **`moav net apply` prints a verification summary after applying** — calls `nt_status` at the end so the operator sees `✓ bbr active ✓ fq active ✓ rmem_max=32 MiB ...` immediately instead of having to run a second command to confirm the sysctl reload worked
+- **`moav doctor net` extended with packet-drop / PMTU / CGNAT / MTU checks** — reads `/proc/net/snmp` + `/proc/net/netstat` for TCP `ListenDrops` + `ListenOverflows` (SYN queue overflow → recommends raising `somaxconn`/`tcp_max_syn_backlog`) and UDP `RcvbufErrors` + `SndbufErrors` (Hysteria2/WireGuard buffer overflow → recommends raising `{r,w}mem_max`). Verifies `tcp_mtu_probing` is on (silent PMTU black-hole recovery). Detects CGNAT (100.64/10 on the default route — hard failure for inbound proxy traffic) and RFC1918 (NAT — warns with the `SERVER_IP` from `.env` for forwarding context). Prints egress + WireGuard MTU with the WG-1420 / Hysteria-1450-1472 recommendations. When the sysctl bundle isn't applied (or kernel doesn't support BBR), the extended checks skip silently rather than fail-flagging a fresh install
+
 ## [1.8.4] - 2026-06-05
 
 ### Added
