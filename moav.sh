@@ -548,6 +548,17 @@ validate_reality_targets() {
     [[ "$failed" -eq 0 ]]
 }
 
+# Monitoring opt-in default: N below 2 GB (hang risk), Y otherwise.
+monitoring_default_for_ram() {
+    local total_mb
+    total_mb=$(awk '/MemTotal/ {printf "%.0f", $2/1024}' /proc/meminfo 2>/dev/null || echo 0)
+    if [[ "$total_mb" -gt 0 && "$total_mb" -lt 2048 ]]; then
+        echo "n"
+    else
+        echo "y"
+    fi
+}
+
 ensure_admin_password() {
     # Check if admin password is unset, empty, or still the insecure default
     local current_password=""
@@ -4392,7 +4403,7 @@ select_profiles() {
             # Not explicitly set - ask user
             echo ""
             warn "Monitoring stack (Grafana + Prometheus) requires at least 2GB RAM."
-            if confirm "Enable monitoring?" "n"; then
+            if confirm "Enable monitoring?" "$(monitoring_default_for_ram)"; then
                 update_env_var "$env_file" "ENABLE_MONITORING" "true"
                 SELECTED_PROFILES+=("monitoring")
                 success "Monitoring enabled"
@@ -4675,7 +4686,7 @@ ensure_clash_api_secret() {
     if [[ "$enable_monitoring" == "false" ]]; then
         echo ""
         warn "Monitoring is currently disabled in .env (ENABLE_MONITORING=false)"
-        if confirm "Enable monitoring?" "y"; then
+        if confirm "Enable monitoring?" "$(monitoring_default_for_ram)"; then
             update_env_var "$env_file" "ENABLE_MONITORING" "true"
             success "ENABLE_MONITORING set to true"
         else

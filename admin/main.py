@@ -31,6 +31,10 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
 ADMIN_IP_WHITELIST = os.environ.get("ADMIN_IP_WHITELIST", "").split(",")
 ADMIN_IP_WHITELIST = [ip.strip() for ip in ADMIN_IP_WHITELIST if ip.strip()]
 
+# compare_digest("", "") is True — empty / insecure-default ADMIN_PASSWORD must
+# fail closed (#126).
+ADMIN_PASSWORD_INSECURE = ADMIN_PASSWORD in ("", "admin", "change_me_to_something_secure")
+
 SERVER_IP = os.environ.get("SERVER_IP", "")
 DOMAIN = os.environ.get("DOMAIN", "")
 
@@ -123,6 +127,17 @@ async def check_for_updates() -> dict:
 def verify_auth(request: Request, credentials: HTTPBasicCredentials = Depends(security)):
     """Verify authentication via password and optional IP whitelist"""
     client_ip = request.client.host
+
+    # Fail closed on empty / insecure-default password (#126).
+    if ADMIN_PASSWORD_INSECURE:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Admin dashboard is locked: ADMIN_PASSWORD is unset, empty, or the "
+                "insecure default. Set ADMIN_PASSWORD in .env, then "
+                "`moav restart admin` (or run `moav admin password` to generate one)."
+            ),
+        )
 
     # Check IP whitelist if configured
     if ADMIN_IP_WHITELIST:
