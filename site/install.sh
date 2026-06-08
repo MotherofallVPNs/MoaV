@@ -512,32 +512,22 @@ maybe_offer_swap() {
 # Best-effort; never let a swap hiccup abort the installer (set -e is on).
 maybe_offer_swap || true
 
-# =============================================================================
-# Offer BBR + kernel network tuning. Commonly 2–5× TCP throughput on long-RTT
-# or lossy paths (which the Iran-bound proxy use case very much is). Reversible
-# later via `moav net revert`. Same logic ships in moav.sh as `moav net apply`
-# so updates can re-trigger or revert this independently.
-# =============================================================================
+# Offer BBR + kernel network tuning at install time. Mirrors `moav net apply`.
 maybe_offer_net_tuning() {
     [[ "$(uname -s)" == "Linux" ]] || return 0
-    [[ -t 0 || -e /dev/tty ]] || return 0   # skip in non-interactive runs
+    [[ -t 0 || -e /dev/tty ]] || return 0   # non-interactive → skip
 
     local NT_CONF=/etc/sysctl.d/99-moav-net.conf
-    # Already applied (re-install / re-run) — skip silently.
-    [[ -f "$NT_CONF" ]] && return 0
+    [[ -f "$NT_CONF" ]] && return 0   # already applied
 
-    # Kernel must expose BBR (mainline since 4.9; OpenVZ doesn't). It's usually
-    # a module that's absent from the list until loaded — try modprobe first.
+    # tcp_bbr is a module on most distros — modprobe before declaring absent.
     local avail
     avail=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null || echo "")
     if [[ " $avail " != *" bbr "* ]]; then
         ${SUDO:-} modprobe tcp_bbr 2>/dev/null || sudo modprobe tcp_bbr 2>/dev/null || true
         avail=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null || echo "")
     fi
-    if [[ " $avail " != *" bbr "* ]]; then
-        # Quiet skip — operator can't do anything about a missing-BBR kernel.
-        return 0
-    fi
+    [[ " $avail " != *" bbr "* ]] && return 0
 
     local current_cc
     current_cc=$(cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null || echo "?")
@@ -575,9 +565,9 @@ maybe_offer_net_tuning() {
     tmp=$(mktemp)
     cat > "$tmp" <<EOF
 # MoaV network tuning — generated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-# Reversible: moav net revert (deletes this file + reloads sysctl)
-# Docs: docs/OPSEC.md → "Network tuning"
+# Reversible: moav net revert. Docs: docs/OPSEC.md → "Network tuning".
 
+# BBR needs fq for pacing.
 net.ipv4.tcp_congestion_control = bbr
 net.core.default_qdisc          = fq
 
@@ -586,6 +576,7 @@ net.core.wmem_max               = ${bmax}
 net.ipv4.tcp_rmem               = 4096 131072 ${bmax}
 net.ipv4.tcp_wmem               = 4096 16384 ${bmax}
 
+# UDP defaults (Hysteria2, WireGuard, quic-go)
 net.core.rmem_default           = 1048576
 net.core.wmem_default           = 1048576
 
@@ -596,9 +587,7 @@ net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.tcp_mtu_probing           = 1
 net.ipv4.tcp_notsent_lowat         = 131072
 
-# DELIBERATELY NOT SET: net.ipv4.tcp_fastopen
-# TFO server-side ADDS latency in heavily-censored networks because
-# middleboxes (notably China Mobile) drop SYN+data on ~5% of paths.
+# tcp_fastopen DELIBERATELY UNSET — middleboxes drop SYN+data, raising latency.
 EOF
 
     if $SUDO install -m 0644 "$tmp" "$NT_CONF"; then
