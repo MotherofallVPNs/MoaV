@@ -149,6 +149,7 @@ moav help                 # نمایش تمام دستورات
 | Reality (VLESS) | 443/tcp | ★★★★★ | ★★★★☆ | ✅ | اصلی، قابل اعتمادترین |
 | Hysteria2 | 443/udp | ★★★★☆ | ★★★★★ | ✅ | سریع، کار می‌کند وقتی TCP محدود است |
 | Trojan | 8443/tcp | ★★★★☆ | ★★★★☆ | ✅ | پشتیبان، از دامنه شما استفاده می‌کند |
+| AnyTLS | 8445/tcp | ★★★★★ | ★★★★☆ | ⬜ | خنثی‌سازی اثرانگشت TLS-in-TLS، از دامنه شما استفاده می‌کند |
 | Shadowsocks-2022 | 8388/tcp+udp | ★★★★☆ | ★★★★☆ | ⬜ | AEAD-2022 ضد پروب فعال؛ سازگار با اپ Outline |
 | CDN (VLESS+WS) | 443 از Cloudflare | ★★★★★ | ★★★☆☆ | ✅ | وقتی IP سرور مسدود است |
 | TrustTunnel | 4443/tcp+udp | ★★★★★ | ★★★★☆ | ✅ | HTTP/2 و QUIC، شبیه HTTPS |
@@ -283,6 +284,7 @@ moav client connect user1 # اتصال به عنوان کاربر (پراکسی 
 | 443/tcp | TCP | Reality (VLESS) | بله |
 | 443/udp | UDP | Hysteria2 | بله |
 | 8443/tcp | TCP | Trojan | بله |
+| 8445/tcp | TCP | AnyTLS | بله |
 | 8388/tcp+udp | TCP+UDP | Shadowsocks-2022 | خیر |
 | 4443/tcp+udp | TCP+UDP | TrustTunnel | بله |
 | 2082/tcp | TCP | CDN WebSocket | بله (Cloudflare) |

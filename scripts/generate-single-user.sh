@@ -78,10 +78,10 @@ donate_needs() {
     return 1
 }
 
-# Add to sing-box config (Reality, Trojan, Hysteria2, CDN — all sing-box inbounds)
+# Add to sing-box config (Reality, Trojan, AnyTLS, Hysteria2, CDN — all sing-box inbounds)
 CONFIG_FILE="/configs/sing-box/config.json"
 
-if [[ -f "$CONFIG_FILE" ]] && donate_needs singbox reality trojan hysteria2 cdn shadowsocks ss; then
+if [[ -f "$CONFIG_FILE" ]] && donate_needs singbox reality trojan anytls hysteria2 cdn shadowsocks ss; then
     # Add to Reality inbound
     if donate_needs reality reality; then
         jq --arg name "$USER_ID" --arg uuid "$USER_UUID" \
@@ -93,6 +93,13 @@ if [[ -f "$CONFIG_FILE" ]] && donate_needs singbox reality trojan hysteria2 cdn 
     if donate_needs trojan trojan; then
         jq --arg name "$USER_ID" --arg password "$USER_PASSWORD" \
             '(.inbounds[] | select(.tag == "trojan-tls-in") | .users) += [{"name": $name, "password": $password}]' \
+            "$CONFIG_FILE" > /tmp/config.tmp && mv -f /tmp/config.tmp "$CONFIG_FILE"
+    fi
+
+    # Add to AnyTLS inbound (no-op if anytls-in inbound isn't present)
+    if donate_needs anytls anytls; then
+        jq --arg name "$USER_ID" --arg password "$USER_PASSWORD" \
+            '(.inbounds[] | select(.tag == "anytls-in") | .users) += [{"name": $name, "password": $password}]' \
             "$CONFIG_FILE" > /tmp/config.tmp && mv -f /tmp/config.tmp "$CONFIG_FILE"
     fi
 
@@ -226,6 +233,11 @@ if [[ -n "$DONATE_ONLY" ]]; then
     else
         export ENABLE_TROJAN=false
     fi
+    if echo " $DONATE_ONLY " | grep -q " anytls "; then
+        export ENABLE_ANYTLS=true
+    else
+        export ENABLE_ANYTLS=false
+    fi
     if echo " $DONATE_ONLY " | grep -q " hysteria2 "; then
         export ENABLE_HYSTERIA2=true
     else
@@ -258,11 +270,13 @@ else
     export ENABLE_MASTERDNS="${ENABLE_MASTERDNS:-true}"
     export ENABLE_GOOSERELAY="${ENABLE_GOOSERELAY:-false}"
     export ENABLE_HYSTERIA2="${ENABLE_HYSTERIA2:-true}"
+    export ENABLE_ANYTLS="${ENABLE_ANYTLS:-false}"
     export ENABLE_TRUSTTUNNEL="${ENABLE_TRUSTTUNNEL:-true}"
     export ENABLE_XHTTP="${ENABLE_XHTTP:-true}"
     export ENABLE_TELEMT="${ENABLE_TELEMT:-true}"
     export ENABLE_SS="${ENABLE_SS:-true}"
 fi
+export PORT_ANYTLS="${PORT_ANYTLS:-8445}"
 export PORT_SS="${PORT_SS:-8388}"
 export SS_METHOD="${SS_METHOD:-2022-blake3-aes-128-gcm}"
 if [[ -f "$STATE_DIR/keys/shadowsocks-server.psk" ]]; then

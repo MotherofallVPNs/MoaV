@@ -1,7 +1,7 @@
 # =============================================================================
 # MoaV Client - Multi-protocol client for testing and connecting
 # =============================================================================
-# Supports: Reality, Trojan, Hysteria2, XHTTP, WireGuard (via wstunnel),
+# Supports: Reality, Trojan, AnyTLS, Hysteria2, XHTTP, WireGuard (via wstunnel),
 #           AmneziaWG, dnstt, Slipstream, TrustTunnel, Tor/Snowflake
 #
 # Strategy: Download pre-built binaries with proper architecture detection

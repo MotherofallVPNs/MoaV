@@ -179,6 +179,57 @@ EOF
 fi
 
 # -----------------------------------------------------------------------------
+# Generate AnyTLS client config (sing-box native, reuses Trojan TLS cert/domain)
+# -----------------------------------------------------------------------------
+if [[ "${ENABLE_ANYTLS:-false}" == "true" ]]; then
+  if [[ -f "$OUTPUT_DIR/anytls.txt" ]] && [[ "$FORCE_REGENERATE" != "force" ]]; then
+    log_info "  - AnyTLS config exists, skipping"
+  else
+    BUNDLE_CHANGED=true
+    cat > "$OUTPUT_DIR/anytls-singbox.json" <<EOF
+{
+  "log": {"level": "info"},
+  "inbounds": [
+    {"type": "tun", "tag": "tun-in", "address": ["172.19.0.1/30"], "auto_route": true, "strict_route": true}
+  ],
+  "outbounds": [
+    {
+      "type": "anytls",
+      "tag": "proxy",
+      "server": "${SERVER_IP}",
+      "server_port": ${PORT_ANYTLS:-8445},
+      "password": "${USER_PASSWORD}",
+      "tls": {
+        "enabled": true,
+        "server_name": "${DOMAIN}",
+        "utls": {"enabled": true, "fingerprint": "random"}
+      }
+    }
+  ],
+  "route": {
+    "auto_detect_interface": true,
+    "final": "proxy"
+  }
+}
+EOF
+
+    # Generate AnyTLS URI (IPv4)
+    ANYTLS_LINK="anytls://${USER_PASSWORD}@${SERVER_IP}:${PORT_ANYTLS:-8445}?sni=${DOMAIN}&insecure=0#MoaV-AnyTLS-${USER_ID}"
+    echo "$ANYTLS_LINK" > "$OUTPUT_DIR/anytls.txt"
+    qrencode -o "$OUTPUT_DIR/anytls-qr.png" -s 6 "$ANYTLS_LINK" 2>/dev/null || true
+
+    # Generate IPv6 link if available
+    if [[ -n "${SERVER_IPV6:-}" ]]; then
+        ANYTLS_LINK_V6="anytls://${USER_PASSWORD}@[${SERVER_IPV6}]:${PORT_ANYTLS:-8445}?sni=${DOMAIN}&insecure=0#MoaV-AnyTLS-${USER_ID}-IPv6"
+        echo "$ANYTLS_LINK_V6" > "$OUTPUT_DIR/anytls-ipv6.txt"
+        qrencode -o "$OUTPUT_DIR/anytls-ipv6-qr.png" -s 6 "$ANYTLS_LINK_V6" 2>/dev/null || true
+    fi
+
+    log_info "  - AnyTLS config generated"
+  fi
+fi
+
+# -----------------------------------------------------------------------------
 # Generate Hysteria2 client config
 # -----------------------------------------------------------------------------
 if [[ "${ENABLE_HYSTERIA2:-true}" == "true" ]]; then
@@ -783,6 +834,7 @@ elif [[ -f "$TEMPLATE_FILE" ]]; then
     CONFIG_REALITY=$(cat "$OUTPUT_DIR/reality.txt" 2>/dev/null | tr -d '\n' || echo "")
     CONFIG_HYSTERIA2=$(cat "$OUTPUT_DIR/hysteria2.txt" 2>/dev/null | tr -d '\n' || echo "")
     CONFIG_TROJAN=$(cat "$OUTPUT_DIR/trojan.txt" 2>/dev/null | tr -d '\n' || echo "")
+    CONFIG_ANYTLS=$(cat "$OUTPUT_DIR/anytls.txt" 2>/dev/null | tr -d '\n' || echo "")
     CONFIG_CDN=$(cat "$OUTPUT_DIR/cdn-vless.txt" 2>/dev/null | tr -d '\n' || echo "")
     CONFIG_WIREGUARD=$(cat "$OUTPUT_DIR/wireguard.conf" 2>/dev/null || echo "")
     CONFIG_WIREGUARD_WSTUNNEL=$(cat "$OUTPUT_DIR/wireguard-wstunnel.conf" 2>/dev/null || echo "")
@@ -826,6 +878,7 @@ elif [[ -f "$TEMPLATE_FILE" ]]; then
     QR_REALITY_B64=$(qr_to_base64 "$OUTPUT_DIR/reality-qr.png")
     QR_HYSTERIA2_B64=$(qr_to_base64 "$OUTPUT_DIR/hysteria2-qr.png")
     QR_TROJAN_B64=$(qr_to_base64 "$OUTPUT_DIR/trojan-qr.png")
+    QR_ANYTLS_B64=$(qr_to_base64 "$OUTPUT_DIR/anytls-qr.png")
     QR_CDN_B64=$(qr_to_base64 "$OUTPUT_DIR/cdn-vless-qr.png")
     QR_WIREGUARD_B64=$(qr_to_base64 "$OUTPUT_DIR/wireguard-qr.png")
     QR_WIREGUARD_WSTUNNEL_B64=$(qr_to_base64 "$OUTPUT_DIR/wireguard-wstunnel-qr.png")
@@ -852,10 +905,10 @@ elif [[ -f "$TEMPLATE_FILE" ]]; then
     # configured separately and intentionally excluded. base64 has no '|', so it
     # is safe in the sed replacement below.
     _mahsanet_uris=""
-    for _f in reality cdn-vless xhttp-vless trojan shadowsocks hysteria2 \
-              reality-ipv6 trojan-ipv6 shadowsocks-ipv6 hysteria2-ipv6; do
+    for _f in reality cdn-vless xhttp-vless trojan anytls shadowsocks hysteria2 \
+              reality-ipv6 trojan-ipv6 anytls-ipv6 shadowsocks-ipv6 hysteria2-ipv6; do
         [[ -f "$OUTPUT_DIR/$_f.txt" ]] || continue
-        _u=$(tr -d '\r' < "$OUTPUT_DIR/$_f.txt" | grep -aE '^(vless|trojan|ss|hysteria2|vmess)://' | head -1 || true)
+        _u=$(tr -d '\r' < "$OUTPUT_DIR/$_f.txt" | grep -aE '^(vless|trojan|anytls|ss|hysteria2|vmess)://' | head -1 || true)
         [[ -n "$_u" ]] && _mahsanet_uris+="$_u"$'\n'
     done
     if [[ -n "$_mahsanet_uris" ]]; then
@@ -885,6 +938,7 @@ elif [[ -f "$TEMPLATE_FILE" ]]; then
         [[ "${ENABLE_WIREGUARD:-true}" != "true" ]] && DISABLED_SERVICES+="WireGuard, "
         [[ "${ENABLE_DNSTT:-true}" != "true" ]] && DISABLED_SERVICES+="DNS Tunnel, "
         [[ "${ENABLE_TROJAN:-true}" != "true" ]] && DISABLED_SERVICES+="Trojan, "
+        [[ "${ENABLE_ANYTLS:-false}" != "true" ]] && DISABLED_SERVICES+="AnyTLS, "
         [[ "${ENABLE_HYSTERIA2:-true}" != "true" ]] && DISABLED_SERVICES+="Hysteria2, "
         [[ "${ENABLE_REALITY:-true}" != "true" ]] && DISABLED_SERVICES+="Reality, "
         DISABLED_SERVICES="${DISABLED_SERVICES%, }"  # Remove trailing comma
@@ -910,6 +964,7 @@ elif [[ -f "$TEMPLATE_FILE" ]]; then
     sed -i "s|{{QR_REALITY}}|$QR_REALITY_B64|g" "$OUTPUT_HTML"
     sed -i "s|{{QR_HYSTERIA2}}|$QR_HYSTERIA2_B64|g" "$OUTPUT_HTML"
     sed -i "s|{{QR_TROJAN}}|$QR_TROJAN_B64|g" "$OUTPUT_HTML"
+    sed -i "s|{{QR_ANYTLS}}|$QR_ANYTLS_B64|g" "$OUTPUT_HTML"
     sed -i "s|{{QR_CDN}}|$QR_CDN_B64|g" "$OUTPUT_HTML"
     sed -i "s|{{QR_WIREGUARD}}|$QR_WIREGUARD_B64|g" "$OUTPUT_HTML"
     sed -i "s|{{QR_WIREGUARD_WSTUNNEL}}|$QR_WIREGUARD_WSTUNNEL_B64|g" "$OUTPUT_HTML"
@@ -949,6 +1004,12 @@ with open(filepath, 'w') as f:
         replace_placeholder "{{CONFIG_TROJAN}}" "$CONFIG_TROJAN"
     else
         replace_placeholder "{{CONFIG_TROJAN}}" "No Trojan config available"
+    fi
+
+    if [[ -n "$CONFIG_ANYTLS" ]]; then
+        replace_placeholder "{{CONFIG_ANYTLS}}" "$CONFIG_ANYTLS"
+    else
+        replace_placeholder "{{CONFIG_ANYTLS}}" "No AnyTLS config available"
     fi
 
     # CDN VLESS+WS config

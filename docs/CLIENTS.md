@@ -16,6 +16,7 @@ This guide explains how to connect to MoaV from various devices.
 - [WireGuard Setup](#wireguard-setup)
 - [AmneziaWG Setup](#amneziawg-setup)
 - [Hysteria2 Setup](#hysteria2-setup)
+- [AnyTLS Setup](#anytls-setup)
 - [CDN VLESS+WS Setup (When IP Blocked)](#cdn-vlessws-setup-when-ip-blocked)
 - [TrustTunnel Setup](#trusttunnel-setup)
 - [DNS Tunnel Setup (Last Resort)](#dns-tunnel-setup-last-resort)
@@ -36,6 +37,7 @@ This guide explains how to connect to MoaV from various devices.
 |----------|------|-------------|
 | [Reality (VLESS)](https://github.com/XTLS/REALITY) | 443/tcp | TLS camouflage, virtually undetectable |
 | [Trojan](https://trojan-gfw.github.io/trojan/) | 8443/tcp | HTTPS mimicry, battle-tested |
+| [AnyTLS](https://github.com/anytls/anytls-go) | 8445/tcp | Defeats TLS-in-TLS fingerprinting, very high stealth |
 | [Shadowsocks-2022](https://github.com/shadowsocks/shadowsocks-org/blob/main/docs/doc/sip022.md) | 8388/tcp+udp | AEAD-2022 anti-active-probing; same protocol Outline VPN uses |
 | [Hysteria2](https://v2.hysteria.network/) | 443/udp | QUIC-based, fast on lossy networks |
 | CDN (VLESS+WS) | 443 via Cloudflare | When server IP is blocked |
@@ -56,11 +58,11 @@ This guide explains how to connect to MoaV from various devices.
 
 | App | Protocols | Link |
 |-----|-----------|------|
-| [Shadowrocket](https://apps.apple.com/us/app/shadowrocket/id932747118) | VLESS, VMess, Trojan, Hysteria2, WireGuard | [App Store ($2.99)](https://apps.apple.com/us/app/shadowrocket/id932747118) |
+| [Shadowrocket](https://apps.apple.com/us/app/shadowrocket/id932747118) | VLESS, VMess, Trojan, Hysteria2, AnyTLS (2.2.65+), WireGuard | [App Store ($2.99)](https://apps.apple.com/us/app/shadowrocket/id932747118) |
 | [Streisand](https://apps.apple.com/us/app/streisand/id6450534064) | VLESS/Reality, VMess, Trojan, Hysteria2, WireGuard | [App Store (Free)](https://apps.apple.com/us/app/streisand/id6450534064) |
-| [Hiddify](https://apps.apple.com/us/app/hiddify-proxy-vpn/id6596777532) | VLESS, VMess, Hysteria2, Trojan, Reality, SSH | [App Store (Free)](https://apps.apple.com/us/app/hiddify-proxy-vpn/id6596777532) |
+| [Hiddify](https://apps.apple.com/us/app/hiddify-proxy-vpn/id6596777532) | VLESS, VMess, Hysteria2, Trojan, AnyTLS, Reality, SSH | [App Store (Free)](https://apps.apple.com/us/app/hiddify-proxy-vpn/id6596777532) |
 | [V2Box](https://apps.apple.com/ca/app/v2box-v2ray-client/id6446814690) | VLESS, VMess, Trojan, Hysteria2, Reality | [App Store](https://apps.apple.com/ca/app/v2box-v2ray-client/id6446814690) |
-| [sing-box](https://apps.apple.com/us/app/sing-box-vt/id6673731168) | VLESS, VMess, Trojan, Hysteria2, WireGuard | [App Store (Free)](https://apps.apple.com/us/app/sing-box-vt/id6673731168) |
+| [sing-box](https://apps.apple.com/us/app/sing-box-vt/id6673731168) | VLESS, VMess, Trojan, Hysteria2, AnyTLS, WireGuard | [App Store (Free)](https://apps.apple.com/us/app/sing-box-vt/id6673731168) |
 | [Loon](https://apps.apple.com/us/app/loon/id1373567447) | VLESS/Reality, Hysteria2, Trojan, WireGuard | [App Store](https://apps.apple.com/us/app/loon/id1373567447) |
 | [Pharos Pro](https://apps.apple.com/us/app/pharos-pro/id1456610173) | VLESS, Hysteria2, Trojan, TUIC | [App Store ($2.99)](https://apps.apple.com/us/app/pharos-pro/id1456610173) |
 | [Onion Browser](https://apps.apple.com/us/app/onion-browser/id519296448) | Tor | [App Store (Free)](https://apps.apple.com/us/app/onion-browser/id519296448) |
@@ -74,10 +76,10 @@ This guide explains how to connect to MoaV from various devices.
 | App | Protocols | Link |
 |-----|-----------|------|
 | [v2rayNG](https://github.com/2dust/v2rayNG) | VLESS, VMess, Trojan, Shadowsocks | [GitHub](https://github.com/2dust/v2rayNG/releases) |
-| [Hiddify](https://hiddify.com/) | VLESS, VMess, Hysteria2, Trojan, Reality, SSH | [GitHub](https://github.com/hiddify/hiddify-app/releases) |
-| [NekoBox](https://github.com/MatsuriDayo/NekoBoxForAndroid) | VLESS, VMess, Trojan, Hysteria2 (sing-box) | [GitHub](https://github.com/MatsuriDayo/NekoBoxForAndroid/releases) |
+| [Hiddify](https://hiddify.com/) | VLESS, VMess, Hysteria2, Trojan, AnyTLS, Reality, SSH | [GitHub](https://github.com/hiddify/hiddify-app/releases) |
+| [NekoBox](https://github.com/MatsuriDayo/NekoBoxForAndroid) | VLESS, VMess, Trojan, Hysteria2, AnyTLS (sing-box) | [GitHub](https://github.com/MatsuriDayo/NekoBoxForAndroid/releases) |
 | [V2Box](https://play.google.com/store/apps/details?id=dev.hexasoftware.v2box) | VLESS, VMess, Trojan, Hysteria2, Reality | [Play Store](https://play.google.com/store/apps/details?id=dev.hexasoftware.v2box) |
-| [sing-box](https://github.com/SagerNet/sing-box) | VLESS, VMess, Trojan, Hysteria2, WireGuard | [F-Droid](https://f-droid.org/packages/io.nekohasekai.sfa/) / [GitHub](https://github.com/SagerNet/sing-box/releases) |
+| [sing-box](https://github.com/SagerNet/sing-box) | VLESS, VMess, Trojan, Hysteria2, AnyTLS, WireGuard | [F-Droid](https://f-droid.org/packages/io.nekohasekai.sfa/) / [GitHub](https://github.com/SagerNet/sing-box/releases) |
 | [HTTP Injector](https://play.google.com/store/apps/details?id=com.evozi.injector) | VLESS, Hysteria, DNS Tunnel, WireGuard, SSH | [Play Store](https://play.google.com/store/apps/details?id=com.evozi.injector) |
 | [Clash Meta](https://github.com/MetaCubeX/ClashMetaForAndroid) | VLESS, VMess, Hysteria2, Trojan | [GitHub](https://github.com/MetaCubeX/ClashMetaForAndroid/releases) |
 | [Tor Browser](https://www.torproject.org/download/) | Tor | [Play Store](https://play.google.com/store/apps/details?id=org.torproject.torbrowser) / [Official](https://www.torproject.org/download/) |
@@ -91,9 +93,9 @@ This guide explains how to connect to MoaV from various devices.
 | App | Protocols | Link |
 |-----|-----------|------|
 | [v2rayN](https://github.com/2dust/v2rayN) | VLESS, VMess, Trojan, Hysteria2, TUIC | [GitHub](https://github.com/2dust/v2rayN/releases) |
-| [Hiddify](https://hiddify.com/) | VLESS, VMess, Hysteria2, Trojan, Reality | [GitHub](https://github.com/hiddify/hiddify-app/releases) |
-| [NekoRay](https://github.com/MatsuriDayo/nekoray) | VLESS, VMess, Trojan, Hysteria2 (sing-box) | [GitHub](https://github.com/MatsuriDayo/nekoray/releases) ¹ |
-| [Mihomo Party](https://github.com/mihomo-party-org/mihomo-party) | VLESS, VMess, Hysteria2, Trojan | [GitHub](https://github.com/mihomo-party-org/mihomo-party/releases) |
+| [Hiddify](https://hiddify.com/) | VLESS, VMess, Hysteria2, Trojan, AnyTLS, Reality | [GitHub](https://github.com/hiddify/hiddify-app/releases) |
+| [NekoRay](https://github.com/MatsuriDayo/nekoray) | VLESS, VMess, Trojan, Hysteria2, AnyTLS (sing-box) | [GitHub](https://github.com/MatsuriDayo/nekoray/releases) ¹ |
+| [Mihomo Party](https://github.com/mihomo-party-org/mihomo-party) | VLESS, VMess, Hysteria2, Trojan, AnyTLS | [GitHub](https://github.com/mihomo-party-org/mihomo-party/releases) |
 | [Clash Verge](https://github.com/clash-verge-rev/clash-verge-rev) | VLESS, VMess, Hysteria2, Trojan | [GitHub](https://github.com/clash-verge-rev/clash-verge-rev/releases) |
 | [Tor Browser](https://www.torproject.org/download/) | Tor | [Official](https://www.torproject.org/download/) |
 | [Psiphon](https://psiphon.ca/) | Psiphon | [Official](https://psiphon.ca/en/download.html) |
@@ -107,10 +109,10 @@ This guide explains how to connect to MoaV from various devices.
 |-----|-----------|------|
 | [Streisand](https://apps.apple.com/us/app/streisand/id6450534064) | VLESS/Reality, VMess, Trojan, Hysteria2, WireGuard | [App Store (Free)](https://apps.apple.com/us/app/streisand/id6450534064) |
 | [v2rayN](https://github.com/2dust/v2rayN) | VLESS, VMess, Trojan, Hysteria2 | [GitHub](https://github.com/2dust/v2rayN/releases) |
-| [Hiddify](https://hiddify.com/) | VLESS, VMess, Hysteria2, Trojan, Reality | [GitHub](https://github.com/hiddify/hiddify-app/releases) |
-| [NekoRay](https://github.com/MatsuriDayo/nekoray) | VLESS, VMess, Trojan, Hysteria2 (sing-box) | [GitHub](https://github.com/MatsuriDayo/nekoray/releases) ¹ |
+| [Hiddify](https://hiddify.com/) | VLESS, VMess, Hysteria2, Trojan, AnyTLS, Reality | [GitHub](https://github.com/hiddify/hiddify-app/releases) |
+| [NekoRay](https://github.com/MatsuriDayo/nekoray) | VLESS, VMess, Trojan, Hysteria2, AnyTLS (sing-box) | [GitHub](https://github.com/MatsuriDayo/nekoray/releases) ¹ |
 | [Clash Verge](https://github.com/clash-verge-rev/clash-verge-rev) | VLESS, VMess, Hysteria2, Trojan | [GitHub](https://github.com/clash-verge-rev/clash-verge-rev/releases) |
-| [sing-box](https://sing-box.sagernet.org/) | VLESS, VMess, Trojan, Hysteria2, WireGuard | [Homebrew](https://formulae.brew.sh/formula/sing-box) / [GitHub](https://github.com/SagerNet/sing-box) |
+| [sing-box](https://sing-box.sagernet.org/) | VLESS, VMess, Trojan, Hysteria2, AnyTLS, WireGuard | [Homebrew](https://formulae.brew.sh/formula/sing-box) / [GitHub](https://github.com/SagerNet/sing-box) |
 | [Tor Browser](https://www.torproject.org/download/) | Tor | [Official](https://www.torproject.org/download/) |
 | [Psiphon](https://psiphon.ca/) | Psiphon | [App Store (Apple Silicon)](https://apps.apple.com/us/app/psiphon/id1276263909) |
 | [WireGuard](https://www.wireguard.com/) | WireGuard | [App Store](https://apps.apple.com/us/app/wireguard/id1451685025) |
@@ -121,11 +123,11 @@ This guide explains how to connect to MoaV from various devices.
 
 | App | Protocols | Link |
 |-----|-----------|------|
-| [Hiddify](https://hiddify.com/) | VLESS, VMess, Hysteria2, Trojan, Reality | [GitHub](https://github.com/hiddify/hiddify-app/releases) |
+| [Hiddify](https://hiddify.com/) | VLESS, VMess, Hysteria2, Trojan, AnyTLS, Reality | [GitHub](https://github.com/hiddify/hiddify-app/releases) |
 | [v2rayN](https://github.com/2dust/v2rayN) | VLESS, VMess, Trojan, Hysteria2 | [GitHub](https://github.com/2dust/v2rayN/releases) |
-| [sing-box](https://sing-box.sagernet.org/) | VLESS, VMess, Trojan, Hysteria2, WireGuard, DNS | [GitHub](https://github.com/SagerNet/sing-box) |
+| [sing-box](https://sing-box.sagernet.org/) | VLESS, VMess, Trojan, Hysteria2, AnyTLS, WireGuard, DNS | [GitHub](https://github.com/SagerNet/sing-box) |
 | [Clash Verge](https://github.com/clash-verge-rev/clash-verge-rev) | VLESS, VMess, Hysteria2, Trojan | [GitHub](https://github.com/clash-verge-rev/clash-verge-rev/releases) |
-| [Mihomo Party](https://github.com/mihomo-party-org/mihomo-party) | VLESS, VMess, Hysteria2, Trojan | [GitHub](https://github.com/mihomo-party-org/mihomo-party/releases) |
+| [Mihomo Party](https://github.com/mihomo-party-org/mihomo-party) | VLESS, VMess, Hysteria2, Trojan, AnyTLS | [GitHub](https://github.com/mihomo-party-org/mihomo-party/releases) |
 | [Tor Browser](https://www.torproject.org/download/) | Tor | [Official](https://www.torproject.org/download/) |
 | [WireGuard](https://www.wireguard.com/) | WireGuard | [Official](https://www.wireguard.com/install/) |
 | [AmneziaWG](https://github.com/amnezia-vpn/amneziawg-linux-kernel-module) | AmneziaWG | `awg-quick` CLI (awg-tools) |
@@ -533,6 +535,58 @@ This creates a local proxy on:
 - HTTP: `127.0.0.1:8080`
 
 Configure your browser/apps to use this proxy.
+
+---
+
+## AnyTLS Setup
+
+AnyTLS is a password-authenticated TLS proxy that defeats **TLS-in-TLS fingerprinting** for very high stealth. It runs on the same sing-box engine as Trojan and reuses your domain's TLS certificate. It is **opt-in** (enabled with `ENABLE_ANYTLS=true` on the server) and uses the same per-user password as your Trojan/Hysteria2 entries.
+
+**Your config file:** `anytls.txt`
+
+**Important:** AnyTLS is a newer protocol with **narrower client support** than VLESS/Trojan. Use a recent build of one of these apps:
+
+- **Hiddify** (iOS, Android, macOS, Windows)
+- **sing-box** (SFA on Android, SFI on iOS, CLI on desktop)
+- **NekoBox** (Android) / **NekoRay** (desktop)
+- **Mihomo Party** (macOS, Windows)
+- **Shadowrocket** 2.2.65 or newer (iOS)
+
+Clients without AnyTLS support (e.g., v2rayNG, Streisand, V2Box, Clash Verge) will fail to import the link — switch to one of the apps above.
+
+### Import the link
+
+The `anytls.txt` link works in any of the supported apps:
+
+1. Copy the link from `anytls.txt`
+2. Import into your client app (paste from clipboard, or scan `anytls-qr.png` if present)
+3. Connect
+
+**Link format:**
+```
+anytls://password@yourdomain.com:8445?sni=yourdomain.com&insecure=0#MoaV-AnyTLS-username
+```
+
+### iOS (Shadowrocket 2.2.65+ / Hiddify)
+
+1. Open Shadowrocket or Hiddify
+2. Tap the scanner icon → scan `anytls-qr.png`, or paste the link from `anytls.txt`
+3. Toggle ON to connect
+
+### Android (NekoBox / Hiddify / sing-box)
+
+1. Open NekoBox, Hiddify, or sing-box (SFA)
+2. Tap "+" → "Import from clipboard"
+3. Paste the link from `anytls.txt`
+4. Connect
+
+### Desktop (NekoRay / Mihomo Party / sing-box)
+
+1. Open NekoRay, Mihomo Party, or the sing-box CLI
+2. Import the link from `anytls.txt`
+3. Connect
+
+**Note:** AnyTLS requires a domain (TLS) and shares the Trojan certificate. If import fails, confirm your client actually supports AnyTLS (see the list above) and is up to date.
 
 ---
 

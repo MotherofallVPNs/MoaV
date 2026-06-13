@@ -66,6 +66,19 @@
       }
     },
     {
+      "type": "anytls",
+      "tag": "anytls-in",
+      "listen": "::",
+      "listen_port": ${PORT_ANYTLS},
+      "users": ${ANYTLS_USERS_JSON},
+      "tls": {
+        "enabled": true,
+        "server_name": "${DOMAIN}",
+        "certificate_path": "/certs/live/${DOMAIN}/fullchain.pem",
+        "key_path": "/certs/live/${DOMAIN}/privkey.pem"
+      }
+    },
+    {
       "type": "hysteria2",
       "tag": "hysteria2-in",
       "listen": "::",

@@ -45,6 +45,7 @@ services:
     ports:
       - "${PORT_HTTPS:-443}:443/tcp"      # Reality (VLESS)
       - "${PORT_TROJAN:-8443}:8443/tcp"   # Trojan (backup)
+      - "${PORT_ANYTLS:-8445}:8445/tcp"   # AnyTLS (only if ENABLE_ANYTLS=true)
       - "${PORT_HYSTERIA:-443}:443/udp"   # Hysteria2 (QUIC)
       - "${PORT_CDN:-2082}:2082/tcp"      # CDN WebSocket (VLESS+WS)
       - "${PORT_SS:-8388}:${PORT_SS:-8388}/tcp"  # Shadowsocks-2022 (only if ENABLE_SS=true)
@@ -1251,6 +1252,8 @@ services:
       - REALITY_PRIVATE_KEY=${REALITY_PRIVATE_KEY:-}
       - ENABLE_REALITY=${ENABLE_REALITY:-true}
       - ENABLE_TROJAN=${ENABLE_TROJAN:-true}
+      - ENABLE_ANYTLS=${ENABLE_ANYTLS:-false}
+      - PORT_ANYTLS=${PORT_ANYTLS:-8445}
       - ENABLE_HYSTERIA2=${ENABLE_HYSTERIA2:-true}
       - ENABLE_WIREGUARD=${ENABLE_WIREGUARD:-true}
       - ENABLE_DNSTT=${ENABLE_DNSTT:-true}

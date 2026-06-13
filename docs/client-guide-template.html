@@ -622,6 +622,7 @@
                 <li><a href="#en" onclick="scrollToSection('reality-en')">1. Reality (VLESS) <span class="toc-badge badge-primary">Primary</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('hysteria2-en')">2. Hysteria2 <span class="toc-badge badge-secondary">Fast</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('trojan-en')">3. Trojan <span class="toc-badge badge-secondary">Backup</span></a></li>
+                <li><a href="#en" onclick="scrollToSection('anytls-en')">3c. AnyTLS <span class="toc-badge badge-secondary">Anti-Fingerprint</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('shadowsocks-en')">3b. Shadowsocks-2022</a></li>
                 <li><a href="#en" onclick="scrollToSection('cdn-en')">4. CDN VLESS+WS <span class="toc-badge badge-secondary">IP Blocked?</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('xhttp-en')">4b. XHTTP <span class="toc-badge badge-secondary">Xray-core</span></a></li>
@@ -777,6 +778,41 @@
                     <p>Enable <strong>TLS Fragment</strong> to bypass DPI, and <strong>MUX</strong> to multiplex connections (fewer handshakes, harder to fingerprint).</p>
                     <p style="margin-top: 6px;"><strong>Hiddify:</strong> Settings → Config Options → TLS Fragment (Size: <code>10-100</code>, Sleep: <code>10-50</code>) and MUX (Protocol: <code>h2mux</code>, Max Connections: <code>2</code>, Padding: On)</p>
                     <p><strong>v2rayNG:</strong> Settings → TLS Fragment (Length: <code>50-200</code>, Interval: <code>10-50</code>) and MUX (Concurrency: <code>2-4</code>)</p>
+                </div>
+            </div>
+        </details>
+
+        <!-- AnyTLS -->
+        <details class="protocol-section" id="anytls-en">
+            <summary class="protocol-header">
+                <div class="protocol-title">
+                    <h2>3c. AnyTLS</h2>
+                    <span class="protocol-badge badge-secondary">Anti-Fingerprint</span>
+                </div>
+                <span class="protocol-port">Port 8445/tcp</span>
+            </summary>
+            <div class="protocol-content">
+                <p class="protocol-desc">A sing-box-native protocol that reuses real TLS on the server domain with password authentication. Its padding scheme defeats <strong>TLS-in-TLS fingerprinting</strong>, giving higher stealth than Trojan.</p>
+                <div class="extra-section" style="margin-top: 16px; border: 1px solid var(--border-color); padding: 12px; border-radius: 6px;">
+                    <h4>When to use</h4>
+                    <p>Choose AnyTLS when you want <strong>stronger anti-fingerprinting than Trojan</strong> and your client supports it. Client support is narrower than VLESS/Trojan — use one of the apps listed below.</p>
+                </div>
+                <div class="qr-section">
+                    <div class="qr-code">
+                        <img src="data:image/png;base64,{{QR_ANYTLS}}" alt="AnyTLS QR Code" onerror="this.parentElement.classList.add('qr-missing'); this.parentElement.innerHTML='QR not available<br>Use config below';">
+                    </div>
+                    <div class="qr-instructions">
+                        <h4>How to connect:</h4>
+                        <ol>
+                            <li>Install <strong>Hiddify</strong>, <strong>sing-box (SFA/SFI)</strong>, <strong>NekoBox/NekoRay</strong>, <strong>Mihomo Party</strong>, or <strong>Shadowrocket 2.2.65+</strong></li>
+                            <li>Scan the QR code or copy the config link</li>
+                            <li>Enable the connection</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="config-box">
+                    <h4>Config Link (click to copy)</h4>
+                    <div class="config-value multiline">{{CONFIG_ANYTLS}}</div>
                 </div>
             </div>
         </details>
@@ -1353,7 +1389,7 @@
                     </tr>
                     <tr>
                         <td><a href="https://apps.apple.com/us/app/hiddify-proxy-vpn/id6596777532" target="_blank">Hiddify</a> (Free)</td>
-                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP</td>
+                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP, AnyTLS</td>
                     </tr>
                     <tr>
                         <td><a href="https://apps.apple.com/ca/app/v2box-v2ray-client/id6446814690" target="_blank">V2Box</a> (Free)</td>
@@ -1377,7 +1413,7 @@
                     </tr>
                     <tr>
                         <td><a href="https://apps.apple.com/us/app/shadowrocket/id932747118" target="_blank">Shadowrocket</a> ($2.99)</td>
-                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP, WireGuard</td>
+                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP, WireGuard, AnyTLS</td>
                     </tr>
                     <tr>
                         <td rowspan="9"><span class="platform-icon">🤖</span>Android</td>
@@ -1394,7 +1430,7 @@
                     </tr>
                     <tr>
                         <td><a href="https://github.com/hiddify/hiddify-app/releases" target="_blank">Hiddify</a></td>
-                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP</td>
+                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP, AnyTLS</td>
                     </tr>
                     <tr>
                         <td><a href="https://play.google.com/store/apps/details?id=com.wireguard.android" target="_blank">WireGuard</a></td>
@@ -1427,7 +1463,7 @@
                     </tr>
                     <tr>
                         <td><a href="https://github.com/hiddify/hiddify-app/releases" target="_blank">Hiddify</a></td>
-                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP</td>
+                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP, AnyTLS</td>
                     </tr>
                     <tr>
                         <td><a href="https://www.wireguard.com/install/" target="_blank">WireGuard</a></td>
@@ -1452,7 +1488,7 @@
                     </tr>
                     <tr>
                         <td><a href="https://github.com/hiddify/hiddify-app/releases" target="_blank">Hiddify</a></td>
-                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP</td>
+                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP, AnyTLS</td>
                     </tr>
                     <tr>
                         <td><a href="https://github.com/clash-verge-rev/clash-verge-rev/releases" target="_blank">Clash Verge</a></td>
@@ -1477,7 +1513,7 @@
                     <tr>
                         <td rowspan="5"><span class="platform-icon">🐧</span>Linux</td>
                         <td><a href="https://github.com/hiddify/hiddify-app/releases" target="_blank">Hiddify</a></td>
-                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP</td>
+                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP, AnyTLS</td>
                     </tr>
                     <tr>
                         <td><a href="https://www.wireguard.com/install/" target="_blank">WireGuard</a></td>
@@ -1523,6 +1559,7 @@
                 <li><a href="#fa" onclick="scrollToSection('reality-fa')">۱. Reality (VLESS) <span class="toc-badge badge-primary">اصلی</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('hysteria2-fa')">۲. Hysteria2 <span class="toc-badge badge-secondary">سریع</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('trojan-fa')">۳. Trojan <span class="toc-badge badge-secondary">پشتیبان</span></a></li>
+                <li><a href="#fa" onclick="scrollToSection('anytls-fa')">۳پ. AnyTLS <span class="toc-badge badge-secondary">ضد اثرانگشت</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('shadowsocks-fa')">۳ب. Shadowsocks-2022</a></li>
                 <li><a href="#fa" onclick="scrollToSection('cdn-fa')">۴. CDN VLESS+WS <span class="toc-badge badge-secondary">IP مسدود؟</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('xhttp-fa')">۴ب. XHTTP <span class="toc-badge badge-secondary">Xray-core</span></a></li>
@@ -1678,6 +1715,41 @@
                     <p><strong>TLS Fragment</strong> را برای عبور از DPI و <strong>MUX</strong> را برای ادغام اتصالات فعال کنید (Handshake کمتر، شناسایی سخت‌تر).</p>
                     <p style="margin-top: 6px;"><strong>Hiddify:</strong> Settings → Config Options → TLS Fragment (Size: <code>10-100</code>، Sleep: <code>10-50</code>) و MUX (Protocol: <code>h2mux</code>، Max Connections: <code>2</code>، Padding: روشن)</p>
                     <p><strong>v2rayNG:</strong> Settings → TLS Fragment (Length: <code>50-200</code>، Interval: <code>10-50</code>) و MUX (Concurrency: <code>2-4</code>)</p>
+                </div>
+            </div>
+        </details>
+
+        <!-- AnyTLS -->
+        <details class="protocol-section" id="anytls-fa">
+            <summary class="protocol-header">
+                <div class="protocol-title">
+                    <h2>۳پ. AnyTLS</h2>
+                    <span class="protocol-badge badge-secondary">ضد اثرانگشت</span>
+                </div>
+                <span class="protocol-port">پورت 8445/tcp</span>
+            </summary>
+            <div class="protocol-content">
+                <p class="protocol-desc">یک پروتکل بومی sing-box که از TLS واقعی روی دامنه سرور با احراز هویت رمز عبور استفاده می‌کند. طرح padding آن <strong>اثرانگشت TLS-in-TLS</strong> را خنثی می‌کند و مخفی‌کاری بالاتری نسبت به Trojan دارد.</p>
+                <div class="extra-section" style="margin-top: 16px; border: 1px solid var(--border-color); padding: 12px; border-radius: 6px;">
+                    <h4>چه زمانی استفاده شود</h4>
+                    <p>زمانی AnyTLS را انتخاب کنید که به <strong>ضد اثرانگشت قوی‌تر از Trojan</strong> نیاز دارید و کلاینت شما از آن پشتیبانی می‌کند. پشتیبانی کلاینت‌ها محدودتر از VLESS/Trojan است — از یکی از اپ‌های فهرست‌شده زیر استفاده کنید.</p>
+                </div>
+                <div class="qr-section">
+                    <div class="qr-code">
+                        <img src="data:image/png;base64,{{QR_ANYTLS}}" alt="QR Code AnyTLS" onerror="this.parentElement.classList.add('qr-missing'); this.parentElement.innerHTML='QR در دسترس نیست<br>از لینک زیر استفاده کنید';">
+                    </div>
+                    <div class="qr-instructions">
+                        <h4>نحوه اتصال:</h4>
+                        <ol>
+                            <li><strong>Hiddify</strong>، <strong>sing-box (SFA/SFI)</strong>، <strong>NekoBox/NekoRay</strong>، <strong>Mihomo Party</strong> یا <strong>Shadowrocket 2.2.65+</strong> را نصب کنید</li>
+                            <li>کد QR را اسکن کنید یا لینک کانفیگ را کپی کنید</li>
+                            <li>اتصال را فعال کنید</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="config-box">
+                    <h4>لینک کانفیگ (کلیک برای کپی)</h4>
+                    <div class="config-value multiline">{{CONFIG_ANYTLS}}</div>
                 </div>
             </div>
         </details>
@@ -2243,7 +2315,7 @@
                     </tr>
                     <tr>
                         <td><a href="https://apps.apple.com/us/app/hiddify-proxy-vpn/id6596777532" target="_blank">Hiddify</a></td>
-                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP</td>
+                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP, AnyTLS</td>
                     </tr>
                     <tr>
                         <td><a href="https://apps.apple.com/us/app/wireguard/id1441195209" target="_blank">WireGuard</a></td>
@@ -2263,7 +2335,7 @@
                     </tr>
                     <tr>
                         <td><a href="https://apps.apple.com/us/app/shadowrocket/id932747118" target="_blank">Shadowrocket</a></td>
-                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP, WireGuard</td>
+                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP, WireGuard, AnyTLS</td>
                     </tr>
                     <tr>
                         <td rowspan="8"><span class="platform-icon">🤖</span>Android</td>
@@ -2280,7 +2352,7 @@
                     </tr>
                     <tr>
                         <td><a href="https://github.com/hiddify/hiddify-app/releases" target="_blank">Hiddify</a></td>
-                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP</td>
+                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP, AnyTLS</td>
                     </tr>
                     <tr>
                         <td><a href="https://play.google.com/store/apps/details?id=com.wireguard.android" target="_blank">WireGuard</a></td>
@@ -2326,7 +2398,7 @@
                     <tr>
                         <td rowspan="6"><span class="platform-icon">🍎</span>macOS</td>
                         <td><a href="https://github.com/hiddify/hiddify-app/releases" target="_blank">Hiddify</a></td>
-                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP</td>
+                        <td class="protocols">Reality, Trojan, Hysteria2, XHTTP, AnyTLS</td>
                     </tr>
                     <tr>
                         <td><a href="https://apps.apple.com/us/app/streisand/id6450534064" target="_blank">Streisand</a></td>

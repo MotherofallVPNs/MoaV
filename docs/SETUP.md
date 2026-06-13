@@ -39,7 +39,7 @@ Complete guide to deploy MoaV on a VPS or home server.
 - Public IPv6 address (optional, see [IPv6 Support](#ipv6-support))
 
 **Domain (Optional but Recommended):**
-- Required for: Reality, Trojan, Hysteria2, TrustTunnel, CDN mode, DNS tunnels (dnstt, Slipstream, XDNS)
+- Required for: Reality, Trojan, AnyTLS, Hysteria2, TrustTunnel, CDN mode, DNS tunnels (dnstt, Slipstream, XDNS)
 - Not required for: Reality, WireGuard, AmneziaWG, Telegram MTProxy, Admin dashboard, Conduit, Snowflake
 - See [Domainless Mode](#domainless-mode) if you don't have a domain
 
@@ -50,6 +50,7 @@ Complete guide to deploy MoaV on a VPS or home server.
 | 443/tcp | TCP | Reality (VLESS) | Yes |
 | 443/udp | UDP | Hysteria2 | Yes |
 | 8443/tcp | TCP | Trojan | Yes |
+| 8445/tcp | TCP | AnyTLS | Yes |
 | 8388/tcp+udp | TCP+UDP | Shadowsocks-2022 | No |
 | 4443/tcp+udp | TCP+UDP | TrustTunnel | Yes |
 | 2082/tcp | TCP | CDN WebSocket | Yes (Cloudflare) or No (CloudFront) |
@@ -267,6 +268,7 @@ See [CLI Reference → Profiles](CLI.md#profiles) for the full profile/service/`
 ufw allow 443/tcp    # Reality
 ufw allow 443/udp    # Hysteria2
 ufw allow 8443/tcp   # Trojan
+ufw allow 8445/tcp   # AnyTLS
 ufw allow 8388       # Shadowsocks-2022
 
 # TrustTunnel
@@ -317,6 +319,7 @@ ls outputs/bundles/
 - `README.html` - User instructions (English + Farsi)
 - `reality.txt` - Reality share link + QR code
 - `trojan.txt` - Trojan share link
+- `anytls.txt` - AnyTLS share link (if `ENABLE_ANYTLS=true`)
 - `shadowsocks.txt` / `shadowsocks-qr.png` - Shadowsocks-2022 `ss://` URI + QR
 - `hysteria2.txt` - Hysteria2 share link
 - `cdn-vless.txt` - CDN share link (if CDN_DOMAIN set)
