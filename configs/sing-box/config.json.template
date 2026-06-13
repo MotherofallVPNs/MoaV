@@ -71,6 +71,7 @@
       "listen": "::",
       "listen_port": 443,
       "users": ${HYSTERIA2_USERS_JSON},
+      "ignore_client_bandwidth": true,
       "obfs": {
         "type": "salamander",
         "password": "${HYSTERIA2_OBFS_PASSWORD}"

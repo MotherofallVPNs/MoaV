@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Monitoring-stack opt-in default is now RAM-aware** — both confirm prompts (first-time + re-enable) default to `N` on hosts with `<2 GB` RAM, `Y` otherwise. Matches the doctor's existing "<2 GB + monitoring = hang risk" warning and the build-concurrency tier model. Operators on 2 GB+ hosts see no change; operators on small VPSes no longer get a default-yes monitoring stack competing for memory with the proxy containers
+- **Hysteria2 inbound now sets `ignore_client_bandwidth: true`** (PR [#131](https://github.com/shayanb/MoaV/pull/131)) — with `up_mbps`/`down_mbps` left unset the server uses BBR; this flag keeps clients on BBR too, preventing a client-advertised bandwidth from switching the link to Brutal congestion control and saturating a low-RAM VPS. Note: this is Hysteria2's own QUIC-layer BBR inside sing-box, unrelated to the kernel `tcp_bbr` module — no host dependency.
 
 ## [1.8.4] - 2026-06-05
 
