@@ -51,7 +51,7 @@ QUIC-based protocol optimized for high throughput on lossy networks. Includes bu
 - **Engine:** [sing-box](https://github.com/SagerNet/sing-box)
 - **Clients:** Streisand, Hiddify, v2rayNG, v2rayN
 - **Note:** Requires UDP. Blocked in some censored networks that drop all non-DNS UDP.
-- **Congestion control:** The server leaves `up_mbps`/`down_mbps` unset (so it uses BBR) and sets `ignore_client_bandwidth: true`. This forces clients onto BBR as well, preventing a client-advertised bandwidth from switching the link to Brutal congestion control, which can saturate a low-RAM VPS.
+- **Congestion control:** `up_mbps`/`down_mbps` are left unset and `ignore_client_bandwidth: true` is set, keeping both ends on BBR and stopping a client-advertised bandwidth from switching the link to Brutal (which can saturate a low-RAM VPS). This BBR is Hysteria2's own QUIC-layer controller inside sing-box — unrelated to the kernel `tcp_bbr` module, so it has no host dependency.
 
 ### CDN (VLESS+WS)
 
