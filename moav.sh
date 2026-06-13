@@ -429,33 +429,22 @@ get_env_val() {
     echo "${val:-$default}"
 }
 
-# -----------------------------------------------------------------------------
-# Reality fallback target — vetted lists + DNS validation (issue #115)
-#
-# Reality's `handshake.server` / `realitySettings.dest` is the host the inbound
-# proxies non-Reality TLS hellos to (the "you didn't auth, here's a real site"
-# fallback). If it doesn't resolve, every probe and every legitimate client
-# sees an RST. Operators historically picked plausible-sounding hostnames
-# (`update.samsung.com`, `swl.samsung.com`) that aren't public DNS names —
-# those bundles silently break.
-# -----------------------------------------------------------------------------
+# Reality fallback target — vetted lists + DNS validation (#115).
+# NXDOMAIN target → every TLS hello RSTs, bundle silently breaks.
 REALITY_TARGETS_GLOBAL=(
     "www.cloudflare.com:443"
     "www.apple.com:443"
     "cdn.kernel.org:443"
     "www.microsoft.com:443"
 )
-# SNI cover for Iran-resident clients — Reality hello looks like normal traffic
-# to Iranian-domestic sites, which Iran DPI is less aggressive about than
-# Western corporate destinations.
+# SNI cover for clients inside Iran.
 REALITY_TARGETS_IRAN=(
     "www.aparat.com:443"
     "digikala.com:443"
     "taghche.com:443"
 )
 
-# Returns 0 if `host` resolves to at least one A or AAAA record. Tries getent,
-# then host, then nslookup — whichever is present. Empty host → fail.
+# 0 if host has A/AAAA. Tries getent → host → nslookup. Empty host → fail.
 reality_target_resolves() {
     local host="$1"
     [[ -n "$host" ]] || return 1
@@ -485,10 +474,8 @@ show_vetted_reality_targets() {
     done
 }
 
-# Validate REALITY_TARGET and XHTTP_REALITY_TARGET from .env resolve in DNS.
-# If a host is NXDOMAIN, prompt for a replacement (up to 3 attempts), rewrite
-# .env in place. Returns 0 on success / all valid, 1 if still invalid after
-# attempts and operator can't fix it. Skips disabled protocols.
+# Validate REALITY_TARGET / XHTTP_REALITY_TARGET resolve. NXDOMAIN → re-prompt
+# (≤3) and rewrite .env. Returns 1 if still invalid after retries.
 validate_reality_targets() {
     local env_file="${1:-.env}"
     [[ -f "$env_file" ]] || return 0  # nothing to validate yet
@@ -546,6 +533,17 @@ validate_reality_targets() {
     done
 
     [[ "$failed" -eq 0 ]]
+}
+
+# Monitoring opt-in default: N below 2 GB (hang risk), Y otherwise.
+monitoring_default_for_ram() {
+    local total_mb
+    total_mb=$(awk '/MemTotal/ {printf "%.0f", $2/1024}' /proc/meminfo 2>/dev/null || echo 0)
+    if [[ "$total_mb" -gt 0 && "$total_mb" -lt 2048 ]]; then
+        echo "n"
+    else
+        echo "y"
+    fi
 }
 
 ensure_admin_password() {
@@ -2571,30 +2569,13 @@ ZONEOF
 }
 
 # =============================================================================
-# Network tuning — BBR congestion control + buffers + queue depth
-#
-# Real-world Portugal→Vilnius test (Time4VPS, ~400 ms RTT with burst loss):
-# CUBIC 5.45 Mbps → BBR 14.8 Mbps single-flow TCP. Recovery from packet loss
-# went from "CUBIC stuck at 2 Mbps for seconds" to "BBR jumped to 43 Mbps in
-# the next second". UDP buffer bumps help Hysteria2 / WireGuard / quic-go even
-# though they don't use BBR (quic-go needs >=7.5 MiB).
-#
-# Sources: naiveproxy Performance Tuning wiki, Cloudflare TCP tuning blog,
-# Stony Brook IMC'19 "When to use BBR", quic-go UDP Buffer Sizes wiki.
-#
-# `tcp_fastopen` is deliberately NOT set — TFO is hostile in censored networks
-# (~5% of paths drop SYN+data; China Mobile firewalls). See Craig Andrews'
-# "Sad Story of TCP Fast Open" + the same reasoning that removed it from the
-# sing-box Reality / Trojan inbounds in v1.8.4.
+# Network tuning — BBR + buffers + queue depth. Rationale + sources: OPSEC.md.
 # =============================================================================
 
 NT_CONF_PATH="/etc/sysctl.d/99-moav-net.conf"
 
-# Returns 0 if the running kernel can use BBR. On most distro kernels tcp_bbr
-# ships as a module that isn't loaded until requested, so it's absent from
-# tcp_available_congestion_control on a fresh boot — try modprobe before
-# concluding it's unsupported. OpenVZ guests + ancient kernels (<4.9) still
-# fail cleanly.
+# Returns 0 if the kernel can use BBR. tcp_bbr is a module on most distros —
+# modprobe first, otherwise OpenVZ / pre-4.9 kernels both fail cleanly.
 nt_kernel_supports_bbr() {
     local avail
     avail=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null || echo "")
@@ -2607,8 +2588,7 @@ nt_kernel_supports_bbr() {
     [[ " $avail " == *" bbr "* ]]
 }
 
-# 16 MiB on hosts <2 GB RAM, 32 MiB otherwise. quic-go needs >=7.5 MiB just for
-# its UDP buffer; 16 MiB headroom matters even on small VPSes.
+# 16 MiB on <2 GB RAM hosts, 32 MiB otherwise (quic-go floor is 7.5 MiB).
 nt_buffer_max() {
     local total_mb
     total_mb=$(awk '/MemTotal/ {printf "%.0f", $2/1024}' /proc/meminfo 2>/dev/null || echo 0)
@@ -2619,41 +2599,35 @@ nt_buffer_max() {
     fi
 }
 
-# Render the sysctl bundle to stdout. Caller writes it to /etc/sysctl.d/.
+# Render the sysctl bundle to stdout. Caller writes it to NT_CONF_PATH.
+# bmax = max for {r,w}mem_max + tcp_{r,w}mem high bound.
 nt_render_config() {
     local bmax="$1"
     cat <<EOF
 # MoaV network tuning — generated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-# Reversible: moav net revert (deletes this file + reloads sysctl)
-# Docs: docs/OPSEC.md → "Network tuning"
+# Reversible: moav net revert. Docs: docs/OPSEC.md → "Network tuning".
 
-# Congestion control + queue discipline. BBR has been mainline since 4.9;
-# fq is required for BBR's pacing.
+# BBR needs fq for pacing.
 net.ipv4.tcp_congestion_control = bbr
 net.core.default_qdisc          = fq
 
-# TCP buffers — auto-sized per host RAM.
 net.core.rmem_max               = ${bmax}
 net.core.wmem_max               = ${bmax}
 net.ipv4.tcp_rmem               = 4096 131072 ${bmax}
 net.ipv4.tcp_wmem               = 4096 16384 ${bmax}
 
-# UDP/QUIC defaults (Hysteria2, WireGuard, quic-go)
+# UDP defaults (Hysteria2, WireGuard, quic-go)
 net.core.rmem_default           = 1048576
 net.core.wmem_default           = 1048576
 
-# Queue depth — UDP drops hurt circumvention worse than TCP drops.
 net.core.netdev_max_backlog     = 16384
 net.core.somaxconn              = 8192
 
-# Long-lived proxy hygiene
 net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.tcp_mtu_probing           = 1
 net.ipv4.tcp_notsent_lowat         = 131072
 
-# DELIBERATELY NOT SET: net.ipv4.tcp_fastopen
-# TFO server-side ADDS latency in heavily-censored networks because
-# middleboxes drop the SYN+data and the client has to retry. See OPSEC.md.
+# tcp_fastopen DELIBERATELY UNSET — middleboxes drop SYN+data, raising latency.
 EOF
 }
 
@@ -2687,8 +2661,7 @@ nt_apply() {
     fi
     rm -f "$tmp"
 
-    # Persist the module so bbr survives reboot even if nothing else pulls it
-    # in before sysctl runs.
+    # Persist tcp_bbr across reboot.
     echo "tcp_bbr" | $SUDO tee /etc/modules-load.d/moav-bbr.conf >/dev/null 2>&1 || true
 
     if $SUDO sysctl -p "$NT_CONF_PATH" >/dev/null 2>&1; then
@@ -2700,8 +2673,7 @@ nt_apply() {
     fi
 }
 
-# Remove the moav tuning file and reload sysctl. Returns 0 even if the file
-# didn't exist (revert is idempotent).
+# Idempotent — returns 0 even if NT_CONF_PATH doesn't exist.
 nt_revert() {
     local SUDO=""
     if [[ "$(id -u)" -ne 0 ]]; then
@@ -2718,17 +2690,14 @@ nt_revert() {
 
     $SUDO rm -f "$NT_CONF_PATH"
     $SUDO rm -f /etc/modules-load.d/moav-bbr.conf 2>/dev/null || true
-    # Re-load the rest of sysctl.d (and main sysctl.conf) so the kernel reverts
-    # to distro defaults / whatever else is configured. Best-effort.
     $SUDO sysctl --system >/dev/null 2>&1 || true
     success "Network tuning reverted (removed $NT_CONF_PATH)."
     echo "  Some settings (rmem_max, wmem_max, congestion_control) only fully reset on reboot."
     return 0
 }
 
-# Print current vs desired values + applied/not-applied marker. Used by both
-# `moav net status` and `doctor_check_net`. Returns 0 if file exists AND core
-# values match, 1 if file present but drifted, 2 if not applied (skipped/unset).
+# Returns 0 = applied + values match, 1 = applied but drifted, 2 = not applied
+# or kernel unsupported. Called by `moav net status` and doctor_check_net.
 nt_status() {
     local pass=true
     local applied=false
@@ -2781,11 +2750,10 @@ nt_status() {
     if [[ "$applied" == "true" ]]; then
         $pass && return 0 || return 1
     else
-        return 2  # not applied — treat as skip in doctor sweep
+        return 2
     fi
 }
 
-# Top-level dispatcher for `moav net <subcommand>`.
 cmd_net() {
     local sub="${1:-status}"
     case "$sub" in
@@ -2847,8 +2815,6 @@ DOCTOR_CHECKS=(
     "updates:Check for MoaV updates"
 )
 
-# Wrapper so the doctor dispatcher can call nt_status without leaking the
-# `net.*` namespace from /proc directly into the checks list.
 doctor_check_net() {
     nt_status
 }
@@ -3688,11 +3654,8 @@ doctor_check_conflicts() {
     $pass && return 0 || return 1
 }
 
-# Reality fallback target check (issue #115).
-# For each enabled Reality inbound, ask its container's resolver whether the
-# configured `dest` hostname resolves, then TCP-probe the port from inside the
-# same container. Falls back to the host resolver if the container isn't
-# running (still useful — operator hasn't started services yet).
+# Reality dest reachability (#115). Uses the container's resolver (matches what
+# Reality sees at handshake); falls back to host resolver when container down.
 doctor_check_reality() {
     local env_file="$SCRIPT_DIR/.env"
     local enable_reality enable_xhttp
@@ -4392,7 +4355,7 @@ select_profiles() {
             # Not explicitly set - ask user
             echo ""
             warn "Monitoring stack (Grafana + Prometheus) requires at least 2GB RAM."
-            if confirm "Enable monitoring?" "n"; then
+            if confirm "Enable monitoring?" "$(monitoring_default_for_ram)"; then
                 update_env_var "$env_file" "ENABLE_MONITORING" "true"
                 SELECTED_PROFILES+=("monitoring")
                 success "Monitoring enabled"
@@ -4675,7 +4638,7 @@ ensure_clash_api_secret() {
     if [[ "$enable_monitoring" == "false" ]]; then
         echo ""
         warn "Monitoring is currently disabled in .env (ENABLE_MONITORING=false)"
-        if confirm "Enable monitoring?" "y"; then
+        if confirm "Enable monitoring?" "$(monitoring_default_for_ram)"; then
             update_env_var "$env_file" "ENABLE_MONITORING" "true"
             success "ENABLE_MONITORING set to true"
         else

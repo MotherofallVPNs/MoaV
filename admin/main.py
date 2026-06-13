@@ -31,6 +31,10 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
 ADMIN_IP_WHITELIST = os.environ.get("ADMIN_IP_WHITELIST", "").split(",")
 ADMIN_IP_WHITELIST = [ip.strip() for ip in ADMIN_IP_WHITELIST if ip.strip()]
 
+# compare_digest("", "") is True — empty / insecure-default ADMIN_PASSWORD must
+# fail closed (#126).
+ADMIN_PASSWORD_INSECURE = ADMIN_PASSWORD in ("", "admin", "change_me_to_something_secure")
+
 SERVER_IP = os.environ.get("SERVER_IP", "")
 DOMAIN = os.environ.get("DOMAIN", "")
 
@@ -124,6 +128,17 @@ def verify_auth(request: Request, credentials: HTTPBasicCredentials = Depends(se
     """Verify authentication via password and optional IP whitelist"""
     client_ip = request.client.host
 
+    # Fail closed on empty / insecure-default password (#126).
+    if ADMIN_PASSWORD_INSECURE:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Admin dashboard is locked: ADMIN_PASSWORD is unset, empty, or the "
+                "insecure default. Set ADMIN_PASSWORD in .env, then "
+                "`moav restart admin` (or run `moav admin password` to generate one)."
+            ),
+        )
+
     # Check IP whitelist if configured
     if ADMIN_IP_WHITELIST:
         ip_allowed = any(
@@ -145,9 +160,8 @@ def verify_auth(request: Request, credentials: HTTPBasicCredentials = Depends(se
     return credentials.username
 
 
-# Dashboard service name → docker container name. One source of truth.
-# Keep in sync with all_services in get_services_status() and with
-# `container_name:` fields in docker-compose.yml.
+# Service name → container name. Keep in sync with all_services in
+# get_services_status() and docker-compose.yml `container_name:` fields.
 SERVICE_CONTAINERS = {
     "sing-box":    "moav-sing-box",
     "decoy":       "moav-decoy",
@@ -169,14 +183,8 @@ SERVICE_CONTAINERS = {
 
 
 def _fetch_running_containers():
-    """Query docker-socket-proxy for the set of currently-running container
-    names. Returns a set on success, or None on any error so callers can
-    surface "unknown" instead of mis-reporting everything as stopped.
-
-    /containers/json returns only running containers by default (no `all=1`).
-    The admin container has DOCKER_HOST=tcp://docker-proxy:2375 set in
-    docker-compose.yml, and docker-proxy has CONTAINERS=1 capability.
-    """
+    """Set of running container names via docker-socket-proxy, or None on error
+    (so callers surface "unknown" instead of falsely "stopped")."""
     base = os.environ.get("DOCKER_HOST", "tcp://docker-proxy:2375").replace("tcp://", "http://")
     try:
         resp = httpx.get(f"{base}/containers/json", timeout=1.5)
@@ -184,7 +192,7 @@ def _fetch_running_containers():
             return None
         names = set()
         for c in resp.json():
-            # /containers/json returns names with a leading slash, e.g. "/moav-xray".
+            # /containers/json names have a leading slash, e.g. "/moav-xray".
             for n in c.get("Names", []):
                 names.add(n.lstrip("/"))
         return names
@@ -193,16 +201,8 @@ def _fetch_running_containers():
 
 
 def check_service_status(name: str, _running=None) -> str:
-    """Check whether a service's container is running.
-
-    Uniform docker-socket-proxy lookup. One round-trip lists every running
-    container; we cross-reference against SERVICE_CONTAINERS. Works for both
-    bridge-networked (moav_net) and host-networked (snowflake) services
-    without per-service special cases.
-
-    `_running` lets get_services_status() pass a pre-fetched set so the dashboard
-    only makes one docker-proxy call per refresh, not one per service card.
-    """
+    """Returns 'running' | 'stopped' | 'unknown'. `_running` lets callers pass
+    a pre-fetched set so a dashboard refresh makes one docker-proxy call total."""
     running = _running if _running is not None else _fetch_running_containers()
     if running is None:
         return "unknown"
