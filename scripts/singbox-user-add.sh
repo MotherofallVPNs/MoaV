@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # =============================================================================
-# Add a new user to sing-box (Reality, Trojan, Hysteria2)
+# Add a new user to sing-box (Reality, Trojan, AnyTLS, Hysteria2)
 # Usage: ./scripts/singbox-user-add.sh <username> [--no-reload]
 # =============================================================================
 
@@ -144,6 +144,12 @@ jq --arg name "$USERNAME" --arg pass "$USER_PASSWORD" \
     "$TEMP_CONFIG" > "${TEMP_CONFIG}.2"
 mv -f "${TEMP_CONFIG}.2" "$TEMP_CONFIG"
 
+# Add to AnyTLS users (no-op if the anytls-in inbound isn't present)
+jq --arg name "$USERNAME" --arg pass "$USER_PASSWORD" \
+    '.inbounds |= map(if .tag == "anytls-in" then .users += [{"name": $name, "password": $pass}] else . end)' \
+    "$TEMP_CONFIG" > "${TEMP_CONFIG}.2"
+mv -f "${TEMP_CONFIG}.2" "$TEMP_CONFIG"
+
 # Add to Hysteria2 users
 jq --arg name "$USERNAME" --arg pass "$USER_PASSWORD" \
     '.inbounds |= map(if .tag == "hysteria2-in" then .users += [{"name": $name, "password": $pass}] else . end)' \
@@ -249,6 +255,12 @@ if [[ -n "${DOMAIN:-}" ]]; then
     echo "$TROJAN_LINK" > "$OUTPUT_DIR/trojan.txt"
 fi
 
+# AnyTLS link (IPv4) — only if enabled and domain is set (requires TLS cert)
+if [[ "${ENABLE_ANYTLS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
+    ANYTLS_LINK="anytls://${USER_PASSWORD}@${SERVER_IP}:${PORT_ANYTLS:-8445}?sni=${DOMAIN}&insecure=0#MoaV-AnyTLS-${USERNAME}"
+    echo "$ANYTLS_LINK" > "$OUTPUT_DIR/anytls.txt"
+fi
+
 # Hysteria2 link (IPv4) — only if domain is set (requires TLS cert)
 if [[ -n "${DOMAIN:-}" ]]; then
     HY2_LINK="hysteria2://${USER_PASSWORD}@${SERVER_IP}:443?sni=${DOMAIN}&obfs=salamander&obfs-password=${HYSTERIA2_OBFS_PASSWORD}#MoaV-Hysteria2-${USERNAME}"
@@ -264,6 +276,11 @@ if [[ -n "$SERVER_IPV6" ]]; then
         TROJAN_LINK_V6="trojan://${USER_PASSWORD}@[${SERVER_IPV6}]:8443?security=tls&sni=${DOMAIN}&type=tcp#MoaV-Trojan-${USERNAME}-IPv6"
         echo "$TROJAN_LINK_V6" > "$OUTPUT_DIR/trojan-ipv6.txt"
 
+        if [[ "${ENABLE_ANYTLS:-false}" == "true" ]]; then
+            ANYTLS_LINK_V6="anytls://${USER_PASSWORD}@[${SERVER_IPV6}]:${PORT_ANYTLS:-8445}?sni=${DOMAIN}&insecure=0#MoaV-AnyTLS-${USERNAME}-IPv6"
+            echo "$ANYTLS_LINK_V6" > "$OUTPUT_DIR/anytls-ipv6.txt"
+        fi
+
         HY2_LINK_V6="hysteria2://${USER_PASSWORD}@[${SERVER_IPV6}]:443?sni=${DOMAIN}&obfs=salamander&obfs-password=${HYSTERIA2_OBFS_PASSWORD}#MoaV-Hysteria2-${USERNAME}-IPv6"
         echo "$HY2_LINK_V6" > "$OUTPUT_DIR/hysteria2-ipv6.txt"
     fi
@@ -275,12 +292,14 @@ fi
 if command -v qrencode &>/dev/null; then
     qrencode -o "$OUTPUT_DIR/reality-qr.png" -s 6 "$REALITY_LINK" 2>/dev/null || true
     [[ -n "${TROJAN_LINK:-}" ]] && qrencode -o "$OUTPUT_DIR/trojan-qr.png" -s 6 "$TROJAN_LINK" 2>/dev/null || true
+    [[ -n "${ANYTLS_LINK:-}" ]] && qrencode -o "$OUTPUT_DIR/anytls-qr.png" -s 6 "$ANYTLS_LINK" 2>/dev/null || true
     [[ -n "${HY2_LINK:-}" ]] && qrencode -o "$OUTPUT_DIR/hysteria2-qr.png" -s 6 "$HY2_LINK" 2>/dev/null || true
 
     # IPv6 QR codes
     if [[ -n "$SERVER_IPV6" ]]; then
         qrencode -o "$OUTPUT_DIR/reality-ipv6-qr.png" -s 6 "$REALITY_LINK_V6" 2>/dev/null || true
         [[ -n "${TROJAN_LINK_V6:-}" ]] && qrencode -o "$OUTPUT_DIR/trojan-ipv6-qr.png" -s 6 "$TROJAN_LINK_V6" 2>/dev/null || true
+        [[ -n "${ANYTLS_LINK_V6:-}" ]] && qrencode -o "$OUTPUT_DIR/anytls-ipv6-qr.png" -s 6 "$ANYTLS_LINK_V6" 2>/dev/null || true
         [[ -n "${HY2_LINK_V6:-}" ]] && qrencode -o "$OUTPUT_DIR/hysteria2-ipv6-qr.png" -s 6 "$HY2_LINK_V6" 2>/dev/null || true
     fi
 fi
@@ -824,6 +843,11 @@ if [[ -n "${TROJAN_LINK:-}" ]]; then
     echo "Trojan Link:"
     echo "$TROJAN_LINK"
 fi
+if [[ -n "${ANYTLS_LINK:-}" ]]; then
+    echo ""
+    echo "AnyTLS Link:"
+    echo "$ANYTLS_LINK"
+fi
 if [[ -n "${HY2_LINK:-}" ]]; then
     echo ""
     echo "Hysteria2 Link:"
@@ -840,6 +864,11 @@ if [[ -n "${SERVER_IPV6:-}" ]]; then
         echo ""
         echo "Trojan (IPv6):"
         echo "$TROJAN_LINK_V6"
+    fi
+    if [[ -n "${ANYTLS_LINK_V6:-}" ]]; then
+        echo ""
+        echo "AnyTLS (IPv6):"
+        echo "$ANYTLS_LINK_V6"
     fi
     if [[ -n "${HY2_LINK_V6:-}" ]]; then
         echo ""

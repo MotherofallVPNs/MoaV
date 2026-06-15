@@ -24,7 +24,7 @@ TEST_TIMEOUT="${TEST_TIMEOUT:-10}"
 
 # Protocol priority for auto mode
 # Note: psiphon excluded - requires embedded server list, not supported in client mode
-PROTOCOL_PRIORITY=(reality hysteria2 trojan xhttp trusttunnel wireguard amneziawg tor dnstt slipstream)
+PROTOCOL_PRIORITY=(reality hysteria2 trojan anytls xhttp trusttunnel wireguard amneziawg tor dnstt slipstream)
 
 # State
 CURRENT_PID=""
@@ -124,6 +124,16 @@ generate_singbox_config() {
             done
             if [[ -z "$config_file" ]]; then
                 for f in "$CONFIG_DIR"/trojan*.txt "$CONFIG_DIR"/trojan*.json; do
+                    [[ -f "$f" ]] && config_file="$f" && break
+                done
+            fi
+            ;;
+        anytls)
+            for f in "$CONFIG_DIR"/anytls.txt "$CONFIG_DIR"/anytls.json; do
+                [[ -f "$f" ]] && config_file="$f" && break
+            done
+            if [[ -z "$config_file" ]]; then
+                for f in "$CONFIG_DIR"/anytls*.txt "$CONFIG_DIR"/anytls*.json; do
                     [[ -f "$f" ]] && config_file="$f" && break
                 done
             fi
@@ -259,6 +269,55 @@ EOF
       "tls": {
         "enabled": true,
         "server_name": "$sni"
+      }
+    }
+  ],
+  "route": {"final": "proxy"}
+}
+EOF
+            else
+                jq --argjson inbounds "$inbounds" '. + {"inbounds": $inbounds, "log": {"level": "info", "timestamp": true}, "route": {"final": "proxy"}}' "$config_file" > "$output_file"
+            fi
+            ;;
+
+        anytls)
+            if [[ "$config_file" == *.txt ]]; then
+                local uri=$(cat "$config_file" | tr -d '\n\r')
+                local password=$(extract_auth "$uri" "anytls")
+                local server=$(extract_host "$uri")
+                local port=$(extract_port "$uri")
+                local sni=$(extract_param "$uri" "sni")
+
+                [[ -z "$sni" ]] && sni="$server"
+
+                # Ensure port is numeric
+                port=$(echo "$port" | tr -cd '0-9')
+                [[ -z "$port" ]] && port="8445"
+
+                # Validate required fields
+                if [[ -z "$server" ]] || [[ -z "$password" ]]; then
+                    log_error "Failed to parse AnyTLS URI (missing required fields)"
+                    log_debug "server='$server' password='${password:0:8}...'"
+                    return 1
+                fi
+
+                log_debug "AnyTLS config: server=$server port=$port sni=$sni"
+
+                cat > "$output_file" << EOF
+{
+  "log": {"level": "info", "timestamp": true},
+  "inbounds": $inbounds,
+  "outbounds": [
+    {
+      "type": "anytls",
+      "tag": "proxy",
+      "server": "$server",
+      "server_port": $port,
+      "password": "$password",
+      "tls": {
+        "enabled": true,
+        "server_name": "$sni",
+        "utls": {"enabled": true, "fingerprint": "random"}
       }
     }
   ],
@@ -977,7 +1036,7 @@ connect_auto() {
         log_info "Trying $protocol..."
 
         case "$protocol" in
-            reality|trojan|hysteria2)
+            reality|trojan|anytls|hysteria2)
                 if connect_singbox "$protocol"; then
                     log_success "Connected via $protocol"
                     return 0
@@ -1064,7 +1123,7 @@ main() {
         auto)
             connect_auto && connected=true
             ;;
-        reality|trojan|hysteria2)
+        reality|trojan|anytls|hysteria2)
             connect_singbox "$PROTOCOL" && connected=true
             ;;
         wireguard)

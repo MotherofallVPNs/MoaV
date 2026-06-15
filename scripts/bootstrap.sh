@@ -39,6 +39,7 @@ done
 # Note: Telegram MTProxy works without domain (IP only + fake-TLS)
 domain_required=false
 [[ "${ENABLE_TROJAN:-true}" == "true" ]] && domain_required=true
+[[ "${ENABLE_ANYTLS:-false}" == "true" ]] && domain_required=true
 [[ "${ENABLE_HYSTERIA2:-true}" == "true" ]] && domain_required=true
 [[ "${ENABLE_DNSTT:-true}" == "true" ]] && domain_required=true
 [[ "${ENABLE_SLIPSTREAM:-true}" == "true" ]] && domain_required=true
@@ -56,6 +57,7 @@ if [[ "$domain_required" == "true" ]] && [[ -z "${DOMAIN:-}" ]]; then
     log_error "  WireGuard, AmneziaWG, Telegram, Admin, Conduit, Snowflake still"
     log_error "  work without a domain):"
     log_error "    ENABLE_TROJAN=false"
+    log_error "    ENABLE_ANYTLS=false"
     log_error "    ENABLE_HYSTERIA2=false"
     log_error "    ENABLE_DNSTT=false"
     log_error "    ENABLE_SLIPSTREAM=false"
@@ -251,6 +253,8 @@ export DOMAIN="${DOMAIN:-}"
 export DNSTT_SUBDOMAIN="${DNSTT_SUBDOMAIN:-t}"
 export ENABLE_REALITY="${ENABLE_REALITY:-true}"
 export ENABLE_TROJAN="${ENABLE_TROJAN:-true}"
+export ENABLE_ANYTLS="${ENABLE_ANYTLS:-false}"
+export PORT_ANYTLS="${PORT_ANYTLS:-8445}"
 export ENABLE_HYSTERIA2="${ENABLE_HYSTERIA2:-true}"
 export ENABLE_WIREGUARD="${ENABLE_WIREGUARD:-true}"
 export ENABLE_AMNEZIAWG="${ENABLE_AMNEZIAWG:-true}"
@@ -509,6 +513,7 @@ log_info "Creating $INITIAL_USERS initial users..."
 
 REALITY_USERS_JSON="["
 TROJAN_USERS_JSON="["
+ANYTLS_USERS_JSON="["
 HYSTERIA2_USERS_JSON="["
 VLESS_WS_USERS_JSON="["
 SHADOWSOCKS_USERS_JSON="["
@@ -551,12 +556,14 @@ EOF
     # Build JSON arrays for sing-box config
     [[ $i -gt 1 ]] && REALITY_USERS_JSON+=","
     [[ $i -gt 1 ]] && TROJAN_USERS_JSON+=","
+    [[ $i -gt 1 ]] && ANYTLS_USERS_JSON+=","
     [[ $i -gt 1 ]] && HYSTERIA2_USERS_JSON+=","
     [[ $i -gt 1 ]] && VLESS_WS_USERS_JSON+=","
     [[ $i -gt 1 ]] && SHADOWSOCKS_USERS_JSON+=","
 
     REALITY_USERS_JSON+="{\"name\":\"$USER_ID\",\"uuid\":\"$USER_UUID\",\"flow\":\"xtls-rprx-vision\"}"
     TROJAN_USERS_JSON+="{\"name\":\"$USER_ID\",\"password\":\"$USER_PASSWORD\"}"
+    ANYTLS_USERS_JSON+="{\"name\":\"$USER_ID\",\"password\":\"$USER_PASSWORD\"}"
     HYSTERIA2_USERS_JSON+="{\"name\":\"$USER_ID\",\"password\":\"$USER_PASSWORD\"}"
     VLESS_WS_USERS_JSON+="{\"name\":\"$USER_ID\",\"uuid\":\"$USER_UUID\"}"
 
@@ -680,6 +687,7 @@ for user_dir in "$STATE_DIR"/users/*/; do
     # Add to sing-box JSON arrays (need comma separator)
     REALITY_USERS_JSON+=",{\"name\":\"$EXTRA_USER_ID\",\"uuid\":\"$USER_UUID\",\"flow\":\"xtls-rprx-vision\"}"
     TROJAN_USERS_JSON+=",{\"name\":\"$EXTRA_USER_ID\",\"password\":\"$USER_PASSWORD\"}"
+    ANYTLS_USERS_JSON+=",{\"name\":\"$EXTRA_USER_ID\",\"password\":\"$USER_PASSWORD\"}"
     HYSTERIA2_USERS_JSON+=",{\"name\":\"$EXTRA_USER_ID\",\"password\":\"$USER_PASSWORD\"}"
     VLESS_WS_USERS_JSON+=",{\"name\":\"$EXTRA_USER_ID\",\"uuid\":\"$USER_UUID\"}"
 
@@ -721,6 +729,7 @@ fi
 
 REALITY_USERS_JSON+="]"
 TROJAN_USERS_JSON+="]"
+ANYTLS_USERS_JSON+="]"
 HYSTERIA2_USERS_JSON+="]"
 VLESS_WS_USERS_JSON+="]"
 SHADOWSOCKS_USERS_JSON+="]"
@@ -829,6 +838,7 @@ fi
 singbox_needed=false
 [[ "${ENABLE_REALITY:-true}" == "true" ]] && singbox_needed=true
 [[ "${ENABLE_TROJAN:-true}" == "true" ]] && singbox_needed=true
+[[ "${ENABLE_ANYTLS:-false}" == "true" ]] && singbox_needed=true
 [[ "${ENABLE_HYSTERIA2:-true}" == "true" ]] && singbox_needed=true
 [[ "${ENABLE_SS:-true}" == "true" ]] && singbox_needed=true
 
@@ -837,6 +847,8 @@ if [[ "$singbox_needed" == "true" ]]; then
 
     export REALITY_USERS_JSON
     export TROJAN_USERS_JSON
+    export ANYTLS_USERS_JSON="${ANYTLS_USERS_JSON:-[]}"
+    export PORT_ANYTLS="${PORT_ANYTLS:-8445}"
     export HYSTERIA2_USERS_JSON
     export VLESS_WS_USERS_JSON
     export SHADOWSOCKS_USERS_JSON="${SHADOWSOCKS_USERS_JSON:-[]}"
@@ -861,6 +873,10 @@ if [[ "$singbox_needed" == "true" ]]; then
     if [[ "${ENABLE_TROJAN:-true}" != "true" ]]; then
         jq 'del(.inbounds[] | select(.tag == "trojan-tls-in"))' "$config_file" > "${config_file}.tmp" && mv -f "${config_file}.tmp" "$config_file"
         log_info "  Removed Trojan inbound (disabled)"
+    fi
+    if [[ "${ENABLE_ANYTLS:-false}" != "true" ]]; then
+        jq 'del(.inbounds[] | select(.tag == "anytls-in"))' "$config_file" > "${config_file}.tmp" && mv -f "${config_file}.tmp" "$config_file"
+        log_info "  Removed AnyTLS inbound (disabled)"
     fi
     if [[ "${ENABLE_HYSTERIA2:-true}" != "true" ]]; then
         jq 'del(.inbounds[] | select(.tag == "hysteria2-in"))' "$config_file" > "${config_file}.tmp" && mv -f "${config_file}.tmp" "$config_file"

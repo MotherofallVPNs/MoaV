@@ -782,7 +782,7 @@ check_prerequisites() {
                     warn "No domain provided!"
                     echo ""
                     echo -e "  ${YELLOW}Services that require a domain (will be disabled):${NC}"
-                    echo "    • Trojan, Hysteria2, CDN VLESS (need TLS certificates)"
+                    echo "    • Trojan, AnyTLS, Hysteria2, CDN VLESS (need TLS certificates)"
                     echo "    • TrustTunnel"
                     echo "    • DNS tunnels (dnstt, Slipstream, MasterDNS, XDNS)"
                     echo ""
@@ -805,7 +805,7 @@ check_prerequisites() {
                         # 41-46. XDNS is added here so dns-router (in the dnstunnel
                         # profile) doesn't fight systemd-resolved for port 53 with
                         # nothing to route; direct-mode XDNS can be re-enabled manually.
-                        for var in ENABLE_TROJAN ENABLE_HYSTERIA2 ENABLE_DNSTT ENABLE_SLIPSTREAM ENABLE_MASTERDNS ENABLE_XDNS ENABLE_TRUSTTUNNEL; do
+                        for var in ENABLE_TROJAN ENABLE_ANYTLS ENABLE_HYSTERIA2 ENABLE_DNSTT ENABLE_SLIPSTREAM ENABLE_MASTERDNS ENABLE_XDNS ENABLE_TRUSTTUNNEL; do
                             update_env_var ".env" "$var" "false"
                         done
                         # Derive DEFAULT_PROFILES from the mutated ENABLE_* set (issue #106).
@@ -3963,14 +3963,15 @@ show_status() {
     if [[ -f "$env_file" ]]; then
         local enable_reality=$(get_env_val "ENABLE_REALITY" "$env_file" "true")
         local enable_trojan=$(get_env_val "ENABLE_TROJAN" "$env_file" "true")
+        local enable_anytls=$(get_env_val "ENABLE_ANYTLS" "$env_file" "false")
         local enable_hysteria2=$(get_env_val "ENABLE_HYSTERIA2" "$env_file" "true")
         local enable_wireguard=$(get_env_val "ENABLE_WIREGUARD" "$env_file" "true")
         local enable_dnstt=$(get_env_val "ENABLE_DNSTT" "$env_file" "true")
         local enable_admin=$(get_env_val "ENABLE_ADMIN_UI" "$env_file" "true")
 
         # Mark services as disabled based on ENABLE_* settings
-        # sing-box handles Reality, Trojan, Hysteria2
-        if [[ "$enable_reality" != "true" ]] && [[ "$enable_trojan" != "true" ]] && [[ "$enable_hysteria2" != "true" ]]; then
+        # sing-box handles Reality, Trojan, AnyTLS, Hysteria2
+        if [[ "$enable_reality" != "true" ]] && [[ "$enable_trojan" != "true" ]] && [[ "$enable_anytls" != "true" ]] && [[ "$enable_hysteria2" != "true" ]]; then
             disabled_services["sing-box"]=1
             disabled_services["decoy"]=1
         fi
@@ -4165,6 +4166,7 @@ select_profiles() {
     if [[ -f "$env_file" ]]; then
         local enable_reality=$(get_env_val "ENABLE_REALITY" "$env_file" "true")
         local enable_trojan=$(get_env_val "ENABLE_TROJAN" "$env_file" "true")
+        local enable_anytls=$(get_env_val "ENABLE_ANYTLS" "$env_file" "false")
         local enable_hysteria2=$(get_env_val "ENABLE_HYSTERIA2" "$env_file" "true")
         local enable_wireguard=$(get_env_val "ENABLE_WIREGUARD" "$env_file" "true")
         local enable_amneziawg=$(get_env_val "ENABLE_AMNEZIAWG" "$env_file" "true")
@@ -4175,8 +4177,8 @@ select_profiles() {
         local enable_admin=$(get_env_val "ENABLE_ADMIN_UI" "$env_file" "true")
         local enable_xhttp=$(get_env_val "ENABLE_XHTTP" "$env_file" "true")
 
-        # proxy is disabled if all three protocols are disabled
-        if [[ "$enable_reality" != "true" ]] && [[ "$enable_trojan" != "true" ]] && [[ "$enable_hysteria2" != "true" ]]; then
+        # proxy is disabled if all sing-box protocols are disabled
+        if [[ "$enable_reality" != "true" ]] && [[ "$enable_trojan" != "true" ]] && [[ "$enable_anytls" != "true" ]] && [[ "$enable_hysteria2" != "true" ]]; then
             proxy_enabled=false
         fi
         [[ "$enable_wireguard" != "true" ]] && wg_enabled=false
@@ -4283,6 +4285,7 @@ select_profiles() {
         # Check which protocols are enabled
         local enable_reality=$(get_env_val "ENABLE_REALITY" "$env_file" "true")
         local enable_trojan=$(get_env_val "ENABLE_TROJAN" "$env_file" "true")
+        local enable_anytls=$(get_env_val "ENABLE_ANYTLS" "$env_file" "false")
         local enable_hysteria2=$(get_env_val "ENABLE_HYSTERIA2" "$env_file" "true")
         local enable_wireguard=$(get_env_val "ENABLE_WIREGUARD" "$env_file" "true")
         local enable_amneziawg=$(get_env_val "ENABLE_AMNEZIAWG" "$env_file" "true")
@@ -4296,8 +4299,8 @@ select_profiles() {
         # Build profiles list based on enabled services
         SELECTED_PROFILES=()
 
-        # proxy profile (Reality, Trojan, Hysteria2)
-        if [[ "$enable_reality" == "true" ]] || [[ "$enable_trojan" == "true" ]] || [[ "$enable_hysteria2" == "true" ]]; then
+        # proxy profile (Reality, Trojan, AnyTLS, Hysteria2)
+        if [[ "$enable_reality" == "true" ]] || [[ "$enable_trojan" == "true" ]] || [[ "$enable_anytls" == "true" ]] || [[ "$enable_hysteria2" == "true" ]]; then
             SELECTED_PROFILES+=("proxy")
         fi
 
@@ -4475,12 +4478,13 @@ profile_enabled() {
     local profile="$1" env_file="${2:-$SCRIPT_DIR/.env}"
     case "$profile" in
         proxy)
-            local _r _t _h _s
+            local _r _t _a _h _s
             _r=$(get_env_val "ENABLE_REALITY"   "$env_file" "true")
             _t=$(get_env_val "ENABLE_TROJAN"    "$env_file" "true")
+            _a=$(get_env_val "ENABLE_ANYTLS"    "$env_file" "false")
             _h=$(get_env_val "ENABLE_HYSTERIA2" "$env_file" "true")
             _s=$(get_env_val "ENABLE_SS"        "$env_file" "true")
-            [[ "$_r" == "true" || "$_t" == "true" || "$_h" == "true" || "$_s" == "true" ]] \
+            [[ "$_r" == "true" || "$_t" == "true" || "$_a" == "true" || "$_h" == "true" || "$_s" == "true" ]] \
                 && echo true || echo false ;;
         wireguard)   [[ "$(get_env_val "ENABLE_WIREGUARD"   "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
         amneziawg)   [[ "$(get_env_val "ENABLE_AMNEZIAWG"   "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
@@ -4554,7 +4558,7 @@ confirm_disabled_profile() {
         snowflake)   enable_var="ENABLE_SNOWFLAKE" ;;
         gooserelay)  enable_var="ENABLE_GOOSERELAY" ;;
         monitoring)  enable_var="ENABLE_MONITORING" ;;
-        proxy)       multi_flag_hint="ENABLE_REALITY, ENABLE_TROJAN, ENABLE_HYSTERIA2, ENABLE_SS" ;;
+        proxy)       multi_flag_hint="ENABLE_REALITY, ENABLE_TROJAN, ENABLE_ANYTLS, ENABLE_HYSTERIA2, ENABLE_SS" ;;
         dnstunnel)   multi_flag_hint="ENABLE_DNSTT, ENABLE_SLIPSTREAM, ENABLE_MASTERDNS, ENABLE_XDNS" ;;
     esac
 
@@ -6634,7 +6638,7 @@ cmd_domainless() {
     # Disable cert-needing protocols. TROJAN..TRUSTTUNNEL must match
     # bootstrap.sh:41-46; XDNS is added to keep dns-router off port 53 in
     # domainless mode (direct-mode XDNS can be re-enabled manually).
-    for var in ENABLE_TROJAN ENABLE_HYSTERIA2 ENABLE_DNSTT ENABLE_SLIPSTREAM ENABLE_MASTERDNS ENABLE_XDNS ENABLE_TRUSTTUNNEL; do
+    for var in ENABLE_TROJAN ENABLE_ANYTLS ENABLE_HYSTERIA2 ENABLE_DNSTT ENABLE_SLIPSTREAM ENABLE_MASTERDNS ENABLE_XDNS ENABLE_TRUSTTUNNEL; do
         update_env_var ".env" "$var" "false"
     done
 
@@ -8577,6 +8581,8 @@ cmd_regenerate_users() {
     # Load ENABLE_* settings from .env
     local enable_reality=$(get_env_val "ENABLE_REALITY" .env "true")
     local enable_trojan=$(get_env_val "ENABLE_TROJAN" .env "true")
+    local enable_anytls=$(get_env_val "ENABLE_ANYTLS" .env "false")
+    local port_anytls=$(get_env_val "PORT_ANYTLS" .env "8445")
     local enable_hysteria2=$(get_env_val "ENABLE_HYSTERIA2" .env "true")
     local enable_wireguard=$(get_env_val "ENABLE_WIREGUARD" .env "true")
     local enable_amneziawg=$(get_env_val "ENABLE_AMNEZIAWG" .env "true")
@@ -8626,6 +8632,8 @@ cmd_regenerate_users() {
             -e "CDN_ADDRESS=$cdn_address" \
             -e "ENABLE_REALITY=${enable_reality:-true}" \
             -e "ENABLE_TROJAN=${enable_trojan:-true}" \
+            -e "ENABLE_ANYTLS=${enable_anytls:-false}" \
+            -e "PORT_ANYTLS=${port_anytls:-8445}" \
             -e "ENABLE_HYSTERIA2=${enable_hysteria2:-true}" \
             -e "ENABLE_WIREGUARD=${enable_wireguard:-true}" \
             -e "ENABLE_AMNEZIAWG=${enable_amneziawg:-true}" \
