@@ -220,12 +220,13 @@ moav regenerate-users
    ```bash
    moav user revoke compromised_user
    ```
-3. **Rotate server keys periodically** — re-bootstrap if concerned
-4. **Keep backups:**
+3. **Keep dnstt private keys private** — `state/keys/dnstt-server.key.hex` is the persistent dnstt server private key. It should be readable only by the dnstt container user (`100:101`, mode `0600`). If MoaV cannot set that ownership during bootstrap, fix the host permissions and re-run bootstrap rather than making the key world-readable.
+4. **Rotate server keys periodically** — re-bootstrap if concerned
+5. **Keep backups:**
    ```bash
    moav export    # Creates moav-backup-TIMESTAMP.tar.gz
    ```
-5. **Use strong admin password** — at least 16 characters, generated randomly
+6. **Use strong admin password** — at least 16 characters, generated randomly
 
 ### Monitoring
 

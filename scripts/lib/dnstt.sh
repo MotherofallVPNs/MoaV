@@ -8,10 +8,13 @@ ensure_dnstt_key_permissions() {
     local pub_file="$STATE_DIR/keys/dnstt-server.pub.hex"
 
     if [[ -f "$key_file" ]]; then
-        if chown 100:101 "$key_file" 2>/dev/null; then
-            chmod 0600 "$key_file" 2>/dev/null || true
-        else
-            chmod 0644 "$key_file" 2>/dev/null || true
+        if ! chown 100:101 "$key_file" 2>/dev/null; then
+            log_error "Failed to set dnstt private key ownership for container user 100:101"
+            return 1
+        fi
+        if ! chmod 0600 "$key_file" 2>/dev/null; then
+            log_error "Failed to lock down dnstt private key permissions"
+            return 1
         fi
     fi
 
@@ -100,7 +103,9 @@ generate_dnstt_config() {
         log_info "Public key at: $STATE_DIR/keys/dnstt-server.pub.hex ($(wc -c < "$STATE_DIR/keys/dnstt-server.pub.hex" | tr -d ' ') bytes)"
     fi
 
-    ensure_dnstt_key_permissions
+    if ! ensure_dnstt_key_permissions; then
+        return 1
+    fi
 
     local dnstt_pubkey
     dnstt_pubkey=$(cat "$STATE_DIR/keys/dnstt-server.pub.hex")
