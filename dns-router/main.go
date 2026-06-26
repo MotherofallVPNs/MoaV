@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -33,6 +34,8 @@ const (
 	// stateless forwarder, so a reconnect is transparent to tunnel sessions.
 	maxBackendFailures = 5
 )
+
+var buildSerial string
 
 // Route maps a domain suffix to a backend address.
 type Route struct {
@@ -586,11 +589,11 @@ func authoritativeResponse(packet []byte, question questionInfo, route Route) []
 	case qtypeSOA:
 		rdata = append(rdata, encodeDNSName(nsName)...)
 		rdata = append(rdata, encodeDNSName("hostmaster."+parent)...)
-		rdata = appendUint32(rdata, 2026052401) // serial
-		rdata = appendUint32(rdata, 300)        // refresh
-		rdata = appendUint32(rdata, 60)         // retry
-		rdata = appendUint32(rdata, 86400)      // expire
-		rdata = appendUint32(rdata, 300)        // negative cache TTL
+		rdata = appendUint32(rdata, currentSOASerial()) // serial
+		rdata = appendUint32(rdata, 300)                // refresh
+		rdata = appendUint32(rdata, 60)                 // retry
+		rdata = appendUint32(rdata, 86400)              // expire
+		rdata = appendUint32(rdata, 300)                // negative cache TTL
 	}
 
 	if question.End+4 > len(packet) {
@@ -633,6 +636,69 @@ func defaultAuthoritativeNS(routeDomain string) string {
 		return "dns"
 	}
 	return "dns." + parent
+}
+
+func currentSOASerial() uint32 {
+	if serial, ok := serialFromVersion(buildSerial); ok {
+		return serial
+	}
+
+	for _, path := range versionFileCandidates() {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		if serial, ok := serialFromVersion(string(data)); ok {
+			return serial
+		}
+	}
+
+	return timestampSOASerial(time.Now().UTC())
+}
+
+func versionFileCandidates() []string {
+	paths := []string{}
+	if path := strings.TrimSpace(os.Getenv("MOAV_VERSION_FILE")); path != "" {
+		paths = append(paths, path)
+	}
+	return append(paths, "/VERSION", "VERSION", "../VERSION")
+}
+
+func serialFromVersion(version string) (uint32, bool) {
+	version = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(version), "v"))
+	if version == "" {
+		return 0, false
+	}
+
+	parts := strings.FieldsFunc(version, func(r rune) bool {
+		return r < '0' || r > '9'
+	})
+	if len(parts) == 0 {
+		return 0, false
+	}
+
+	nums := [3]uint64{}
+	for i := 0; i < len(parts) && i < len(nums); i++ {
+		n, err := strconv.ParseUint(parts[i], 10, 16)
+		if err != nil {
+			return 0, false
+		}
+		nums[i] = n
+	}
+
+	serial := 2000000000 + nums[0]*1000000 + nums[1]*1000 + nums[2]
+	if serial > uint64(^uint32(0)) {
+		return 0, false
+	}
+	return uint32(serial), true
+}
+
+func timestampSOASerial(now time.Time) uint32 {
+	serial, err := strconv.ParseUint(now.UTC().Format("2006010215"), 10, 32)
+	if err != nil {
+		return uint32(now.UTC().Unix() / 300)
+	}
+	return uint32(serial)
 }
 
 func encodeDNSName(name string) []byte {
