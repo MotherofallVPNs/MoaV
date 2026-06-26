@@ -3716,6 +3716,28 @@ doctor_check_reality() {
     fi
 
     local pass=true
+    _doctor_reality_tcp_probe() {
+        local container="$1" host="$2" port="$3"
+        docker compose exec -T "$container" sh -s -- "$host" "$port" <<'EOF'
+host="$1"
+port="$2"
+
+if command -v nc >/dev/null 2>&1 && nc -z -w 5 "$host" "$port" >/dev/null 2>&1; then
+    exit 0
+fi
+
+if command -v curl >/dev/null 2>&1 && curl -k -IsS --connect-timeout 5 --max-time 8 "https://$host:$port/" >/dev/null 2>&1; then
+    exit 0
+fi
+
+if command -v bash >/dev/null 2>&1 && timeout 5 bash -c "exec 3<>/dev/tcp/$host/$port" >/dev/null 2>&1; then
+    exit 0
+fi
+
+exit 1
+EOF
+    }
+
     _doctor_reality_one() {
         local label="$1" container="$2" key="$3" default_target="$4"
         local host_port host port resolver_label resolves=false container_running=false
@@ -3744,7 +3766,7 @@ doctor_check_reality() {
         fi
 
         if [[ "$container_running" == "true" ]]; then
-            if docker compose exec -T "$container" sh -c "exec 3<>/dev/tcp/$host/$port" 2>/dev/null; then
+            if _doctor_reality_tcp_probe "$container" "$host" "$port"; then
                 echo -e "    ${GREEN}✓${NC} $label: $host:$port resolves and reachable from $container"
             else
                 echo -e "    ${YELLOW}!${NC} $label: $host resolves but TCP $port unreachable from $container"
@@ -3759,6 +3781,7 @@ doctor_check_reality() {
     [[ "$enable_reality" == "true" ]] && _doctor_reality_one "VLESS Reality (:443)" "sing-box" "REALITY_TARGET" "www.cloudflare.com:443"
     [[ "$enable_xhttp"    == "true" ]] && _doctor_reality_one "XHTTP-Reality (:2096)" "xray" "XHTTP_REALITY_TARGET" "www.cloudflare.com:443"
 
+    unset -f _doctor_reality_tcp_probe
     unset -f _doctor_reality_one
     $pass && return 0 || return 1
 }
