@@ -358,8 +358,8 @@ if [[ "${ENABLE_SS:-true}" == "true" ]] && [[ -n "${SS_USER_PSK:-}" ]]; then
         SS_METHOD_LOCAL="${SS_METHOD:-$(grep -E '^SS_METHOD=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || echo 2022-blake3-aes-128-gcm)}"
 
         # SIP002 ss:// URI with SS-2022 multi-user encoding: BASE64URL_NOPAD(method:server_psk:user_psk)@host:port#tag
-        SS_USERINFO=$(printf '%s' "${SS_METHOD_LOCAL}:${SS_SERVER_PSK}:${SS_USER_PSK}" | base64 | tr -d '\n=' | tr '/+' '_-')
-        SS_LINK="ss://${SS_USERINFO}@${SERVER_IP}:${SS_PORT_LOCAL}#MoaV-Shadowsocks-${USERNAME}"
+        SS_USERINFO=$(singbox_ss_userinfo "$SS_METHOD_LOCAL" "$SS_SERVER_PSK" "$SS_USER_PSK")
+        SS_LINK=$(singbox_ss_link "$USERNAME" "$SERVER_IP" "$SS_USERINFO" "$SS_PORT_LOCAL")
         echo "$SS_LINK" > "$OUTPUT_DIR/shadowsocks.txt"
 
         cat > "$OUTPUT_DIR/shadowsocks-singbox.json" <<EOF
@@ -388,7 +388,7 @@ EOF
         fi
 
         if [[ -n "$SERVER_IPV6" ]]; then
-            SS_LINK_V6="ss://${SS_USERINFO}@[${SERVER_IPV6}]:${SS_PORT_LOCAL}#MoaV-Shadowsocks-${USERNAME}-IPv6"
+            SS_LINK_V6=$(singbox_ss_link "${USERNAME}-IPv6" "[${SERVER_IPV6}]" "$SS_USERINFO" "$SS_PORT_LOCAL")
             echo "$SS_LINK_V6" > "$OUTPUT_DIR/shadowsocks-ipv6.txt"
             command -v qrencode &>/dev/null && qrencode -o "$OUTPUT_DIR/shadowsocks-ipv6-qr.png" -s 6 "$SS_LINK_V6" 2>/dev/null || true
         fi

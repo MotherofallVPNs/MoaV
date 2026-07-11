@@ -154,3 +154,16 @@ singbox_cdn_link() {
     local label="$1"
     echo "vless://${USER_UUID}@${CDN_ADDRESS}:443?security=tls&type=${CDN_TRANSPORT}&path=${CDN_WS_PATH}&sni=${CDN_SNI}&host=${CDN_DOMAIN}&fp=random&alpn=http/1.1#MoaV-CDN-${label}"
 }
+
+# Shadowsocks-2022 SIP002 userinfo: BASE64URL_NOPAD(method:server_psk:user_psk).
+singbox_ss_userinfo() {
+    local method="$1" server_psk="$2" user_psk="$3"
+    printf '%s' "${method}:${server_psk}:${user_psk}" | base64 | tr -d '\n=' | tr '/+' '_-'
+}
+
+# Shadowsocks-2022 ss:// share link. userinfo from singbox_ss_userinfo; port and
+# host are passed so one builder serves IPv4 and IPv6.
+singbox_ss_link() {
+    local label="$1" host="$2" userinfo="$3" port="$4"
+    echo "ss://${userinfo}@${host}:${port}#MoaV-Shadowsocks-${label}"
+}

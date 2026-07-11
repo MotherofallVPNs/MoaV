@@ -59,4 +59,14 @@ check hy2-v6      "$(singbox_hysteria2_link "${U}-IPv6" "[${SERVER_IPV6}]")" \
 check cdn         "$(singbox_cdn_link "$U")" \
   "vless://${USER_UUID}@cdn.example.net:443?security=tls&type=ws&path=/moav&sni=cdn.example.net&host=cdn.example.net&fp=random&alpn=http/1.1#MoaV-CDN-alice"
 
+# Shadowsocks: userinfo round-trip against the exact inline encoding, then link.
+SS_METHOD="2022-blake3-aes-128-gcm"; SS_SPSK="c2VydmVyUFNL"; SS_UPSK="dXNlclBTSw=="; SS_PORT="8388"
+SS_USERINFO_EXPECT=$(printf '%s' "${SS_METHOD}:${SS_SPSK}:${SS_UPSK}" | base64 | tr -d '\n=' | tr '/+' '_-')
+SS_UI=$(singbox_ss_userinfo "$SS_METHOD" "$SS_SPSK" "$SS_UPSK")
+check ss-userinfo "$SS_UI" "$SS_USERINFO_EXPECT"
+check ss-v4       "$(singbox_ss_link "$U" "$SERVER_IP" "$SS_UI" "$SS_PORT")" \
+  "ss://${SS_USERINFO_EXPECT}@203.0.113.9:8388#MoaV-Shadowsocks-alice"
+check ss-v6       "$(singbox_ss_link "${U}-IPv6" "[${SERVER_IPV6}]" "$SS_UI" "$SS_PORT")" \
+  "ss://${SS_USERINFO_EXPECT}@[2001:db8::1]:8388#MoaV-Shadowsocks-alice-IPv6"
+
 if [[ $fail -eq 0 ]]; then echo "ALL PASS"; else echo "SOME FAILED"; exit 1; fi

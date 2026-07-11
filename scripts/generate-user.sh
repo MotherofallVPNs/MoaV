@@ -358,13 +358,13 @@ EOF
 
         # Build ss:// URI per SIP002 with SS-2022 multi-user encoding
         # Format: ss://BASE64URL_NOPAD(method:server_psk:user_psk)@host:port#tag
-        SS_USERINFO=$(printf '%s' "${SS_METHOD_LOCAL}:${SS_SERVER_PSK_LOCAL}:${SS_USER_PSK}" | base64 | tr -d '\n=' | tr '/+' '_-')
-        SS_LINK="ss://${SS_USERINFO}@${SERVER_IP}:${SS_PORT}#MoaV-Shadowsocks-${USER_ID}"
+        SS_USERINFO=$(singbox_ss_userinfo "$SS_METHOD_LOCAL" "$SS_SERVER_PSK_LOCAL" "$SS_USER_PSK")
+        SS_LINK=$(singbox_ss_link "$USER_ID" "$SERVER_IP" "$SS_USERINFO" "$SS_PORT")
         echo "$SS_LINK" > "$OUTPUT_DIR/shadowsocks.txt"
         qrencode -o "$OUTPUT_DIR/shadowsocks-qr.png" -s 6 "$SS_LINK" 2>/dev/null || true
 
         if [[ -n "${SERVER_IPV6:-}" ]]; then
-            SS_LINK_V6="ss://${SS_USERINFO}@[${SERVER_IPV6}]:${SS_PORT}#MoaV-Shadowsocks-${USER_ID}-IPv6"
+            SS_LINK_V6=$(singbox_ss_link "${USER_ID}-IPv6" "[${SERVER_IPV6}]" "$SS_USERINFO" "$SS_PORT")
             echo "$SS_LINK_V6" > "$OUTPUT_DIR/shadowsocks-ipv6.txt"
             qrencode -o "$OUTPUT_DIR/shadowsocks-ipv6-qr.png" -s 6 "$SS_LINK_V6" 2>/dev/null || true
         fi
