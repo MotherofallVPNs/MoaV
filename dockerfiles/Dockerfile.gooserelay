@@ -15,6 +15,13 @@ FROM golang:1.22-alpine AS builder
 
 ARG GOOSERELAY_VERSION=v1.7.1
 
+# Go module fetch resilience (pipe = fall through on ANY error incl. a
+# proxy.golang.org TLS-handshake timeout). See Dockerfile.xray for the full
+# rationale. Override via .env.
+ARG GOPROXY="https://proxy.golang.org|https://goproxy.cn|direct"
+ARG GOSUMDB=off
+ENV GOPROXY=${GOPROXY} GOSUMDB=${GOSUMDB}
+
 RUN apk add --no-cache git
 
 WORKDIR /src

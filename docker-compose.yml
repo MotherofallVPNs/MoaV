@@ -544,6 +544,8 @@ services:
       dockerfile: dockerfiles/Dockerfile.gooserelay
       args:
         GOOSERELAY_VERSION: ${GOOSERELAY_VERSION:-v1.7.1}
+        GOPROXY: "${GOPROXY:-https://proxy.golang.org|https://goproxy.cn|direct}"
+        GOSUMDB: "${GOSUMDB:-off}"
     container_name: moav-gooserelay
     restart: unless-stopped
     logging: *default-logging
