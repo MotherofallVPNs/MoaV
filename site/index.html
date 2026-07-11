@@ -59,6 +59,7 @@
             "XHTTP (Xray-core) - Multiplexed HTTP with Reality camouflage, no domain needed",
             "Shadowsocks-2022 - AEAD-2022 ciphers with active-probing resistance, Outline-compatible",
             "Trojan protocol - HTTPS mimicry",
+            "AnyTLS - defeats TLS-in-TLS fingerprinting",
             "Hysteria2 - QUIC-based fast protocol",
             "TrustTunnel - HTTP/2 and QUIC tunneling",
             "AmneziaWG - Obfuscated WireGuard defeating DPI",
@@ -122,7 +123,7 @@
                 "name": "Which VPN protocols does MoaV support?",
                 "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "MoaV supports 16+ protocols: Reality (VLESS) on 443/tcp, XHTTP (Xray-core) on 2096/tcp, XDNS (FinalMask DNS tunnel) on 53/udp, Hysteria2 on 443/udp, Trojan on 8443/tcp, Shadowsocks-2022 on 8388/tcp+udp, TrustTunnel on 4443/tcp+udp, AmneziaWG on 51821/udp, CDN mode (VLESS via Cloudflare or CloudFront), WireGuard on 51820/udp (and via WebSocket on 8080/tcp), DNS tunneling on 53/udp (dnstt, Slipstream, MasterDNS, XDNS — all four via dns-router), GooseRelay (SOCKS5 via Google Apps Script) on 8444/tcp, Telegram MTProxy on 993/tcp, Psiphon Conduit, Tor Snowflake, and MahsaNet config donation."
+                    "text": "MoaV supports 16+ protocols: Reality (VLESS) on 443/tcp, XHTTP (Xray-core) on 2096/tcp, XDNS (FinalMask DNS tunnel) on 53/udp, Hysteria2 on 443/udp, Trojan on 8443/tcp, AnyTLS on 8445/tcp, Shadowsocks-2022 on 8388/tcp+udp, TrustTunnel on 4443/tcp+udp, AmneziaWG on 51821/udp, CDN mode (VLESS via Cloudflare or CloudFront), WireGuard on 51820/udp (and via WebSocket on 8080/tcp), DNS tunneling on 53/udp (dnstt, Slipstream, MasterDNS, XDNS — all four via dns-router), GooseRelay (SOCKS5 via Google Apps Script) on 8444/tcp, Telegram MTProxy on 993/tcp, Psiphon Conduit, Tor Snowflake, and MahsaNet config donation."
                 }
             },
             {
@@ -241,7 +242,7 @@
                         </svg>
                     </div>
                     <h3>Stealth Proxies</h3>
-                    <p>Reality (VLESS), Hysteria2, Trojan, Shadowsocks-2022. Look like normal HTTPS or random bytes — active-probing resistant. CDN mode routes through Cloudflare when IP is blocked.</p>
+                    <p>Reality (VLESS), Hysteria2, Trojan, AnyTLS, Shadowsocks-2022. Look like normal HTTPS or random bytes — active-probing resistant. CDN mode routes through Cloudflare when IP is blocked.</p>
                     <span class="protocol-port">443/tcp · 443/udp · 8443/tcp · 8388/tcp+udp · CDN</span>
                 </div>
 
@@ -992,7 +993,7 @@ moav update            # Update MoaV</pre>
     <!-- AI/LLM-friendly project summary (hidden visually, readable by crawlers) -->
     <section class="sr-only" aria-label="Project Summary for AI and Search Engines">
         <h2>MoaV Technical Summary</h2>
-        <p>MoaV (Mother of all VPNs) version 1.8.2 is a free, open-source, self-hosted censorship circumvention stack designed for countries with heavy internet censorship such as Iran, China, and Russia. It deploys 16+ anti-censorship protocols in a single Docker Compose command: Reality (VLESS) for TLS camouflage, XHTTP via Xray-core for multiplexed HTTP with Reality camouflage requiring no domain, Trojan for HTTPS mimicry, Hysteria2 for QUIC-based fast connections, Shadowsocks-2022 (AEAD-2022 ciphers with active-probing resistance, Outline-compatible), TrustTunnel for HTTP/2 and QUIC tunneling, AmneziaWG for DPI-resistant obfuscated WireGuard, CDN mode routing VLESS through Cloudflare or AWS CloudFront, standard WireGuard with optional WebSocket tunneling, four DNS tunnels — dnstt, Slipstream (QUIC-over-DNS), MasterDNS (ARQ + resolver load-balancing, native to MahsaNG v16), and XDNS (Xray-core FinalMask) — that all run simultaneously on port 53 via the dns-router (fanned out by subdomain) and work during heavy internet shutdowns, Telegram MTProxy with anti-DPI tuning (17 configurable settings), GooseRelay for SOCKS5 tunneled through a user-deployed Google Apps Script fronted as google.com (MahsaNG v16), Psiphon Conduit for bandwidth donation, Tor Snowflake for Tor network support, and MahsaNet config donation to Mahsa VPN (2M+ users in Iran).</p>
+        <p>MoaV (Mother of all VPNs) version 1.8.5 is a free, open-source, self-hosted censorship circumvention stack designed for countries with heavy internet censorship such as Iran, China, and Russia. It deploys 16+ anti-censorship protocols in a single Docker Compose command: Reality (VLESS) for TLS camouflage, XHTTP via Xray-core for multiplexed HTTP with Reality camouflage requiring no domain, Trojan for HTTPS mimicry, AnyTLS for defeating TLS-in-TLS fingerprinting, Hysteria2 for QUIC-based fast connections, Shadowsocks-2022 (AEAD-2022 ciphers with active-probing resistance, Outline-compatible), TrustTunnel for HTTP/2 and QUIC tunneling, AmneziaWG for DPI-resistant obfuscated WireGuard, CDN mode routing VLESS through Cloudflare or AWS CloudFront, standard WireGuard with optional WebSocket tunneling, four DNS tunnels — dnstt, Slipstream (QUIC-over-DNS), MasterDNS (ARQ + resolver load-balancing, native to MahsaNG v16), and XDNS (Xray-core FinalMask) — that all run simultaneously on port 53 via the dns-router (fanned out by subdomain) and work during heavy internet shutdowns, Telegram MTProxy with anti-DPI tuning (17 configurable settings), GooseRelay for SOCKS5 tunneled through a user-deployed Google Apps Script fronted as google.com (MahsaNG v16), Psiphon Conduit for bandwidth donation, Tor Snowflake for Tor network support, and MahsaNet config donation to Mahsa VPN (2M+ users in Iran).</p>
         <p>Key features include: GeoIP country distribution showing where users connect from on Grafana dashboards (powered by DB-IP Lite, fully offline), web-based admin dashboard on port 9443 with Prometheus-backed aggregate stats across all protocols, Grafana monitoring on port 9444 with per-user traffic metrics and geographic distribution, MahsaNet/MahsaAlert integration to donate VPN configurations to Mahsa VPN (over 2 million users in Iran) using the 'moav donate' command, automatic protocol fallback when individual protocols are blocked, Docker security hardening with cap_drop ALL and read-only filesystems, multi-user credential management with downloadable config bundles and QR codes, moav doctor diagnostics with DNS zone file export, shell autocompletion for bash and zsh, domainless deployment mode for servers without a domain name, and a decoy website with anti-fingerprinting randomization.</p>
         <p>Installation: curl -fsSL moav.sh/install | bash. Source code: github.com/shayanb/MoaV. License: MIT. The project has an active open-source community contributing via GitHub issues and pull requests.</p>
     </section>

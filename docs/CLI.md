@@ -10,6 +10,7 @@ Complete reference for the `moav` command-line interface.
   - [General](#general)
   - [Setup & Configuration](#setup--configuration)
   - [Service Management](#service-management)
+  - [Certificates](#certificates)
   - [User Management](#user-management)
   - [Testing & Client](#testing--client)
   - [Migration](#migration)
@@ -51,6 +52,7 @@ moav user add NAME        # Add new user
 moav user add --batch 5   # Batch create 5 users
 moav user revoke NAME     # Revoke user
 moav test USERNAME        # Test connectivity
+moav cert status          # TLS cert expiry + renewal status
 moav admin password       # Reset admin password
 moav donate               # Donate configs to MahsaNet
 ```
@@ -315,6 +317,48 @@ moav build                    # Build all images
 moav build sing-box           # Build specific image
 moav build conduit snowflake  # Build multiple images
 ```
+
+---
+
+### Certificates
+
+TLS certificates for Trojan, Hysteria2, CDN VLESS, AnyTLS, and the admin UI come from Let's Encrypt (via the bundled `certbot` service) when a `DOMAIN` is set. They expire after 90 days, so MoaV manages renewal for you.
+
+#### `moav cert status`
+Show certificate expiry and whether the auto-renewal schedule is installed.
+
+```bash
+moav cert status
+```
+
+In domainless mode this reports that no Let's Encrypt certificates are in use and exits cleanly.
+
+#### `moav cert renew`
+Run a renewal check now. Renews only if the certificate is within Let's Encrypt's renewal window, and restarts the services that load certs at startup (sing-box, wstunnel, trusttunnel, admin, grafana, grafana-proxy) **only if the certificate actually changed**.
+
+```bash
+moav cert renew
+```
+
+> Do **not** use `docker compose run --rm certbot renew` directly — the compose `certbot` service overrides its entrypoint for one-shot issuance, so that command runs `/bin/sh renew` and never invokes certbot. `moav cert renew` forces the correct entrypoint.
+
+#### `moav cert install`
+Install the daily auto-renewal schedule. Uses a **systemd timer** (`moav-cert-renew.timer`) where available, falling back to `/etc/cron.d/moav-cert-renew` on hosts without systemd. The timer runs daily with a randomized delay, well within the renewal window.
+
+```bash
+moav cert install
+```
+
+This is installed **automatically** the first time `moav start` runs with a `DOMAIN` set. Opt out by setting `CERT_AUTORENEW=false` in `.env`.
+
+#### `moav cert uninstall`
+Remove the auto-renewal timer/cron job (certificates then expire in ≤90 days unless renewed manually).
+
+```bash
+moav cert uninstall
+```
+
+**Recovering an already-expired certificate:** `moav update` then `moav cert renew` — certbot reissues the cert in place (the webroot challenge on port 80 still works), and the timer self-installs on the next `moav start`.
 
 ---
 

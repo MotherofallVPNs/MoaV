@@ -18,6 +18,7 @@ Every protocol is one or more containers grouped into a docker-compose **profile
   proxy        sing-box
                  ├─ Reality (VLESS)
                  ├─ Trojan
+                 ├─ AnyTLS         (opt-in; defeats TLS-in-TLS fingerprinting)
                  ├─ Hysteria2
                  ├─ Shadowsocks-2022
                  └─ CDN VLESS+WS
@@ -25,7 +26,7 @@ Every protocol is one or more containers grouped into a docker-compose **profile
   xhttp        xray   (VLESS + XHTTP + Reality)
 
   wireguard    wireguard + wstunnel
-                 (direct UDP + WebSocket fallback)
+                 (direct UDP + wss:// WebSocket fallback)
 
   amneziawg    amneziawg   (obfuscated WireGuard)
 
@@ -96,7 +97,7 @@ User credentials and per-protocol configs originate inside the `bootstrap` conta
 
 Bundles split into three groups:
 
-- **V2Ray-compatible** (Reality, Trojan, Hysteria2, SS-2022, CDN, XHTTP) — share-link `.txt`s, QR `.png`s, a single base64 `subscription.txt` importable by MahsaNG / v2rayNG / Hiddify / Streisand.
+- **V2Ray-compatible** (Reality, Trojan, AnyTLS, Hysteria2, SS-2022, CDN, XHTTP) — share-link `.txt`s, QR `.png`s, a single base64 `subscription.txt` importable by MahsaNG / v2rayNG / Hiddify / Streisand.
 - **L3 VPNs** (WireGuard, AmneziaWG, TrustTunnel) — `.conf` / `.toml` configs + QR.
 - **DNS tunnels** (dnstt, Slipstream, MasterDNS, XDNS) and **donations** (GooseRelay) — text instruction files + protocol-specific config blobs (`xdns-config.json`, `gooserelay-AppsScript.gs` + `gooserelay-client_config.json`, etc.).
 
@@ -132,6 +133,20 @@ The `monitoring` profile is opt-in. When enabled, it adds Prometheus + Grafana p
 ```
 
 Pre-built dashboards land in `configs/monitoring/grafana/dashboards/`. The Conduit lifetime panels depend on a recording rule plus an offset watcher — see [Monitoring → Conduit lifetime bandwidth](MONITORING.md#conduit-lifetime-bandwidth).
+
+## Security & isolation model
+
+Every service runs in its own container with least-privilege defaults applied in `docker-compose.yml`:
+
+- **Capability drop + selective add** — services start from `cap_drop: ALL` and add back only what they need (e.g. `NET_ADMIN` for WireGuard, `NET_BIND_SERVICE` for privileged ports). Most also set `read_only: true` with a small `tmpfs` for `/tmp`, `no-new-privileges: true`, and `mem_limit`/`cpus` caps.
+- **Non-root** — services that must read the root-owned Let's Encrypt cert (sing-box, wstunnel) start their entrypoint as root only long enough to copy the cert into a tmpfs, then drop to an unprivileged user via `setpriv` before exec'ing the daemon.
+- **No direct Docker socket** — the admin dashboard reads container status through a read-only [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy) scoped to `CONTAINERS`/`NETWORKS` only, never mounting `/var/run/docker.sock` into the app.
+- **Admin auth fails closed** — the dashboard refuses to serve (HTTP 503) if `ADMIN_PASSWORD` is empty or one of the known-insecure defaults, and uses constant-time comparison; an optional IP allow-list narrows access further. See [OPSEC](OPSEC.md).
+- **Secrets** live under the `moav_state` Docker volume (`state/keys/`, `state/users/<user>/`), generated with `openssl rand` / `wg genkey` / `x25519`, mounted read-only into the admin service.
+
+## Service lifecycle & health
+
+`ENABLE_*` flags in `.env` select which profiles `moav start` brings up. The `certbot` service is a one-shot that obtains the TLS cert before the cert-consuming services start; `moav cert install` schedules ongoing renewal (see [CLI → Certificates](CLI.md#certificates)). `restart: unless-stopped` recovers services across crashes and reboots. Core engines (sing-box, xray, telemt) declare Compose healthchecks so `moav doctor` and dependency ordering can distinguish "running" from "actually serving"; extending healthchecks to the remaining long-running services is in progress.
 
 ## See also
 

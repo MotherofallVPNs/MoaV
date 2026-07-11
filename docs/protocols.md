@@ -10,6 +10,7 @@ MoaV deploys 16+ protocols, each with different stealth characteristics, speed p
 | [Trojan](#trojan) | 8443/tcp | High | High | Yes |
 | [AnyTLS](#anytls) | 8445/tcp | Very High | High | Yes |
 | [Hysteria2](#hysteria2) | 443/udp | High | Very High | Yes |
+| [Shadowsocks-2022](#shadowsocks-2022) | 8388/tcp+udp | High | Very High | No |
 | [CDN (VLESS+WS)](#cdn-vlessws) | 443 via CDN | Very High | Medium | Yes (Cloudflare) |
 | [TrustTunnel](#trusttunnel) | 4443/tcp+udp | Very High | High | Yes |
 | [WireGuard](#wireguard) | 51820/udp | Medium | Very High | No |
@@ -63,6 +64,15 @@ QUIC-based protocol optimized for high throughput on lossy networks. Includes bu
 - **Note:** Requires UDP. Blocked in some censored networks that drop all non-DNS UDP.
 - **Congestion control:** `up_mbps`/`down_mbps` are left unset and `ignore_client_bandwidth: true` is set, keeping both ends on BBR and stopping a client-advertised bandwidth from switching the link to Brutal (which can saturate a low-RAM VPS). This BBR is Hysteria2's own QUIC-layer controller inside sing-box — unrelated to the kernel `tcp_bbr` module, so it has no host dependency.
 
+### Shadowsocks-2022
+
+AEAD-2022 Shadowsocks (`2022-blake3-aes-128-gcm`), the modern Shadowsocks generation with per-user keys and built-in resistance to active probing and replay attacks. Needs **no domain and no TLS certificate**, so it works in domainless mode and is a good fallback when certificate-based protocols aren't an option. Wire-compatible with the Outline app.
+
+- **Port:** 8388/tcp + 8388/udp
+- **Engine:** [sing-box](https://github.com/SagerNet/sing-box)
+- **Clients:** Outline (iOS/Android/desktop), NekoBox/NekoRay, Hiddify, Streisand, sing-box — via the standard `ss://` URI
+- **Note:** On by default (`ENABLE_SS=true`). If port 8388 is fingerprinted by your ISP, change `PORT_SS` in `.env` to a less-conspicuous port and `moav restart sing-box`.
+
 ### CDN (VLESS+WS)
 
 Routes VLESS traffic through Cloudflare's CDN via WebSocket. When your server's IP is blocked, traffic goes through Cloudflare instead, making it unblockable without blocking all of Cloudflare.
@@ -99,11 +109,12 @@ Obfuscated WireGuard variant that defeats Deep Packet Inspection. Adds junk pack
 
 ### WireGuard (wstunnel)
 
-WireGuard tunneled through WebSocket (TCP). Works when UDP is completely blocked.
+WireGuard tunneled through WebSocket (TCP). Works when UDP is completely blocked. When a `DOMAIN` is configured the tunnel is served over **`wss://` (TLS)** using the server's Let's Encrypt certificate, so the WebSocket upgrade is indistinguishable from ordinary HTTPS; it falls back to plain `ws://` only in domainless mode. A per-install **HTTP-upgrade path secret** is also required, so a scanner probing port 8080 can't complete the WebSocket upgrade blind. The exact client command (correct `wss://`/`ws://` scheme and path prefix) is emitted in each user bundle's `wireguard-instructions.txt`.
 
 - **Port:** 8080/tcp
-- **Engine:** [wstunnel](https://github.com/erebe/wstunnel) + [sing-box](https://github.com/SagerNet/sing-box)
+- **Engine:** [wstunnel](https://github.com/erebe/wstunnel) wrapping the WireGuard container
 - **Clients:** WireGuard app + wstunnel binary
+- **Note:** After upgrading an existing install, rebuild the image (`moav build wstunnel`) and re-bootstrap to generate the path secret and enable `wss://`; older bundles keep working over `ws://` until re-issued.
 
 ### Telegram MTProxy
 
@@ -223,6 +234,7 @@ SOCKS5 tunnelled through a **Google Apps Script** web app that the user deploys 
 | `XDNS_MTU` | `35` | mKCP packet size. Smaller = works with more DNS resolvers. 35=safest, 67=most, 130=unrestricted |
 | `XDNS_SUBDOMAIN` | `x` | Subdomain for XDNS queries (x.yourdomain.com) |
 | `XDNS_RESOLVERS` | `1.1.1.1,8.8.8.8` | CSV of public DNS resolvers the client round-robins across in a single mKCP session (Xray v26.4.13+, [PR #5872](https://github.com/XTLS/Xray-core/pull/5872)). See [Reachable DNS resolvers](#reachable-dns-resolvers) — replace the defaults with resolvers that actually answer on your network. Set empty to fall back to single-resolver mode. |
+| `XDNS_METHOD` | `txt` | Finalmask record mode in generated client bundles. `txt` is the widest-compatibility default; `aaaa` ([Xray #6123](https://github.com/XTLS/Xray-core/pull/6123)) gives higher throughput per query but **requires an Xray client core ≥ v26.6.1** (Happ / Xray CLI). Server side needs no change. |
 
 MTU depends on domain name length — shorter domain allows higher MTU. The values above are for ~19-character domains.
 
