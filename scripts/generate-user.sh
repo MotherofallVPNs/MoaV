@@ -14,6 +14,7 @@ source /app/lib/slipstream.sh
 source /app/lib/masterdns.sh
 source /app/lib/gooserelay.sh
 source /app/lib/telemt.sh
+source /app/lib/sing-box.sh
 
 # Default state directory if not set
 STATE_DIR="${STATE_DIR:-/state}"
@@ -103,7 +104,7 @@ if [[ "${ENABLE_REALITY:-true}" == "true" ]]; then
 EOF
 
     # Generate v2rayN/NekoBox compatible link (IPv4)
-    REALITY_LINK="vless://${USER_UUID}@${SERVER_IP}:443?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${REALITY_TARGET_HOST}&fp=random&pbk=${REALITY_PUBLIC_KEY}&sid=${REALITY_SHORT_ID}&type=tcp#MoaV-Reality-${USER_ID}"
+    REALITY_LINK=$(singbox_reality_link "$USER_ID" "$SERVER_IP")
     echo "$REALITY_LINK" > "$OUTPUT_DIR/reality.txt"
 
     # Generate QR code
@@ -111,7 +112,7 @@ EOF
 
     # Generate IPv6 link if available
     if [[ -n "${SERVER_IPV6:-}" ]]; then
-        REALITY_LINK_V6="vless://${USER_UUID}@[${SERVER_IPV6}]:443?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${REALITY_TARGET_HOST}&fp=random&pbk=${REALITY_PUBLIC_KEY}&sid=${REALITY_SHORT_ID}&type=tcp#MoaV-Reality-${USER_ID}-IPv6"
+        REALITY_LINK_V6=$(singbox_reality_link "${USER_ID}-IPv6" "[${SERVER_IPV6}]")
         echo "$REALITY_LINK_V6" > "$OUTPUT_DIR/reality-ipv6.txt"
         qrencode -o "$OUTPUT_DIR/reality-ipv6-qr.png" -s 6 "$REALITY_LINK_V6" 2>/dev/null || true
     fi
@@ -163,13 +164,13 @@ if [[ "${ENABLE_TROJAN:-true}" == "true" ]]; then
 EOF
 
     # Generate Trojan URI (IPv4)
-    TROJAN_LINK="trojan://${USER_PASSWORD}@${SERVER_IP}:8443?security=tls&sni=${DOMAIN}&type=tcp#MoaV-Trojan-${USER_ID}"
+    TROJAN_LINK=$(singbox_trojan_link "$USER_ID" "$SERVER_IP")
     echo "$TROJAN_LINK" > "$OUTPUT_DIR/trojan.txt"
     qrencode -o "$OUTPUT_DIR/trojan-qr.png" -s 6 "$TROJAN_LINK" 2>/dev/null || true
 
     # Generate IPv6 link if available
     if [[ -n "${SERVER_IPV6:-}" ]]; then
-        TROJAN_LINK_V6="trojan://${USER_PASSWORD}@[${SERVER_IPV6}]:8443?security=tls&sni=${DOMAIN}&type=tcp#MoaV-Trojan-${USER_ID}-IPv6"
+        TROJAN_LINK_V6=$(singbox_trojan_link "${USER_ID}-IPv6" "[${SERVER_IPV6}]")
         echo "$TROJAN_LINK_V6" > "$OUTPUT_DIR/trojan-ipv6.txt"
         qrencode -o "$OUTPUT_DIR/trojan-ipv6-qr.png" -s 6 "$TROJAN_LINK_V6" 2>/dev/null || true
     fi
@@ -214,13 +215,13 @@ if [[ "${ENABLE_ANYTLS:-false}" == "true" ]]; then
 EOF
 
     # Generate AnyTLS URI (IPv4)
-    ANYTLS_LINK="anytls://${USER_PASSWORD}@${SERVER_IP}:${PORT_ANYTLS:-8445}?sni=${DOMAIN}&insecure=0#MoaV-AnyTLS-${USER_ID}"
+    ANYTLS_LINK=$(singbox_anytls_link "$USER_ID" "$SERVER_IP")
     echo "$ANYTLS_LINK" > "$OUTPUT_DIR/anytls.txt"
     qrencode -o "$OUTPUT_DIR/anytls-qr.png" -s 6 "$ANYTLS_LINK" 2>/dev/null || true
 
     # Generate IPv6 link if available
     if [[ -n "${SERVER_IPV6:-}" ]]; then
-        ANYTLS_LINK_V6="anytls://${USER_PASSWORD}@[${SERVER_IPV6}]:${PORT_ANYTLS:-8445}?sni=${DOMAIN}&insecure=0#MoaV-AnyTLS-${USER_ID}-IPv6"
+        ANYTLS_LINK_V6=$(singbox_anytls_link "${USER_ID}-IPv6" "[${SERVER_IPV6}]")
         echo "$ANYTLS_LINK_V6" > "$OUTPUT_DIR/anytls-ipv6.txt"
         qrencode -o "$OUTPUT_DIR/anytls-ipv6-qr.png" -s 6 "$ANYTLS_LINK_V6" 2>/dev/null || true
     fi
@@ -287,13 +288,13 @@ EOF
 EOF
 
     # Hysteria2 URI (IPv4) - includes obfs parameter
-    HY2_LINK="hysteria2://${USER_PASSWORD}@${SERVER_IP}:443?sni=${DOMAIN}&obfs=salamander&obfs-password=${HYSTERIA2_OBFS_PASSWORD}#MoaV-Hysteria2-${USER_ID}"
+    HY2_LINK=$(singbox_hysteria2_link "$USER_ID" "$SERVER_IP")
     echo "$HY2_LINK" > "$OUTPUT_DIR/hysteria2.txt"
     qrencode -o "$OUTPUT_DIR/hysteria2-qr.png" -s 6 "$HY2_LINK" 2>/dev/null || true
 
     # Generate IPv6 link if available
     if [[ -n "${SERVER_IPV6:-}" ]]; then
-        HY2_LINK_V6="hysteria2://${USER_PASSWORD}@[${SERVER_IPV6}]:443?sni=${DOMAIN}&obfs=salamander&obfs-password=${HYSTERIA2_OBFS_PASSWORD}#MoaV-Hysteria2-${USER_ID}-IPv6"
+        HY2_LINK_V6=$(singbox_hysteria2_link "${USER_ID}-IPv6" "[${SERVER_IPV6}]")
         echo "$HY2_LINK_V6" > "$OUTPUT_DIR/hysteria2-ipv6.txt"
         qrencode -o "$OUTPUT_DIR/hysteria2-ipv6-qr.png" -s 6 "$HY2_LINK_V6" 2>/dev/null || true
     fi
@@ -432,7 +433,7 @@ if [[ -n "${CDN_DOMAIN:-}" ]]; then
 }
 EOF
 
-    CDN_LINK="vless://${USER_UUID}@${CDN_ADDRESS}:443?security=tls&type=${CDN_TRANSPORT}&path=${CDN_WS_PATH}&sni=${CDN_SNI}&host=${CDN_DOMAIN}&fp=random&alpn=http/1.1#MoaV-CDN-${USER_ID}"
+    CDN_LINK=$(singbox_cdn_link "$USER_ID")
     echo "$CDN_LINK" > "$OUTPUT_DIR/cdn-vless.txt"
     qrencode -o "$OUTPUT_DIR/cdn-vless-qr.png" -s 6 "$CDN_LINK" 2>/dev/null || true
 
