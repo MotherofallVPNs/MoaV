@@ -474,12 +474,21 @@ docker compose logs certbot
 
 **Certificate not renewing:**
 ```bash
-# Manual renewal
-docker compose run --rm certbot renew
+# Check expiry + whether the auto-renewal timer is installed
+moav cert status
 
-# Check certificate expiry
-docker compose exec sing-box openssl x509 -enddate -noout -in /certs/live/*/fullchain.pem
+# Run a renewal check now (restarts TLS services if the cert changed)
+moav cert renew
+
+# (Re)install the daily auto-renewal timer — installed automatically on
+# `moav start` since v1.8.5; pre-v1.8.5 installs need this once
+moav cert install
 ```
+
+> **Note:** plain `docker compose run --rm certbot renew` does NOT work — the
+> compose service overrides the entrypoint for one-shot issuance and would run
+> `/bin/sh renew` instead of certbot. Use `moav cert renew`, which forces
+> `--entrypoint certbot` and restarts the services that load certs at startup.
 
 **Certificate acquisition failed:**
 - Ensure DNS A record points to this server
