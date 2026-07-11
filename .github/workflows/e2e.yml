@@ -1,0 +1,106 @@
+name: e2e
+
+# Full end-to-end test: build the stack, bootstrap, start every enabled
+# protocol, and run `moav test` (client-test.sh) against the LIVE server.
+#
+# This is NOT on the per-PR path — it builds ~25 images and needs real TLS
+# certs (a domain). It runs on a SELF-HOSTED runner (a test VPS with a test
+# domain). Setup + manual-run instructions: docs/devdocs/E2E-TESTING.md
+on:
+  workflow_dispatch:
+    inputs:
+      verbose:
+        description: 'Verbose client-test output (-v)'
+        type: boolean
+        default: false
+  release:
+    types: [published]
+  schedule:
+    - cron: '0 3 * * *'   # nightly 03:00 UTC (the "overnight" run)
+
+# Never run two e2e jobs on the same box at once — they share host ports.
+concurrency:
+  group: e2e-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    # Register a runner on your test VPS with the label `moav-e2e` (see the doc).
+    runs-on: [self-hosted, moav-e2e]
+    timeout-minutes: 90
+    env:
+      MOAV_DOMAIN: ${{ secrets.E2E_DOMAIN }}
+      MOAV_ACME_EMAIL: ${{ secrets.E2E_ACME_EMAIL }}
+      MOAV_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+      MOAV_SERVER_IP: ${{ secrets.E2E_SERVER_IP }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preflight
+        run: |
+          test -n "$MOAV_DOMAIN"          || { echo "::error::secret E2E_DOMAIN is not set"; exit 1; }
+          test -n "$MOAV_ACME_EMAIL"      || { echo "::error::secret E2E_ACME_EMAIL is not set"; exit 1; }
+          test -n "$MOAV_ADMIN_PASSWORD"  || { echo "::error::secret E2E_ADMIN_PASSWORD is not set"; exit 1; }
+          docker --version && docker compose version
+
+      - name: Prepare .env
+        run: |
+          cp .env.example .env
+          sed -i "s|^DOMAIN=.*|DOMAIN=${MOAV_DOMAIN}|"                 .env
+          sed -i "s|^ACME_EMAIL=.*|ACME_EMAIL=${MOAV_ACME_EMAIL}|"     .env
+          sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${MOAV_ADMIN_PASSWORD}|" .env
+          [ -n "$MOAV_SERVER_IP" ] && sed -i "s|^SERVER_IP=.*|SERVER_IP=${MOAV_SERVER_IP}|" .env
+          # Deterministic single test user + start everything enabled
+          grep -q '^INITIAL_USERS=' .env && sed -i "s|^INITIAL_USERS=.*|INITIAL_USERS=e2e-test|" .env || echo "INITIAL_USERS=e2e-test" >> .env
+          grep -q '^DEFAULT_PROFILES=' .env && sed -i "s|^DEFAULT_PROFILES=.*|DEFAULT_PROFILES=all|" .env || echo "DEFAULT_PROFILES=all" >> .env
+
+      - name: Build images
+        run: ./moav.sh build
+
+      - name: Bootstrap (keys, certs, first user)
+        run: ./moav.sh bootstrap
+
+      - name: Start services
+        run: ./moav.sh start all
+
+      - name: Let services settle
+        run: sleep 45
+
+      - name: Run connectivity tests
+        run: |
+          FLAG=""
+          [ "${{ inputs.verbose }}" = "true" ] && FLAG="-v"
+          # stdout may interleave logs with the JSON object; keep the raw run and
+          # extract the JSON block for evaluation.
+          ./moav.sh test e2e-test --json $FLAG | tee e2e-raw.txt
+          awk '/^{/{p=1} p{print}' e2e-raw.txt > e2e-results.json
+          jq . e2e-results.json > /dev/null   # fail loudly if it isn't valid JSON
+
+      - name: Evaluate results
+        run: |
+          jq -r '.tests | to_entries[] | "  \(.key): \(.value.status)"' e2e-results.json
+          fails=$(jq '[.tests[] | select(.status=="fail")] | length' e2e-results.json)
+          echo "Failed protocols: $fails"
+          if [ "$fails" -ne 0 ]; then
+            echo "::error::e2e connectivity test failed for $fails protocol(s)"
+            exit 1
+          fi
+
+      - name: Upload results + logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: |
+            e2e-results.json
+            e2e-raw.txt
+          if-no-files-found: warn
+
+      - name: Teardown
+        if: always()
+        run: |
+          ./moav.sh stop 2>/dev/null || true
+          docker compose --profile all down -v 2>/dev/null || true
