@@ -109,8 +109,16 @@ services:
       - WSTUNNEL_LISTEN=0.0.0.0:8080
       # Forward to wireguard container via Docker internal DNS
       - WSTUNNEL_RESTRICT=moav-wireguard:51820
+      # Enables wss:// (TLS) using the mounted Let's Encrypt cert; empty = ws://
+      - DOMAIN=${DOMAIN:-}
     cap_drop:
       - ALL
+    cap_add:
+      # Copy the root-owned cert to a tmpfs the moav user can read, then drop privs
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETUID
+      - SETGID
     security_opt:
       - no-new-privileges:true
     read_only: true

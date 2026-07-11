@@ -120,3 +120,4 @@ site/docs/
 spec.yaml
 .claude/settings.local.json
 *.mp4
+.claude/worktrees/
