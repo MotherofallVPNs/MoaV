@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`MASTERDNS_PUBLIC_SUBDOMAIN` — optional alternate MasterDNS subdomain for client bundles** (PR [#112](https://github.com/shayanb/MoaV/pull/112), thanks @vibecodegits) — lets operators hand out a different delegation label than the server's base one (useful when the base label is burned or for staged rotation); the server accepts both, the zone-file generator emits both NS records, and `moav doctor dns` now checks both delegations when the public alias is set
+
+### Fixed
+- **DNS tunnel user-bundle drift + dns-router hardening** (PR [#112](https://github.com/shayanb/MoaV/pull/112), thanks @vibecodegits) — dns-router now parses the full DNS question (type/class), answers authoritative NS/SOA at route apexes (some resolvers refuse to follow delegations without them), derives the default NS from the root `DOMAIN`, and derives the SOA serial from `VERSION`; table-driven Go tests added (golden-byte NS/SOA responses, malformed-packet handling). dnstt key provisioning now hard-fails instead of falling back to a world-readable key file. `moav.sh`'s port-53 conflict check no longer flags MoaV's own dns-router listener. Doctor's Reality TCP probe gained nc/curl/bash fallbacks (the `/dev/tcp` probe always failed under `sh`). All `docker compose` calls in `user-add.sh` are timeout-bounded so a wedged Docker daemon can't hang user creation. User revoke now finds users that exist only in Xray/TrustTunnel/telemt inbounds, not just sing-box
+
 ## [1.8.5] - 2026-07-11
 
 ### Fixed

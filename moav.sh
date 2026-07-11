@@ -3560,11 +3560,18 @@ doctor_check_dns() {
         local masterdns_enabled=""
         masterdns_enabled=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
         if [[ "$masterdns_enabled" == "true" ]]; then
-            local masterdns_subdomain=""
-            masterdns_subdomain=$(get_env_val "MASTERDNS_PUBLIC_SUBDOMAIN" "$env_file" "")
-            [[ -z "$masterdns_subdomain" ]] && masterdns_subdomain=$(get_env_val "MASTERDNS_SUBDOMAIN" "$env_file" "m")
+            local masterdns_subdomain masterdns_public_sub
+            masterdns_subdomain=$(get_env_val "MASTERDNS_SUBDOMAIN" "$env_file" "m")
+            masterdns_public_sub=$(get_env_val "MASTERDNS_PUBLIC_SUBDOMAIN" "$env_file" "")
             if ! doctor_check_ns_record "MasterDNS NS record" "${masterdns_subdomain}.${domain}" "$dns_host" "set NS ${masterdns_subdomain} -> ${dns_host}"; then
                 failures=$((failures + 1))
+            fi
+            # dns-router still serves the base subdomain and pre-existing bundles use it,
+            # so when a public alias is set both delegations must exist
+            if [[ -n "$masterdns_public_sub" && "$masterdns_public_sub" != "$masterdns_subdomain" ]]; then
+                if ! doctor_check_ns_record "MasterDNS public NS record" "${masterdns_public_sub}.${domain}" "$dns_host" "set NS ${masterdns_public_sub} -> ${dns_host}"; then
+                    failures=$((failures + 1))
+                fi
             fi
         fi
 

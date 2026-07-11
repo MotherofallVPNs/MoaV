@@ -1019,15 +1019,17 @@ fi
     # -------------------------------------------------------------------------
     if [[ ${#ERRORS[@]} -eq 0 ]] && [[ -d "./state/users/$USERNAME" ]]; then
         if [[ -d "/state" ]]; then
+            # Admin container mounts the state volume :ro and runs unprivileged —
+            # the write fails there by design and bootstrap imports on its next run
             if mkdir -p "/state/users/$USERNAME" 2>/dev/null && cp -a "./state/users/$USERNAME/." "/state/users/$USERNAME/" 2>/dev/null; then
                 log_info "✓ Synced credentials to Docker volume"
-            elif su-exec root sh -c "mkdir -p '/state/users/$USERNAME' && cp -a './state/users/$USERNAME/.' '/state/users/$USERNAME/' && chown -R moav:moav '/state/users/$USERNAME'" 2>/dev/null; then
-                log_info "✓ Synced credentials to Docker volume"
             else
-                log_warn "Could not sync to Docker volume (bootstrap will import on next run)"
+                log_warn "Could not sync to Docker volume (read-only here; bootstrap will import on next run)"
             fi
         else
-            timeout 15 docker run --rm \
+            _tmo=""
+            command -v timeout >/dev/null 2>&1 && _tmo="timeout 15"
+            $_tmo docker run --rm \
                 -v moav_moav_state:/state \
                 -v "$(pwd)/state/users/$USERNAME:/host-user:ro" \
                 alpine sh -c "mkdir -p /state/users/$USERNAME && cp -a /host-user/. /state/users/$USERNAME/" \
