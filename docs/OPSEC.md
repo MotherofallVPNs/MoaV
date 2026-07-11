@@ -161,6 +161,8 @@ sudo ufw-docker allow moav-admin 8443/tcp from YOUR_IP
 - Reset: `moav admin password`
 - IP whitelist: `ADMIN_IP_WHITELIST` in `.env`
 
+> **Fail-closed authentication.** The dashboard **refuses to serve** (HTTP 503) if `ADMIN_PASSWORD` is empty, unset, or one of the known-insecure defaults (`admin`, `change_me_to_something_secure`), rather than silently allowing access. This closes an edge case where an empty password would otherwise accept an empty `Authorization` header. Password comparison is constant-time. If you see a 503 with a remediation message, set a real `ADMIN_PASSWORD` in `.env` and `moav restart admin`.
+
 **Grafana** (`https://server:9444`):
 - Username: `admin`
 - Password: same as `ADMIN_PASSWORD`

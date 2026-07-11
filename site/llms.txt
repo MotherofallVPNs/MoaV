@@ -1,6 +1,6 @@
 # MoaV
 
-> Multi-protocol Internet censorship circumvention stack optimized for hostile network environments. Bundles 16+ transports — Reality (VLESS), Trojan, Hysteria2, XHTTP, Shadowsocks-2022, CDN VLESS+WS, WireGuard (direct + over WebSocket), AmneziaWG, TrustTunnel (HTTP/2+QUIC), Telegram MTProxy, plus four DNS tunnels (dnstt, Slipstream, MasterDNS, XDNS) sharing port 53 through a subdomain-routing daemon. Optional bandwidth donation paths via Psiphon Conduit, Tor Snowflake, and GooseRelay. Single-host Docker Compose deployment with per-user bundle generation (configs, QR codes, V2Ray subscription) and an optional Prometheus + Grafana monitoring stack.
+> Multi-protocol Internet censorship circumvention stack optimized for hostile network environments. Bundles 16+ transports — Reality (VLESS), Trojan, AnyTLS (defeats TLS-in-TLS fingerprinting), Hysteria2, XHTTP, Shadowsocks-2022, CDN VLESS+WS, WireGuard (direct + over wss:// WebSocket), AmneziaWG, TrustTunnel (HTTP/2+QUIC), Telegram MTProxy, plus four DNS tunnels (dnstt, Slipstream, MasterDNS, XDNS) sharing port 53 through a subdomain-routing daemon. Optional bandwidth donation paths via Psiphon Conduit, Tor Snowflake, and GooseRelay. Single-host Docker Compose deployment with per-user bundle generation (configs, QR codes, V2Ray subscription), automatic Let's Encrypt certificate renewal, and an optional Prometheus + Grafana monitoring stack.
 
 ## Why MoaV exists
 
