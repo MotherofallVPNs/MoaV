@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **XDNS record-mode selector `XDNS_METHOD` (`txt` default, `aaaa` opt-in)** — Xray's finalmask XDNS client can tunnel over AAAA records instead of TXT (upstream [#6123](https://github.com/XTLS/Xray-core/pull/6123)), which is meaningfully higher-throughput per query. Generated client bundles stay on `txt` for the widest client compatibility; set `XDNS_METHOD=aaaa` to emit `x.<domain>:aaaa+udp://…` resolvers. Requires an Xray client core ≥ v26.6.1 (Happ / Xray CLI); server side needs nothing
+- **Opt-in telemt anti-DPI knobs** — `TELEMT_CLIENT_MSS` / `TELEMT_CLIENT_MSS_BULK` expose telemt's handshake-MSS clamping (telemt ≥ 3.4.15/3.4.19): fragmenting the MTPROTO handshake defeats MSS-based DPI fingerprinting (e.g. Iran's TSPU), while the `_BULK` value restores MSS for bulk data so throughput isn't tanked. Both default empty (off) — this is a targeted counter to MSS-fingerprinting networks, not a universal default, and upstream ships it off. `TELEMT_CONFIG_STRICT` (default false) makes telemt fail fast on an unknown/typo'd generated key instead of silently ignoring it. Stale upstream doc links in the generated config's comments were refreshed
 - **`MASTERDNS_PUBLIC_SUBDOMAIN` — optional alternate MasterDNS subdomain for client bundles** (PR [#112](https://github.com/shayanb/MoaV/pull/112), thanks @vibecodegits) — lets operators hand out a different delegation label than the server's base one (useful when the base label is burned or for staged rotation); the server accepts both, the zone-file generator emits both NS records, and `moav doctor dns` now checks both delegations when the public alias is set
 
 ### Fixed
