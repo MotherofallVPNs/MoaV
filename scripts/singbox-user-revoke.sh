@@ -19,49 +19,76 @@ if [[ -z "$USERNAME" ]]; then
 fi
 
 CONFIG_FILE="configs/sing-box/config.json"
+XRAY_CONFIG="configs/xray/config.json"
+TRUSTTUNNEL_CREDS="configs/trusttunnel/credentials.toml"
+TELEMT_CONFIG="configs/telemt/config.toml"
 
-if [[ ! -f "$CONFIG_FILE" ]]; then
-    log_error "sing-box config not found"
-    exit 1
-fi
-
-# Check if user exists (use jq so we don't trip on JSON-formatting whitespace —
-# `jq -S` emits "name": "X" with a space, the grep version required "name":"X").
-if ! jq -e --arg n "$USERNAME" \
-        '.inbounds[]? | select(.users != null) | .users[]? | select(.name == $n)' \
+proxy_user_exists() {
+    if [[ -f "$CONFIG_FILE" ]] && jq -e \
+        --arg name "$USERNAME" --arg email "${USERNAME}@moav" \
+        '
+        def match_user:
+            (.name == $name) or (.email == $email);
+        any(.inbounds[]?; any(((.users // []) + (.settings.users // []) + (.settings.clients // []))[]?; match_user))
+        ' \
         "$CONFIG_FILE" >/dev/null 2>&1; then
-    log_error "User '$USERNAME' not found in sing-box config"
+        return 0
+    fi
+
+    if [[ -f "$XRAY_CONFIG" ]] && jq -e \
+        --arg name "$USERNAME" --arg email "${USERNAME}@moav" \
+        '
+        def match_user:
+            (.name == $name) or (.email == $email);
+        any(.inbounds[]?; any(((.settings.clients // []) + (.settings.users // []))[]?; match_user))
+        ' \
+        "$XRAY_CONFIG" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if [[ -f "$TRUSTTUNNEL_CREDS" ]] && grep -q "username = \"$USERNAME\"" "$TRUSTTUNNEL_CREDS" 2>/dev/null; then
+        return 0
+    fi
+
+    if [[ -f "$TELEMT_CONFIG" ]] && grep -q "^${USERNAME} = " "$TELEMT_CONFIG" 2>/dev/null; then
+        return 0
+    fi
+
+    return 1
+}
+
+if ! proxy_user_exists; then
+    log_error "User '$USERNAME' not found in proxy configs"
     exit 1
 fi
 
-log_info "Revoking user '$USERNAME' from sing-box..."
+log_info "Revoking user '$USERNAME' from proxy configs..."
 
-# Remove user from all inbounds using jq
-TEMP_CONFIG=$(mktemp)
+if [[ -f "$CONFIG_FILE" ]]; then
+    # Remove user from all sing-box inbounds using jq.
+    TEMP_CONFIG=$(mktemp)
 
-# Remove from Reality (vless)
-jq --arg name "$USERNAME" \
-    '.inbounds |= map(if .users then .users |= map(select(.name != $name)) else . end)' \
-    "$CONFIG_FILE" > "$TEMP_CONFIG"
+    jq --arg name "$USERNAME" \
+        '.inbounds |= map(if .users then .users |= map(select(.name != $name)) else . end)' \
+        "$CONFIG_FILE" > "$TEMP_CONFIG"
 
-# Validate
-if ! jq empty "$TEMP_CONFIG" 2>/dev/null; then
-    log_error "Failed to generate valid config"
+    if ! jq empty "$TEMP_CONFIG" 2>/dev/null; then
+        log_error "Failed to generate valid sing-box config"
+        rm -f "$TEMP_CONFIG"
+        exit 1
+    fi
+
+    # Preserve original file's inode/mode/owner (mv -f would replace them — see
+    # wg-user-revoke.sh history). Especially matters when CLI revoke runs as root
+    # (sudo) while the admin container is non-root: a swapped inode would lock the
+    # dashboard out of the next user-add.
+    cat "$TEMP_CONFIG" > "$CONFIG_FILE"
     rm -f "$TEMP_CONFIG"
-    exit 1
+
+    log_info "Removed $USERNAME from sing-box config"
 fi
-
-# Preserve original file's inode/mode/owner (mv -f would replace them — see
-# wg-user-revoke.sh history). Especially matters when CLI revoke runs as root
-# (sudo) while the admin container is non-root: a swapped inode would lock the
-# dashboard out of the next user-add.
-cat "$TEMP_CONFIG" > "$CONFIG_FILE"
-rm -f "$TEMP_CONFIG"
-
-log_info "Removed $USERNAME from sing-box config"
 
 # Remove from TrustTunnel (if config exists)
-TRUSTTUNNEL_CREDS="configs/trusttunnel/credentials.toml"
 if [[ -f "$TRUSTTUNNEL_CREDS" ]]; then
     if grep -q "username = \"$USERNAME\"" "$TRUSTTUNNEL_CREDS" 2>/dev/null; then
         log_info "Removing $USERNAME from TrustTunnel..."
@@ -102,7 +129,6 @@ fi
 # users may live in either array depending on which write path created them
 # (bootstrap → settings.users via template; legacy add → settings.clients).
 # Match + delete from BOTH so revoke is complete regardless.
-XRAY_CONFIG="configs/xray/config.json"
 if [[ -f "$XRAY_CONFIG" ]]; then
     if jq -e --arg email "${USERNAME}@moav" '
             .inbounds[]? |
@@ -128,7 +154,6 @@ if [[ -f "$XRAY_CONFIG" ]]; then
 fi
 
 # Remove from telemt (if config exists)
-TELEMT_CONFIG="configs/telemt/config.toml"
 if [[ -f "$TELEMT_CONFIG" ]]; then
     if grep -q "^${USERNAME} = " "$TELEMT_CONFIG" 2>/dev/null; then
         log_info "Removing $USERNAME from telemt..."

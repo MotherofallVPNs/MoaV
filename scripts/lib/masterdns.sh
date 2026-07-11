@@ -24,6 +24,30 @@ _masterdns_key_chars() {
     esac
 }
 
+_masterdns_base_domain() {
+    echo "${MASTERDNS_SUBDOMAIN:-m}.${DOMAIN}"
+}
+
+_masterdns_public_domain() {
+    if [[ -n "${MASTERDNS_PUBLIC_SUBDOMAIN:-}" ]]; then
+        echo "${MASTERDNS_PUBLIC_SUBDOMAIN}.${DOMAIN}"
+    else
+        _masterdns_base_domain
+    fi
+}
+
+_masterdns_domain_array_toml() {
+    local base_domain public_domain
+    base_domain=$(_masterdns_base_domain)
+    public_domain=$(_masterdns_public_domain)
+
+    if [[ "$public_domain" == "$base_domain" ]]; then
+        echo "[\"${base_domain}\"]"
+    else
+        echo "[\"${base_domain}\", \"${public_domain}\"]"
+    fi
+}
+
 generate_masterdns_config() {
     log_info "Setting up MasterDNS configuration..."
 
@@ -60,7 +84,10 @@ generate_masterdns_config() {
         return 1
     fi
 
-    local md_domain="${MASTERDNS_SUBDOMAIN:-m}.${DOMAIN}"
+    local md_domain
+    md_domain=$(_masterdns_public_domain)
+    local md_domains_toml
+    md_domains_toml=$(_masterdns_domain_array_toml)
 
     # Minimal-but-complete server config. Unspecified tuning knobs are
     # smart-sized internally by the server. Egress is forced through
@@ -70,7 +97,7 @@ generate_masterdns_config() {
 # Do not edit by hand — regenerated on every bootstrap.
 
 # --- Tunnel policy -----------------------------------------------------------
-DOMAIN = ["${md_domain}"]
+DOMAIN = ${md_domains_toml}
 PROTOCOL_TYPE = "SOCKS5"
 SUPPORTED_UPLOAD_COMPRESSION_TYPES = [0, 1, 2, 3]
 SUPPORTED_DOWNLOAD_COMPRESSION_TYPES = [0, 1, 2, 3]
@@ -101,13 +128,13 @@ LOG_LEVEL = "INFO"
 EOF
 
     # Publish the public connection params (key is required by the client).
-    echo "$md_domain" > "$MASTERDNS_CONFIG_DIR/server.domain"
+    printf '%s\n' "$md_domain" > "$MASTERDNS_CONFIG_DIR/server.domain"
     ensure_dir "/outputs/masterdns"
     cp "$key_file" "/outputs/masterdns/encrypt_key.txt" 2>/dev/null || true
-    echo "$md_domain" > "/outputs/masterdns/server.domain"
+    printf '%s\n' "$md_domain" > "/outputs/masterdns/server.domain"
 
     log_info "MasterDNS configuration created"
-    log_info "Domain: $md_domain  (enc method ${MASTERDNS_ENC_METHOD} / AES-256-GCM)"
+    log_info "Domain: $md_domain  (allowed: ${md_domains_toml}; enc method ${MASTERDNS_ENC_METHOD} / AES-256-GCM)"
 }
 
 # Generate MasterDNS client instructions for a user
@@ -115,7 +142,8 @@ masterdns_generate_client_instructions() {
     local user_id="$1"
     local output_dir="$2"
 
-    local md_domain="${MASTERDNS_SUBDOMAIN:-m}.${DOMAIN}"
+    local md_domain
+    md_domain=$(_masterdns_public_domain)
     local key_file="$STATE_DIR/keys/masterdns-encrypt.key"
     local md_key="KEY_NOT_GENERATED"
     [[ -s "$key_file" ]] && md_key=$(tr -d '\n\r ' < "$key_file")
