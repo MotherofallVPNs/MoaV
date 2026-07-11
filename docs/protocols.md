@@ -8,6 +8,7 @@ MoaV deploys 16+ protocols, each with different stealth characteristics, speed p
 |----------|------|---------|-------|-----------------|
 | [Reality (VLESS)](#reality-vless) | 443/tcp | Very High | High | No |
 | [Trojan](#trojan) | 8443/tcp | High | High | Yes |
+| [AnyTLS](#anytls) | 8445/tcp | Very High | High | Yes |
 | [Hysteria2](#hysteria2) | 443/udp | High | Very High | Yes |
 | [CDN (VLESS+WS)](#cdn-vlessws) | 443 via CDN | Very High | Medium | Yes (Cloudflare) |
 | [TrustTunnel](#trusttunnel) | 4443/tcp+udp | Very High | High | Yes |
@@ -43,6 +44,15 @@ Password-authenticated TLS proxy. Traffic looks like normal HTTPS. Uses your dom
 - **Engine:** [sing-box](https://github.com/SagerNet/sing-box)
 - **Clients:** Streisand, Hiddify, v2rayNG, v2rayN, Shadowrocket
 
+### AnyTLS
+
+Password-authenticated TLS proxy designed to defeat **TLS-in-TLS fingerprinting**. By varying record sizes and padding, AnyTLS removes the tell-tale TLS-inside-TLS pattern that DPI uses to detect TLS-tunneling proxies, giving it very high stealth. Reuses the same sing-box engine, the Trojan TLS certificate, and your server domain.
+
+- **Port:** 8445/tcp
+- **Engine:** [sing-box](https://github.com/SagerNet/sing-box) (1.13.x)
+- **Clients:** Hiddify, sing-box (SFA/SFI), NekoBox/NekoRay, Mihomo Party, Shadowrocket 2.2.65+
+- **Note:** Opt-in — enable with `ENABLE_ANYTLS=true`. Requires a domain (TLS). Client support is narrower than VLESS/Trojan; older or Clash-only clients (v2rayNG, Streisand, V2Box, Clash Verge) do **not** support AnyTLS.
+
 ### Hysteria2
 
 QUIC-based protocol optimized for high throughput on lossy networks. Includes built-in obfuscation to bypass QUIC blocking.
@@ -51,6 +61,7 @@ QUIC-based protocol optimized for high throughput on lossy networks. Includes bu
 - **Engine:** [sing-box](https://github.com/SagerNet/sing-box)
 - **Clients:** Streisand, Hiddify, v2rayNG, v2rayN
 - **Note:** Requires UDP. Blocked in some censored networks that drop all non-DNS UDP.
+- **Congestion control:** `up_mbps`/`down_mbps` are left unset and `ignore_client_bandwidth: true` is set, keeping both ends on BBR and stopping a client-advertised bandwidth from switching the link to Brutal (which can saturate a low-RAM VPS). This BBR is Hysteria2's own QUIC-layer controller inside sing-box — unrelated to the kernel `tcp_bbr` module, so it has no host dependency.
 
 ### CDN (VLESS+WS)
 

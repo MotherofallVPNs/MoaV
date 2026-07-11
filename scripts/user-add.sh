@@ -153,6 +153,7 @@ if [[ -n "$DONATE_ONLY" ]]; then
     # Enable/disable based on donate list
     echo " $DONATE_ONLY " | grep -q " reality "   && ENABLE_REALITY=true   || ENABLE_REALITY=false
     echo " $DONATE_ONLY " | grep -q " trojan "    && ENABLE_TROJAN=true    || ENABLE_TROJAN=false
+    echo " $DONATE_ONLY " | grep -q " anytls "    && ENABLE_ANYTLS=true    || ENABLE_ANYTLS=false
     echo " $DONATE_ONLY " | grep -q " hysteria2 " && ENABLE_HYSTERIA2=true || ENABLE_HYSTERIA2=false
     echo " $DONATE_ONLY " | grep -q " telegram "  && ENABLE_TELEMT=true    || ENABLE_TELEMT=false
     echo " $DONATE_ONLY " | grep -q " xhttp "     && ENABLE_XHTTP=true    || ENABLE_XHTTP=false
@@ -232,10 +233,10 @@ for USERNAME in "${USERNAMES[@]}"; do
     fi
 
     # -------------------------------------------------------------------------
-    # Add to sing-box (Reality, Trojan, Hysteria2)
+    # Add to sing-box (Reality, Trojan, AnyTLS, Hysteria2)
     # -------------------------------------------------------------------------
     if [[ -f "configs/sing-box/config.json" ]]; then
-        log_info "[1/3] Adding to sing-box (Reality, Trojan, Hysteria2)..."
+        log_info "[1/3] Adding to sing-box (Reality, Trojan, AnyTLS, Hysteria2)..."
         if "$SCRIPT_DIR/singbox-user-add.sh" "$USERNAME" $RELOAD_FLAG; then
             log_info "✓ sing-box user added"
         else
@@ -716,6 +717,7 @@ if [[ -f "$TEMPLATE_FILE" ]]; then
     CONFIG_REALITY=$(cat "$OUTPUT_DIR/reality.txt" 2>/dev/null | tr -d '\n' || echo "")
     CONFIG_HYSTERIA2=$(cat "$OUTPUT_DIR/hysteria2.txt" 2>/dev/null | tr -d '\n' || echo "")
     CONFIG_TROJAN=$(cat "$OUTPUT_DIR/trojan.txt" 2>/dev/null | tr -d '\n' || echo "")
+    CONFIG_ANYTLS=$(cat "$OUTPUT_DIR/anytls.txt" 2>/dev/null | tr -d '\n' || echo "")
     CONFIG_SHADOWSOCKS=$(cat "$OUTPUT_DIR/shadowsocks.txt" 2>/dev/null | tr -d '\n' || echo "")
     CONFIG_CDN=$(cat "$OUTPUT_DIR/cdn-vless.txt" 2>/dev/null | tr -d '\n' || echo "")
     CONFIG_WIREGUARD=$(cat "$OUTPUT_DIR/wireguard.conf" 2>/dev/null || echo "")
@@ -770,6 +772,7 @@ if [[ -f "$TEMPLATE_FILE" ]]; then
     QR_REALITY_B64=$(qr_to_base64 "$OUTPUT_DIR/reality-qr.png")
     QR_HYSTERIA2_B64=$(qr_to_base64 "$OUTPUT_DIR/hysteria2-qr.png")
     QR_TROJAN_B64=$(qr_to_base64 "$OUTPUT_DIR/trojan-qr.png")
+    QR_ANYTLS_B64=$(qr_to_base64 "$OUTPUT_DIR/anytls-qr.png")
     QR_WIREGUARD_B64=$(qr_to_base64 "$OUTPUT_DIR/wireguard-qr.png")
     QR_WIREGUARD_WSTUNNEL_B64=$(qr_to_base64 "$OUTPUT_DIR/wireguard-wstunnel-qr.png")
     QR_AMNEZIAWG_B64=$(qr_to_base64 "$OUTPUT_DIR/amneziawg-qr.png")
@@ -822,6 +825,7 @@ with open(filepath, 'w') as f:
     sed -i.bak "s|{{QR_REALITY}}|$QR_REALITY_B64|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{QR_HYSTERIA2}}|$QR_HYSTERIA2_B64|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{QR_TROJAN}}|$QR_TROJAN_B64|g" "$OUTPUT_HTML"
+    sed -i.bak "s|{{QR_ANYTLS}}|$QR_ANYTLS_B64|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{QR_WIREGUARD}}|$QR_WIREGUARD_B64|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{QR_WIREGUARD_WSTUNNEL}}|$QR_WIREGUARD_WSTUNNEL_B64|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{QR_AMNEZIAWG}}|$QR_AMNEZIAWG_B64|g" "$OUTPUT_HTML"
@@ -845,6 +849,12 @@ with open(filepath, 'w') as f:
         replace_placeholder "{{CONFIG_TROJAN}}" "$CONFIG_TROJAN"
     else
         replace_placeholder "{{CONFIG_TROJAN}}" "No Trojan config available"
+    fi
+
+    if [[ -n "$CONFIG_ANYTLS" ]]; then
+        replace_placeholder "{{CONFIG_ANYTLS}}" "$CONFIG_ANYTLS"
+    else
+        replace_placeholder "{{CONFIG_ANYTLS}}" "No AnyTLS config available"
     fi
 
     if [[ -n "$CONFIG_SHADOWSOCKS" ]]; then
@@ -957,10 +967,10 @@ with open(html_path, 'w') as f: f.write(html)
     # Hiddify, ...) to import all proxy protocols. DNS tunnels + GooseRelay are
     # configured separately and intentionally excluded.
     _mahsanet_uris=""
-    for _f in reality cdn-vless xhttp-vless trojan shadowsocks hysteria2 \
-              reality-ipv6 trojan-ipv6 shadowsocks-ipv6 hysteria2-ipv6; do
+    for _f in reality cdn-vless xhttp-vless trojan anytls shadowsocks hysteria2 \
+              reality-ipv6 trojan-ipv6 anytls-ipv6 shadowsocks-ipv6 hysteria2-ipv6; do
         [[ -f "$OUTPUT_DIR/$_f.txt" ]] || continue
-        _u=$(tr -d '\r' < "$OUTPUT_DIR/$_f.txt" | grep -aE '^(vless|trojan|ss|hysteria2|vmess)://' | head -1 || true)
+        _u=$(tr -d '\r' < "$OUTPUT_DIR/$_f.txt" | grep -aE '^(vless|trojan|anytls|ss|hysteria2|vmess)://' | head -1 || true)
         [[ -n "$_u" ]] && _mahsanet_uris+="$_u"$'\n'
     done
     if [[ -n "$_mahsanet_uris" ]]; then

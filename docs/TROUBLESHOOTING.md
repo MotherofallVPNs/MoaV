@@ -49,6 +49,7 @@ If `moav doctor` identifies the issue, follow its hints. If not, continue below.
   - [sing-box crashes](#sing-box-crashes)
   - [WireGuard connected but no traffic](#wireguard-connected-but-no-traffic)
   - [Hysteria2 not working](#hysteria2-not-working)
+  - [AnyTLS not connecting](#anytls-not-connecting)
   - [TrustTunnel not connecting](#trusttunnel-not-connecting)
   - [AmneziaWG not connecting](#amneziawg-not-connecting)
   - [CDN VLESS+WS not working](#cdn-vlessws-not-working)
@@ -473,12 +474,21 @@ docker compose logs certbot
 
 **Certificate not renewing:**
 ```bash
-# Manual renewal
-docker compose run --rm certbot renew
+# Check expiry + whether the auto-renewal timer is installed
+moav cert status
 
-# Check certificate expiry
-docker compose exec sing-box openssl x509 -enddate -noout -in /certs/live/*/fullchain.pem
+# Run a renewal check now (restarts TLS services if the cert changed)
+moav cert renew
+
+# (Re)install the daily auto-renewal timer — installed automatically on
+# `moav start` since v1.8.5; pre-v1.8.5 installs need this once
+moav cert install
 ```
+
+> **Note:** plain `docker compose run --rm certbot renew` does NOT work — the
+> compose service overrides the entrypoint for one-shot issuance and would run
+> `/bin/sh renew` instead of certbot. Use `moav cert renew`, which forces
+> `--entrypoint certbot` and restarts the services that load certs at startup.
 
 **Certificate acquisition failed:**
 - Ensure DNS A record points to this server
@@ -612,6 +622,41 @@ docker compose logs sing-box | grep -i hysteria
 # Test UDP connectivity (from another machine)
 nc -vuz YOUR_SERVER_IP 443
 ```
+
+### AnyTLS not connecting
+
+AnyTLS runs inside the existing **sing-box** container on **TCP port 8445** and shares the Trojan TLS certificate for your `DOMAIN`. It is opt-in — make sure `ENABLE_ANYTLS=true` is set in `.env` and that you have re-run `moav restart sing-box` (or `moav bootstrap`).
+
+**Check the container is running:**
+```bash
+docker compose ps sing-box
+```
+
+**Check the logs for the AnyTLS inbound:**
+```bash
+docker compose logs sing-box | grep -i anytls
+# Look for the "anytls-in" inbound starting without errors
+```
+
+**Common issues:**
+
+1. **Port not open:**
+   ```bash
+   ufw allow 8445/tcp
+   ```
+   Verify from another machine: `nc -vz YOUR_SERVER_IP 8445`
+
+2. **Certificate issue:**
+   - AnyTLS uses the same Let's Encrypt certificate as Trojan (for your `DOMAIN`)
+   - If the cert is missing or expired, see [Certificate issues](#certificate-issues) and re-run `moav bootstrap`
+
+3. **Client config error:**
+   - Verify the password matches `anytls.txt` in the user bundle (same password as Trojan/Hysteria2)
+   - Confirm the link points to your domain on port 8445 with `sni=<DOMAIN>` and `insecure=0`
+
+4. **Client does not support AnyTLS (most common):**
+   - AnyTLS has narrower client support than VLESS/Trojan. Use a recent build of **Hiddify**, **sing-box (SFA/SFI)**, **NekoBox/NekoRay**, **Mihomo Party**, or **Shadowrocket 2.2.65+**
+   - Clients such as v2rayNG, Streisand, V2Box, and Clash Verge do **not** support AnyTLS and will fail to import the link — switch to a supported client or use another protocol (Reality, Trojan, Hysteria2)
 
 ### TrustTunnel not connecting
 

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # =============================================================================
-# Revoke a user from sing-box (Reality, Trojan, Hysteria2)
+# Revoke a user from sing-box (Reality, Trojan, AnyTLS, Hysteria2)
 # Usage: ./scripts/singbox-user-revoke.sh <username>
 # =============================================================================
 

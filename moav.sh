@@ -429,33 +429,22 @@ get_env_val() {
     echo "${val:-$default}"
 }
 
-# -----------------------------------------------------------------------------
-# Reality fallback target — vetted lists + DNS validation (issue #115)
-#
-# Reality's `handshake.server` / `realitySettings.dest` is the host the inbound
-# proxies non-Reality TLS hellos to (the "you didn't auth, here's a real site"
-# fallback). If it doesn't resolve, every probe and every legitimate client
-# sees an RST. Operators historically picked plausible-sounding hostnames
-# (`update.samsung.com`, `swl.samsung.com`) that aren't public DNS names —
-# those bundles silently break.
-# -----------------------------------------------------------------------------
+# Reality fallback target — vetted lists + DNS validation (#115).
+# NXDOMAIN target → every TLS hello RSTs, bundle silently breaks.
 REALITY_TARGETS_GLOBAL=(
     "www.cloudflare.com:443"
     "www.apple.com:443"
     "cdn.kernel.org:443"
     "www.microsoft.com:443"
 )
-# SNI cover for Iran-resident clients — Reality hello looks like normal traffic
-# to Iranian-domestic sites, which Iran DPI is less aggressive about than
-# Western corporate destinations.
+# SNI cover for clients inside Iran.
 REALITY_TARGETS_IRAN=(
     "www.aparat.com:443"
     "digikala.com:443"
     "taghche.com:443"
 )
 
-# Returns 0 if `host` resolves to at least one A or AAAA record. Tries getent,
-# then host, then nslookup — whichever is present. Empty host → fail.
+# 0 if host has A/AAAA. Tries getent → host → nslookup. Empty host → fail.
 reality_target_resolves() {
     local host="$1"
     [[ -n "$host" ]] || return 1
@@ -485,10 +474,8 @@ show_vetted_reality_targets() {
     done
 }
 
-# Validate REALITY_TARGET and XHTTP_REALITY_TARGET from .env resolve in DNS.
-# If a host is NXDOMAIN, prompt for a replacement (up to 3 attempts), rewrite
-# .env in place. Returns 0 on success / all valid, 1 if still invalid after
-# attempts and operator can't fix it. Skips disabled protocols.
+# Validate REALITY_TARGET / XHTTP_REALITY_TARGET resolve. NXDOMAIN → re-prompt
+# (≤3) and rewrite .env. Returns 1 if still invalid after retries.
 validate_reality_targets() {
     local env_file="${1:-.env}"
     [[ -f "$env_file" ]] || return 0  # nothing to validate yet
@@ -546,6 +533,17 @@ validate_reality_targets() {
     done
 
     [[ "$failed" -eq 0 ]]
+}
+
+# Monitoring opt-in default: N below 2 GB (hang risk), Y otherwise.
+monitoring_default_for_ram() {
+    local total_mb
+    total_mb=$(awk '/MemTotal/ {printf "%.0f", $2/1024}' /proc/meminfo 2>/dev/null || echo 0)
+    if [[ "$total_mb" -gt 0 && "$total_mb" -lt 2048 ]]; then
+        echo "n"
+    else
+        echo "y"
+    fi
 }
 
 ensure_admin_password() {
@@ -784,7 +782,7 @@ check_prerequisites() {
                     warn "No domain provided!"
                     echo ""
                     echo -e "  ${YELLOW}Services that require a domain (will be disabled):${NC}"
-                    echo "    • Trojan, Hysteria2, CDN VLESS (need TLS certificates)"
+                    echo "    • Trojan, AnyTLS, Hysteria2, CDN VLESS (need TLS certificates)"
                     echo "    • TrustTunnel"
                     echo "    • DNS tunnels (dnstt, Slipstream, MasterDNS, XDNS)"
                     echo ""
@@ -807,7 +805,7 @@ check_prerequisites() {
                         # 41-46. XDNS is added here so dns-router (in the dnstunnel
                         # profile) doesn't fight systemd-resolved for port 53 with
                         # nothing to route; direct-mode XDNS can be re-enabled manually.
-                        for var in ENABLE_TROJAN ENABLE_HYSTERIA2 ENABLE_DNSTT ENABLE_SLIPSTREAM ENABLE_MASTERDNS ENABLE_XDNS ENABLE_TRUSTTUNNEL; do
+                        for var in ENABLE_TROJAN ENABLE_ANYTLS ENABLE_HYSTERIA2 ENABLE_DNSTT ENABLE_SLIPSTREAM ENABLE_MASTERDNS ENABLE_XDNS ENABLE_TRUSTTUNNEL; do
                             update_env_var ".env" "$var" "false"
                         done
                         # Derive DEFAULT_PROFILES from the mutated ENABLE_* set (issue #106).
@@ -2571,30 +2569,13 @@ ZONEOF
 }
 
 # =============================================================================
-# Network tuning — BBR congestion control + buffers + queue depth
-#
-# Real-world Portugal→Vilnius test (Time4VPS, ~400 ms RTT with burst loss):
-# CUBIC 5.45 Mbps → BBR 14.8 Mbps single-flow TCP. Recovery from packet loss
-# went from "CUBIC stuck at 2 Mbps for seconds" to "BBR jumped to 43 Mbps in
-# the next second". UDP buffer bumps help Hysteria2 / WireGuard / quic-go even
-# though they don't use BBR (quic-go needs >=7.5 MiB).
-#
-# Sources: naiveproxy Performance Tuning wiki, Cloudflare TCP tuning blog,
-# Stony Brook IMC'19 "When to use BBR", quic-go UDP Buffer Sizes wiki.
-#
-# `tcp_fastopen` is deliberately NOT set — TFO is hostile in censored networks
-# (~5% of paths drop SYN+data; China Mobile firewalls). See Craig Andrews'
-# "Sad Story of TCP Fast Open" + the same reasoning that removed it from the
-# sing-box Reality / Trojan inbounds in v1.8.4.
+# Network tuning — BBR + buffers + queue depth. Rationale + sources: OPSEC.md.
 # =============================================================================
 
 NT_CONF_PATH="/etc/sysctl.d/99-moav-net.conf"
 
-# Returns 0 if the running kernel can use BBR. On most distro kernels tcp_bbr
-# ships as a module that isn't loaded until requested, so it's absent from
-# tcp_available_congestion_control on a fresh boot — try modprobe before
-# concluding it's unsupported. OpenVZ guests + ancient kernels (<4.9) still
-# fail cleanly.
+# Returns 0 if the kernel can use BBR. tcp_bbr is a module on most distros —
+# modprobe first, otherwise OpenVZ / pre-4.9 kernels both fail cleanly.
 nt_kernel_supports_bbr() {
     local avail
     avail=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null || echo "")
@@ -2607,8 +2588,7 @@ nt_kernel_supports_bbr() {
     [[ " $avail " == *" bbr "* ]]
 }
 
-# 16 MiB on hosts <2 GB RAM, 32 MiB otherwise. quic-go needs >=7.5 MiB just for
-# its UDP buffer; 16 MiB headroom matters even on small VPSes.
+# 16 MiB on <2 GB RAM hosts, 32 MiB otherwise (quic-go floor is 7.5 MiB).
 nt_buffer_max() {
     local total_mb
     total_mb=$(awk '/MemTotal/ {printf "%.0f", $2/1024}' /proc/meminfo 2>/dev/null || echo 0)
@@ -2619,41 +2599,36 @@ nt_buffer_max() {
     fi
 }
 
-# Render the sysctl bundle to stdout. Caller writes it to /etc/sysctl.d/.
+# Render the sysctl bundle to stdout. Caller writes it to NT_CONF_PATH.
+# bmax = max for {r,w}mem_max + tcp_{r,w}mem high bound.
 nt_render_config() {
     local bmax="$1"
     cat <<EOF
 # MoaV network tuning — generated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-# Reversible: moav net revert (deletes this file + reloads sysctl)
-# Docs: docs/OPSEC.md → "Network tuning"
+# Reversible: moav net revert. Docs: docs/OPSEC.md → "Network tuning".
 
-# Congestion control + queue discipline. BBR has been mainline since 4.9;
-# fq is required for BBR's pacing.
+# BBR needs fq for pacing.
 net.ipv4.tcp_congestion_control = bbr
 net.core.default_qdisc          = fq
 
-# TCP buffers — auto-sized per host RAM.
 net.core.rmem_max               = ${bmax}
 net.core.wmem_max               = ${bmax}
 net.ipv4.tcp_rmem               = 4096 131072 ${bmax}
 net.ipv4.tcp_wmem               = 4096 16384 ${bmax}
 
-# UDP/QUIC defaults (Hysteria2, WireGuard, quic-go)
+# UDP defaults (Hysteria2, WireGuard, quic-go)
 net.core.rmem_default           = 1048576
 net.core.wmem_default           = 1048576
 
-# Queue depth — UDP drops hurt circumvention worse than TCP drops.
 net.core.netdev_max_backlog     = 16384
 net.core.somaxconn              = 8192
+net.ipv4.tcp_max_syn_backlog    = 8192
 
-# Long-lived proxy hygiene
 net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.tcp_mtu_probing           = 1
 net.ipv4.tcp_notsent_lowat         = 131072
 
-# DELIBERATELY NOT SET: net.ipv4.tcp_fastopen
-# TFO server-side ADDS latency in heavily-censored networks because
-# middleboxes drop the SYN+data and the client has to retry. See OPSEC.md.
+# tcp_fastopen DELIBERATELY UNSET — middleboxes drop SYN+data, raising latency.
 EOF
 }
 
@@ -2687,21 +2662,20 @@ nt_apply() {
     fi
     rm -f "$tmp"
 
-    # Persist the module so bbr survives reboot even if nothing else pulls it
-    # in before sysctl runs.
+    # Persist tcp_bbr across reboot.
     echo "tcp_bbr" | $SUDO tee /etc/modules-load.d/moav-bbr.conf >/dev/null 2>&1 || true
 
     if $SUDO sysctl -p "$NT_CONF_PATH" >/dev/null 2>&1; then
         success "Network tuning applied → $NT_CONF_PATH (buffer max: $((bmax / 1048576)) MiB)"
-        return 0
     else
         warn "Wrote $NT_CONF_PATH but sysctl reload failed — will activate on next boot."
-        return 0
     fi
+    echo ""
+    nt_status
+    return 0
 }
 
-# Remove the moav tuning file and reload sysctl. Returns 0 even if the file
-# didn't exist (revert is idempotent).
+# Idempotent — returns 0 even if NT_CONF_PATH doesn't exist.
 nt_revert() {
     local SUDO=""
     if [[ "$(id -u)" -ne 0 ]]; then
@@ -2718,17 +2692,14 @@ nt_revert() {
 
     $SUDO rm -f "$NT_CONF_PATH"
     $SUDO rm -f /etc/modules-load.d/moav-bbr.conf 2>/dev/null || true
-    # Re-load the rest of sysctl.d (and main sysctl.conf) so the kernel reverts
-    # to distro defaults / whatever else is configured. Best-effort.
     $SUDO sysctl --system >/dev/null 2>&1 || true
     success "Network tuning reverted (removed $NT_CONF_PATH)."
     echo "  Some settings (rmem_max, wmem_max, congestion_control) only fully reset on reboot."
     return 0
 }
 
-# Print current vs desired values + applied/not-applied marker. Used by both
-# `moav net status` and `doctor_check_net`. Returns 0 if file exists AND core
-# values match, 1 if file present but drifted, 2 if not applied (skipped/unset).
+# Returns 0 = applied + values match, 1 = applied but drifted, 2 = not applied
+# or kernel unsupported. Called by `moav net status` and doctor_check_net.
 nt_status() {
     local pass=true
     local applied=false
@@ -2778,14 +2749,22 @@ nt_status() {
         [[ "$applied" == "true" ]] && pass=false
     fi
 
+    local syn_backlog
+    syn_backlog=$(cat /proc/sys/net/ipv4/tcp_max_syn_backlog 2>/dev/null || echo 0)
+    if [[ "$syn_backlog" -ge 8192 ]]; then
+        echo -e "    ${GREEN}✓${NC} tcp_max_syn_backlog = $syn_backlog"
+    else
+        echo -e "    ${YELLOW}!${NC} tcp_max_syn_backlog = $syn_backlog (expected ≥ 8192)"
+        [[ "$applied" == "true" ]] && pass=false
+    fi
+
     if [[ "$applied" == "true" ]]; then
         $pass && return 0 || return 1
     else
-        return 2  # not applied — treat as skip in doctor sweep
+        return 2
     fi
 }
 
-# Top-level dispatcher for `moav net <subcommand>`.
 cmd_net() {
     local sub="${1:-status}"
     case "$sub" in
@@ -2842,15 +2821,150 @@ DOCTOR_CHECKS=(
     "ports:Check required ports are available"
     "conflicts:Check for conflicting services (e.g. DNS tunnels on port 53)"
     "reality:Check Reality fallback targets resolve and are reachable"
-    "net:Check BBR / kernel network tuning is applied"
+    "net:Check BBR/sysctl tuning + packet drops + PMTU + CGNAT + MTU"
     "env:Compare .env with .env.example for missing vars"
     "updates:Check for MoaV updates"
 )
 
-# Wrapper so the doctor dispatcher can call nt_status without leaking the
-# `net.*` namespace from /proc directly into the checks list.
+# Read a key from /proc/net/snmp or /proc/net/netstat. Returns 0 if not found.
+nt_proc_counter() {
+    local proto="$1" key="$2"
+    local v=""
+    v=$(awk -v p="$proto:" -v k="$key" '
+        $1 == p {
+            if ($0 ~ /[A-Za-z]/ && header == "") { header = $0; next }
+            if (header != "") {
+                n = split(header, h, " "); split($0, v, " ")
+                for (i = 2; i <= n; i++) if (h[i] == k) { print v[i]; exit }
+                header = ""
+            }
+        }' /proc/net/snmp /proc/net/netstat 2>/dev/null | head -1)
+    echo "${v:-0}"
+}
+
+nt_check_drops() {
+    local pass=true
+    local listen_drops syn_overflow rcvbuf_err sndbuf_err retrans
+    listen_drops=$(nt_proc_counter "TcpExt" "ListenDrops")
+    syn_overflow=$(nt_proc_counter "TcpExt" "ListenOverflows")
+    rcvbuf_err=$(nt_proc_counter   "Udp"    "RcvbufErrors")
+    sndbuf_err=$(nt_proc_counter   "Udp"    "SndbufErrors")
+    retrans=$(nt_proc_counter      "Tcp"    "RetransSegs")
+
+    # Counters are since-boot. Operator-actionable thresholds — anything non-trivial.
+    local report=()
+    [[ "$listen_drops" -gt 0   ]] && report+=("TCP ListenDrops=$listen_drops (somaxconn / tcp_max_syn_backlog too small or SYN flood)")
+    [[ "$syn_overflow" -gt 0   ]] && report+=("TCP ListenOverflows=$syn_overflow (accept queue overflow)")
+    [[ "$rcvbuf_err"   -gt 100 ]] && report+=("UDP RcvbufErrors=$rcvbuf_err (raise rmem_max — affects Hysteria2/WG)")
+    [[ "$sndbuf_err"   -gt 100 ]] && report+=("UDP SndbufErrors=$sndbuf_err (raise wmem_max)")
+
+    if [[ ${#report[@]} -eq 0 ]]; then
+        echo -e "    ${GREEN}✓${NC} No notable packet drops (TCP retrans=$retrans since boot)"
+    else
+        local line
+        for line in "${report[@]}"; do
+            echo -e "    ${YELLOW}!${NC} $line"
+            pass=false
+        done
+    fi
+    $pass && return 0 || return 1
+}
+
+nt_check_pmtu() {
+    local probing
+    probing=$(cat /proc/sys/net/ipv4/tcp_mtu_probing 2>/dev/null || echo "?")
+    if [[ "$probing" == "1" || "$probing" == "2" ]]; then
+        echo -e "    ${GREEN}✓${NC} tcp_mtu_probing = $probing (PMTU black-hole recovery enabled)"
+        return 0
+    fi
+    echo -e "    ${YELLOW}!${NC} tcp_mtu_probing = $probing (PMTU black holes will silently stall TCP)"
+    echo -e "      ${DIM}Fix: moav net apply${NC}"
+    return 1
+}
+
+nt_check_cgnat() {
+    # Local IP on the default route. Empty → no route → upstream broken, not our problem here.
+    local local_ip iface
+    local_ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '/src/ {for(i=1;i<=NF;i++) if($i=="src") {print $(i+1); exit}}')
+    iface=$(ip -4 route get 1.1.1.1 2>/dev/null   | awk '/dev/ {for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1); exit}}')
+    if [[ -z "$local_ip" ]]; then
+        echo -e "    ${DIM}○${NC} CGNAT/NAT check skipped (no default route detected)"
+        return 2
+    fi
+
+    local cgnat=false private=false
+    # CGNAT = 100.64.0.0/10
+    if [[ "$local_ip" =~ ^100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\. ]]; then cgnat=true; fi
+    # RFC1918: 10/8, 172.16/12, 192.168/16
+    if [[ "$local_ip" =~ ^10\. ]] || \
+       [[ "$local_ip" =~ ^192\.168\. ]] || \
+       [[ "$local_ip" =~ ^172\.(1[6-9]|2[0-9]|3[01])\. ]]; then private=true; fi
+
+    local public_ip
+    public_ip=$(get_env_val "SERVER_IP" "$SCRIPT_DIR/.env" "")
+
+    if $cgnat; then
+        echo -e "    ${RED}✗${NC} Default route uses CGNAT address ($local_ip on $iface)"
+        echo -e "      ${DIM}Inbound proxy traffic from the public internet can't reach this host directly.${NC}"
+        [[ -n "$public_ip" ]] && echo -e "      ${DIM}SERVER_IP=$public_ip — verify port-forwarding upstream.${NC}"
+        return 1
+    fi
+    if $private; then
+        if [[ -n "$public_ip" && "$public_ip" != "$local_ip" ]]; then
+            echo -e "    ${YELLOW}!${NC} Server is behind NAT (local=$local_ip, public=$public_ip on $iface)"
+            echo -e "      ${DIM}Make sure ports are forwarded from $public_ip to $local_ip.${NC}"
+            return 1
+        fi
+        echo -e "    ${DIM}○${NC} Local address $local_ip is RFC1918 but SERVER_IP not set — can't tell if NAT'd"
+        return 2
+    fi
+    echo -e "    ${GREEN}✓${NC} Default route uses public address ($local_ip on $iface)"
+    return 0
+}
+
+nt_check_mtu() {
+    local enable_wg enable_hy2
+    enable_wg=$(get_env_val  "ENABLE_WIREGUARD" "$SCRIPT_DIR/.env" "true")
+    enable_hy2=$(get_env_val "ENABLE_HYSTERIA2" "$SCRIPT_DIR/.env" "true")
+
+    # Default-egress MTU.
+    local egress_mtu="?"
+    local egress_iface
+    egress_iface=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '/dev/ {for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1); exit}}')
+    if [[ -n "$egress_iface" ]]; then
+        egress_mtu=$(ip link show "$egress_iface" 2>/dev/null | awk '/mtu/ {for(i=1;i<=NF;i++) if($i=="mtu") {print $(i+1); exit}}')
+    fi
+    echo -e "    ${DIM}○${NC} Egress MTU on ${egress_iface:-?}: ${egress_mtu:-?} (Hysteria2 best near 1450–1472, WireGuard 1420)"
+
+    if [[ "$enable_wg" == "true" ]]; then
+        if ip link show wg0 >/dev/null 2>&1; then
+            local wg_mtu
+            wg_mtu=$(ip link show wg0 2>/dev/null | awk '/mtu/ {for(i=1;i<=NF;i++) if($i=="mtu") {print $(i+1); exit}}')
+            if [[ "$wg_mtu" == "1420" ]]; then
+                echo -e "    ${GREEN}✓${NC} wg0 MTU = $wg_mtu (recommended)"
+            else
+                echo -e "    ${YELLOW}!${NC} wg0 MTU = $wg_mtu (recommend 1420 for IPv4-over-UDP overhead)"
+            fi
+        fi
+    fi
+}
+
 doctor_check_net() {
-    nt_status
+    local rc=0
+    nt_status || rc=$?
+    # rc=2 → bundle not applied or kernel unsupported. Skip extended checks.
+    [[ "$rc" -eq 2 ]] && return 2
+
+    local pass=true
+    [[ "$rc" -eq 1 ]] && pass=false
+    nt_check_pmtu  || pass=false
+    nt_check_drops || pass=false
+    # CGNAT returns 2 (unknown — no route or RFC1918 without SERVER_IP), don't fail on that
+    local cgnat=0; nt_check_cgnat || cgnat=$?
+    [[ "$cgnat" -eq 1 ]] && pass=false
+    nt_check_mtu   # informational only
+
+    $pass && return 0 || return 1
 }
 
 doctor_is_enabled() {
@@ -3688,11 +3802,8 @@ doctor_check_conflicts() {
     $pass && return 0 || return 1
 }
 
-# Reality fallback target check (issue #115).
-# For each enabled Reality inbound, ask its container's resolver whether the
-# configured `dest` hostname resolves, then TCP-probe the port from inside the
-# same container. Falls back to the host resolver if the container isn't
-# running (still useful — operator hasn't started services yet).
+# Reality dest reachability (#115). Uses the container's resolver (matches what
+# Reality sees at handshake); falls back to host resolver when container down.
 doctor_check_reality() {
     local env_file="$SCRIPT_DIR/.env"
     local enable_reality enable_xhttp
@@ -3946,15 +4057,15 @@ show_versions() {
     local singbox_ver wstunnel_ver conduit_ver snowflake_ver slipstream_ver telemt_ver
     local trusttunnel_ver trusttunnel_client_ver awgtools_ver xray_ver dnstt_ver
     singbox_ver=$(get_component_version "SINGBOX_VERSION" "1.13.12")
-    wstunnel_ver=$(get_component_version "WSTUNNEL_VERSION" "10.5.5")
+    wstunnel_ver=$(get_component_version "WSTUNNEL_VERSION" "10.6.1")
     conduit_ver=$(get_component_version "CONDUIT_VERSION" "1.2.0")
     snowflake_ver=$(get_component_version "SNOWFLAKE_VERSION" "latest")
     slipstream_ver=$(get_component_version "SLIPSTREAM_VERSION" "2026.02.22.1")
-    telemt_ver=$(get_component_version "TELEMT_VERSION" "3.4.11")
+    telemt_ver=$(get_component_version "TELEMT_VERSION" "3.4.23")
     trusttunnel_ver=$(get_component_version "TRUSTTUNNEL_VERSION" "")
     trusttunnel_client_ver=$(get_component_version "TRUSTTUNNEL_CLIENT_VERSION" "")
     awgtools_ver=$(get_component_version "AWGTOOLS_VERSION" "")
-    xray_ver=$(get_component_version "XRAY_VERSION" "v26.5.9")
+    xray_ver=$(get_component_version "XRAY_VERSION" "v26.6.27")
     dnstt_ver=$(get_component_version "DNSTT_VERSION" "latest")
 
     echo ""
@@ -4000,14 +4111,15 @@ show_status() {
     if [[ -f "$env_file" ]]; then
         local enable_reality=$(get_env_val "ENABLE_REALITY" "$env_file" "true")
         local enable_trojan=$(get_env_val "ENABLE_TROJAN" "$env_file" "true")
+        local enable_anytls=$(get_env_val "ENABLE_ANYTLS" "$env_file" "false")
         local enable_hysteria2=$(get_env_val "ENABLE_HYSTERIA2" "$env_file" "true")
         local enable_wireguard=$(get_env_val "ENABLE_WIREGUARD" "$env_file" "true")
         local enable_dnstt=$(get_env_val "ENABLE_DNSTT" "$env_file" "true")
         local enable_admin=$(get_env_val "ENABLE_ADMIN_UI" "$env_file" "true")
 
         # Mark services as disabled based on ENABLE_* settings
-        # sing-box handles Reality, Trojan, Hysteria2
-        if [[ "$enable_reality" != "true" ]] && [[ "$enable_trojan" != "true" ]] && [[ "$enable_hysteria2" != "true" ]]; then
+        # sing-box handles Reality, Trojan, AnyTLS, Hysteria2
+        if [[ "$enable_reality" != "true" ]] && [[ "$enable_trojan" != "true" ]] && [[ "$enable_anytls" != "true" ]] && [[ "$enable_hysteria2" != "true" ]]; then
             disabled_services["sing-box"]=1
             disabled_services["decoy"]=1
         fi
@@ -4202,6 +4314,7 @@ select_profiles() {
     if [[ -f "$env_file" ]]; then
         local enable_reality=$(get_env_val "ENABLE_REALITY" "$env_file" "true")
         local enable_trojan=$(get_env_val "ENABLE_TROJAN" "$env_file" "true")
+        local enable_anytls=$(get_env_val "ENABLE_ANYTLS" "$env_file" "false")
         local enable_hysteria2=$(get_env_val "ENABLE_HYSTERIA2" "$env_file" "true")
         local enable_wireguard=$(get_env_val "ENABLE_WIREGUARD" "$env_file" "true")
         local enable_amneziawg=$(get_env_val "ENABLE_AMNEZIAWG" "$env_file" "true")
@@ -4212,8 +4325,8 @@ select_profiles() {
         local enable_admin=$(get_env_val "ENABLE_ADMIN_UI" "$env_file" "true")
         local enable_xhttp=$(get_env_val "ENABLE_XHTTP" "$env_file" "true")
 
-        # proxy is disabled if all three protocols are disabled
-        if [[ "$enable_reality" != "true" ]] && [[ "$enable_trojan" != "true" ]] && [[ "$enable_hysteria2" != "true" ]]; then
+        # proxy is disabled if all sing-box protocols are disabled
+        if [[ "$enable_reality" != "true" ]] && [[ "$enable_trojan" != "true" ]] && [[ "$enable_anytls" != "true" ]] && [[ "$enable_hysteria2" != "true" ]]; then
             proxy_enabled=false
         fi
         [[ "$enable_wireguard" != "true" ]] && wg_enabled=false
@@ -4320,6 +4433,7 @@ select_profiles() {
         # Check which protocols are enabled
         local enable_reality=$(get_env_val "ENABLE_REALITY" "$env_file" "true")
         local enable_trojan=$(get_env_val "ENABLE_TROJAN" "$env_file" "true")
+        local enable_anytls=$(get_env_val "ENABLE_ANYTLS" "$env_file" "false")
         local enable_hysteria2=$(get_env_val "ENABLE_HYSTERIA2" "$env_file" "true")
         local enable_wireguard=$(get_env_val "ENABLE_WIREGUARD" "$env_file" "true")
         local enable_amneziawg=$(get_env_val "ENABLE_AMNEZIAWG" "$env_file" "true")
@@ -4333,8 +4447,8 @@ select_profiles() {
         # Build profiles list based on enabled services
         SELECTED_PROFILES=()
 
-        # proxy profile (Reality, Trojan, Hysteria2)
-        if [[ "$enable_reality" == "true" ]] || [[ "$enable_trojan" == "true" ]] || [[ "$enable_hysteria2" == "true" ]]; then
+        # proxy profile (Reality, Trojan, AnyTLS, Hysteria2)
+        if [[ "$enable_reality" == "true" ]] || [[ "$enable_trojan" == "true" ]] || [[ "$enable_anytls" == "true" ]] || [[ "$enable_hysteria2" == "true" ]]; then
             SELECTED_PROFILES+=("proxy")
         fi
 
@@ -4392,7 +4506,7 @@ select_profiles() {
             # Not explicitly set - ask user
             echo ""
             warn "Monitoring stack (Grafana + Prometheus) requires at least 2GB RAM."
-            if confirm "Enable monitoring?" "n"; then
+            if confirm "Enable monitoring?" "$(monitoring_default_for_ram)"; then
                 update_env_var "$env_file" "ENABLE_MONITORING" "true"
                 SELECTED_PROFILES+=("monitoring")
                 success "Monitoring enabled"
@@ -4512,12 +4626,13 @@ profile_enabled() {
     local profile="$1" env_file="${2:-$SCRIPT_DIR/.env}"
     case "$profile" in
         proxy)
-            local _r _t _h _s
+            local _r _t _a _h _s
             _r=$(get_env_val "ENABLE_REALITY"   "$env_file" "true")
             _t=$(get_env_val "ENABLE_TROJAN"    "$env_file" "true")
+            _a=$(get_env_val "ENABLE_ANYTLS"    "$env_file" "false")
             _h=$(get_env_val "ENABLE_HYSTERIA2" "$env_file" "true")
             _s=$(get_env_val "ENABLE_SS"        "$env_file" "true")
-            [[ "$_r" == "true" || "$_t" == "true" || "$_h" == "true" || "$_s" == "true" ]] \
+            [[ "$_r" == "true" || "$_t" == "true" || "$_a" == "true" || "$_h" == "true" || "$_s" == "true" ]] \
                 && echo true || echo false ;;
         wireguard)   [[ "$(get_env_val "ENABLE_WIREGUARD"   "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
         amneziawg)   [[ "$(get_env_val "ENABLE_AMNEZIAWG"   "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
@@ -4591,7 +4706,7 @@ confirm_disabled_profile() {
         snowflake)   enable_var="ENABLE_SNOWFLAKE" ;;
         gooserelay)  enable_var="ENABLE_GOOSERELAY" ;;
         monitoring)  enable_var="ENABLE_MONITORING" ;;
-        proxy)       multi_flag_hint="ENABLE_REALITY, ENABLE_TROJAN, ENABLE_HYSTERIA2, ENABLE_SS" ;;
+        proxy)       multi_flag_hint="ENABLE_REALITY, ENABLE_TROJAN, ENABLE_ANYTLS, ENABLE_HYSTERIA2, ENABLE_SS" ;;
         dnstunnel)   multi_flag_hint="ENABLE_DNSTT, ENABLE_SLIPSTREAM, ENABLE_MASTERDNS, ENABLE_XDNS" ;;
     esac
 
@@ -4675,7 +4790,7 @@ ensure_clash_api_secret() {
     if [[ "$enable_monitoring" == "false" ]]; then
         echo ""
         warn "Monitoring is currently disabled in .env (ENABLE_MONITORING=false)"
-        if confirm "Enable monitoring?" "y"; then
+        if confirm "Enable monitoring?" "$(monitoring_default_for_ram)"; then
             update_env_var "$env_file" "ENABLE_MONITORING" "true"
             success "ENABLE_MONITORING set to true"
         else
@@ -5439,6 +5554,7 @@ show_usage() {
     echo "  migrate-ip NEW_IP     Update SERVER_IP and regenerate all configs"
     echo "  regenerate-users      Regenerate all user bundles with current .env"
     echo "  conduit-offsets CMD   Manage Conduit lifetime-offset auto-updater (install/uninstall/status)"
+    echo "  cert [CMD]            TLS certificate status/renew + auto-renewal timer (install/uninstall)"
     echo "  setup-dns             Free port 53 for DNS tunnels (disables systemd-resolved)"
     echo "  switch-dns [NAME|off] Enable/disable DNS tunnel daemons (dnstt/slipstream/masterdns/xdns)"
     echo ""
@@ -6671,7 +6787,7 @@ cmd_domainless() {
     # Disable cert-needing protocols. TROJAN..TRUSTTUNNEL must match
     # bootstrap.sh:41-46; XDNS is added to keep dns-router off port 53 in
     # domainless mode (direct-mode XDNS can be re-enabled manually).
-    for var in ENABLE_TROJAN ENABLE_HYSTERIA2 ENABLE_DNSTT ENABLE_SLIPSTREAM ENABLE_MASTERDNS ENABLE_XDNS ENABLE_TRUSTTUNNEL; do
+    for var in ENABLE_TROJAN ENABLE_ANYTLS ENABLE_HYSTERIA2 ENABLE_DNSTT ENABLE_SLIPSTREAM ENABLE_MASTERDNS ENABLE_XDNS ENABLE_TRUSTTUNNEL; do
         update_env_var ".env" "$var" "false"
     done
 
@@ -6907,6 +7023,7 @@ cmd_start() {
             docker compose --profile all up -d $individual_services
             success "Services started!"
             auto_setup_conduit_offsets
+            auto_setup_cert_renew
             return 0
         elif [[ -n "$individual_services" ]]; then
             warn "Ignoring individual services ($individual_services) when mixed with profiles"
@@ -7011,6 +7128,7 @@ cmd_start() {
         echo ""
     fi
     auto_setup_conduit_offsets
+    auto_setup_cert_renew
 }
 
 # Resolve profile name aliases to actual docker-compose profile names
@@ -7189,7 +7307,7 @@ cmd_status() {
     # Simple header without clearing terminal
     local singbox_ver wstunnel_ver conduit_ver branch
     singbox_ver=$(get_component_version "SINGBOX_VERSION" "1.13.12")
-    wstunnel_ver=$(get_component_version "WSTUNNEL_VERSION" "10.5.5")
+    wstunnel_ver=$(get_component_version "WSTUNNEL_VERSION" "10.6.1")
     conduit_ver=$(get_component_version "CONDUIT_VERSION" "1.2.0")
     branch=$(git -C "$SCRIPT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 
@@ -8614,6 +8732,8 @@ cmd_regenerate_users() {
     # Load ENABLE_* settings from .env
     local enable_reality=$(get_env_val "ENABLE_REALITY" .env "true")
     local enable_trojan=$(get_env_val "ENABLE_TROJAN" .env "true")
+    local enable_anytls=$(get_env_val "ENABLE_ANYTLS" .env "false")
+    local port_anytls=$(get_env_val "PORT_ANYTLS" .env "8445")
     local enable_hysteria2=$(get_env_val "ENABLE_HYSTERIA2" .env "true")
     local enable_wireguard=$(get_env_val "ENABLE_WIREGUARD" .env "true")
     local enable_amneziawg=$(get_env_val "ENABLE_AMNEZIAWG" .env "true")
@@ -8663,6 +8783,8 @@ cmd_regenerate_users() {
             -e "CDN_ADDRESS=$cdn_address" \
             -e "ENABLE_REALITY=${enable_reality:-true}" \
             -e "ENABLE_TROJAN=${enable_trojan:-true}" \
+            -e "ENABLE_ANYTLS=${enable_anytls:-false}" \
+            -e "PORT_ANYTLS=${port_anytls:-8445}" \
             -e "ENABLE_HYSTERIA2=${enable_hysteria2:-true}" \
             -e "ENABLE_WIREGUARD=${enable_wireguard:-true}" \
             -e "ENABLE_AMNEZIAWG=${enable_amneziawg:-true}" \
@@ -8852,6 +8974,149 @@ auto_setup_conduit_offsets() {
 }
 
 # =============================================================================
+# TLS certificate auto-renewal
+# =============================================================================
+# Let's Encrypt certs expire after 90 days and nothing renewed them before
+# v1.8.5 — scripts/cert-renew.sh only documented a cron line. Installed
+# automatically at the end of `moav start` when DOMAIN is set.
+
+CERT_RENEW_UNIT="moav-cert-renew"
+CERT_RENEW_SERVICE_PATH="/etc/systemd/system/${CERT_RENEW_UNIT}.service"
+CERT_RENEW_TIMER_PATH="/etc/systemd/system/${CERT_RENEW_UNIT}.timer"
+CERT_RENEW_CRON_PATH="/etc/cron.d/moav-cert-renew"
+
+cert_renew_install() {
+    local quiet="${1:-}"
+    local sudo_prefix; sudo_prefix=$(_root_prefix)
+
+    if _has_systemd; then
+        if [[ $EUID -ne 0 && -z "$sudo_prefix" ]]; then
+            error "Need root (or sudo) to install ${CERT_RENEW_UNIT}.timer."
+            return 1
+        fi
+        $sudo_prefix tee "$CERT_RENEW_SERVICE_PATH" >/dev/null <<UNIT
+[Unit]
+Description=MoaV TLS certificate renewal
+Documentation=https://github.com/shayanb/MoaV
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=${SCRIPT_DIR}
+ExecStart=/bin/bash ${SCRIPT_DIR}/scripts/cert-renew.sh
+UNIT
+        $sudo_prefix tee "$CERT_RENEW_TIMER_PATH" >/dev/null <<UNIT
+[Unit]
+Description=MoaV TLS certificate renewal (daily)
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+        $sudo_prefix systemctl daemon-reload
+        if $sudo_prefix systemctl enable --now "${CERT_RENEW_UNIT}.timer" >/dev/null 2>&1; then
+            [[ "$quiet" == "--quiet" ]] || success "Installed ${CERT_RENEW_UNIT}.timer (daily renewal check)"
+            [[ "$quiet" == "--quiet" ]] && info "TLS certs will now auto-renew daily (${CERT_RENEW_UNIT}.timer)"
+            return 0
+        fi
+        error "Failed to enable ${CERT_RENEW_UNIT}.timer. Check: systemctl status ${CERT_RENEW_UNIT}.timer"
+        return 1
+    fi
+
+    # No systemd (container / WSL): cron.d if a cron daemon is plausible
+    if [[ -d /etc/cron.d ]]; then
+        $sudo_prefix tee "$CERT_RENEW_CRON_PATH" >/dev/null <<CRON
+# MoaV TLS certificate renewal (installed by: moav cert install)
+17 3 * * * root /bin/bash ${SCRIPT_DIR}/scripts/cert-renew.sh >>/var/log/moav-cert-renew.log 2>&1
+CRON
+        [[ "$quiet" == "--quiet" ]] || success "Installed ${CERT_RENEW_CRON_PATH} (daily renewal check)"
+        return 0
+    fi
+
+    error "Neither systemd nor cron.d detected — cannot schedule renewals."
+    echo "  Certs expire after 90 days; run 'bash scripts/cert-renew.sh' periodically"
+    echo "  with whatever scheduler this host has."
+    return 1
+}
+
+cert_renew_uninstall() {
+    local sudo_prefix; sudo_prefix=$(_root_prefix)
+    if _has_systemd; then
+        $sudo_prefix systemctl disable --now "${CERT_RENEW_UNIT}.timer" >/dev/null 2>&1 || true
+        $sudo_prefix rm -f "$CERT_RENEW_TIMER_PATH" "$CERT_RENEW_SERVICE_PATH"
+        $sudo_prefix systemctl daemon-reload
+    fi
+    [[ -f "$CERT_RENEW_CRON_PATH" ]] && $sudo_prefix rm -f "$CERT_RENEW_CRON_PATH"
+    success "Removed cert auto-renewal (certs expire in ≤90 days unless renewed manually)"
+}
+
+cert_renew_scheduler_status() {
+    if _has_systemd && [[ -f "$CERT_RENEW_TIMER_PATH" ]]; then
+        systemctl list-timers "${CERT_RENEW_UNIT}.timer" --no-pager 2>/dev/null || true
+        return 0
+    fi
+    if [[ -f "$CERT_RENEW_CRON_PATH" ]]; then
+        info "Renewal scheduled via ${CERT_RENEW_CRON_PATH}"
+        return 0
+    fi
+    warn "Cert auto-renewal is NOT scheduled — install with: moav cert install"
+    return 1
+}
+
+cmd_cert() {
+    case "${1:-status}" in
+        renew)
+            bash "$SCRIPT_DIR/scripts/cert-renew.sh"
+            ;;
+        status)
+            local domain
+            domain=$(get_env_val "DOMAIN" "$SCRIPT_DIR/.env" "")
+            if [[ -z "$domain" ]]; then
+                info "Domainless mode — no Let's Encrypt certificates in use."
+                return 0
+            fi
+            docker compose run --rm --entrypoint certbot certbot certificates 2>/dev/null || \
+                warn "Could not read certificates (is Docker running?)"
+            echo ""
+            cert_renew_scheduler_status || true
+            ;;
+        install)          cert_renew_install ;;
+        uninstall|remove) cert_renew_uninstall ;;
+        *)
+            echo "Usage: moav cert {status|renew|install|uninstall}"
+            echo ""
+            echo "  status     Show certificate expiry and renewal-schedule status."
+            echo "  renew      Run a renewal check now (restarts TLS services if renewed)."
+            echo "  install    Install the daily auto-renewal timer (systemd, or cron.d fallback)."
+            echo "  uninstall  Remove the auto-renewal timer."
+            return 1
+            ;;
+    esac
+}
+
+# Called at the end of `moav start`: schedule renewal the first time a domain
+# deployment starts. No-op if already installed, opted out
+# (CERT_AUTORENEW=false), or domainless.
+auto_setup_cert_renew() {
+    [[ "$(get_env_val "CERT_AUTORENEW" "$SCRIPT_DIR/.env" "true")" == "true" ]] || return 0
+    [[ -n "$(get_env_val "DOMAIN" "$SCRIPT_DIR/.env" "")" ]] || return 0
+    if _has_systemd; then
+        [[ -f "$CERT_RENEW_TIMER_PATH" ]] && return 0
+    else
+        [[ -f "$CERT_RENEW_CRON_PATH" ]] && return 0
+    fi
+    echo ""
+    info "Domain deployment detected — installing daily TLS cert auto-renewal..."
+    cert_renew_install --quiet || \
+        warn "Auto-install failed; run 'moav cert install' manually (or set CERT_AUTORENEW=false to silence)."
+}
+
+# =============================================================================
 # Entry Point
 # =============================================================================
 
@@ -9010,6 +9275,10 @@ main() {
         conduit-offsets|conduit_offsets|conduit-lifetime)
             shift
             cmd_conduit_offsets "$@"
+            ;;
+        cert|certs|certificate)
+            shift
+            cmd_cert "$@"
             ;;
         setup-dns|setup_dns|dns-setup)
             cmd_setup_dns

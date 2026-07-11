@@ -452,6 +452,175 @@ EOF
     wait $pid 2>/dev/null || true
 }
 
+# Test AnyTLS protocol (sing-box native, password-auth TLS, reuses Trojan cert)
+test_anytls() {
+    log_info "Testing AnyTLS..."
+
+    local config_file=""
+    local detail=""
+    local is_ipv6=false
+
+    # Find AnyTLS config - prefer IPv4 over IPv6
+    for f in "$CONFIG_DIR"/anytls.txt "$CONFIG_DIR"/anytls.json; do
+        [[ -f "$f" ]] && config_file="$f" && break
+    done
+    if [[ -z "$config_file" ]]; then
+        for f in "$CONFIG_DIR"/anytls*.txt "$CONFIG_DIR"/anytls*.json; do
+            [[ -f "$f" ]] && config_file="$f" && break
+        done
+    fi
+    [[ "$config_file" == *ipv6* ]] && is_ipv6=true
+
+    if [[ -z "$config_file" ]]; then
+        detail="No AnyTLS config found in bundle"
+        log_warn "$detail"
+        log_debug "Searched in: $CONFIG_DIR for anytls*.txt, anytls*.json"
+        RESULTS[anytls]="skip"
+        DETAILS[anytls]="$detail"
+        return
+    fi
+
+    log_debug "Using config: $config_file"
+    log_debug "Config content: $(cat "$config_file" | head -1 | cut -c1-80)..."
+
+    local client_config="$TEMP_DIR/anytls-client.json"
+
+    if [[ "$config_file" == *.txt ]]; then
+        local uri=$(cat "$config_file" | tr -d '\n\r')
+
+        local password=$(extract_auth "$uri" "anytls")
+        local server=$(extract_host "$uri")
+        local port=$(extract_port "$uri")
+        local sni=$(extract_param "$uri" "sni")
+
+        [[ -z "$sni" ]] && sni="$server"
+        [[ -z "$port" ]] && port="8445"
+
+        # Ensure port is numeric
+        port=$(echo "$port" | tr -cd '0-9')
+        [[ -z "$port" ]] && port="8445"
+
+        log_debug "Parsed: server=$server port=$port sni=$sni"
+
+        # Validate required fields
+        if [[ -z "$server" ]] || [[ -z "$password" ]]; then
+            detail="Failed to parse AnyTLS URI (missing required fields). Run with -v for details."
+            log_error "$detail"
+            log_error "server='$server' password='${password:0:8}...'"
+            RESULTS[anytls]="fail"
+            DETAILS[anytls]="$detail"
+            return
+        fi
+
+        cat > "$client_config" << EOF
+{
+  "log": {"level": "error"},
+  "inbounds": [
+    {"type": "socks", "listen": "127.0.0.1", "listen_port": 10805}
+  ],
+  "outbounds": [
+    {
+      "type": "anytls",
+      "tag": "proxy",
+      "server": "$server",
+      "server_port": $port,
+      "password": "$password",
+      "tls": {
+        "enabled": true,
+        "server_name": "$sni",
+        "utls": {"enabled": true, "fingerprint": "random"}
+      }
+    }
+  ],
+  "route": {
+    "final": "proxy"
+  }
+}
+EOF
+    else
+        jq '. + {
+          "log": {"level": "error"},
+          "inbounds": [{"type": "socks", "listen": "127.0.0.1", "listen_port": 10805}],
+          "route": {"final": "proxy"}
+        }' "$config_file" > "$client_config" 2>/dev/null || {
+            detail="Failed to parse JSON config"
+            log_error "$detail"
+            RESULTS[anytls]="fail"
+            DETAILS[anytls]="$detail"
+            return
+        }
+    fi
+
+    # Validate JSON before running
+    if ! jq empty "$client_config" 2>/dev/null; then
+        detail="Generated invalid JSON config"
+        log_error "$detail"
+        RESULTS[anytls]="fail"
+        DETAILS[anytls]="$detail"
+        return
+    fi
+
+    # Start sing-box and capture errors
+    local error_log="$TEMP_DIR/anytls-error.log"
+    sing-box run -c "$client_config" 2>"$error_log" &
+    local pid=$!
+    sleep 3
+
+    if ! kill -0 $pid 2>/dev/null; then
+        detail="sing-box failed to start"
+        if [[ -s "$error_log" ]]; then
+            local error_msg=$(tail -5 "$error_log" 2>/dev/null | tr '\n' ' ' || true)
+            detail="sing-box error: $error_msg"
+        fi
+        log_error "$detail"
+        log_debug "Generated config was: $(cat "$client_config" 2>/dev/null | tr '\n' ' ')"
+        RESULTS[anytls]="fail"
+        DETAILS[anytls]="$detail"
+        return
+    fi
+
+    log_debug "sing-box started successfully (PID: $pid)"
+    log_debug "Testing connectivity via SOCKS5 on port 10805..."
+
+    if curl -sf --socks5 127.0.0.1:10805 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+        # Verify we can access the internet and get exit IP
+        local exit_ip=""
+        exit_ip=$(curl -sf --socks5 127.0.0.1:10805 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf --socks5 127.0.0.1:10805 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+        if [[ -n "$exit_ip" ]]; then
+            log_success "AnyTLS connection successful (exit IP: $exit_ip)"
+            RESULTS[anytls]="pass"
+            DETAILS[anytls]="Connected via AnyTLS, exit IP: $exit_ip"
+        else
+            log_success "AnyTLS connection successful"
+            RESULTS[anytls]="pass"
+            DETAILS[anytls]="Connected via AnyTLS"
+        fi
+    else
+        detail="Connection test failed"
+        # Check for sing-box errors during operation
+        if [[ -s "$error_log" ]]; then
+            local error_msg=$(grep -i "error\|fail\|unreachable\|timeout\|refused" "$error_log" 2>/dev/null | tail -3 | tr '\n' ' ' || true)
+            [[ -n "$error_msg" ]] && detail="$error_msg"
+        fi
+        log_debug "Full error log: $(cat "$error_log" 2>/dev/null | tail -10 | tr '\n' ' ')"
+        log_debug "Server: $server:$port, SNI: $sni"
+        # If IPv6 config and network unreachable, warn instead of fail
+        if [[ "$is_ipv6" == "true" ]] && echo "$detail" | grep -qi "unreachable\|network"; then
+            log_warn "IPv6 config - $detail"
+            RESULTS[anytls]="warn"
+            DETAILS[anytls]="IPv6 network may not be available: $detail"
+        else
+            log_error "$detail"
+            RESULTS[anytls]="fail"
+            DETAILS[anytls]="$detail"
+        fi
+    fi
+
+    kill $pid 2>/dev/null || true
+    wait $pid 2>/dev/null || true
+}
+
 # Test Hysteria2 protocol
 test_hysteria2() {
     log_info "Testing Hysteria2..."
@@ -1620,7 +1789,7 @@ output_json() {
 EOF
 
     local first=true
-    for protocol in reality trojan hysteria2 wireguard amneziawg dnstt slipstream trusttunnel telemt; do
+    for protocol in reality trojan anytls hysteria2 wireguard amneziawg dnstt slipstream trusttunnel telemt; do
         if [[ -n "${RESULTS[$protocol]:-}" ]]; then
             [[ "$first" != "true" ]] && echo ","
             first=false
@@ -1651,7 +1820,7 @@ output_human() {
     echo ""
     echo "───────────────────────────────────────────────────────────────"
 
-    for protocol in reality trojan hysteria2 wireguard amneziawg dnstt slipstream trusttunnel telemt; do
+    for protocol in reality trojan anytls hysteria2 wireguard amneziawg dnstt slipstream trusttunnel telemt; do
         if [[ -n "${RESULTS[$protocol]:-}" ]]; then
             local status="${RESULTS[$protocol]}"
             local detail="${DETAILS[$protocol]:-}"
@@ -1687,6 +1856,7 @@ main() {
     # Run all tests
     test_reality
     test_trojan
+    test_anytls
     test_hysteria2
     test_xhttp
     test_wireguard

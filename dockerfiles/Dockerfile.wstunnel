@@ -3,7 +3,7 @@
 FROM debian:bookworm-slim
 
 ARG TARGETARCH
-ARG WSTUNNEL_VERSION=10.5.5
+ARG WSTUNNEL_VERSION=10.6.1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
