@@ -582,6 +582,7 @@ net.core.wmem_default           = 1048576
 
 net.core.netdev_max_backlog     = 16384
 net.core.somaxconn              = 8192
+net.ipv4.tcp_max_syn_backlog    = 8192
 
 net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.tcp_mtu_probing           = 1

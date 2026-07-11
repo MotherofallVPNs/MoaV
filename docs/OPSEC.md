@@ -286,6 +286,7 @@ The installer offers a one-time kernel-level network tuning bundle aimed at the 
 | `net.core.{r,w}mem_default` | 1 MiB | Default UDP socket buffer (Hysteria2 / WireGuard) |
 | `net.core.netdev_max_backlog` | 16384 | Queue depth — UDP drops hurt circumvention more than TCP drops |
 | `net.core.somaxconn` | 8192 | Listen backlog for high-concurrency inbounds |
+| `net.ipv4.tcp_max_syn_backlog` | 8192 | SYN queue depth — prevents drops on coordinated reconnect bursts |
 | `net.ipv4.tcp_slow_start_after_idle` | 0 | Avoid restarting at congestion-window 1 on idle long-lived proxies |
 | `net.ipv4.tcp_mtu_probing` | 1 | Recover gracefully if a path silently has a smaller MTU |
 | `net.ipv4.tcp_notsent_lowat` | 131072 | Smaller send buffers to reduce HOL latency for interactive flows |
@@ -296,10 +297,17 @@ The installer offers a one-time kernel-level network tuning bundle aimed at the 
 
 ```bash
 moav net status   # show current vs recommended values
-moav net apply    # write 99-moav-net.conf + reload sysctl
+moav net apply    # write 99-moav-net.conf + reload sysctl + print verification
 moav net revert   # remove the file + reload sysctl (clean rollback)
-moav doctor net   # same check that runs in the full doctor sweep
+moav doctor net   # sysctl + packet drops + PMTU + CGNAT + per-interface MTU
 ```
+
+`moav doctor net` extends the sysctl check with:
+
+- **Packet drops**: reads `/proc/net/snmp` + `/proc/net/netstat` for TCP `ListenDrops` / `ListenOverflows` (SYN queue overflows) and UDP `RcvbufErrors` / `SndbufErrors` (Hysteria2/WireGuard buffer overflows). Counters are since-boot; non-zero values name the matching sysctl knob to raise.
+- **PMTU**: confirms `tcp_mtu_probing` is enabled so silent black-hole paths recover instead of stalling.
+- **CGNAT / NAT**: looks at the default route's source address. CGNAT (100.64/10) is reported as a hard failure for inbound proxy traffic; RFC1918 addresses are flagged as "behind NAT" with the public `SERVER_IP` from `.env` for context.
+- **MTU**: prints egress MTU + WireGuard `wg0` MTU (recommends 1420). Informational.
 
 **When it skips silently:** kernel <4.9 (no BBR), OpenVZ guests (shared kernel, no sysctl writes), or already-applied installs.
 
