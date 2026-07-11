@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Testing
+- **`moav test` now covers Shadowsocks-2022 and XDNS** — two protocols that are **on by default** but previously had no connectivity test. `test_ss` decodes the bundle's `ss://` SIP002 URI (base64url `method:server_psk:user_psk`) and drives a sing-box shadowsocks outbound over a local SOCKS port, verifying a real exit IP. `test_xdns` runs the bundle's own Xray client config (`xdns-direct-config.json`, falling back to the via-DNS config) and checks connectivity through its SOCKS inbound, with a longer timeout and warn-on-failure since DNS tunnels are slow/fragile. Both appear in the human and JSON result summaries. First step of the v2 testing epic (remaining gaps: MasterDNS, wstunnel, GooseRelay, and a stronger telemt check)
+
 ### Documentation
 - **v2 docs & compatibility sweep** — reconciled the docs with the shipped 1.8.5 feature set: added a Certificates section to `docs/CLI.md` (`moav cert status/renew/install/uninstall`, `CERT_AUTORENEW`); added the missing **Shadowsocks-2022** section + overview-table row and an **`XDNS_METHOD`** (txt/aaaa) row to `docs/protocols.md`, and updated the wstunnel entry to describe `wss://` + the path secret; added **AnyTLS** to `docs/architecture.md` (plus a new Security & isolation / Service lifecycle section) and to the human-visible/structured surfaces of `site/index.html`, and fixed a stale "version 1.8.2" string there; documented the admin empty-password **fail-closed (503)** behavior in `docs/OPSEC.md`; refreshed `site/llms.txt`
 

@@ -452,6 +452,171 @@ EOF
     wait $pid 2>/dev/null || true
 }
 
+# Test Shadowsocks-2022 (sing-box shadowsocks outbound via local SOCKS)
+test_ss() {
+    log_info "Testing Shadowsocks-2022..."
+
+    local config_file="" detail="" is_ipv6=false
+
+    for f in "$CONFIG_DIR"/shadowsocks.txt "$CONFIG_DIR"/shadowsocks*.txt; do
+        [[ -f "$f" ]] && config_file="$f" && break
+    done
+    if [[ -z "$config_file" ]]; then
+        detail="No Shadowsocks config found in bundle"
+        log_warn "$detail"
+        RESULTS[shadowsocks]="skip"; DETAILS[shadowsocks]="$detail"; return
+    fi
+    [[ "$config_file" == *ipv6* ]] && is_ipv6=true
+
+    local uri; uri=$(cat "$config_file" | tr -d '\n\r')
+    local server; server=$(extract_host "$uri")
+    local port; port=$(extract_port "$uri")
+    port=$(echo "$port" | tr -cd '0-9'); [[ -z "$port" ]] && port="8388"
+
+    # userinfo = base64url-nopad(method:server_psk:user_psk) — decode and split
+    local userinfo="${uri#ss://}"; userinfo="${userinfo%%@*}"
+    local b64; b64=$(echo "$userinfo" | tr '_-' '/+')
+    local pad=$(( (4 - ${#b64} % 4) % 4 ))
+    [[ $pad -gt 0 ]] && b64="${b64}$(printf '=%.0s' $(seq 1 $pad))"
+    local decoded; decoded=$(printf '%s' "$b64" | base64 -d 2>/dev/null)
+    local method="${decoded%%:*}"
+    local password="${decoded#*:}"   # server_psk:user_psk
+
+    if [[ -z "$server" || -z "$decoded" || "$method" == "$decoded" || -z "$password" ]]; then
+        detail="Failed to parse Shadowsocks URI (run with -v for details)"
+        log_error "$detail"
+        log_debug "server='$server' method='$method' decoded='${decoded:0:16}...'"
+        RESULTS[shadowsocks]="fail"; DETAILS[shadowsocks]="$detail"; return
+    fi
+
+    log_debug "Parsed: server=$server port=$port method=$method"
+
+    local client_config="$TEMP_DIR/ss-client.json"
+    cat > "$client_config" << EOF
+{
+  "log": {"level": "error"},
+  "inbounds": [
+    {"type": "socks", "listen": "127.0.0.1", "listen_port": 10807}
+  ],
+  "outbounds": [
+    {
+      "type": "shadowsocks",
+      "tag": "proxy",
+      "server": "$server",
+      "server_port": $port,
+      "method": "$method",
+      "password": "$password"
+    }
+  ],
+  "route": {"final": "proxy"}
+}
+EOF
+
+    if ! jq empty "$client_config" 2>/dev/null; then
+        detail="Generated invalid JSON config"
+        log_error "$detail"; RESULTS[shadowsocks]="fail"; DETAILS[shadowsocks]="$detail"; return
+    fi
+
+    local error_log="$TEMP_DIR/ss-error.log"
+    sing-box run -c "$client_config" 2>"$error_log" &
+    local pid=$!
+    sleep 3
+
+    if ! kill -0 $pid 2>/dev/null; then
+        detail="sing-box failed to start"
+        [[ -s "$error_log" ]] && detail="sing-box error: $(tail -5 "$error_log" 2>/dev/null | tr '\n' ' ' || true)"
+        log_error "$detail"; RESULTS[shadowsocks]="fail"; DETAILS[shadowsocks]="$detail"; return
+    fi
+
+    if curl -sf --socks5 127.0.0.1:10807 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+        local exit_ip=""
+        exit_ip=$(curl -sf --socks5 127.0.0.1:10807 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf --socks5 127.0.0.1:10807 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+        if [[ -n "$exit_ip" ]]; then
+            log_success "Shadowsocks-2022 connection successful (exit IP: $exit_ip)"
+            RESULTS[shadowsocks]="pass"; DETAILS[shadowsocks]="Connected via Shadowsocks-2022, exit IP: $exit_ip"
+        else
+            log_success "Shadowsocks-2022 connection successful"
+            RESULTS[shadowsocks]="pass"; DETAILS[shadowsocks]="Connected via Shadowsocks-2022"
+        fi
+    else
+        detail="Connection test failed"
+        [[ -s "$error_log" ]] && { local em; em=$(grep -i "error\|fail\|unreachable\|timeout\|refused" "$error_log" 2>/dev/null | tail -3 | tr '\n' ' ' || true); [[ -n "$em" ]] && detail="$em"; }
+        if [[ "$is_ipv6" == "true" ]] && echo "$detail" | grep -qi "unreachable\|network"; then
+            log_warn "IPv6 config - $detail"
+            RESULTS[shadowsocks]="warn"; DETAILS[shadowsocks]="IPv6 network may not be available: $detail"
+        else
+            log_error "$detail"; RESULTS[shadowsocks]="fail"; DETAILS[shadowsocks]="$detail"
+        fi
+    fi
+
+    kill $pid 2>/dev/null || true
+    wait $pid 2>/dev/null || true
+}
+
+# Test XDNS (Xray mKCP + FinalMask DNS tunnel) using the bundle's own xray
+# client config. Prefers direct mode (more stable) over via-DNS mode. XDNS is
+# slow/experimental, so a connection failure is a warn, not a hard fail.
+test_xdns() {
+    log_info "Testing XDNS (DNS tunnel via Xray mKCP)..."
+
+    local config_file="" detail=""
+    for f in "$CONFIG_DIR"/xdns-direct-config.json "$CONFIG_DIR"/xdns-config.json; do
+        [[ -f "$f" ]] && config_file="$f" && break
+    done
+    if [[ -z "$config_file" ]]; then
+        detail="No XDNS config found in bundle"
+        log_warn "$detail"
+        RESULTS[xdns]="skip"; DETAILS[xdns]="$detail"; return
+    fi
+
+    if ! command -v xray >/dev/null 2>&1; then
+        detail="xray binary not available in this environment"
+        log_warn "$detail"
+        RESULTS[xdns]="skip"; DETAILS[xdns]="$detail"; return
+    fi
+
+    if ! jq empty "$config_file" 2>/dev/null; then
+        detail="Bundle XDNS config is invalid JSON"
+        log_error "$detail"; RESULTS[xdns]="fail"; DETAILS[xdns]="$detail"; return
+    fi
+
+    log_debug "Using XDNS config: $config_file (SOCKS 127.0.0.1:7891)"
+
+    local error_log="$TEMP_DIR/xdns-error.log"
+    xray run -c "$config_file" 2>"$error_log" &
+    local pid=$!
+    sleep 4   # mKCP handshake over DNS is slower than a direct TCP dial
+
+    if ! kill -0 $pid 2>/dev/null; then
+        detail="xray failed to start"
+        [[ -s "$error_log" ]] && detail="xray error: $(tail -5 "$error_log" 2>/dev/null | tr '\n' ' ' || true)"
+        log_error "$detail"; RESULTS[xdns]="fail"; DETAILS[xdns]="$detail"; return
+    fi
+
+    # XDNS is high-latency; give it a longer ceiling than the default timeout.
+    local xdns_timeout=$(( TEST_TIMEOUT > 20 ? TEST_TIMEOUT : 20 ))
+    if curl -sf --socks5 127.0.0.1:7891 --max-time "$xdns_timeout" "$TEST_URL" >/dev/null 2>&1; then
+        local exit_ip=""
+        exit_ip=$(curl -sf --socks5 127.0.0.1:7891 --max-time "$xdns_timeout" https://api.ipify.org 2>/dev/null || true)
+        if [[ -n "$exit_ip" ]]; then
+            log_success "XDNS connection successful (exit IP: $exit_ip)"
+            RESULTS[xdns]="pass"; DETAILS[xdns]="Connected via XDNS, exit IP: $exit_ip"
+        else
+            log_success "XDNS connection successful"
+            RESULTS[xdns]="pass"; DETAILS[xdns]="Connected via XDNS"
+        fi
+    else
+        detail="XDNS connection test failed (DNS tunnels are slow/fragile — may need a reachable resolver)"
+        [[ -s "$error_log" ]] && { local em; em=$(grep -i "error\|fail\|unreachable\|timeout\|refused" "$error_log" 2>/dev/null | tail -3 | tr '\n' ' ' || true); [[ -n "$em" ]] && detail="$em"; }
+        log_warn "$detail"
+        RESULTS[xdns]="warn"; DETAILS[xdns]="$detail"
+    fi
+
+    kill $pid 2>/dev/null || true
+    wait $pid 2>/dev/null || true
+}
+
 # Test AnyTLS protocol (sing-box native, password-auth TLS, reuses Trojan cert)
 test_anytls() {
     log_info "Testing AnyTLS..."
@@ -1789,7 +1954,7 @@ output_json() {
 EOF
 
     local first=true
-    for protocol in reality trojan anytls hysteria2 wireguard amneziawg dnstt slipstream trusttunnel telemt; do
+    for protocol in reality trojan anytls hysteria2 shadowsocks wireguard amneziawg dnstt slipstream xdns trusttunnel telemt; do
         if [[ -n "${RESULTS[$protocol]:-}" ]]; then
             [[ "$first" != "true" ]] && echo ","
             first=false
@@ -1820,7 +1985,7 @@ output_human() {
     echo ""
     echo "───────────────────────────────────────────────────────────────"
 
-    for protocol in reality trojan anytls hysteria2 wireguard amneziawg dnstt slipstream trusttunnel telemt; do
+    for protocol in reality trojan anytls hysteria2 shadowsocks wireguard amneziawg dnstt slipstream xdns trusttunnel telemt; do
         if [[ -n "${RESULTS[$protocol]:-}" ]]; then
             local status="${RESULTS[$protocol]}"
             local detail="${DETAILS[$protocol]:-}"
@@ -1858,11 +2023,13 @@ main() {
     test_trojan
     test_anytls
     test_hysteria2
+    test_ss
     test_xhttp
     test_wireguard
     test_amneziawg
     test_dnstt
     test_slipstream
+    test_xdns
     test_trusttunnel
     test_telemt
 
