@@ -11,7 +11,7 @@ FROM alpine:3.21
 ARG TARGETARCH
 
 # Version - read from .env via docker-compose build args
-ARG TELEMT_VERSION=3.4.11
+ARG TELEMT_VERSION=3.4.23
 
 # Install runtime dependencies
 RUN apk add --no-cache \
