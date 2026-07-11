@@ -357,6 +357,14 @@ if [[ "${ENABLE_WIREGUARD:-true}" == "true" ]]; then
             log_info "Fixed server.pub to match private key"
         fi
     fi
+
+    # wstunnel HTTP-upgrade path secret — shared with client bundles so a scanner
+    # can't complete the WebSocket upgrade without knowing the path prefix.
+    if [[ ! -f "$STATE_DIR/keys/wstunnel-path.secret" ]]; then
+        mkdir -p "$STATE_DIR/keys"
+        openssl rand -hex 16 > "$STATE_DIR/keys/wstunnel-path.secret"
+        log_info "Generated wstunnel path secret"
+    fi
 fi
 
 # -----------------------------------------------------------------------------

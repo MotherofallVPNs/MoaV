@@ -894,6 +894,7 @@ elif [[ -f "$TEMPLATE_FILE" ]]; then
     sed -i "s|{{USERNAME}}|$USER_ID|g" "$OUTPUT_HTML"
     sed -i "s|{{SERVER_IP}}|$SERVER_IP|g" "$OUTPUT_HTML"
     sed -i "s|{{DOMAIN}}|$DOMAIN|g" "$OUTPUT_HTML"
+    sed -i "s|{{WSTUNNEL_CMD}}|$(wstunnel_client_cmd)|g" "$OUTPUT_HTML"
     sed -i "s|{{GENERATED_DATE}}|$GENERATED_DATE|g" "$OUTPUT_HTML"
     sed -i "s|{{DNSTT_DOMAIN}}|$DNSTT_DOMAIN|g" "$OUTPUT_HTML"
     sed -i "s|{{DNSTT_PUBKEY}}|$DNSTT_PUBKEY|g" "$OUTPUT_HTML"

@@ -244,6 +244,12 @@ EOF
 log_info "Generated wstunnel-mode config"
 
 # Generate wstunnel instructions
+WSTUNNEL_CMD="$(wstunnel_client_cmd)"
+if [[ -n "${DOMAIN:-}" && "${DOMAIN:-}" != "YOUR_DOMAIN" ]]; then
+    WSTUNNEL_SERVER_URL="wss://${DOMAIN}:8080"
+else
+    WSTUNNEL_SERVER_URL="ws://${SERVER_IP}:8080"
+fi
 cat > "$OUTPUT_DIR/wireguard-instructions.txt" <<EOF
 # WireGuard over WebSocket (wstunnel) Instructions
 # ================================================
@@ -260,7 +266,7 @@ cat > "$OUTPUT_DIR/wireguard-instructions.txt" <<EOF
 # ---------------------------
 # This creates a local UDP tunnel to the server:
 
-wstunnel client -L udp://127.0.0.1:51820:moav-wireguard:51820 ws://${SERVER_IP}:8080
+${WSTUNNEL_CMD}
 
 # Step 3: Connect WireGuard
 # -------------------------
@@ -275,12 +281,12 @@ wstunnel client -L udp://127.0.0.1:51820:moav-wireguard:51820 ws://${SERVER_IP}:
 
 # For desktop:
 # ------------
-# Terminal 1: wstunnel client -L udp://127.0.0.1:51820:moav-wireguard:51820 ws://${SERVER_IP}:8080
+# Terminal 1: ${WSTUNNEL_CMD}
 # Terminal 2: wg-quick up ./wireguard-wstunnel.conf
 
 # Server info:
 # ------------
-# wstunnel server: ws://${SERVER_IP}:8080
+# wstunnel server: ${WSTUNNEL_SERVER_URL}
 # Your WireGuard IP: $CLIENT_IP
 EOF
 
@@ -343,5 +349,5 @@ cat "$OUTPUT_DIR/wireguard.conf"
 echo ""
 echo "=== wstunnel Mode (for restrictive networks) ==="
 echo "Run wstunnel first:"
-echo "  wstunnel client -L udp://127.0.0.1:51820:moav-wireguard:51820 ws://${SERVER_IP}:8080"
+echo "  ${WSTUNNEL_CMD}"
 echo "Then use wireguard-wstunnel.conf"

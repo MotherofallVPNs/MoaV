@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     libcap2-bin \
+    util-linux \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -r moav && useradd -r -g moav moav
@@ -32,5 +33,6 @@ RUN chmod +x /entrypoint.sh
 
 EXPOSE 443
 
-USER moav
+# Entrypoint starts as root to read the root-owned TLS cert, then drops to
+# the moav user via setpriv before exec'ing wstunnel.
 ENTRYPOINT ["/entrypoint.sh"]

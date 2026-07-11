@@ -795,6 +795,7 @@ if [[ -f "$TEMPLATE_FILE" ]]; then
     sed -i.bak "s|{{USERNAME}}|$USERNAME|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{SERVER_IP}}|$SERVER_IP|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{DOMAIN}}|${DOMAIN:-YOUR_DOMAIN}|g" "$OUTPUT_HTML"
+    sed -i.bak "s|{{WSTUNNEL_CMD}}|$(wstunnel_client_cmd)|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{PORT_SS}}|${PORT_SS:-8388}|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{GENERATED_DATE}}|$GENERATED_DATE|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{DNSTT_DOMAIN}}|$DNSTT_DOMAIN|g" "$OUTPUT_HTML"
