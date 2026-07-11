@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **CI pipeline** (`.github/workflows/ci.yml`) — runs on every PR to `dev`/`main`: `shellcheck --severity=error` across all 54 shell scripts, `bash -n` parse checks, `go vet` + `go test -race` for `dns-router`, and `docker compose config` validation. First automated regression gate for the repo (previously only release/site-deploy workflows existed). Fixed the one error-severity shellcheck finding it surfaced — an unquoted array expansion (`SC2068`) in `moav.sh`'s build path that could re-split service names.
+
 ### Documentation
 - **v2 docs & compatibility sweep** — reconciled the docs with the shipped 1.8.5 feature set: added a Certificates section to `docs/CLI.md` (`moav cert status/renew/install/uninstall`, `CERT_AUTORENEW`); added the missing **Shadowsocks-2022** section + overview-table row and an **`XDNS_METHOD`** (txt/aaaa) row to `docs/protocols.md`, and updated the wstunnel entry to describe `wss://` + the path secret; added **AnyTLS** to `docs/architecture.md` (plus a new Security & isolation / Service lifecycle section) and to the human-visible/structured surfaces of `site/index.html`, and fixed a stale "version 1.8.2" string there; documented the admin empty-password **fail-closed (503)** behavior in `docs/OPSEC.md`; refreshed `site/llms.txt`
 
