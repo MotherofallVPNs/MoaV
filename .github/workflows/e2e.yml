@@ -88,13 +88,14 @@ jobs:
       - name: Clean slate (domainless/full — start fresh, ignore prior state)
         if: inputs.domainless || inputs.full
         run: |
-          # These runs must not inherit a previous run's persisted state
-          # (volumes couple runs: re-bootstrap can skip regenerating host
-          # configs). Drop the volumes and the root-owned host dirs so bootstrap
-          # rebuilds everything from scratch. (Domain runs deliberately keep the
-          # cert volume — see Teardown — so they are excluded here.)
+          # The run-to-run coupling lives in the docker VOLUMES (moav_state
+          # keeps .bootstrapped + keys, so re-bootstrap skips regenerating the
+          # host configs). Drop the volumes so bootstrap runs first-time and
+          # rebuilds configs from the (checkout-restored) templates. Do NOT rm
+          # configs/ — it holds repo-tracked *.template files bootstrap needs;
+          # checkout already cleans the generated host artifacts. (Domain runs
+          # deliberately keep the cert volume — see Teardown — so are excluded.)
           docker compose --profile all down -v --remove-orphans 2>/dev/null || true
-          sudo rm -rf configs state outputs 2>/dev/null || true
 
       - name: Bootstrap (keys, certs, first user)
         # --yes: non-interactive; also proceeds if a previous run left state
