@@ -8232,6 +8232,15 @@ cmd_export() {
 }
 EOF
 
+    # The container-based `cp -a` steps above (state, conduit, certs) preserve
+    # root ownership, which a non-root operator's host-side tar then can't read
+    # ("Permission denied" on keys/conduit datastore). Hand the staged copy back
+    # to the invoking user via a root container so the tar can read everything.
+    if [[ "$(id -u)" -ne 0 ]]; then
+        docker run --rm -v "$temp_dir:/export" alpine \
+            chown -R "$(id -u):$(id -g)" /export 2>/dev/null || true
+    fi
+
     # 7. Create tarball
     info "  Creating archive..."
     tar -czf "$output_file" -C "$temp_dir" moav-export
