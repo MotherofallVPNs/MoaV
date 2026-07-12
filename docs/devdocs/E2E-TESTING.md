@@ -165,18 +165,37 @@ trigger the workflow (§3).
 | `E2E_SERVER_IP` | *(optional)* the VPS public IP; auto-detected if omitted |
 
 The workflow writes these into a fresh `.env` (copied from `.env.example`) and
-sets `INITIAL_USERS=e2e-test` + `DEFAULT_PROFILES=all`.
+sets `INITIAL_USERS=1` + `DEFAULT_PROFILES=all` (`INITIAL_USERS` is a **count**,
+not a name; the run then adds a named `e2e-test` user to also exercise
+`moav user add`).
 
 ---
 
 ## 3. Run it
 
 - **Manually:** repo → **Actions → e2e → Run workflow**, choose the branch to
-  test (e.g. `dev`), optionally tick *Verbose*. The recommended way to validate a
-  branch before release. If you don't see "e2e" in the Actions list, the workflow
-  isn't on the **default branch** yet (see the note at the top).
+  test (e.g. `dev`), then optionally tick the inputs below. The recommended way
+  to validate a branch before release. If you don't see "e2e" in the Actions
+  list, the workflow isn't on the **default branch** yet (see the note at the top).
 - **On release:** fires automatically when a GitHub Release is published.
 - **Nightly:** disabled by default (re-add the `schedule:` block to enable).
+
+**Run inputs:**
+
+| Input | Effect |
+|---|---|
+| `verbose` | Per-protocol debug output from `client-test.sh` (`-v`). |
+| `domainless` | **No DOMAIN / no cert** — certbot self-skips, so this **never touches the Let's Encrypt rate limit**. Runs the IP-only protocols (Reality, XHTTP, Shadowsocks, WireGuard…) and still builds the client image, so it's the fast way to validate everything *except* the TLS-domain protocols. Needs no `E2E_DOMAIN`/`E2E_ACME_EMAIL`. |
+| `full` | Also runs `build --local` (monitoring images from source), a second **domainless** phase after the domain phase, and `uninstall --wipe --remove-images` on teardown. Much slower, and it **does** re-issue a cert (see below). |
+
+**Cert reuse & the LE rate limit.** Let's Encrypt allows only **5 certs/week per
+exact domain**. A standard (domain) run therefore **keeps the `moav_certs`
+volume** on teardown (`uninstall --yes`, `down` without `-v`), so the next run
+reuses the existing cert instead of re-issuing — you can run it many times a day.
+Only `full` runs wipe the volume (fresh issuance); don't run `full` more than a
+few times a week against the same domain or you'll hit the limit
+("*too many certificates … retry after …*"). If you do get blocked, use
+`domainless` to keep testing in the meantime.
 
 The **e2e-results** artifact (JSON + raw log) is attached to every run. The job
 fails if any protocol reports `fail`; `warn`/`skip` (e.g. an unconfigured
@@ -192,7 +211,8 @@ You can reproduce exactly what the workflow does directly on the test VPS:
 git clone https://github.com/MotherofallVPNs/moav && cd moav
 cp .env.example .env
 # edit .env: set DOMAIN, ACME_EMAIL, ADMIN_PASSWORD, SERVER_IP,
-#            INITIAL_USERS=e2e-test, DEFAULT_PROFILES=all
+#            INITIAL_USERS=1, DEFAULT_PROFILES=all
+#            (leave DOMAIN empty to reproduce a domainless run — no cert)
 
 ./moav.sh build
 ./moav.sh bootstrap        # generates keys, obtains certs, creates the user
