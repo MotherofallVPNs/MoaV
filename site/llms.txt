@@ -23,6 +23,6 @@
 
 ## Optional
 
-- [GitHub repository](https://github.com/shayanb/MoaV): source, issues, releases
-- [Changelog](https://github.com/shayanb/MoaV/blob/main/CHANGELOG.md): release notes, behavior changes per version
+- [GitHub repository](https://github.com/MotherofallVPNs/moav): source, issues, releases
+- [Changelog](https://github.com/MotherofallVPNs/moav/blob/main/CHANGELOG.md): release notes, behavior changes per version
 - [Protocol Integration Checklist](https://moav.sh/docs/devdocs/PROTOCOL-INTEGRATION-CHECKLIST/): contributor guide for adding a new protocol

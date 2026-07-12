@@ -89,7 +89,7 @@ check_for_updates() {
     # Fetch latest release (in background, don't block)
     {
         local latest
-        latest=$(curl -s --max-time 3 "https://api.github.com/repos/shayanb/MoaV/releases/latest" 2>/dev/null | grep '"tag_name"' | head -1 | cut -d'"' -f4 | sed 's/^v//')
+        latest=$(curl -s --max-time 3 "https://api.github.com/repos/MotherofallVPNs/moav/releases/latest" 2>/dev/null | grep '"tag_name"' | head -1 | cut -d'"' -f4 | sed 's/^v//')
         if [[ -n "$latest" && "$latest" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "$latest" > "$cache_file"
         fi
@@ -1524,7 +1524,7 @@ cmd_update() {
         echo "Troubleshooting:"
         echo "  - Check network: ping github.com"
         echo "  - View git status: cd $install_dir && git status"
-        echo "  - See docs: https://github.com/shayanb/MoaV/blob/main/docs/TROUBLESHOOTING.md#git-update-issues"
+        echo "  - See docs: https://github.com/MotherofallVPNs/moav/blob/main/docs/TROUBLESHOOTING.md#git-update-issues"
         return 1
     fi
 }
@@ -4013,7 +4013,7 @@ doctor_check_updates() {
 
     # Check latest version from GitHub
     local latest
-    latest=$(curl -sf --max-time 5 "https://api.github.com/repos/shayanb/MoaV/releases/latest" 2>/dev/null | grep -o '"tag_name": "[^"]*"' | cut -d'"' -f4 | sed 's/^v//')
+    latest=$(curl -sf --max-time 5 "https://api.github.com/repos/MotherofallVPNs/moav/releases/latest" 2>/dev/null | grep -o '"tag_name": "[^"]*"' | cut -d'"' -f4 | sed 's/^v//')
 
     if [[ -z "$latest" ]]; then
         echo -e "    ${YELLOW}○${NC} Could not check for updates (no internet or GitHub unreachable)"
@@ -8962,7 +8962,7 @@ conduit_offsets_install() {
     $sudo_prefix tee "$CONDUIT_OFFSETS_UNIT_PATH" >/dev/null <<UNIT
 [Unit]
 Description=MoaV Conduit lifetime bandwidth offset auto-updater
-Documentation=https://github.com/shayanb/MoaV
+Documentation=https://github.com/MotherofallVPNs/moav
 After=docker.service
 Requires=docker.service
 
@@ -9069,7 +9069,7 @@ cert_renew_install() {
         $sudo_prefix tee "$CERT_RENEW_SERVICE_PATH" >/dev/null <<UNIT
 [Unit]
 Description=MoaV TLS certificate renewal
-Documentation=https://github.com/shayanb/MoaV
+Documentation=https://github.com/MotherofallVPNs/moav
 After=docker.service
 Requires=docker.service
 

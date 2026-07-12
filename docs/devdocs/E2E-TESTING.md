@@ -71,7 +71,7 @@ tar xzf actions-runner-linux-x64.tar.gz
 
 # configure — IMPORTANT: add the `moav-e2e` label the workflow targets.
 # Use a FRESH token (the UI one expires in ~1h).
-./config.sh --url https://github.com/shayanb/MoaV \
+./config.sh --url https://github.com/MotherofallVPNs/moav \
   --token <FRESH_REGISTRATION_TOKEN> \
   --labels moav-e2e \
   --name moav-e2e-vps
@@ -133,7 +133,7 @@ DNS-tunnel NS record, or IPv6 unavailable) do not fail the build.
 You can reproduce exactly what the workflow does directly on the test VPS:
 
 ```bash
-git clone https://github.com/shayanb/MoaV && cd MoaV
+git clone https://github.com/MotherofallVPNs/moav && cd moav
 cp .env.example .env
 # edit .env: set DOMAIN, ACME_EMAIL, ADMIN_PASSWORD, SERVER_IP,
 #            INITIAL_USERS=e2e-test, DEFAULT_PROFILES=all
