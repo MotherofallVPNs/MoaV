@@ -8253,7 +8253,10 @@ EOF
     success "Backup created: $output_file ($size)"
     echo ""
     echo -e "${CYAN}Contents:${NC}"
-    tar -tzf "$output_file" | head -30
+    # `head` closes the pipe after 30 lines; tar then gets SIGPIPE and reports a
+    # write error, which under `set -o pipefail` would fail the whole command
+    # once a backup has >30 entries (any real deployment). Tolerate it.
+    tar -tzf "$output_file" 2>/dev/null | head -30 || true
     echo ""
     echo -e "${YELLOW}Security Note:${NC} This backup contains private keys."
     echo "  Transfer securely and delete after import."
