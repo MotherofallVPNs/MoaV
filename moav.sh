@@ -7713,7 +7713,7 @@ cmd_build() {
                 # Build compose services normally
                 if [[ ${#compose_services[@]} -gt 0 ]]; then
                     info "Building: ${compose_services[*]}${no_cache:+ (no cache)}"
-                    compose_build --profile all build $no_cache ${compose_services[@]}
+                    compose_build --profile all build $no_cache "${compose_services[@]}"
                     success "Build complete!"
                 fi
                 # Auto-redirect image-only services to local build
