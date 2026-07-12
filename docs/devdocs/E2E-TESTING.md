@@ -31,19 +31,48 @@ It runs **manually**, **on each published release**, and **nightly** (the
 
 ## 1. Register the self-hosted runner
 
-On GitHub: **repo → Settings → Actions → Runners → New self-hosted runner**,
-pick **Linux / x64**, and follow the shown commands on the VPS. They look like:
+### Permissions
+
+- To reach **repo → Settings → Actions → Runners → New self-hosted runner** you
+  need **Admin** on the repo. That page shows a **registration token** —
+  auto-generated, scoped to registering one runner, and it **expires in ~1 hour**.
+  You don't create or manage this token yourself; generate a fresh one right
+  before you run `./config.sh`. (If you script registration via the API instead,
+  a PAT with the `repo` scope can mint a registration token — but the UI is
+  simpler.)
+
+### Do NOT run as root
+
+The runner's `./config.sh` **refuses to run as root or under `sudo`**
+(`Must not run with sudo`). If you're logged in as `root`, create a dedicated
+non-root user first — it needs Docker access (the e2e job builds/starts the
+stack) and passwordless `sudo` (moav's host-side steps occasionally call it):
 
 ```bash
-# on the test VPS, as a non-root user in the docker group
+# as root
+adduser --disabled-password --gecos "" gh-runner
+usermod -aG docker gh-runner
+echo 'gh-runner ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/gh-runner
+```
+
+### Download + configure
+
+Get the latest runner version from
+<https://github.com/actions/runner/releases/latest> (the "New self-hosted
+runner" page also prints the exact current commands). Then, **as the non-root
+user**:
+
+```bash
+su - gh-runner                       # NOT root, NO sudo for config.sh
 mkdir -p ~/actions-runner && cd ~/actions-runner
 curl -o actions-runner-linux-x64.tar.gz -L \
   https://github.com/actions/runner/releases/download/vX.Y.Z/actions-runner-linux-x64-X.Y.Z.tar.gz
 tar xzf actions-runner-linux-x64.tar.gz
 
-# configure — IMPORTANT: add the `moav-e2e` label the workflow targets
+# configure — IMPORTANT: add the `moav-e2e` label the workflow targets.
+# Use a FRESH token (the UI one expires in ~1h).
 ./config.sh --url https://github.com/shayanb/MoaV \
-  --token <TOKEN_FROM_GITHUB_UI> \
+  --token <FRESH_REGISTRATION_TOKEN> \
   --labels moav-e2e \
   --name moav-e2e-vps
 ```
@@ -51,16 +80,22 @@ tar xzf actions-runner-linux-x64.tar.gz
 The workflow selects this runner via `runs-on: [self-hosted, moav-e2e]`, so the
 `moav-e2e` label is required.
 
+> Escape hatch: `RUNNER_ALLOW_RUNASROOT=1 ./config.sh ...` lets it configure as
+> root, but running Actions as root is discouraged — prefer the dedicated user.
+
 ### Run it as a service (survives reboots)
 
+Unlike `config.sh`, the service installer **does** use `sudo`, and takes the
+runner's username so the service runs as that user:
+
 ```bash
-sudo ./svc.sh install
+sudo ./svc.sh install gh-runner
 sudo ./svc.sh start
 sudo ./svc.sh status
 ```
 
-The runner user must be able to run Docker without sudo:
-`sudo usermod -aG docker $USER` (re-login afterwards).
+Verify the runner shows up **Idle** under Settings → Actions → Runners, then
+trigger the workflow (§3).
 
 ---
 
