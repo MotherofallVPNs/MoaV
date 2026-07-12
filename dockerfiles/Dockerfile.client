@@ -108,6 +108,9 @@ ARG WSTUNNEL_VERSION=10.6.1
 ARG TRUSTTUNNEL_VERSION=1.0.13
 
 # Install runtime dependencies
+# gcompat + libstdc++: glibc shim so the prebuilt sing-box release (glibc-linked,
+# like the server's debian image uses) can run on this Alpine/musl base —
+# otherwise it fails with "cannot execute: required file not found".
 RUN apk add --no-cache \
     bash \
     curl \
@@ -119,6 +122,8 @@ RUN apk add --no-cache \
     iproute2 \
     bind-tools \
     tor \
+    gcompat \
+    libstdc++ \
     && rm -rf /var/cache/apk/*
 
 # Architecture mapping helper script

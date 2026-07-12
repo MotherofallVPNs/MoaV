@@ -2056,7 +2056,7 @@ test_wstunnel() {
     # real server + port live in the instructions' wstunnel client command.
     local instr="$CONFIG_DIR/wireguard-instructions.txt"
     local cmd=""; [[ -f "$instr" ]] && cmd=$(grep -m1 'wstunnel client' "$instr" 2>/dev/null || true)
-    local url; url=$(echo "$cmd" | grep -oE '(wss?)://[^ ]+' | head -1)
+    local url; url=$(echo "$cmd" | grep -oE '(wss?)://[^ ]+' | head -1 || true)
     local scheme="${url%%://*}"
     local hostport="${url#*://}"; hostport="${hostport%%/*}"
     local server="${hostport%:*}" port="${hostport##*:}"
