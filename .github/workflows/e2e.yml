@@ -86,7 +86,10 @@ jobs:
         run: ./moav.sh build --local
 
       - name: Bootstrap (keys, certs, first user)
-        run: ./moav.sh bootstrap
+        # --yes: non-interactive; also proceeds if a previous run left state
+        # behind (re-bootstrap is idempotent — keeps keys/users, regenerates
+        # configs). Without it, a re-run prompts and cancels with no TTY.
+        run: ./moav.sh bootstrap --yes
 
       - name: Start services
         run: ./moav.sh start all
@@ -173,7 +176,7 @@ jobs:
           grep -q '^DEFAULT_PROFILES=' .env && sed -i "s|^DEFAULT_PROFILES=.*|DEFAULT_PROFILES=all|" .env || echo "DEFAULT_PROFILES=all" >> .env
 
           echo "== domainless: bootstrap -> start -> user add -> test =="
-          ./moav.sh bootstrap
+          ./moav.sh bootstrap --yes
           ./moav.sh start all
           sleep 30
           sudo chown -R "$(id -u):$(id -g)" configs state outputs 2>/dev/null || true

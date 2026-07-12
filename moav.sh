@@ -5617,7 +5617,8 @@ show_usage() {
     echo "  uninstall [--wipe] [--yes] [--remove-images]  Remove containers + command"
     echo "                        (--wipe removes all data; --yes skips prompts; --remove-images also deletes images)"
     echo "  update [-b BRANCH]    Update MoaV (git pull + rebuild)"
-    echo "  bootstrap             First-time setup (keys, configs, service selection)"
+    echo "  bootstrap [--yes]     First-time setup (keys, configs, service selection);"
+    echo "                        --yes re-runs non-interactively (idempotent)"
     echo "  domainless            Enable domainless mode"
     echo "  check                 Run prerequisites check"
     echo "  doctor [CHECK]        Run diagnostics (e.g. 'doctor dns', 'doctor ports')"
@@ -6947,6 +6948,15 @@ cmd_domainless() {
 }
 
 cmd_bootstrap() {
+    local assume_yes=false
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --yes|-y) assume_yes=true ;;
+            *) warn "Unknown bootstrap option: $1" ;;
+        esac
+        shift
+    done
+
     print_header
     check_prerequisites
     echo ""
@@ -6964,7 +6974,9 @@ cmd_bootstrap() {
         echo ""
         info "Existing client configurations will remain valid."
         echo ""
-        if ! confirm "Are you sure you want to re-run bootstrap?" "n"; then
+        if [[ "$assume_yes" == "true" ]]; then
+            info "Re-running bootstrap non-interactively (--yes)"
+        elif ! confirm "Are you sure you want to re-run bootstrap?" "n"; then
             info "Bootstrap cancelled."
             return 0
         fi
@@ -6981,7 +6993,7 @@ cmd_bootstrap() {
         echo "  • Configure enabled protocols"
         echo "  • Create initial users with connection links"
         echo ""
-        if ! confirm "Continue with bootstrap?" "y"; then
+        if [[ "$assume_yes" != "true" ]] && ! confirm "Continue with bootstrap?" "y"; then
             info "Bootstrap cancelled."
             return 0
         fi
@@ -9296,7 +9308,7 @@ main() {
             cmd_doctor "$@"
             ;;
         bootstrap)
-            cmd_bootstrap
+            cmd_bootstrap "$@"
             ;;
         domainless|domain-less|no-domain)
             cmd_domainless
