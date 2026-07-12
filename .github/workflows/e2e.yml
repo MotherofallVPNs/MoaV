@@ -13,6 +13,10 @@ on:
         description: 'Verbose client-test output (-v)'
         type: boolean
         default: false
+      full:
+        description: 'FULL suite: also run domainless mode, build --local, and remove images on uninstall (much slower)'
+        type: boolean
+        default: false
   release:
     types: [published]
 
@@ -58,6 +62,10 @@ jobs:
 
       - name: Build images
         run: ./moav.sh build
+
+      - name: Build monitoring images from source (full only)
+        if: inputs.full
+        run: ./moav.sh build --local
 
       - name: Bootstrap (keys, certs, first user)
         run: ./moav.sh bootstrap
@@ -108,6 +116,43 @@ jobs:
       - name: CLI smoke test
         run: bash scripts/cli-smoke-test.sh
 
+      - name: Full — domainless mode
+        if: inputs.full && success()
+        env:
+          MOAV_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+          MOAV_SERVER_IP: ${{ secrets.E2E_SERVER_IP }}
+        run: |
+          set -o pipefail
+          echo "== tear down the domain stack for a clean domainless run =="
+          printf 'y\nn\n' | timeout 180 ./moav.sh uninstall --wipe 2>&1 | tail -15 || true
+          docker compose --profile all down -v 2>/dev/null || true
+
+          echo "== reconfigure .env for domainless (no DOMAIN; cert/domain protocols off) =="
+          cp .env.example .env
+          sed -i "s|^DOMAIN=.*|DOMAIN=|" .env
+          sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${MOAV_ADMIN_PASSWORD}|" .env
+          [ -n "${MOAV_SERVER_IP:-}" ] && sed -i "s|^SERVER_IP=.*|SERVER_IP=${MOAV_SERVER_IP}|" .env
+          sed -i "s|^CDN_SUBDOMAIN=.*|CDN_SUBDOMAIN=|" .env
+          for p in TROJAN ANYTLS HYSTERIA2 DNSTT SLIPSTREAM MASTERDNS TRUSTTUNNEL XDNS; do
+            sed -i "s|^ENABLE_${p}=.*|ENABLE_${p}=false|" .env
+          done
+          grep -q '^INITIAL_USERS=' .env && sed -i "s|^INITIAL_USERS=.*|INITIAL_USERS=1|" .env || echo "INITIAL_USERS=1" >> .env
+          grep -q '^DEFAULT_PROFILES=' .env && sed -i "s|^DEFAULT_PROFILES=.*|DEFAULT_PROFILES=all|" .env || echo "DEFAULT_PROFILES=all" >> .env
+
+          echo "== domainless: bootstrap -> start -> user add -> test =="
+          ./moav.sh bootstrap
+          ./moav.sh start all
+          sleep 30
+          ./moav.sh user add e2e-dl
+          ./moav.sh test e2e-dl --json | tee e2e-domainless-raw.txt
+          awk '/^{/{p=1} p{print}' e2e-domainless-raw.txt > e2e-domainless.json
+          count=$(jq '.tests | length' e2e-domainless.json 2>/dev/null || echo 0)
+          [ "${count:-0}" -ge 1 ] || { echo "::error::domainless produced no results"; exit 1; }
+          jq -r '.tests | to_entries[] | "  \(.key): \(.value.status)"' e2e-domainless.json
+          fails=$(jq '[.tests[] | select(.status=="fail")] | length' e2e-domainless.json); fails=${fails:-1}
+          echo "domainless failed protocols: $fails"
+          [ "$fails" -eq 0 ] || { echo "::error::domainless: $fails protocol(s) failed"; exit 1; }
+
       - name: Diagnostics on failure
         if: failure()
         run: |
@@ -131,6 +176,8 @@ jobs:
           path: |
             e2e-results.json
             e2e-raw.txt
+            e2e-domainless.json
+            e2e-domainless-raw.txt
             compose-logs.txt
           if-no-files-found: warn
 
@@ -140,13 +187,15 @@ jobs:
           ./moav.sh stop 2>/dev/null || true
           # Exercise the uninstall CLI paths as part of cleanup — a broken
           # uninstall should surface. `uninstall` has no --yes flag and prompts
-          # ("Continue?" then "Also remove Docker images?"): answer y then n so
-          # we tear down but KEEP the image cache (a full rebuild each run is
-          # wasteful). timeout guards against a hang (a real regression).
-          echo "== moav uninstall =="
-          printf 'y\nn\n' | timeout 180 ./moav.sh uninstall 2>&1 | tail -25 || echo "::warning::moav uninstall returned non-zero / timed out"
+          # ("Continue?" then "Also remove Docker images?"). Answer y, then y/n
+          # to the image prompt: FULL runs also remove images (test that path +
+          # clean slate); standard runs keep the cache (a full rebuild each run
+          # is wasteful). timeout guards against a hang (a real regression).
+          IMG=n; [ "${{ inputs.full }}" = "true" ] && IMG=y
+          echo "== moav uninstall (remove images: $IMG) =="
+          printf "y\n${IMG}\n" | timeout 300 ./moav.sh uninstall 2>&1 | tail -25 || echo "::warning::moav uninstall returned non-zero / timed out"
           echo "== moav uninstall --wipe =="
-          printf 'y\nn\n' | timeout 180 ./moav.sh uninstall --wipe 2>&1 | tail -25 || echo "::warning::moav uninstall --wipe returned non-zero / timed out"
+          printf "y\n${IMG}\n" | timeout 300 ./moav.sh uninstall --wipe 2>&1 | tail -25 || echo "::warning::moav uninstall --wipe returned non-zero / timed out"
 
       - name: Final cleanup — reclaim workspace
         if: always()
