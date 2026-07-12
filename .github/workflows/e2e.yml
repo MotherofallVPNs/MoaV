@@ -17,6 +17,10 @@ on:
         description: 'FULL suite: also run domainless mode, build --local, and remove images on uninstall (much slower)'
         type: boolean
         default: false
+      domainless:
+        description: 'Domainless-only run: no DOMAIN/cert (skips Let''s Encrypt entirely). Validates the IP-only protocols without touching the LE rate limit.'
+        type: boolean
+        default: false
   release:
     types: [published]
 
@@ -43,18 +47,32 @@ jobs:
 
       - name: Preflight
         run: |
-          test -n "$MOAV_DOMAIN"          || { echo "::error::secret E2E_DOMAIN is not set"; exit 1; }
-          test -n "$MOAV_ACME_EMAIL"      || { echo "::error::secret E2E_ACME_EMAIL is not set"; exit 1; }
+          # DOMAIN/ACME are only needed for the cert-bearing (domain) run.
+          if [ "${{ inputs.domainless }}" != "true" ]; then
+            test -n "$MOAV_DOMAIN"          || { echo "::error::secret E2E_DOMAIN is not set"; exit 1; }
+            test -n "$MOAV_ACME_EMAIL"      || { echo "::error::secret E2E_ACME_EMAIL is not set"; exit 1; }
+          fi
           test -n "$MOAV_ADMIN_PASSWORD"  || { echo "::error::secret E2E_ADMIN_PASSWORD is not set"; exit 1; }
           docker --version && docker compose version
 
       - name: Prepare .env
         run: |
           cp .env.example .env
-          sed -i "s|^DOMAIN=.*|DOMAIN=${MOAV_DOMAIN}|"                 .env
-          sed -i "s|^ACME_EMAIL=.*|ACME_EMAIL=${MOAV_ACME_EMAIL}|"     .env
           sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${MOAV_ADMIN_PASSWORD}|" .env
           [ -n "$MOAV_SERVER_IP" ] && sed -i "s|^SERVER_IP=.*|SERVER_IP=${MOAV_SERVER_IP}|" .env
+          if [ "${{ inputs.domainless }}" = "true" ]; then
+            # No DOMAIN → certbot self-skips (no LE cert, no rate-limit hit).
+            # Disable protocols that need a domain cert or DNS delegation so
+            # their services don't crash-loop without one.
+            sed -i "s|^DOMAIN=.*|DOMAIN=|" .env
+            sed -i "s|^CDN_SUBDOMAIN=.*|CDN_SUBDOMAIN=|" .env
+            for p in TROJAN ANYTLS HYSTERIA2 DNSTT SLIPSTREAM MASTERDNS TRUSTTUNNEL XDNS; do
+              sed -i "s|^ENABLE_${p}=.*|ENABLE_${p}=false|" .env
+            done
+          else
+            sed -i "s|^DOMAIN=.*|DOMAIN=${MOAV_DOMAIN}|"             .env
+            sed -i "s|^ACME_EMAIL=.*|ACME_EMAIL=${MOAV_ACME_EMAIL}|" .env
+          fi
           # INITIAL_USERS is a COUNT (not a name) — 1 creates the 'demouser'.
           # We add a named 'e2e-test' user after start (also exercises `user add`).
           grep -q '^INITIAL_USERS=' .env && sed -i "s|^INITIAL_USERS=.*|INITIAL_USERS=1|" .env || echo "INITIAL_USERS=1" >> .env
@@ -131,7 +149,8 @@ jobs:
         run: bash scripts/cli-smoke-test.sh
 
       - name: Full — domainless mode
-        if: inputs.full && success()
+        # Skip when the primary run is already domainless (would just repeat it).
+        if: inputs.full && inputs.domainless != true && success()
         env:
           MOAV_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
           MOAV_SERVER_IP: ${{ secrets.E2E_SERVER_IP }}
