@@ -318,7 +318,7 @@
 - [ ] Add to `main()` case block (~line 827)
 - [ ] If protocol requires privileged mode or manual config: exclude from auto mode
 
-### 5c. `scripts/client-test.sh`
+### 5c. `tests/client-test.sh`
 
 - [ ] Add `test_newproto()` function:
   - Look for config files (ordered preference)

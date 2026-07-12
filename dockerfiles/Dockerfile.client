@@ -258,7 +258,7 @@ RUN mkdir -p /config /app /state /var/log/moav
 
 # Copy scripts
 COPY scripts/client-entrypoint.sh /app/
-COPY scripts/client-test.sh /app/
+COPY tests/client-test.sh /app/
 COPY scripts/client-connect.sh /app/
 RUN chmod +x /app/*.sh
 

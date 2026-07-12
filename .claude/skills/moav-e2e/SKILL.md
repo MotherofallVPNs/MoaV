@@ -13,9 +13,9 @@ description: >-
 
 Two layers run against a live server (not mocks):
 
-- **`scripts/client-test.sh`** (`moav test <user> [--json] [-v]`) — stands up a client-side
+- **`tests/client-test.sh`** (`moav test <user> [--json] [-v]`) — stands up a client-side
   tunnel per protocol and checks the exit IP. This is the protocol matrix.
-- **`scripts/cli-smoke-test.sh`** — exercises the `moav` *tool* (help/status/users/doctor/cert/
+- **`tests/cli-smoke-test.sh`** — exercises the `moav` *tool* (help/status/users/doctor/cert/
   export→import/user add+revoke/admin password/…), each hang-guarded.
 
 The per-PR CI (`ci.yml`) only lints + unit-tests; it never brings the stack up. Full e2e is

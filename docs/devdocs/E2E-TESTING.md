@@ -6,7 +6,7 @@
 > page is the human setup guide.
 
 
-`moav test` (`scripts/client-test.sh`) verifies real connectivity through each
+`moav test` (`tests/client-test.sh`) verifies real connectivity through each
 protocol by standing up client-side tunnels against a **live** MoaV server and
 checking the exit IP. The per-PR CI (`.github/workflows/ci.yml`) only lints and
 unit-tests — it never brings the stack up. Full e2e is a separate workflow

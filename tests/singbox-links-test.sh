@@ -2,12 +2,13 @@
 # Golden test for the sing-box share-link builders in lib/sing-box.sh.
 # Locks their output to the exact strings the inline code produced before the
 # refactor, so an extraction can be proven byte-identical. Pure string
-# functions — no server, no Docker. Run: bash scripts/lib/test-singbox-links.sh
+# functions — no server, no Docker. Run: bash tests/singbox-links-test.sh
 set -uo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
+# The library under test stays in scripts/lib/ (this test lives in tests/).
 # shellcheck source=/dev/null
-source "$DIR/sing-box.sh"
+source "$DIR/../scripts/lib/sing-box.sh"
 
 # Fixed inputs
 export USER_UUID="11111111-2222-3333-4444-555555555555"

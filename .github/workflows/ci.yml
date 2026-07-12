@@ -32,7 +32,7 @@ jobs:
       - name: shellcheck (severity=error)
         run: xargs shellcheck --severity=error < /tmp/shfiles
       - name: share-link golden test
-        run: bash scripts/lib/test-singbox-links.sh
+        run: bash tests/singbox-links-test.sh
       - name: protocol-roster drift gate
         run: python3 scripts/gen-protocol-docs.py --check
 

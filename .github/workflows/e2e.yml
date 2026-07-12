@@ -165,7 +165,7 @@ jobs:
           fi
 
       - name: CLI smoke test
-        run: bash scripts/cli-smoke-test.sh
+        run: bash tests/cli-smoke-test.sh
 
       - name: Full — domainless mode
         # Skip when the primary run is already domainless (would just repeat it).

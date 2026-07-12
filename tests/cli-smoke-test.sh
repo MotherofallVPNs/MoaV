@@ -5,7 +5,7 @@
 # tests (client-test.sh): those check the tunnels, this checks the tool.
 #
 # Run from the repo root with the stack up (this is what the e2e workflow does):
-#   ./moav.sh start all && bash scripts/cli-smoke-test.sh
+#   ./moav.sh start all && bash tests/cli-smoke-test.sh
 #
 # Two classes of check:
 #   must  — the command must exit 0 (a read/report command; non-zero = breakage)
