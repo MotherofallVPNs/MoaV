@@ -106,8 +106,12 @@ jobs:
           # works — the same access a root operator gets for free.
           sudo chown -R "$(id -u):$(id -g)" configs state outputs 2>/dev/null || true
 
-      - name: Provision test user (exercises `moav user add`)
+      - name: Provision test user (exercises `moav user add` + `revoke`)
         run: |
+          # A previous run may have left the user behind (state is preserved for
+          # cert reuse; re-bootstrap even regenerates its bundle). Revoke first
+          # so `user add` runs cleanly — this also exercises the revoke path.
+          ./moav.sh user revoke e2e-test 2>/dev/null || true
           ./moav.sh user add e2e-test
           test -d outputs/bundles/e2e-test \
             || { echo "::error::user add did not produce outputs/bundles/e2e-test"; exit 1; }
@@ -180,6 +184,7 @@ jobs:
           ./moav.sh start all
           sleep 30
           sudo chown -R "$(id -u):$(id -g)" configs state outputs 2>/dev/null || true
+          ./moav.sh user revoke e2e-dl 2>/dev/null || true
           ./moav.sh user add e2e-dl
           ./moav.sh test e2e-dl --json | tee e2e-domainless-raw.txt
           awk '/^{/{p=1} p{print}' e2e-domainless-raw.txt > e2e-domainless.json
