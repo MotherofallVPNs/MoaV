@@ -1904,19 +1904,221 @@ test_telemt() {
 
     log_debug "Parsed: server=$server port=$port"
 
-    # TCP connectivity test (cannot test MTProxy protocol without Telegram client)
-    log_info "  Testing TCP connectivity to $server:$port..."
-    if nc -z -w 5 "$server" "$port" 2>/dev/null; then
-        detail="Port $port reachable — use Telegram app to verify proxy"
-        log_info "  $detail"
-        RESULTS[telemt]="pass"
-        DETAILS[telemt]="$detail"
-    else
-        detail="TCP connection to $server:$port failed (port may be blocked or service not running)"
+    # Step 1: TCP reachability. A hard MTProto test needs a Telegram client, but
+    # we can go beyond nc -z by probing telemt's Fake-TLS front.
+    if ! nc -z -w 5 "$server" "$port" 2>/dev/null; then
+        detail="TCP connection to $server:$port failed (port blocked or service down)"
         log_error "  $detail"
-        RESULTS[telemt]="fail"
-        DETAILS[telemt]="$detail"
+        RESULTS[telemt]="fail"; DETAILS[telemt]="$detail"
+        return
     fi
+
+    # Step 2: Fake-TLS handshake probe. The tg:// secret is ee<16-byte hex><hex(domain)>;
+    # decode the fronted domain and offer it as SNI. telemt in tls mode answers a
+    # TLS hello (fronting the decoy), so a completed handshake means the Fake-TLS
+    # layer is actually responding — not just an open socket.
+    local sni=""
+    local secret_field; secret_field=$(echo "$tg_link" | sed -n 's/.*secret=\([^&]*\).*/\1/p')
+    local rest="${secret_field#ee}"          # strip the ee (Fake-TLS) marker
+    local domain_hex="${rest:32}"            # after the 16-byte (32 hex) secret
+    if [[ -n "$domain_hex" && "$domain_hex" =~ ^([0-9a-fA-F]{2})+$ ]]; then
+        sni=$(printf '%b' "$(echo "$domain_hex" | sed 's/\(..\)/\\x\1/g')" 2>/dev/null)
+    fi
+    log_debug "Fake-TLS SNI (decoded): ${sni:-<none>}"
+
+    if command -v openssl >/dev/null 2>&1; then
+        local sni_arg=()
+        [[ -n "$sni" ]] && sni_arg=(-servername "$sni")
+        if echo | timeout 8 openssl s_client -connect "$server:$port" "${sni_arg[@]}" 2>/dev/null | grep -q 'BEGIN CERTIFICATE'; then
+            detail="Port $port reachable + Fake-TLS handshake OK${sni:+ (fronting $sni)} — verify end-to-end in the Telegram app"
+            log_success "  $detail"
+            RESULTS[telemt]="pass"; DETAILS[telemt]="$detail"
+            return
+        fi
+        detail="Port $port reachable but Fake-TLS handshake didn't complete — verify in the Telegram app"
+        log_warn "  $detail"
+        RESULTS[telemt]="warn"; DETAILS[telemt]="$detail"
+        return
+    fi
+
+    detail="Port $port reachable — use the Telegram app to verify the proxy (openssl absent, skipped Fake-TLS probe)"
+    log_info "  $detail"
+    RESULTS[telemt]="pass"; DETAILS[telemt]="$detail"
+}
+
+# Test CDN (VLESS + WebSocket, fronted through Cloudflare). Real SOCKS exit-IP
+# test via a sing-box VLESS/ws outbound. warn-on-fail: CDN depends on the
+# operator's Cloudflare setup (proxied record + Origin Rule -> 2082 + SSL mode),
+# so a failure here usually means that's incomplete, not that MoaV is broken.
+test_cdn() {
+    log_info "Testing CDN (VLESS+WS via Cloudflare)..."
+
+    local config_file="" detail=""
+    for f in "$CONFIG_DIR"/cdn-vless.txt "$CONFIG_DIR"/cdn*.txt; do
+        [[ -f "$f" ]] && config_file="$f" && break
+    done
+    if [[ -z "$config_file" ]]; then
+        detail="No CDN config found in bundle"
+        log_warn "$detail"
+        RESULTS[cdn]="skip"; DETAILS[cdn]="$detail"; return
+    fi
+
+    local uri; uri=$(cat "$config_file" | tr -d '\n\r')
+    local uuid; uuid=$(extract_auth "$uri" "vless")
+    local server; server=$(extract_host "$uri")
+    local port; port=$(extract_port "$uri"); port=$(echo "$port" | tr -cd '0-9'); [[ -z "$port" ]] && port="443"
+    local path; path=$(extract_param "$uri" "path")
+    local sni; sni=$(extract_param "$uri" "sni")
+    local ws_host; ws_host=$(extract_param "$uri" "host")
+    # URL-decode the path (bundle percent-encodes it)
+    path=$(printf '%b' "${path//%/\\x}" 2>/dev/null || echo "$path")
+    [[ -z "$path" ]] && path="/"
+    [[ -z "$sni" ]] && sni="$server"
+    [[ -z "$ws_host" ]] && ws_host="$server"
+
+    if [[ -z "$uuid" || -z "$server" ]]; then
+        detail="Failed to parse CDN VLESS URI"
+        log_error "$detail"; RESULTS[cdn]="fail"; DETAILS[cdn]="$detail"; return
+    fi
+    log_debug "Parsed: server=$server port=$port sni=$sni host=$ws_host path=$path"
+
+    local client_config="$TEMP_DIR/cdn-client.json"
+    cat > "$client_config" << EOF
+{
+  "log": {"level": "error"},
+  "inbounds": [
+    {"type": "socks", "listen": "127.0.0.1", "listen_port": 10808}
+  ],
+  "outbounds": [
+    {
+      "type": "vless",
+      "tag": "proxy",
+      "server": "$server",
+      "server_port": $port,
+      "uuid": "$uuid",
+      "tls": {"enabled": true, "server_name": "$sni", "utls": {"enabled": true, "fingerprint": "chrome"}},
+      "transport": {"type": "ws", "path": "$path", "headers": {"Host": "$ws_host"}}
+    }
+  ],
+  "route": {"final": "proxy"}
+}
+EOF
+
+    if ! jq empty "$client_config" 2>/dev/null; then
+        detail="Generated invalid JSON config"
+        log_error "$detail"; RESULTS[cdn]="fail"; DETAILS[cdn]="$detail"; return
+    fi
+
+    local error_log="$TEMP_DIR/cdn-error.log"
+    sing-box run -c "$client_config" 2>"$error_log" &
+    local pid=$!
+    sleep 3
+
+    if ! kill -0 $pid 2>/dev/null; then
+        detail="sing-box failed to start"
+        [[ -s "$error_log" ]] && detail="sing-box error: $(tail -5 "$error_log" 2>/dev/null | tr '\n' ' ' || true)"
+        log_error "$detail"; RESULTS[cdn]="fail"; DETAILS[cdn]="$detail"; return
+    fi
+
+    if curl -sf --socks5 127.0.0.1:10808 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+        local exit_ip=""
+        exit_ip=$(curl -sf --socks5 127.0.0.1:10808 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || true)
+        log_success "CDN connection successful${exit_ip:+ (exit IP: $exit_ip)}"
+        RESULTS[cdn]="pass"; DETAILS[cdn]="Connected via CDN${exit_ip:+, exit IP: $exit_ip}"
+    else
+        detail="CDN connection failed — check the Cloudflare proxied record, Origin Rule (-> port 2082), and SSL/TLS = Flexible"
+        [[ -s "$error_log" ]] && { local em; em=$(grep -i 'error\|fail\|timeout\|refused\|tls' "$error_log" 2>/dev/null | tail -3 | tr '\n' ' ' || true); [[ -n "$em" ]] && detail="$detail — $em"; }
+        log_warn "$detail"
+        RESULTS[cdn]="warn"; DETAILS[cdn]="$detail"
+    fi
+
+    kill $pid 2>/dev/null || true
+    wait $pid 2>/dev/null || true
+}
+
+# Test WireGuard-over-wstunnel. Mirrors test_wireguard's level (config validation
+# + endpoint reachability), plus verifies the tunnel port speaks wss:// TLS (the
+# 1.9.0 hardening) rather than plain ws://.
+test_wstunnel() {
+    log_info "Testing WireGuard-over-wstunnel..."
+
+    local conf="" detail=""
+    for f in "$CONFIG_DIR"/wireguard-wstunnel.conf; do
+        [[ -f "$f" ]] && conf="$f" && break
+    done
+    if [[ -z "$conf" ]]; then
+        detail="No wireguard-wstunnel config found in bundle"
+        log_warn "$detail"
+        RESULTS[wstunnel]="skip"; DETAILS[wstunnel]="$detail"; return
+    fi
+
+    # The .conf points WireGuard at the local wstunnel endpoint (127.0.0.1); the
+    # real server + port live in the instructions' wstunnel client command.
+    local instr="$CONFIG_DIR/wireguard-instructions.txt"
+    local cmd=""; [[ -f "$instr" ]] && cmd=$(grep -m1 'wstunnel client' "$instr" 2>/dev/null || true)
+    local url; url=$(echo "$cmd" | grep -oE '(wss?)://[^ ]+' | head -1)
+    local scheme="${url%%://*}"
+    local hostport="${url#*://}"; hostport="${hostport%%/*}"
+    local server="${hostport%:*}" port="${hostport##*:}"
+    [[ -z "$port" || "$port" == "$server" ]] && port="8080"
+
+    if ! grep -q '\[Interface\]' "$conf" || ! grep -q '\[Peer\]' "$conf"; then
+        detail="Invalid wireguard-wstunnel config format"
+        log_error "$detail"; RESULTS[wstunnel]="fail"; DETAILS[wstunnel]="$detail"; return
+    fi
+    if [[ -z "$server" ]]; then
+        detail="Config valid but couldn't parse the wstunnel server from instructions"
+        log_warn "$detail"; RESULTS[wstunnel]="warn"; DETAILS[wstunnel]="$detail"; return
+    fi
+    log_debug "wstunnel endpoint: $scheme://$server:$port"
+
+    # Reachability + wss:// verification
+    if [[ "$scheme" == "wss" ]] && command -v openssl >/dev/null 2>&1; then
+        if echo | timeout 8 openssl s_client -connect "$server:$port" -servername "$server" 2>/dev/null | grep -q 'BEGIN CERTIFICATE'; then
+            log_success "wstunnel reachable and serving wss:// (TLS) on $server:$port"
+            RESULTS[wstunnel]="pass"; DETAILS[wstunnel]="Config valid; wss:// TLS endpoint up on $server:$port"
+            return
+        fi
+    fi
+    if nc -z -w 5 "$server" "$port" 2>/dev/null; then
+        local note="port reachable"
+        [[ "$scheme" == "wss" ]] && note="$note (wss:// TLS handshake not confirmed)"
+        log_warn "wstunnel $server:$port $note"
+        RESULTS[wstunnel]="warn"; DETAILS[wstunnel]="Config valid; $note — bring up the tunnel to verify end-to-end"
+    else
+        detail="wstunnel endpoint $server:$port not reachable (may be blocked or wstunnel not started)"
+        log_warn "$detail"
+        RESULTS[wstunnel]="warn"; DETAILS[wstunnel]="Config valid; $detail"
+    fi
+}
+
+# Test MasterDNS. No standalone MasterDNS client ships in this harness (it's a
+# MahsaNG v16 component), so this validates the bundle rather than tunnelling.
+# Honest skip with what to check manually.
+test_masterdns() {
+    log_info "Testing MasterDNS..."
+    local f="$CONFIG_DIR/masterdns-instructions.txt"
+    if [[ ! -f "$f" ]]; then
+        log_warn "No MasterDNS config in bundle"
+        RESULTS[masterdns]="skip"; DETAILS[masterdns]="No MasterDNS config in bundle"; return
+    fi
+    local detail="Bundle present; no standalone MasterDNS client in this harness — verify with a MahsaNG v16 client and check the 'm' subdomain NS delegation (moav doctor dns)"
+    log_warn "  $detail"
+    RESULTS[masterdns]="skip"; DETAILS[masterdns]="$detail"
+}
+
+# Test GooseRelay. The exit server is only reachable via a Google Apps Script the
+# user deploys, so it can't be exercised from the harness. Honest skip.
+test_gooserelay() {
+    log_info "Testing GooseRelay..."
+    local f="$CONFIG_DIR/gooserelay-instructions.txt"
+    if [[ ! -f "$f" ]]; then
+        log_warn "No GooseRelay config in bundle (off by default)"
+        RESULTS[gooserelay]="skip"; DETAILS[gooserelay]="No GooseRelay config in bundle"; return
+    fi
+    local detail="Bundle present; requires a deployed Google Apps Script forwarder to reach the exit — not testable from the harness"
+    log_warn "  $detail"
+    RESULTS[gooserelay]="skip"; DETAILS[gooserelay]="$detail"
 }
 
 # =============================================================================
@@ -1954,7 +2156,7 @@ output_json() {
 EOF
 
     local first=true
-    for protocol in reality trojan anytls hysteria2 shadowsocks wireguard amneziawg dnstt slipstream xdns trusttunnel telemt; do
+    for protocol in reality trojan anytls hysteria2 shadowsocks cdn xhttp wireguard wstunnel amneziawg dnstt slipstream masterdns xdns gooserelay trusttunnel telemt; do
         if [[ -n "${RESULTS[$protocol]:-}" ]]; then
             [[ "$first" != "true" ]] && echo ","
             first=false
@@ -1985,7 +2187,7 @@ output_human() {
     echo ""
     echo "───────────────────────────────────────────────────────────────"
 
-    for protocol in reality trojan anytls hysteria2 shadowsocks wireguard amneziawg dnstt slipstream xdns trusttunnel telemt; do
+    for protocol in reality trojan anytls hysteria2 shadowsocks cdn xhttp wireguard wstunnel amneziawg dnstt slipstream masterdns xdns gooserelay trusttunnel telemt; do
         if [[ -n "${RESULTS[$protocol]:-}" ]]; then
             local status="${RESULTS[$protocol]}"
             local detail="${DETAILS[$protocol]:-}"
@@ -2024,12 +2226,16 @@ main() {
     test_anytls
     test_hysteria2
     test_ss
+    test_cdn
     test_xhttp
     test_wireguard
+    test_wstunnel
     test_amneziawg
     test_dnstt
     test_slipstream
+    test_masterdns
     test_xdns
+    test_gooserelay
     test_trusttunnel
     test_telemt
 

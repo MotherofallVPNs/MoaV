@@ -18,16 +18,35 @@ It runs **manually**, **on each published release**, and **nightly** (the
 
 ## What you need
 
-- A **test VPS** you can wipe freely (a $5 box is fine; monitoring off).
+- A **dedicated test VPS** you can wipe freely, with **no other MoaV install on
+  it** — the e2e job binds the standard MoaV host ports and would collide with a
+  running stack. **≥ 2 vCPU / 4 GB RAM** (it builds ~25 images, several compiled
+  from Go — 1 GB will OOM).
+- **Docker + Docker Compose installed on the VPS.** The e2e job runs
+  `moav build`/`docker compose` directly on the runner; **it does not install
+  Docker for you** — that's a host prerequisite (see step 0 below).
 - A **test domain** with DNS pointing at that VPS (A record, plus the DNS-tunnel
   NS records if you want those protocols to pass — see [DNS.md](../DNS.md)).
-- Docker + Docker Compose on the VPS.
 - Admin access to the GitHub repo (to add a runner + secrets).
 
 > Use a **dedicated throwaway domain**, not your production `moav.sh` — the e2e
 > run issues real certs and reconfigures the whole stack.
 
 ---
+
+## 0. Install Docker (prerequisite)
+
+The e2e job needs Docker on the runner, and the `docker` group must exist
+**before** you add the runner user to it. On a fresh Ubuntu box:
+
+```bash
+# as root
+curl -fsSL https://get.docker.com | sh      # installs Docker + the compose plugin
+docker --version && docker compose version  # verify both
+```
+
+If you skip this you'll see `usermod: group 'docker' does not exist` in the next
+step — that means Docker isn't installed, not that the e2e run will install it.
 
 ## 1. Register the self-hosted runner
 
