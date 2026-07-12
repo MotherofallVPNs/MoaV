@@ -145,7 +145,7 @@ If you have a VPS and want to help:
 2. **[Enable Conduit](SETUP.md#bandwidth-donation-conduit--snowflake)** to relay bandwidth for Psiphon users worldwide.
 3. **[Enable Snowflake](SETUP.md#bandwidth-donation-conduit--snowflake)** to relay bandwidth for Tor users.
 4. **[Donate configs to MahsaNet](mahsanet.md)** so 2M+ MahsaNG users discover your server automatically.
-5. **[Contribute code](https://github.com/shayanb/MoaV)** — fix bugs, add protocols, improve documentation.
+5. **[Contribute code](https://github.com/MotherofallVPNs/moav)** — fix bugs, add protocols, improve documentation.
 
 ## Sources & Further Reading
 

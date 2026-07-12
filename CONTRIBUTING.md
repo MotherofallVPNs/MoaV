@@ -18,7 +18,7 @@ Linux host (a throwaway VPS is ideal — see [E2E testing](docs/devdocs/E2E-TEST
 with Docker + Docker Compose.
 
 ```bash
-git clone https://github.com/shayanb/MoaV && cd MoaV
+git clone https://github.com/MotherofallVPNs/moav && cd moav
 cp .env.example .env      # set DOMAIN, ACME_EMAIL, ADMIN_PASSWORD, INITIAL_USERS
 ./moav.sh build
 ./moav.sh bootstrap       # generates keys, obtains certs, creates the first user

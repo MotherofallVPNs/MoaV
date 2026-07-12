@@ -44,8 +44,8 @@ This will:
 **Manual install** (alternative):
 
 ```bash
-git clone https://github.com/shayanb/MoaV.git
-cd MoaV
+git clone https://github.com/MotherofallVPNs/moav.git
+cd moav
 cp .env.example .env
 nano .env  # Set DOMAIN, ACME_EMAIL, ADMIN_PASSWORD
 ./moav.sh

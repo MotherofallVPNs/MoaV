@@ -1,7 +1,7 @@
 blank_issues_enabled: true
 contact_links:
   - name: Documentation
-    url: https://github.com/shayanb/MoaV/tree/main/docs
+    url: https://github.com/MotherofallVPNs/moav/tree/main/docs
     about: Check the docs before opening an issue
   - name: Website
     url: https://moav.sh

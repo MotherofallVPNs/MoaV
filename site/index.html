@@ -84,14 +84,14 @@
             "Decoy website with anti-fingerprinting"
         ],
         "keywords": "VPN, censorship circumvention, privacy, Reality, XHTTP, XDNS, FinalMask, Xray-core, Trojan, AnyTLS, Hysteria2, Shadowsocks, Shadowsocks-2022, TrustTunnel, AmneziaWG, WireGuard, DNS tunnel, Slipstream, MasterDNS, MahsaNG, GooseRelay, Telegram MTProxy, proxy, anti-censorship, Cloudflare CDN, CloudFront, Grafana monitoring, MahsaNet, MahsaAlert, Mahsa VPN, Iran, Happ",
-        "downloadUrl": "https://github.com/shayanb/MoaV",
+        "downloadUrl": "https://github.com/MotherofallVPNs/moav",
         "installUrl": "https://moav.sh/install.sh",
-        "codeRepository": "https://github.com/shayanb/MoaV",
+        "codeRepository": "https://github.com/MotherofallVPNs/moav",
         "programmingLanguage": ["Bash", "Docker"],
         "author": {
             "@type": "Organization",
             "name": "MoaV Contributors",
-            "url": "https://github.com/shayanb/MoaV"
+            "url": "https://github.com/MotherofallVPNs/moav"
         }
     }
     </script>
@@ -214,7 +214,7 @@
             </div>
 
             <div class="cta-buttons">
-                <a href="https://github.com/shayanb/MoaV" class="btn btn-primary">
+                <a href="https://github.com/MotherofallVPNs/moav" class="btn btn-primary">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
                     </svg>
@@ -369,8 +369,8 @@
                     <h3>Your Protocol?</h3>
                     <p>Easy to add new protocols! Know one that should be here? Let us know.</p>
                     <div class="protocol-cta-buttons">
-                        <a href="https://github.com/shayanb/MoaV/issues/new?template=feature_request.md&title=[Protocol]+" class="btn-small" target="_blank" rel="noopener">Request</a>
-                        <a href="https://github.com/shayanb/MoaV/pulls" class="btn-small btn-outline" target="_blank" rel="noopener">Send PR</a>
+                        <a href="https://github.com/MotherofallVPNs/moav/issues/new?template=feature_request.md&title=[Protocol]+" class="btn-small" target="_blank" rel="noopener">Request</a>
+                        <a href="https://github.com/MotherofallVPNs/moav/pulls" class="btn-small btn-outline" target="_blank" rel="noopener">Send PR</a>
                     </div>
                 </div>
             </div>
@@ -806,8 +806,8 @@
                                 <div class="code-header">
                                     <span>Terminal</span>
                                 </div>
-                                <pre>git clone https://github.com/shayanb/MoaV.git
-cd MoaV
+                                <pre>git clone https://github.com/MotherofallVPNs/moav.git
+cd moav
 cp .env.example .env
 nano .env  # Set DOMAIN, ACME_EMAIL, ADMIN_PASSWORD
 ./moav.sh</pre>
@@ -928,7 +928,7 @@ moav update            # Update MoaV</pre>
                     <p>Deploy it on your server and help others connect. Every node strengthens the network.</p>
                 </a>
 
-                <a href="https://github.com/shayanb/MoaV" class="support-card action" target="_blank" rel="noopener">
+                <a href="https://github.com/MotherofallVPNs/moav" class="support-card action" target="_blank" rel="noopener">
                     <div class="support-icon code">
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="16 18 22 12 16 6"/>
@@ -995,7 +995,7 @@ moav update            # Update MoaV</pre>
         <h2>MoaV Technical Summary</h2>
         <p>MoaV (Mother of all VPNs) version 1.9.0 is a free, open-source, self-hosted censorship circumvention stack designed for countries with heavy internet censorship such as Iran, China, and Russia. It deploys 16+ anti-censorship protocols in a single Docker Compose command: Reality (VLESS) for TLS camouflage, XHTTP via Xray-core for multiplexed HTTP with Reality camouflage requiring no domain, Trojan for HTTPS mimicry, AnyTLS for defeating TLS-in-TLS fingerprinting, Hysteria2 for QUIC-based fast connections, Shadowsocks-2022 (AEAD-2022 ciphers with active-probing resistance, Outline-compatible), TrustTunnel for HTTP/2 and QUIC tunneling, AmneziaWG for DPI-resistant obfuscated WireGuard, CDN mode routing VLESS through Cloudflare or AWS CloudFront, standard WireGuard with optional WebSocket tunneling, four DNS tunnels — dnstt, Slipstream (QUIC-over-DNS), MasterDNS (ARQ + resolver load-balancing, native to MahsaNG v16), and XDNS (Xray-core FinalMask) — that all run simultaneously on port 53 via the dns-router (fanned out by subdomain) and work during heavy internet shutdowns, Telegram MTProxy with anti-DPI tuning (17 configurable settings), GooseRelay for SOCKS5 tunneled through a user-deployed Google Apps Script fronted as google.com (MahsaNG v16), Psiphon Conduit for bandwidth donation, Tor Snowflake for Tor network support, and MahsaNet config donation to Mahsa VPN (2M+ users in Iran).</p>
         <p>Key features include: GeoIP country distribution showing where users connect from on Grafana dashboards (powered by DB-IP Lite, fully offline), web-based admin dashboard on port 9443 with Prometheus-backed aggregate stats across all protocols, Grafana monitoring on port 9444 with per-user traffic metrics and geographic distribution, MahsaNet/MahsaAlert integration to donate VPN configurations to Mahsa VPN (over 2 million users in Iran) using the 'moav donate' command, automatic protocol fallback when individual protocols are blocked, Docker security hardening with cap_drop ALL and read-only filesystems, multi-user credential management with downloadable config bundles and QR codes, moav doctor diagnostics with DNS zone file export, shell autocompletion for bash and zsh, domainless deployment mode for servers without a domain name, and a decoy website with anti-fingerprinting randomization.</p>
-        <p>Installation: curl -fsSL moav.sh/install | bash. Source code: github.com/shayanb/MoaV. License: MIT. The project has an active open-source community contributing via GitHub issues and pull requests.</p>
+        <p>Installation: curl -fsSL moav.sh/install | bash. Source code: github.com/MotherofallVPNs/moav. License: MIT. The project has an active open-source community contributing via GitHub issues and pull requests.</p>
     </section>
 
     <!-- Footer -->
@@ -1008,10 +1008,10 @@ moav update            # Update MoaV</pre>
                 </div>
 
                 <div class="footer-links">
-                    <a href="https://github.com/shayanb/MoaV">GitHub</a>
-                    <a href="https://github.com/shayanb/MoaV#documentation">Docs</a>
-                    <a href="https://github.com/shayanb/MoaV/blob/main/CHANGELOG.md">Changelog</a>
-                    <a href="https://github.com/shayanb/MoaV/blob/main/LICENSE">License</a>
+                    <a href="https://github.com/MotherofallVPNs/moav">GitHub</a>
+                    <a href="https://github.com/MotherofallVPNs/moav#documentation">Docs</a>
+                    <a href="https://github.com/MotherofallVPNs/moav/blob/main/CHANGELOG.md">Changelog</a>
+                    <a href="https://github.com/MotherofallVPNs/moav/blob/main/LICENSE">License</a>
                 </div>
             </div>
 

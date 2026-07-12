@@ -163,7 +163,7 @@ curl -fsSL https://get.docker.com | sh
 apt install -y git qrencode
 
 # Clone MoaV
-git clone https://github.com/shayanb/MoaV.git /opt/moav
+git clone https://github.com/MotherofallVPNs/moav.git /opt/moav
 cd /opt/moav
 ```
 

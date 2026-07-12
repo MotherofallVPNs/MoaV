@@ -51,7 +51,7 @@ if [ -d "$INSTALL_DIR" ]; then
     cd "$INSTALL_DIR"
     git pull origin main || true
 else
-    git clone https://github.com/shayanb/MoaV.git "$INSTALL_DIR"
+    git clone https://github.com/MotherofallVPNs/moav.git "$INSTALL_DIR"
 fi
 
 cd "$INSTALL_DIR"
