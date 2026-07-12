@@ -76,11 +76,25 @@ jobs:
       - name: Let services settle
         run: sleep 45
 
+      - name: Reclaim config/state ownership for the host CLI
+        run: |
+          # build/bootstrap/start containers run as root and write configs/,
+          # state/, outputs/ root-owned. The host-side CLI (moav user add/test)
+          # runs as the non-root runner user, which then can't read them
+          # ("Skipping sing-box (not configured)"). Reclaim ownership so the CLI
+          # works — the same access a root operator gets for free.
+          sudo chown -R "$(id -u):$(id -g)" configs state outputs 2>/dev/null || true
+
       - name: Provision test user (exercises `moav user add`)
         run: |
           ./moav.sh user add e2e-test
           test -d outputs/bundles/e2e-test \
             || { echo "::error::user add did not produce outputs/bundles/e2e-test"; exit 1; }
+          # Require real protocol configs, not just the README.html — an empty
+          # bundle means provisioning silently skipped everything.
+          n=$(find outputs/bundles/e2e-test -maxdepth 1 -type f ! -name 'README.html' 2>/dev/null | wc -l)
+          echo "bundle has $n config file(s):"; ls -1 outputs/bundles/e2e-test || true
+          [ "$n" -ge 1 ] || { echo "::error::user add produced an empty bundle (only README.html) — provisioning skipped the protocols"; exit 1; }
 
       - name: Run connectivity tests
         run: |
@@ -143,6 +157,7 @@ jobs:
           ./moav.sh bootstrap
           ./moav.sh start all
           sleep 30
+          sudo chown -R "$(id -u):$(id -g)" configs state outputs 2>/dev/null || true
           ./moav.sh user add e2e-dl
           ./moav.sh test e2e-dl --json | tee e2e-domainless-raw.txt
           awk '/^{/{p=1} p{print}' e2e-domainless-raw.txt > e2e-domainless.json
