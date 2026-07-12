@@ -109,6 +109,34 @@ The workflow selects this runner via `runs-on: [self-hosted, moav-e2e]`, so the
 > Escape hatch: `RUNNER_ALLOW_RUNASROOT=1 ./config.sh ...` lets it configure as
 > root, but running Actions as root is discouraged — prefer the dedicated user.
 
+### Reclaim-workspace pre-job hook (REQUIRED for repeat runs)
+
+MoaV's containers run as root and write root-owned files into the bind-mounted
+host dirs (`configs/`, `state/`, `outputs/`). The runner user can't delete those,
+so the **next** run's `actions/checkout` fails to clean the workspace
+(`Error: EACCES: permission denied, rmdir .../configs/amneziawg`). The e2e job's
+teardown chowns the workspace back, but that only helps if a run *reaches*
+teardown — a run that fails or is cancelled early leaves the mess, and the next
+checkout then can't self-heal.
+
+The robust fix is a **pre-job hook** that reclaims ownership *before* checkout,
+every job. Set it up once:
+
+```bash
+cat > /home/gh-runner/reclaim-workspace.sh <<'EOF'
+#!/bin/bash
+sudo chown -R "$(id -u):$(id -g)" "$HOME/actions-runner/_work" 2>/dev/null || true
+EOF
+chmod +x /home/gh-runner/reclaim-workspace.sh
+
+grep -q ACTIONS_RUNNER_HOOK_JOB_STARTED /home/gh-runner/actions-runner/.env \
+  || echo 'ACTIONS_RUNNER_HOOK_JOB_STARTED=/home/gh-runner/reclaim-workspace.sh' \
+       >> /home/gh-runner/actions-runner/.env
+```
+
+(The hook relies on the runner user's passwordless `sudo`, set up above.) Restart
+the service after adding it so it picks up the new `.env`.
+
 ### Run it as a service (survives reboots)
 
 Unlike `config.sh`, the service installer **does** use `sudo`, and takes the
