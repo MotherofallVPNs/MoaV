@@ -85,6 +85,17 @@ jobs:
         if: inputs.full
         run: ./moav.sh build --local
 
+      - name: Clean slate (domainless/full — start fresh, ignore prior state)
+        if: inputs.domainless || inputs.full
+        run: |
+          # These runs must not inherit a previous run's persisted state
+          # (volumes couple runs: re-bootstrap can skip regenerating host
+          # configs). Drop the volumes and the root-owned host dirs so bootstrap
+          # rebuilds everything from scratch. (Domain runs deliberately keep the
+          # cert volume — see Teardown — so they are excluded here.)
+          docker compose --profile all down -v --remove-orphans 2>/dev/null || true
+          sudo rm -rf configs state outputs 2>/dev/null || true
+
       - name: Bootstrap (keys, certs, first user)
         # --yes: non-interactive; also proceeds if a previous run left state
         # behind (re-bootstrap is idempotent — keeps keys/users, regenerates
@@ -227,28 +238,29 @@ jobs:
         if: always()
         run: |
           ./moav.sh stop 2>/dev/null || true
-          # Exercise the uninstall CLI path as cleanup — a broken uninstall
-          # should surface. `--yes` is non-interactive; plain uninstall keeps
-          # the moav_certs volume, so the NEXT run reuses the Let's Encrypt cert
-          # instead of re-issuing (LE allows only 5/week per domain — re-issuing
-          # every run exhausts it). timeout guards a hang (a real regression).
-          echo "== moav uninstall --yes (keeps cert volume for cert reuse) =="
-          timeout 300 ./moav.sh uninstall --yes 2>&1 | tail -25 || echo "::warning::moav uninstall returned non-zero / timed out"
-          # --wipe destroys the cert volume → forces a fresh LE cert next run.
-          # Only exercise that path (and --remove-images) in FULL runs, which are
-          # infrequent enough not to hit the rate limit.
-          if [ "${{ inputs.full }}" = "true" ]; then
-            echo "== FULL: moav uninstall --wipe --yes --remove-images =="
-            timeout 300 ./moav.sh uninstall --wipe --yes --remove-images 2>&1 | tail -25 || echo "::warning::moav uninstall --wipe returned non-zero / timed out"
+          # A DOMAIN run keeps the moav_certs volume so the next run reuses the
+          # Let's Encrypt cert instead of re-issuing (LE allows only 5/week per
+          # domain). A DOMAINLESS run has no trusted cert to preserve, and a FULL
+          # run is deliberately destructive — both --wipe for a clean slate, so
+          # the next run bootstraps fresh instead of inheriting stale state
+          # (persisted state couples runs: re-bootstrap can skip regenerating
+          # host configs, leaving `user add` with nothing). timeout guards a hang.
+          if [ "${{ inputs.domainless }}" = "true" ] || [ "${{ inputs.full }}" = "true" ]; then
+            IMG=""; [ "${{ inputs.full }}" = "true" ] && IMG="--remove-images"
+            echo "== moav uninstall --wipe --yes $IMG (fresh slate next run) =="
+            timeout 300 ./moav.sh uninstall --wipe --yes $IMG 2>&1 | tail -25 || echo "::warning::moav uninstall --wipe returned non-zero / timed out"
+          else
+            echo "== moav uninstall --yes (keeps cert volume for cert reuse) =="
+            timeout 300 ./moav.sh uninstall --yes 2>&1 | tail -25 || echo "::warning::moav uninstall returned non-zero / timed out"
           fi
 
       - name: Final cleanup — reclaim workspace
         if: always()
         run: |
-          # Standard runs: `down` WITHOUT -v, to keep the moav_certs volume so
-          # the next run reuses the LE cert (see Teardown). FULL runs: -v for a
-          # clean slate (fresh cert issuance).
-          if [ "${{ inputs.full }}" = "true" ]; then
+          # Domain runs: `down` WITHOUT -v, to keep the moav_certs volume so the
+          # next run reuses the LE cert (see Teardown). Domainless/FULL: -v for a
+          # clean slate (no cert to preserve / deliberately destructive).
+          if [ "${{ inputs.domainless }}" = "true" ] || [ "${{ inputs.full }}" = "true" ]; then
             docker compose --profile all down -v 2>/dev/null || true
           else
             docker compose --profile all down 2>/dev/null || true
