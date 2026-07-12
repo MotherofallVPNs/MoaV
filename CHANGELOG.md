@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **CI pipeline** (`.github/workflows/ci.yml`) — runs on every PR to `dev`/`main`: `shellcheck --severity=error` across all 54 shell scripts, `bash -n` parse checks, `go vet` + `go test -race` for `dns-router`, and `docker compose config` validation. First automated regression gate for the repo (previously only release/site-deploy workflows existed). Fixed the one error-severity shellcheck finding it surfaced — an unquoted array expansion (`SC2068`) in `moav.sh`'s build path that could re-split service names.
+- **Manual/per-release end-to-end test** (`.github/workflows/e2e.yml`) — stands up the full Compose stack on a **self-hosted runner** (a test VPS with a real test domain), provisions a user, and runs `moav test` (`client-test.sh`) against the live server across every enabled protocol. Triggered manually (`workflow_dispatch`), on published releases, and nightly. Not on the per-PR path because it builds ~25 images and needs TLS certs. Setup + manual-run instructions in `docs/devdocs/E2E-TESTING.md`.
+
+### Testing
+- **`moav test` now covers Shadowsocks-2022 and XDNS** — the two protocols that are **on by default** but previously had no connectivity test. `test_ss` decodes the bundle's `ss://` SIP002 URI (base64url `method:server_psk:user_psk`) and drives a sing-box shadowsocks outbound over a local SOCKS port; `test_xdns` runs the bundle's own Xray client config (`xdns-direct-config.json`, falling back to the via-DNS config) and checks its SOCKS inbound, with a longer timeout and warn-on-failure since DNS tunnels are slow. Both appear in the human + JSON result summaries. Coverage for the remaining untested protocols (MasterDNS, wstunnel, GooseRelay) and a stronger telemt check will land once the e2e runner can validate them against a live server.
+
 ### Documentation
 - **v2 docs & compatibility sweep** — reconciled the docs with the shipped 1.8.5 feature set: added a Certificates section to `docs/CLI.md` (`moav cert status/renew/install/uninstall`, `CERT_AUTORENEW`); added the missing **Shadowsocks-2022** section + overview-table row and an **`XDNS_METHOD`** (txt/aaaa) row to `docs/protocols.md`, and updated the wstunnel entry to describe `wss://` + the path secret; added **AnyTLS** to `docs/architecture.md` (plus a new Security & isolation / Service lifecycle section) and to the human-visible/structured surfaces of `site/index.html`, and fixed a stale "version 1.8.2" string there; documented the admin empty-password **fail-closed (503)** behavior in `docs/OPSEC.md`; refreshed `site/llms.txt`
 
