@@ -121,3 +121,8 @@ jobs:
         run: |
           ./moav.sh stop 2>/dev/null || true
           docker compose --profile all down -v 2>/dev/null || true
+          # MoaV containers run as root and write into the bind-mounted host
+          # dirs (configs/, state/, outputs/), leaving root-owned files the
+          # runner user can't delete — the next checkout then fails to clean the
+          # workspace (EACCES rmdir). Hand ownership back to the runner user.
+          sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE" 2>/dev/null || true
