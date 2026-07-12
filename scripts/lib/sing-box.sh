@@ -117,3 +117,53 @@ trusttunnel_remove_user() {
 
     log_info "Removed user $user_id from TrustTunnel credentials"
 }
+
+# =============================================================================
+# Share-link builders — pure functions of the caller's environment.
+# Both the host add-user path (singbox-user-add.sh) and the bundle generator
+# (generate-user.sh) emit byte-identical share links; these are the single
+# source of truth. Each reads USER_UUID / USER_PASSWORD and the relevant
+# protocol keys from the environment, and takes (label, host) so one builder
+# serves IPv4 and IPv6 — host is "1.2.3.4" or "[2001:db8::1]", label is e.g.
+# "alice" or "alice-IPv6".
+# =============================================================================
+
+singbox_reality_link() {
+    local label="$1" host="$2"
+    echo "vless://${USER_UUID}@${host}:443?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${REALITY_TARGET_HOST}&fp=random&pbk=${REALITY_PUBLIC_KEY}&sid=${REALITY_SHORT_ID}&type=tcp#MoaV-Reality-${label}"
+}
+
+singbox_trojan_link() {
+    local label="$1" host="$2"
+    echo "trojan://${USER_PASSWORD}@${host}:8443?security=tls&sni=${DOMAIN}&type=tcp#MoaV-Trojan-${label}"
+}
+
+singbox_anytls_link() {
+    local label="$1" host="$2"
+    echo "anytls://${USER_PASSWORD}@${host}:${PORT_ANYTLS:-8445}?sni=${DOMAIN}&insecure=0#MoaV-AnyTLS-${label}"
+}
+
+singbox_hysteria2_link() {
+    local label="$1" host="$2"
+    echo "hysteria2://${USER_PASSWORD}@${host}:443?sni=${DOMAIN}&obfs=salamander&obfs-password=${HYSTERIA2_OBFS_PASSWORD}#MoaV-Hysteria2-${label}"
+}
+
+# CDN routes through a fronting address (CDN_ADDRESS), not the server IP, so it
+# has no IPv6 variant — only the label varies.
+singbox_cdn_link() {
+    local label="$1"
+    echo "vless://${USER_UUID}@${CDN_ADDRESS}:443?security=tls&type=${CDN_TRANSPORT}&path=${CDN_WS_PATH}&sni=${CDN_SNI}&host=${CDN_DOMAIN}&fp=random&alpn=http/1.1#MoaV-CDN-${label}"
+}
+
+# Shadowsocks-2022 SIP002 userinfo: BASE64URL_NOPAD(method:server_psk:user_psk).
+singbox_ss_userinfo() {
+    local method="$1" server_psk="$2" user_psk="$3"
+    printf '%s' "${method}:${server_psk}:${user_psk}" | base64 | tr -d '\n=' | tr '/+' '_-'
+}
+
+# Shadowsocks-2022 ss:// share link. userinfo from singbox_ss_userinfo; port and
+# host are passed so one builder serves IPv4 and IPv6.
+singbox_ss_link() {
+    local label="$1" host="$2" userinfo="$3" port="$4"
+    echo "ss://${userinfo}@${host}:${port}#MoaV-Shadowsocks-${label}"
+}
