@@ -1050,7 +1050,7 @@ do_install() {
 }
 
 do_uninstall() {
-    local wipe=false
+    local wipe=false assume_yes=false remove_imgs=false
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -1059,9 +1059,17 @@ do_uninstall() {
                 wipe=true
                 shift
                 ;;
+            --yes|-y)
+                assume_yes=true
+                shift
+                ;;
+            --remove-images)
+                remove_imgs=true
+                shift
+                ;;
             *)
                 error "Unknown option: $1"
-                echo "Usage: moav uninstall [--wipe]"
+                echo "Usage: moav uninstall [--wipe] [--yes|-y] [--remove-images]"
                 return 1
                 ;;
         esac
@@ -1087,10 +1095,14 @@ do_uninstall() {
     fi
     echo ""
 
-    read -r -p "Continue? [y/N] " confirm
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-        info "Cancelled"
-        return 0
+    if [[ "$assume_yes" == "true" ]]; then
+        info "Proceeding non-interactively (--yes)"
+    else
+        read -r -p "Continue? [y/N] " confirm
+        if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+            info "Cancelled"
+            return 0
+        fi
     fi
 
     echo ""
@@ -1262,7 +1274,14 @@ do_uninstall() {
             fi
 
             echo ""
-            read -r -p "Also remove Docker images? [y/N] " remove_images
+            local remove_images
+            if [[ "$remove_imgs" == "true" ]]; then
+                remove_images="y"
+            elif [[ "$assume_yes" == "true" ]]; then
+                remove_images="n"   # --yes keeps images unless --remove-images
+            else
+                read -r -p "Also remove Docker images? [y/N] " remove_images
+            fi
             if [[ "$remove_images" =~ ^[Yy]$ ]]; then
                 info "Removing Docker images..."
                 # Remove moav-* images (include tag for images like moav-nginx:local)
@@ -5595,7 +5614,8 @@ show_usage() {
     echo ""
     echo "Setup & Maintenance:"
     echo "  install               Install 'moav' command globally"
-    echo "  uninstall [--wipe]    Remove containers and command (--wipe removes all data)"
+    echo "  uninstall [--wipe] [--yes] [--remove-images]  Remove containers + command"
+    echo "                        (--wipe removes all data; --yes skips prompts; --remove-images also deletes images)"
     echo "  update [-b BRANCH]    Update MoaV (git pull + rebuild)"
     echo "  bootstrap             First-time setup (keys, configs, service selection)"
     echo "  domainless            Enable domainless mode"

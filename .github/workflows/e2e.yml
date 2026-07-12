@@ -124,7 +124,7 @@ jobs:
         run: |
           set -o pipefail
           echo "== tear down the domain stack for a clean domainless run =="
-          printf 'y\nn\n' | timeout 180 ./moav.sh uninstall --wipe 2>&1 | tail -15 || true
+          timeout 180 ./moav.sh uninstall --wipe --yes 2>&1 | tail -15 || true
           docker compose --profile all down -v 2>/dev/null || true
 
           echo "== reconfigure .env for domainless (no DOMAIN; cert/domain protocols off) =="
@@ -186,16 +186,14 @@ jobs:
         run: |
           ./moav.sh stop 2>/dev/null || true
           # Exercise the uninstall CLI paths as part of cleanup — a broken
-          # uninstall should surface. `uninstall` has no --yes flag and prompts
-          # ("Continue?" then "Also remove Docker images?"). Answer y, then y/n
-          # to the image prompt: FULL runs also remove images (test that path +
-          # clean slate); standard runs keep the cache (a full rebuild each run
-          # is wasteful). timeout guards against a hang (a real regression).
-          IMG=n; [ "${{ inputs.full }}" = "true" ] && IMG=y
-          echo "== moav uninstall (remove images: $IMG) =="
-          printf "y\n${IMG}\n" | timeout 300 ./moav.sh uninstall 2>&1 | tail -25 || echo "::warning::moav uninstall returned non-zero / timed out"
-          echo "== moav uninstall --wipe =="
-          printf "y\n${IMG}\n" | timeout 300 ./moav.sh uninstall --wipe 2>&1 | tail -25 || echo "::warning::moav uninstall --wipe returned non-zero / timed out"
+          # uninstall should surface. Uses the non-interactive --yes flag; FULL
+          # runs add --remove-images (test that path + a clean slate); standard
+          # runs keep the image cache. timeout guards a hang (a real regression).
+          IMG=""; [ "${{ inputs.full }}" = "true" ] && IMG="--remove-images"
+          echo "== moav uninstall --yes $IMG =="
+          timeout 300 ./moav.sh uninstall --yes $IMG 2>&1 | tail -25 || echo "::warning::moav uninstall returned non-zero / timed out"
+          echo "== moav uninstall --wipe --yes $IMG =="
+          timeout 300 ./moav.sh uninstall --wipe --yes $IMG 2>&1 | tail -25 || echo "::warning::moav uninstall --wipe returned non-zero / timed out"
 
       - name: Final cleanup — reclaim workspace
         if: always()
