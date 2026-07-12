@@ -31,6 +31,10 @@ jobs:
           exit $rc
       - name: shellcheck (severity=error)
         run: xargs shellcheck --severity=error < /tmp/shfiles
+      - name: share-link golden test
+        run: bash scripts/lib/test-singbox-links.sh
+      - name: protocol-roster drift gate
+        run: python3 scripts/gen-protocol-docs.py --check
 
   go-test:
     name: go test dns-router
