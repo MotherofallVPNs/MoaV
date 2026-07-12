@@ -196,24 +196,36 @@ jobs:
             compose-logs.txt
           if-no-files-found: warn
 
-      - name: Teardown — exercise `moav uninstall` (+ --wipe)
+      - name: Teardown — exercise `moav uninstall`
         if: always()
         run: |
           ./moav.sh stop 2>/dev/null || true
-          # Exercise the uninstall CLI paths as part of cleanup — a broken
-          # uninstall should surface. Uses the non-interactive --yes flag; FULL
-          # runs add --remove-images (test that path + a clean slate); standard
-          # runs keep the image cache. timeout guards a hang (a real regression).
-          IMG=""; [ "${{ inputs.full }}" = "true" ] && IMG="--remove-images"
-          echo "== moav uninstall --yes $IMG =="
-          timeout 300 ./moav.sh uninstall --yes $IMG 2>&1 | tail -25 || echo "::warning::moav uninstall returned non-zero / timed out"
-          echo "== moav uninstall --wipe --yes $IMG =="
-          timeout 300 ./moav.sh uninstall --wipe --yes $IMG 2>&1 | tail -25 || echo "::warning::moav uninstall --wipe returned non-zero / timed out"
+          # Exercise the uninstall CLI path as cleanup — a broken uninstall
+          # should surface. `--yes` is non-interactive; plain uninstall keeps
+          # the moav_certs volume, so the NEXT run reuses the Let's Encrypt cert
+          # instead of re-issuing (LE allows only 5/week per domain — re-issuing
+          # every run exhausts it). timeout guards a hang (a real regression).
+          echo "== moav uninstall --yes (keeps cert volume for cert reuse) =="
+          timeout 300 ./moav.sh uninstall --yes 2>&1 | tail -25 || echo "::warning::moav uninstall returned non-zero / timed out"
+          # --wipe destroys the cert volume → forces a fresh LE cert next run.
+          # Only exercise that path (and --remove-images) in FULL runs, which are
+          # infrequent enough not to hit the rate limit.
+          if [ "${{ inputs.full }}" = "true" ]; then
+            echo "== FULL: moav uninstall --wipe --yes --remove-images =="
+            timeout 300 ./moav.sh uninstall --wipe --yes --remove-images 2>&1 | tail -25 || echo "::warning::moav uninstall --wipe returned non-zero / timed out"
+          fi
 
       - name: Final cleanup — reclaim workspace
         if: always()
         run: |
-          docker compose --profile all down -v 2>/dev/null || true
+          # Standard runs: `down` WITHOUT -v, to keep the moav_certs volume so
+          # the next run reuses the LE cert (see Teardown). FULL runs: -v for a
+          # clean slate (fresh cert issuance).
+          if [ "${{ inputs.full }}" = "true" ]; then
+            docker compose --profile all down -v 2>/dev/null || true
+          else
+            docker compose --profile all down 2>/dev/null || true
+          fi
           # MoaV containers run as root and write into the bind-mounted host
           # dirs (configs/, state/, outputs/), leaving root-owned files the
           # runner user can't delete — the next checkout then fails to clean the
