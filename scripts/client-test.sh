@@ -2133,11 +2133,14 @@ output_json() {
     local warn_count=0
 
     for protocol in "${!RESULTS[@]}"; do
+        # NB: use x=$((x+1)), not ((x++)) — under `set -e` a post-increment
+        # returns exit 1 when the counter goes 0->1 (the expression evaluates to
+        # the old value 0), which would kill the script mid-JSON.
         case "${RESULTS[$protocol]}" in
-            pass) ((pass_count++)) ;;
-            fail) ((fail_count++)); overall_status="fail" ;;
-            skip) ((skip_count++)) ;;
-            warn) ((warn_count++)); [[ "$overall_status" == "pass" ]] && overall_status="warn" ;;
+            pass) pass_count=$((pass_count+1)) ;;
+            fail) fail_count=$((fail_count+1)); overall_status="fail" ;;
+            skip) skip_count=$((skip_count+1)) ;;
+            warn) warn_count=$((warn_count+1)); [[ "$overall_status" == "pass" ]] && overall_status="warn" ;;
         esac
     done
 
