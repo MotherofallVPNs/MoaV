@@ -10,6 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR/.."
 
 source scripts/lib/common.sh
+source scripts/lib/sing-box.sh
 
 # Parse arguments
 USERNAME=""
@@ -246,42 +247,42 @@ REALITY_TARGET_HOST=$(echo "$REALITY_TARGET" | cut -d: -f1)
 # -----------------------------------------------------------------------------
 
 # Reality link (IPv4)
-REALITY_LINK="vless://${USER_UUID}@${SERVER_IP}:443?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${REALITY_TARGET_HOST}&fp=random&pbk=${REALITY_PUBLIC_KEY}&sid=${REALITY_SHORT_ID}&type=tcp#MoaV-Reality-${USERNAME}"
+REALITY_LINK=$(singbox_reality_link "$USERNAME" "$SERVER_IP")
 echo "$REALITY_LINK" > "$OUTPUT_DIR/reality.txt"
 
 # Trojan link (IPv4) — only if domain is set (requires TLS cert)
 if [[ -n "${DOMAIN:-}" ]]; then
-    TROJAN_LINK="trojan://${USER_PASSWORD}@${SERVER_IP}:8443?security=tls&sni=${DOMAIN}&type=tcp#MoaV-Trojan-${USERNAME}"
+    TROJAN_LINK=$(singbox_trojan_link "$USERNAME" "$SERVER_IP")
     echo "$TROJAN_LINK" > "$OUTPUT_DIR/trojan.txt"
 fi
 
 # AnyTLS link (IPv4) — only if enabled and domain is set (requires TLS cert)
 if [[ "${ENABLE_ANYTLS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
-    ANYTLS_LINK="anytls://${USER_PASSWORD}@${SERVER_IP}:${PORT_ANYTLS:-8445}?sni=${DOMAIN}&insecure=0#MoaV-AnyTLS-${USERNAME}"
+    ANYTLS_LINK=$(singbox_anytls_link "$USERNAME" "$SERVER_IP")
     echo "$ANYTLS_LINK" > "$OUTPUT_DIR/anytls.txt"
 fi
 
 # Hysteria2 link (IPv4) — only if domain is set (requires TLS cert)
 if [[ -n "${DOMAIN:-}" ]]; then
-    HY2_LINK="hysteria2://${USER_PASSWORD}@${SERVER_IP}:443?sni=${DOMAIN}&obfs=salamander&obfs-password=${HYSTERIA2_OBFS_PASSWORD}#MoaV-Hysteria2-${USERNAME}"
+    HY2_LINK=$(singbox_hysteria2_link "$USERNAME" "$SERVER_IP")
     echo "$HY2_LINK" > "$OUTPUT_DIR/hysteria2.txt"
 fi
 
 # Generate IPv6 links if available
 if [[ -n "$SERVER_IPV6" ]]; then
-    REALITY_LINK_V6="vless://${USER_UUID}@[${SERVER_IPV6}]:443?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${REALITY_TARGET_HOST}&fp=random&pbk=${REALITY_PUBLIC_KEY}&sid=${REALITY_SHORT_ID}&type=tcp#MoaV-Reality-${USERNAME}-IPv6"
+    REALITY_LINK_V6=$(singbox_reality_link "${USERNAME}-IPv6" "[${SERVER_IPV6}]")
     echo "$REALITY_LINK_V6" > "$OUTPUT_DIR/reality-ipv6.txt"
 
     if [[ -n "${DOMAIN:-}" ]]; then
-        TROJAN_LINK_V6="trojan://${USER_PASSWORD}@[${SERVER_IPV6}]:8443?security=tls&sni=${DOMAIN}&type=tcp#MoaV-Trojan-${USERNAME}-IPv6"
+        TROJAN_LINK_V6=$(singbox_trojan_link "${USERNAME}-IPv6" "[${SERVER_IPV6}]")
         echo "$TROJAN_LINK_V6" > "$OUTPUT_DIR/trojan-ipv6.txt"
 
         if [[ "${ENABLE_ANYTLS:-false}" == "true" ]]; then
-            ANYTLS_LINK_V6="anytls://${USER_PASSWORD}@[${SERVER_IPV6}]:${PORT_ANYTLS:-8445}?sni=${DOMAIN}&insecure=0#MoaV-AnyTLS-${USERNAME}-IPv6"
+            ANYTLS_LINK_V6=$(singbox_anytls_link "${USERNAME}-IPv6" "[${SERVER_IPV6}]")
             echo "$ANYTLS_LINK_V6" > "$OUTPUT_DIR/anytls-ipv6.txt"
         fi
 
-        HY2_LINK_V6="hysteria2://${USER_PASSWORD}@[${SERVER_IPV6}]:443?sni=${DOMAIN}&obfs=salamander&obfs-password=${HYSTERIA2_OBFS_PASSWORD}#MoaV-Hysteria2-${USERNAME}-IPv6"
+        HY2_LINK_V6=$(singbox_hysteria2_link "${USERNAME}-IPv6" "[${SERVER_IPV6}]")
         echo "$HY2_LINK_V6" > "$OUTPUT_DIR/hysteria2-ipv6.txt"
     fi
 
@@ -329,7 +330,7 @@ CDN_ADDRESS="${CDN_ADDRESS:-$(grep -E '^CDN_ADDRESS=' .env 2>/dev/null | cut -d=
 CDN_ADDRESS="${CDN_ADDRESS:-${CDN_DOMAIN}}"
 
 if [[ -n "$CDN_DOMAIN" ]]; then
-    CDN_LINK="vless://${USER_UUID}@${CDN_ADDRESS}:443?security=tls&type=${CDN_TRANSPORT}&path=${CDN_WS_PATH}&sni=${CDN_SNI}&host=${CDN_DOMAIN}&fp=random&alpn=http/1.1#MoaV-CDN-${USERNAME}"
+    CDN_LINK=$(singbox_cdn_link "$USERNAME")
     echo "$CDN_LINK" > "$OUTPUT_DIR/cdn-vless.txt"
 
     if command -v qrencode &>/dev/null; then
@@ -357,8 +358,8 @@ if [[ "${ENABLE_SS:-true}" == "true" ]] && [[ -n "${SS_USER_PSK:-}" ]]; then
         SS_METHOD_LOCAL="${SS_METHOD:-$(grep -E '^SS_METHOD=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || echo 2022-blake3-aes-128-gcm)}"
 
         # SIP002 ss:// URI with SS-2022 multi-user encoding: BASE64URL_NOPAD(method:server_psk:user_psk)@host:port#tag
-        SS_USERINFO=$(printf '%s' "${SS_METHOD_LOCAL}:${SS_SERVER_PSK}:${SS_USER_PSK}" | base64 | tr -d '\n=' | tr '/+' '_-')
-        SS_LINK="ss://${SS_USERINFO}@${SERVER_IP}:${SS_PORT_LOCAL}#MoaV-Shadowsocks-${USERNAME}"
+        SS_USERINFO=$(singbox_ss_userinfo "$SS_METHOD_LOCAL" "$SS_SERVER_PSK" "$SS_USER_PSK")
+        SS_LINK=$(singbox_ss_link "$USERNAME" "$SERVER_IP" "$SS_USERINFO" "$SS_PORT_LOCAL")
         echo "$SS_LINK" > "$OUTPUT_DIR/shadowsocks.txt"
 
         cat > "$OUTPUT_DIR/shadowsocks-singbox.json" <<EOF
@@ -387,7 +388,7 @@ EOF
         fi
 
         if [[ -n "$SERVER_IPV6" ]]; then
-            SS_LINK_V6="ss://${SS_USERINFO}@[${SERVER_IPV6}]:${SS_PORT_LOCAL}#MoaV-Shadowsocks-${USERNAME}-IPv6"
+            SS_LINK_V6=$(singbox_ss_link "${USERNAME}-IPv6" "[${SERVER_IPV6}]" "$SS_USERINFO" "$SS_PORT_LOCAL")
             echo "$SS_LINK_V6" > "$OUTPUT_DIR/shadowsocks-ipv6.txt"
             command -v qrencode &>/dev/null && qrencode -o "$OUTPUT_DIR/shadowsocks-ipv6-qr.png" -s 6 "$SS_LINK_V6" 2>/dev/null || true
         fi
