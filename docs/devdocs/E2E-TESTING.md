@@ -1,5 +1,11 @@
 # End-to-End Testing (self-hosted runner)
 
+> **Using Claude Code?** The `moav-e2e` skill (`.claude/skills/moav-e2e/`) is an
+> agent-facing runbook for this: how to trigger/watch the workflow, read the
+> pass/warn/skip/fail matrix, and a table of known failure modes → fixes. This
+> page is the human setup guide.
+
+
 `moav test` (`scripts/client-test.sh`) verifies real connectivity through each
 protocol by standing up client-side tunnels against a **live** MoaV server and
 checking the exit IP. The per-PR CI (`.github/workflows/ci.yml`) only lints and
