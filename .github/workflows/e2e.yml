@@ -87,6 +87,9 @@ jobs:
             exit 1
           fi
 
+      - name: CLI smoke test
+        run: bash scripts/cli-smoke-test.sh
+
       - name: Upload results + logs
         if: always()
         uses: actions/upload-artifact@v4
