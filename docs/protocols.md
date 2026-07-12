@@ -4,6 +4,7 @@ MoaV deploys 16+ protocols, each with different stealth characteristics, speed p
 
 ## Protocol Overview
 
+<!-- BEGIN gen:overview-table -->
 | Protocol | Port | Stealth | Speed | Domain Required |
 |----------|------|---------|-------|-----------------|
 | [Reality (VLESS)](#reality-vless) | 443/tcp | Very High | High | No |
@@ -26,6 +27,7 @@ MoaV deploys 16+ protocols, each with different stealth characteristics, speed p
 | [XDNS (VLESS+mKCP+DNS)](#xdns-vlesmkcpdns) | 53/udp | Medium | Low | Yes |
 | [Tor Snowflake](#tor-snowflake) | dynamic | High | Low | No |
 | [MahsaNet](#mahsanet) | — | — | — | No |
+<!-- END gen:overview-table -->
 
 ## Protocols in Detail
 
