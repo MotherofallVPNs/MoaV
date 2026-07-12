@@ -7963,11 +7963,12 @@ cmd_test() {
 
     info "Testing connectivity for user: $user"
 
-    # Build client image if needed
-    if ! docker images --format "{{.Repository}}" 2>/dev/null | grep -q "^moav-client$"; then
-        info "Building client image..."
-        compose_build --profile client build client
-    fi
+    # Always (re)build the client image. Docker's layer cache makes this a
+    # near-noop when nothing changed, but a plain "skip if it exists" check
+    # silently reused a stale image — so `moav test` missed client Dockerfile /
+    # pinned-version changes (e.g. a new sing-box after `moav update`).
+    info "Building client image (cached if unchanged)..."
+    compose_build --profile client build client
 
     # Run test (mount bundle + dnstt/slipstream outputs)
     docker run --rm \
