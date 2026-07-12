@@ -3,6 +3,11 @@
 > Machine-readable checklist for adding a new protocol to MoaV.
 > Reference implementation: TrustTunnel (most recently added protocol).
 > Placeholder `NEWPROTO` = protocol name (lowercase, no hyphens in env vars).
+>
+> **Also add the protocol to the single-source roster** `data/protocols.json`,
+> then run `python3 scripts/gen-protocol-docs.py --write` (regenerates the
+> `docs/protocols.md` overview table) and `--check` (CI gate — every protocol
+> must also appear in `site/index.html` + `README.md`).
 
 ---
 

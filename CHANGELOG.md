@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Single-source protocol roster** (`data/protocols.json` + `scripts/gen-protocol-docs.py`) — the protocol list had drifted across 6+ surfaces (README, `docs/protocols.md`, `site/index.html` meta/JSON-LD, `site/llms.txt`), most visibly AnyTLS and Shadowsocks-2022 missing from some. There is now one canonical roster: the `docs/protocols.md` overview table is **generated** from it (marker-delimited, idempotent), and `site/index.html` + `README.md` + `site/llms.txt` are **drift-checked** against it — `gen-protocol-docs.py --check` fails if any protocol is missing from a surface (intended for CI). Fixed the current drift: added the missing **AnyTLS** to the site's meta/OG/JSON-LD/keywords strings and named **wstunnel** in `llms.txt`.
+
 ### Documentation
+- **`CONTRIBUTING.md`** — top-level contributor entry point: dev setup, the PRs-target-`dev` rule, comment/CHANGELOG/test-domain conventions, the local CI commands (shellcheck, go test, the share-link golden test, the roster drift gate), how the single-source protocol roster works, and how to add a protocol. Cross-links the devdocs checklists.
 - **v2 docs & compatibility sweep** — reconciled the docs with the shipped 1.8.5 feature set: added a Certificates section to `docs/CLI.md` (`moav cert status/renew/install/uninstall`, `CERT_AUTORENEW`); added the missing **Shadowsocks-2022** section + overview-table row and an **`XDNS_METHOD`** (txt/aaaa) row to `docs/protocols.md`, and updated the wstunnel entry to describe `wss://` + the path secret; added **AnyTLS** to `docs/architecture.md` (plus a new Security & isolation / Service lifecycle section) and to the human-visible/structured surfaces of `site/index.html`, and fixed a stale "version 1.8.2" string there; documented the admin empty-password **fail-closed (503)** behavior in `docs/OPSEC.md`; refreshed `site/llms.txt`
 
 ### Changed
