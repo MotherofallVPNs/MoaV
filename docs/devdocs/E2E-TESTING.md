@@ -11,8 +11,15 @@ unit-tests — it never brings the stack up. Full e2e is a separate workflow
   Hysteria2, AnyTLS, CDN), which a stock GitHub-hosted runner can't provide, and
 - exercises UDP/QUIC/DNS transports that ephemeral CI networks block.
 
-It runs **manually**, **on each published release**, and **nightly** (the
-"overnight" run). GitHub-hosted runners are intentionally not used.
+It runs **manually** (`workflow_dispatch`) and **on each published release**.
+(A nightly `schedule` trigger is available but disabled by default — re-add the
+`schedule:` block to `e2e.yml` to enable it.) GitHub-hosted runners are
+intentionally not used.
+
+> **The workflow must live on the repo's *default* branch** (`main`) for GitHub
+> to show "Run workflow" and to fire the `release`/`schedule` triggers — that's
+> a GitHub rule for `workflow_dispatch`. When you dispatch it, pick the branch
+> to test (e.g. `dev`) as the ref; `actions/checkout` runs that branch's code.
 
 ---
 
@@ -136,10 +143,12 @@ sets `INITIAL_USERS=e2e-test` + `DEFAULT_PROFILES=all`.
 
 ## 3. Run it
 
-- **Manually:** repo → **Actions → e2e → Run workflow** (optionally tick
-  *Verbose*). This is the recommended way to validate a branch before release.
+- **Manually:** repo → **Actions → e2e → Run workflow**, choose the branch to
+  test (e.g. `dev`), optionally tick *Verbose*. The recommended way to validate a
+  branch before release. If you don't see "e2e" in the Actions list, the workflow
+  isn't on the **default branch** yet (see the note at the top).
 - **On release:** fires automatically when a GitHub Release is published.
-- **Nightly:** `03:00 UTC` via the `schedule` trigger.
+- **Nightly:** disabled by default (re-add the `schedule:` block to enable).
 
 The **e2e-results** artifact (JSON + raw log) is attached to every run. The job
 fails if any protocol reports `fail`; `warn`/`skip` (e.g. an unconfigured

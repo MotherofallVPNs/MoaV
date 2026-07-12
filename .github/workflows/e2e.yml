@@ -15,8 +15,6 @@ on:
         default: false
   release:
     types: [published]
-  schedule:
-    - cron: '0 3 * * *'   # nightly 03:00 UTC (the "overnight" run)
 
 # Never run two e2e jobs on the same box at once — they share host ports.
 concurrency:
