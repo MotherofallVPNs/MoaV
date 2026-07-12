@@ -51,8 +51,9 @@ jobs:
           sed -i "s|^ACME_EMAIL=.*|ACME_EMAIL=${MOAV_ACME_EMAIL}|"     .env
           sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${MOAV_ADMIN_PASSWORD}|" .env
           [ -n "$MOAV_SERVER_IP" ] && sed -i "s|^SERVER_IP=.*|SERVER_IP=${MOAV_SERVER_IP}|" .env
-          # Deterministic single test user + start everything enabled
-          grep -q '^INITIAL_USERS=' .env && sed -i "s|^INITIAL_USERS=.*|INITIAL_USERS=e2e-test|" .env || echo "INITIAL_USERS=e2e-test" >> .env
+          # INITIAL_USERS is a COUNT (not a name) — 1 creates the 'demouser'.
+          # We add a named 'e2e-test' user after start (also exercises `user add`).
+          grep -q '^INITIAL_USERS=' .env && sed -i "s|^INITIAL_USERS=.*|INITIAL_USERS=1|" .env || echo "INITIAL_USERS=1" >> .env
           grep -q '^DEFAULT_PROFILES=' .env && sed -i "s|^DEFAULT_PROFILES=.*|DEFAULT_PROFILES=all|" .env || echo "DEFAULT_PROFILES=all" >> .env
 
       - name: Build images
@@ -67,20 +68,37 @@ jobs:
       - name: Let services settle
         run: sleep 45
 
+      - name: Provision test user (exercises `moav user add`)
+        run: |
+          ./moav.sh user add e2e-test
+          test -d outputs/bundles/e2e-test \
+            || { echo "::error::user add did not produce outputs/bundles/e2e-test"; exit 1; }
+
       - name: Run connectivity tests
         run: |
+          set -o pipefail
           FLAG=""
           [ "${{ inputs.verbose }}" = "true" ] && FLAG="-v"
           # stdout may interleave logs with the JSON object; keep the raw run and
           # extract the JSON block for evaluation.
           ./moav.sh test e2e-test --json $FLAG | tee e2e-raw.txt
           awk '/^{/{p=1} p{print}' e2e-raw.txt > e2e-results.json
-          jq . e2e-results.json > /dev/null   # fail loudly if it isn't valid JSON
+          # Fail LOUD if we didn't get a real result set (missing bundle, moav
+          # test crashed, empty JSON) — a green run that tested nothing is worse
+          # than a red one.
+          count=$(jq '.tests | length' e2e-results.json 2>/dev/null || echo 0)
+          if [ "${count:-0}" -lt 1 ]; then
+            echo "::error::no protocol results produced — bundle missing or 'moav test' errored"
+            cat e2e-raw.txt | tail -20
+            exit 1
+          fi
+          echo "Collected $count protocol results."
 
       - name: Evaluate results
         run: |
           jq -r '.tests | to_entries[] | "  \(.key): \(.value.status)"' e2e-results.json
           fails=$(jq '[.tests[] | select(.status=="fail")] | length' e2e-results.json)
+          fails=${fails:-1}   # empty => treat as failure, never as "0 failures"
           echo "Failed protocols: $fails"
           if [ "$fails" -ne 0 ]; then
             echo "::error::e2e connectivity test failed for $fails protocol(s)"
@@ -116,10 +134,23 @@ jobs:
             compose-logs.txt
           if-no-files-found: warn
 
-      - name: Teardown
+      - name: Teardown — exercise `moav uninstall` (+ --wipe)
         if: always()
         run: |
           ./moav.sh stop 2>/dev/null || true
+          # Exercise the uninstall CLI paths as part of cleanup — a broken
+          # uninstall should surface. `uninstall` has no --yes flag and prompts
+          # ("Continue?" then "Also remove Docker images?"): answer y then n so
+          # we tear down but KEEP the image cache (a full rebuild each run is
+          # wasteful). timeout guards against a hang (a real regression).
+          echo "== moav uninstall =="
+          printf 'y\nn\n' | timeout 180 ./moav.sh uninstall 2>&1 | tail -25 || echo "::warning::moav uninstall returned non-zero / timed out"
+          echo "== moav uninstall --wipe =="
+          printf 'y\nn\n' | timeout 180 ./moav.sh uninstall --wipe 2>&1 | tail -25 || echo "::warning::moav uninstall --wipe returned non-zero / timed out"
+
+      - name: Final cleanup — reclaim workspace
+        if: always()
+        run: |
           docker compose --profile all down -v 2>/dev/null || true
           # MoaV containers run as root and write into the bind-mounted host
           # dirs (configs/, state/, outputs/), leaving root-owned files the
