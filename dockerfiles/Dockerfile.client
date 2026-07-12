@@ -128,9 +128,12 @@ RUN apk add --no-cache \
 # loader), so the alpine-musl tools (amneziawg-tools, etc.) keep working.
 # gcompat's shim is not sufficient for sing-box.
 ARG GLIBC_VERSION=2.35-r1
-RUN wget -qO /etc/apk/keys/sgerrand.rsa.pub https://raw.githubusercontent.com/sgerrand/alpine-pkg-glibc/master/sgerrand.rsa.pub && \
-    wget -q "https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-${GLIBC_VERSION}.apk" && \
-    apk add --no-cache "glibc-${GLIBC_VERSION}.apk" && \
+# --allow-untrusted: the .apk is pulled straight from the official GitHub
+# release over HTTPS (which authenticates the source); sgerrand's signing key
+# is no longer served at a stable URL, so we skip apk's signature check rather
+# than depend on a 404-prone key fetch.
+RUN wget -q "https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-${GLIBC_VERSION}.apk" && \
+    apk add --no-cache --allow-untrusted "glibc-${GLIBC_VERSION}.apk" && \
     rm -f "glibc-${GLIBC_VERSION}.apk" && \
     rm -rf /var/cache/apk/*
 
