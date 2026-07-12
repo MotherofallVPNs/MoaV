@@ -90,6 +90,21 @@ jobs:
       - name: CLI smoke test
         run: bash scripts/cli-smoke-test.sh
 
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          echo "::group::docker compose ps"
+          docker compose --profile all ps 2>&1 || true
+          echo "::endgroup::"
+          echo "::group::certbot log (cert issuance — the usual first-failure)"
+          docker compose --profile all logs --no-color --tail 120 certbot 2>&1 || true
+          echo "::endgroup::"
+          # Full logs to an artifact for anything else that crash-looped
+          docker compose --profile all logs --no-color 2>&1 > compose-logs.txt || true
+          echo "=== hint: 'certbot ... exit 1' almost always means the DOMAIN's" \
+               "A record doesn't point here yet, port 80 is closed, or the record" \
+               "is Cloudflare-proxied (must be DNS-only for HTTP-01)."
+
       - name: Upload results + logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -98,6 +113,7 @@ jobs:
           path: |
             e2e-results.json
             e2e-raw.txt
+            compose-logs.txt
           if-no-files-found: warn
 
       - name: Teardown
