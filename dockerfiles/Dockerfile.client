@@ -132,8 +132,15 @@ ARG GLIBC_VERSION=2.35-r1
 # release over HTTPS (which authenticates the source); sgerrand's signing key
 # is no longer served at a stable URL, so we skip apk's signature check rather
 # than depend on a 404-prone key fetch.
+# The apk drops the loader at /usr/glibc-compat/lib but does NOT create the
+# /lib64/ld-linux-x86-64.so.2 symlink that glibc binaries name as their ELF
+# interpreter — without it sing-box still fails "cannot execute". Create it
+# ourselves (verified: sing-box runs once this symlink exists).
 RUN wget -q "https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-${GLIBC_VERSION}.apk" && \
     apk add --no-cache --allow-untrusted "glibc-${GLIBC_VERSION}.apk" && \
+    mkdir -p /lib64 && \
+    ln -sf /usr/glibc-compat/lib/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2 && \
+    ln -sf /usr/glibc-compat/lib/ld-linux-x86-64.so.2 /lib/ld-linux-x86-64.so.2 && \
     rm -f "glibc-${GLIBC_VERSION}.apk" && \
     rm -rf /var/cache/apk/*
 
