@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.6] - 2026-07-13
+
+### Fixed
+- **Reality/XHTTP could break for every client after an `update` + `bootstrap` (silent short_id blanking).** The sing-box/xray config templates interpolate `${REALITY_SHORT_ID}`, and docker-compose passes `REALITY_SHORT_ID=${REALITY_SHORT_ID:-}` from `.env` into the bootstrap container — but the short_id's source of truth is the **state** (`state/keys/reality.env`), not `.env`. `.env.example` ships `REALITY_SHORT_ID=` empty, and an update can reset it, so that empty value **shadowed the real one at render time** and produced `short_id: [""]`. The server then rejected every client (which sends the real `sid`) with `REALITY: processed invalid connection` (clients saw `received real certificate`) — while keys, bundles, services, and certs were all intact and *unchanged*, making it baffling to diagnose. The private key was never affected (it isn't passed through `.env`). Both render blocks now **re-source `state/keys/reality.env` immediately before `envsubst`**, so the authoritative state value always wins. **If you're already hit** (without updating): put the real `REALITY_SHORT_ID` (from `state/keys/reality.env`) into `.env`, `rm configs/{sing-box,xray}/config.json`, `moav bootstrap --yes`, `moav restart sing-box xray` — existing user bundles keep working, nothing to re-issue.
+
 ## [1.8.5] - 2026-07-11
 
 ### Fixed
