@@ -779,7 +779,10 @@ if [[ "${ENABLE_XHTTP:-true}" == "true" ]]; then
     XHTTP_REALITY_TARGET_HOST="${XHTTP_REALITY_TARGET%%:*}"
     export XHTTP_REALITY_TARGET_HOST
 
-    # Reuse Reality keys from sing-box
+    # Reuse Reality keys from sing-box. Re-load from state first so an empty
+    # REALITY_SHORT_ID injected from .env can't blank the rendered shortIds
+    # (same trap as the sing-box render below).
+    [[ -f "$STATE_DIR/keys/reality.env" ]] && source "$STATE_DIR/keys/reality.env"
     export REALITY_PRIVATE_KEY
     export REALITY_SHORT_ID
 
@@ -853,6 +856,13 @@ singbox_needed=false
 
 if [[ "$singbox_needed" == "true" ]]; then
     log_info "Generating sing-box configuration (using existing keys)..."
+
+    # Re-load the authoritative Reality identity from state right before the
+    # render. docker-compose injects REALITY_SHORT_ID=${REALITY_SHORT_ID:-} from
+    # .env into this container; since the short id lives in state (not .env),
+    # that value is usually empty and would shadow the real one — rendering an
+    # empty short_id that silently rejects EVERY Reality client. State wins.
+    [[ -f "$STATE_DIR/keys/reality.env" ]] && source "$STATE_DIR/keys/reality.env"
 
     export REALITY_USERS_JSON
     export TROJAN_USERS_JSON
