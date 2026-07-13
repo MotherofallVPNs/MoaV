@@ -2125,6 +2125,74 @@ test_gooserelay() {
 # Output Functions
 # =============================================================================
 
+# =============================================================================
+# Bundle README.html validation
+# The generated README.html must have every enabled protocol section filled in:
+#   (a) no template placeholder ({{TOKEN}}) may survive substitution, and
+#   (b) a protocol whose config file is present (enabled) must not still show the
+#       "…not enabled/available" sentinel — that means its section was skipped.
+# Catches template/generator drift, e.g. a new {{CONFIG_X}} that was never wired
+# into a generation path (this is exactly how the SS/XHTTP gap slipped through).
+# =============================================================================
+test_readme_bundle() {
+    log_info "Validating bundle README.html..."
+    local readme="$CONFIG_DIR/README.html"
+
+    if [[ ! -f "$readme" ]]; then
+        RESULTS[readme]="fail"
+        DETAILS[readme]="README.html missing from bundle"
+        log_error "README.html missing from bundle"
+        return
+    fi
+
+    local problems=""
+
+    # (a) leftover placeholders — an uppercase {{TOKEN}} is only ever a template slot
+    local leftover
+    leftover=$(grep -oE '\{\{[A-Z0-9_]+\}\}' "$readme" | sort -u | tr '\n' ' ' || true)
+    [[ -n "$leftover" ]] && problems+="unsubstituted placeholders: ${leftover}| "
+
+    # (b) config file present + non-empty (enabled) but section shows disabled sentinel.
+    # pairs: "<bundle-file>::<sentinel>::<label>"
+    local pair file rest sentinel label
+    for pair in \
+        "reality.txt::No Reality config available::reality" \
+        "hysteria2.txt::No Hysteria2 config available::hysteria2" \
+        "trojan.txt::No Trojan config available::trojan" \
+        "anytls.txt::No AnyTLS config available::anytls" \
+        "shadowsocks.txt::No Shadowsocks config available::shadowsocks" \
+        "xhttp-vless.txt::XHTTP not enabled::xhttp" \
+        "cdn-vless.txt::CDN not configured::cdn" \
+        "wireguard.conf::No WireGuard config available::wireguard" \
+        "wireguard-wstunnel.conf::No WireGuard-wstunnel config available::wstunnel" \
+        "amneziawg.conf::No AmneziaWG config available::amneziawg" \
+        "slipstream-instructions.txt::Slipstream not enabled::slipstream" \
+        "xdns-config.json::XDNS not enabled::xdns" \
+        "masterdns-instructions.txt::MasterDNS not enabled::masterdns" \
+        "gooserelay-instructions.txt::GooseRelay not enabled::gooserelay" \
+        "telegram-proxy-link.txt::Telegram MTProxy not enabled::telemt" \
+    ; do
+        file="${pair%%::*}"
+        rest="${pair#*::}"
+        sentinel="${rest%%::*}"
+        label="${rest##*::}"
+        if [[ -s "$CONFIG_DIR/$file" ]] && grep -qF "$sentinel" "$readme"; then
+            problems+="${label} enabled but README section not filled| "
+        fi
+    done
+
+    if [[ -n "$problems" ]]; then
+        RESULTS[readme]="fail"
+        # keep DETAILS JSON-safe: no double quotes (output_json does not escape)
+        DETAILS[readme]="${problems%| }"
+        log_error "README.html issues: ${problems//| /; }"
+    else
+        RESULTS[readme]="pass"
+        DETAILS[readme]="all enabled protocol sections filled"
+        log_success "README.html: all enabled protocol sections filled"
+    fi
+}
+
 output_json() {
     local overall_status="pass"
     local pass_count=0
@@ -2159,7 +2227,7 @@ output_json() {
 EOF
 
     local first=true
-    for protocol in reality trojan anytls hysteria2 shadowsocks cdn xhttp wireguard wstunnel amneziawg dnstt slipstream masterdns xdns gooserelay trusttunnel telemt; do
+    for protocol in reality trojan anytls hysteria2 shadowsocks cdn xhttp wireguard wstunnel amneziawg dnstt slipstream masterdns xdns gooserelay trusttunnel telemt readme; do
         if [[ -n "${RESULTS[$protocol]:-}" ]]; then
             [[ "$first" != "true" ]] && echo ","
             first=false
@@ -2190,7 +2258,7 @@ output_human() {
     echo ""
     echo "───────────────────────────────────────────────────────────────"
 
-    for protocol in reality trojan anytls hysteria2 shadowsocks cdn xhttp wireguard wstunnel amneziawg dnstt slipstream masterdns xdns gooserelay trusttunnel telemt; do
+    for protocol in reality trojan anytls hysteria2 shadowsocks cdn xhttp wireguard wstunnel amneziawg dnstt slipstream masterdns xdns gooserelay trusttunnel telemt readme; do
         if [[ -n "${RESULTS[$protocol]:-}" ]]; then
             local status="${RESULTS[$protocol]}"
             local detail="${DETAILS[$protocol]:-}"
@@ -2241,6 +2309,9 @@ main() {
     test_gooserelay
     test_trusttunnel
     test_telemt
+
+    # Bundle integrity: every enabled protocol's section is filled in README.html
+    test_readme_bundle
 
     # Output results
     if [[ "${JSON_OUTPUT:-false}" == "true" ]]; then

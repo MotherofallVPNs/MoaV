@@ -848,6 +848,8 @@ elif [[ -f "$TEMPLATE_FILE" ]]; then
     CONFIG_WIREGUARD=$(cat "$OUTPUT_DIR/wireguard.conf" 2>/dev/null || echo "")
     CONFIG_WIREGUARD_WSTUNNEL=$(cat "$OUTPUT_DIR/wireguard-wstunnel.conf" 2>/dev/null || echo "")
     CONFIG_AMNEZIAWG=$(cat "$OUTPUT_DIR/amneziawg.conf" 2>/dev/null || echo "")
+    CONFIG_SHADOWSOCKS=$(cat "$OUTPUT_DIR/shadowsocks.txt" 2>/dev/null | tr -d '\n' || echo "")
+    CONFIG_XHTTP=$(cat "$OUTPUT_DIR/xhttp-vless.txt" 2>/dev/null | tr -d '\n' || echo "")
 
     # Get dnstt info
     DNSTT_DOMAIN="${DNSTT_SUBDOMAIN:-t}.${DOMAIN}"
@@ -892,6 +894,8 @@ elif [[ -f "$TEMPLATE_FILE" ]]; then
     QR_WIREGUARD_B64=$(qr_to_base64 "$OUTPUT_DIR/wireguard-qr.png")
     QR_WIREGUARD_WSTUNNEL_B64=$(qr_to_base64 "$OUTPUT_DIR/wireguard-wstunnel-qr.png")
     QR_AMNEZIAWG_B64=$(qr_to_base64 "$OUTPUT_DIR/amneziawg-qr.png")
+    QR_SHADOWSOCKS_B64=$(qr_to_base64 "$OUTPUT_DIR/shadowsocks-qr.png")
+    QR_XHTTP_B64=$(qr_to_base64 "$OUTPUT_DIR/xhttp-qr.png")
     QR_TELEMT_B64=$(qr_to_base64 "$OUTPUT_DIR/telegram-proxy-qr.png")
 
     GENERATED_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -979,6 +983,9 @@ elif [[ -f "$TEMPLATE_FILE" ]]; then
     sed -i "s|{{QR_WIREGUARD}}|$QR_WIREGUARD_B64|g" "$OUTPUT_HTML"
     sed -i "s|{{QR_WIREGUARD_WSTUNNEL}}|$QR_WIREGUARD_WSTUNNEL_B64|g" "$OUTPUT_HTML"
     sed -i "s|{{QR_AMNEZIAWG}}|$QR_AMNEZIAWG_B64|g" "$OUTPUT_HTML"
+    sed -i "s|{{QR_SHADOWSOCKS}}|$QR_SHADOWSOCKS_B64|g" "$OUTPUT_HTML"
+    sed -i "s|{{QR_XHTTP}}|$QR_XHTTP_B64|g" "$OUTPUT_HTML"
+    sed -i "s|{{PORT_SS}}|${PORT_SS:-8388}|g" "$OUTPUT_HTML"
     sed -i "s|{{QR_TELEMT}}|$QR_TELEMT_B64|g" "$OUTPUT_HTML"
 
     # Python-based placeholder replacement - handles special chars and multiline safely
@@ -1020,6 +1027,19 @@ with open(filepath, 'w') as f:
         replace_placeholder "{{CONFIG_ANYTLS}}" "$CONFIG_ANYTLS"
     else
         replace_placeholder "{{CONFIG_ANYTLS}}" "No AnyTLS config available"
+    fi
+
+    if [[ -n "$CONFIG_SHADOWSOCKS" ]]; then
+        replace_placeholder "{{CONFIG_SHADOWSOCKS}}" "$CONFIG_SHADOWSOCKS"
+    else
+        replace_placeholder "{{CONFIG_SHADOWSOCKS}}" "No Shadowsocks config available"
+    fi
+
+    # XHTTP (Xray-core) share link
+    if [[ -n "${CONFIG_XHTTP:-}" ]]; then
+        replace_placeholder "{{CONFIG_XHTTP}}" "$CONFIG_XHTTP"
+    else
+        replace_placeholder "{{CONFIG_XHTTP}}" "XHTTP not enabled"
     fi
 
     # CDN VLESS+WS config
