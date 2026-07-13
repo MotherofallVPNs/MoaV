@@ -126,3 +126,14 @@ jobs:
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Attach installer asset
+        # install.sh is the source of truth in this repo. moav-site publishes it under
+        # moav.sh/install.sh by fetching the latest release asset at deploy time, so
+        # users curl from the censorship-reachable vanity domain (never a GitHub host
+        # that may be blocked). --clobber makes re-runs idempotent.
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          gh release upload "$TAG" install.sh --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
