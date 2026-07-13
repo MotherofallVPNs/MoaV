@@ -7,6 +7,8 @@ name: e2e
 # certs (a domain). It runs on a SELF-HOSTED runner (a test VPS with a test
 # domain). Setup + manual-run instructions: docs/devdocs/E2E-TESTING.md
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       verbose:

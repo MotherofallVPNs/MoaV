@@ -183,6 +183,8 @@ not a name; the run then adds a named `e2e-test` user to also exercise
   test (e.g. `dev`), then optionally tick the inputs below. The recommended way
   to validate a branch before release. If you don't see "e2e" in the Actions
   list, the workflow isn't on the **default branch** yet (see the note at the top).
+- **On push to `main`:** runs automatically on every merge to `main` (domain
+  mode). Reuses the `moav_certs` volume, so it won't burn the LE rate limit.
 - **On release:** fires automatically when a GitHub Release is published.
 - **Nightly:** disabled by default (re-add the `schedule:` block to enable).
 
