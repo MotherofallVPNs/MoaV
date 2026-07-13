@@ -108,6 +108,17 @@ jobs:
       - name: Start services
         run: ./moav.sh start all
 
+      - name: Diagnostics on failure
+        # compose-up only surfaces container lifecycle, not a service's own logs.
+        # certbot exiting 1 (LE issuance/renewal) is the common start failure, so
+        # dump its logs + the stack status to make the real reason visible.
+        if: failure()
+        run: |
+          echo "== certbot logs =="
+          docker compose logs --no-color certbot 2>&1 | tail -80 || true
+          echo "== container status =="
+          docker compose --profile all ps 2>&1 || true
+
       - name: Let services settle
         run: sleep 45
 
