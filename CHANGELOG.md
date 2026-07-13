@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-07-14
+
 ### Changed
 - **Repository moved to the `MotherofallVPNs` org** — `shayanb/MoaV` is now [`MotherofallVPNs/moav`](https://github.com/MotherofallVPNs/moav), joining `moav-client` and `moav-site` under one org. GitHub 301-redirects the old paths (clones, issues, PRs, releases) so existing installs and links keep working. Swept the hardcoded `shayanb/MoaV` references across the repo (install one-liner `REPO_URL`, README badges, docs, issue templates, CHANGELOG links, the `dns-router` Go module path) to the new home; the personal GitHub Sponsors link is intentionally unchanged.
 
@@ -1192,7 +1194,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - uTLS fingerprint spoofing (Chrome)
 - Automatic short ID generation for Reality
 
-[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v1.8.5...HEAD
+[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/MotherofallVPNs/moav/compare/v1.8.5...v1.9.0
 [1.8.5]: https://github.com/MotherofallVPNs/moav/compare/v1.8.4...v1.8.5
 [1.8.4]: https://github.com/MotherofallVPNs/moav/compare/v1.8.3...v1.8.4
 [1.8.3]: https://github.com/MotherofallVPNs/moav/compare/v1.8.2...v1.8.3
