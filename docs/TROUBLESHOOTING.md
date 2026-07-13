@@ -88,7 +88,7 @@ When running `moav update` or the installer, you may see:
 
 ```
 error: Your local changes to the following files would be overwritten by merge:
-    scripts/client-test.sh
+    tests/client-test.sh
 Please commit your changes or stash them before you merge.
 Aborting
 ```
@@ -105,7 +105,7 @@ The latest MoaV versions detect this and offer options:
 moav update
 # Will show:
 # ⚠ Local changes detected:
-#     M scripts/client-test.sh
+#     M tests/client-test.sh
 # Options:
 #   1) Stash changes (save temporarily, can restore later)
 #   2) Discard changes (reset to clean state)

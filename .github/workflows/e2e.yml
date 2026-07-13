@@ -7,16 +7,24 @@ name: e2e
 # certs (a domain). It runs on a SELF-HOSTED runner (a test VPS with a test
 # domain). Setup + manual-run instructions: docs/devdocs/E2E-TESTING.md
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       verbose:
         description: 'Verbose client-test output (-v)'
         type: boolean
         default: false
+      full:
+        description: 'FULL suite: also run domainless mode, build --local, and remove images on uninstall (much slower)'
+        type: boolean
+        default: false
+      domainless:
+        description: 'Domainless-only run: no DOMAIN/cert (skips Let''s Encrypt entirely). Validates the IP-only protocols without touching the LE rate limit.'
+        type: boolean
+        default: false
   release:
     types: [published]
-  schedule:
-    - cron: '0 3 * * *'   # nightly 03:00 UTC (the "overnight" run)
 
 # Never run two e2e jobs on the same box at once — they share host ports.
 concurrency:
@@ -41,27 +49,61 @@ jobs:
 
       - name: Preflight
         run: |
-          test -n "$MOAV_DOMAIN"          || { echo "::error::secret E2E_DOMAIN is not set"; exit 1; }
-          test -n "$MOAV_ACME_EMAIL"      || { echo "::error::secret E2E_ACME_EMAIL is not set"; exit 1; }
+          # DOMAIN/ACME are only needed for the cert-bearing (domain) run.
+          if [ "${{ inputs.domainless }}" != "true" ]; then
+            test -n "$MOAV_DOMAIN"          || { echo "::error::secret E2E_DOMAIN is not set"; exit 1; }
+            test -n "$MOAV_ACME_EMAIL"      || { echo "::error::secret E2E_ACME_EMAIL is not set"; exit 1; }
+          fi
           test -n "$MOAV_ADMIN_PASSWORD"  || { echo "::error::secret E2E_ADMIN_PASSWORD is not set"; exit 1; }
           docker --version && docker compose version
 
       - name: Prepare .env
         run: |
           cp .env.example .env
-          sed -i "s|^DOMAIN=.*|DOMAIN=${MOAV_DOMAIN}|"                 .env
-          sed -i "s|^ACME_EMAIL=.*|ACME_EMAIL=${MOAV_ACME_EMAIL}|"     .env
           sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${MOAV_ADMIN_PASSWORD}|" .env
           [ -n "$MOAV_SERVER_IP" ] && sed -i "s|^SERVER_IP=.*|SERVER_IP=${MOAV_SERVER_IP}|" .env
-          # Deterministic single test user + start everything enabled
-          grep -q '^INITIAL_USERS=' .env && sed -i "s|^INITIAL_USERS=.*|INITIAL_USERS=e2e-test|" .env || echo "INITIAL_USERS=e2e-test" >> .env
+          if [ "${{ inputs.domainless }}" = "true" ]; then
+            # No DOMAIN → certbot self-skips (no LE cert, no rate-limit hit).
+            # Disable protocols that need a domain cert or DNS delegation so
+            # their services don't crash-loop without one.
+            sed -i "s|^DOMAIN=.*|DOMAIN=|" .env
+            sed -i "s|^CDN_SUBDOMAIN=.*|CDN_SUBDOMAIN=|" .env
+            for p in TROJAN ANYTLS HYSTERIA2 DNSTT SLIPSTREAM MASTERDNS TRUSTTUNNEL XDNS; do
+              sed -i "s|^ENABLE_${p}=.*|ENABLE_${p}=false|" .env
+            done
+          else
+            sed -i "s|^DOMAIN=.*|DOMAIN=${MOAV_DOMAIN}|"             .env
+            sed -i "s|^ACME_EMAIL=.*|ACME_EMAIL=${MOAV_ACME_EMAIL}|" .env
+          fi
+          # INITIAL_USERS is a COUNT (not a name) — 1 creates the 'demouser'.
+          # We add a named 'e2e-test' user after start (also exercises `user add`).
+          grep -q '^INITIAL_USERS=' .env && sed -i "s|^INITIAL_USERS=.*|INITIAL_USERS=1|" .env || echo "INITIAL_USERS=1" >> .env
           grep -q '^DEFAULT_PROFILES=' .env && sed -i "s|^DEFAULT_PROFILES=.*|DEFAULT_PROFILES=all|" .env || echo "DEFAULT_PROFILES=all" >> .env
 
       - name: Build images
         run: ./moav.sh build
 
+      - name: Build monitoring images from source (full only)
+        if: inputs.full
+        run: ./moav.sh build --local
+
+      - name: Clean slate (domainless/full — start fresh, ignore prior state)
+        if: inputs.domainless || inputs.full
+        run: |
+          # The run-to-run coupling lives in the docker VOLUMES (moav_state
+          # keeps .bootstrapped + keys, so re-bootstrap skips regenerating the
+          # host configs). Drop the volumes so bootstrap runs first-time and
+          # rebuilds configs from the (checkout-restored) templates. Do NOT rm
+          # configs/ — it holds repo-tracked *.template files bootstrap needs;
+          # checkout already cleans the generated host artifacts. (Domain runs
+          # deliberately keep the cert volume — see Teardown — so are excluded.)
+          docker compose --profile all down -v --remove-orphans 2>/dev/null || true
+
       - name: Bootstrap (keys, certs, first user)
-        run: ./moav.sh bootstrap
+        # --yes: non-interactive; also proceeds if a previous run left state
+        # behind (re-bootstrap is idempotent — keeps keys/users, regenerates
+        # configs). Without it, a re-run prompts and cancels with no TTY.
+        run: ./moav.sh bootstrap --yes
 
       - name: Start services
         run: ./moav.sh start all
@@ -69,25 +111,118 @@ jobs:
       - name: Let services settle
         run: sleep 45
 
+      - name: Reclaim config/state ownership for the host CLI
+        run: |
+          # build/bootstrap/start containers run as root and write configs/,
+          # state/, outputs/ root-owned. The host-side CLI (moav user add/test)
+          # runs as the non-root runner user, which then can't read them
+          # ("Skipping sing-box (not configured)"). Reclaim ownership so the CLI
+          # works — the same access a root operator gets for free.
+          sudo chown -R "$(id -u):$(id -g)" configs state outputs 2>/dev/null || true
+
+      - name: Provision test user (exercises `moav user add` + `revoke`)
+        run: |
+          # A previous run may have left the user behind (state is preserved for
+          # cert reuse; re-bootstrap even regenerates its bundle). Revoke first
+          # so `user add` runs cleanly — this also exercises the revoke path.
+          ./moav.sh user revoke e2e-test 2>/dev/null || true
+          ./moav.sh user add e2e-test
+          test -d outputs/bundles/e2e-test \
+            || { echo "::error::user add did not produce outputs/bundles/e2e-test"; exit 1; }
+          # Require real protocol configs, not just the README.html — an empty
+          # bundle means provisioning silently skipped everything.
+          n=$(find outputs/bundles/e2e-test -maxdepth 1 -type f ! -name 'README.html' 2>/dev/null | wc -l)
+          echo "bundle has $n config file(s):"; ls -1 outputs/bundles/e2e-test || true
+          [ "$n" -ge 1 ] || { echo "::error::user add produced an empty bundle (only README.html) — provisioning skipped the protocols"; exit 1; }
+
       - name: Run connectivity tests
         run: |
+          set -o pipefail
           FLAG=""
           [ "${{ inputs.verbose }}" = "true" ] && FLAG="-v"
           # stdout may interleave logs with the JSON object; keep the raw run and
           # extract the JSON block for evaluation.
           ./moav.sh test e2e-test --json $FLAG | tee e2e-raw.txt
           awk '/^{/{p=1} p{print}' e2e-raw.txt > e2e-results.json
-          jq . e2e-results.json > /dev/null   # fail loudly if it isn't valid JSON
+          # Fail LOUD if we didn't get a real result set (missing bundle, moav
+          # test crashed, empty JSON) — a green run that tested nothing is worse
+          # than a red one.
+          count=$(jq '.tests | length' e2e-results.json 2>/dev/null || echo 0)
+          if [ "${count:-0}" -lt 1 ]; then
+            echo "::error::no protocol results produced — bundle missing or 'moav test' errored"
+            cat e2e-raw.txt | tail -20
+            exit 1
+          fi
+          echo "Collected $count protocol results."
 
       - name: Evaluate results
         run: |
           jq -r '.tests | to_entries[] | "  \(.key): \(.value.status)"' e2e-results.json
           fails=$(jq '[.tests[] | select(.status=="fail")] | length' e2e-results.json)
+          fails=${fails:-1}   # empty => treat as failure, never as "0 failures"
           echo "Failed protocols: $fails"
           if [ "$fails" -ne 0 ]; then
             echo "::error::e2e connectivity test failed for $fails protocol(s)"
             exit 1
           fi
+
+      - name: CLI smoke test
+        run: bash tests/cli-smoke-test.sh
+
+      - name: Full — domainless mode
+        # Skip when the primary run is already domainless (would just repeat it).
+        if: inputs.full && inputs.domainless != true && success()
+        env:
+          MOAV_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+          MOAV_SERVER_IP: ${{ secrets.E2E_SERVER_IP }}
+        run: |
+          set -o pipefail
+          echo "== tear down the domain stack for a clean domainless run =="
+          timeout 180 ./moav.sh uninstall --wipe --yes 2>&1 | tail -15 || true
+          docker compose --profile all down -v 2>/dev/null || true
+
+          echo "== reconfigure .env for domainless (no DOMAIN; cert/domain protocols off) =="
+          cp .env.example .env
+          sed -i "s|^DOMAIN=.*|DOMAIN=|" .env
+          sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${MOAV_ADMIN_PASSWORD}|" .env
+          [ -n "${MOAV_SERVER_IP:-}" ] && sed -i "s|^SERVER_IP=.*|SERVER_IP=${MOAV_SERVER_IP}|" .env
+          sed -i "s|^CDN_SUBDOMAIN=.*|CDN_SUBDOMAIN=|" .env
+          for p in TROJAN ANYTLS HYSTERIA2 DNSTT SLIPSTREAM MASTERDNS TRUSTTUNNEL XDNS; do
+            sed -i "s|^ENABLE_${p}=.*|ENABLE_${p}=false|" .env
+          done
+          grep -q '^INITIAL_USERS=' .env && sed -i "s|^INITIAL_USERS=.*|INITIAL_USERS=1|" .env || echo "INITIAL_USERS=1" >> .env
+          grep -q '^DEFAULT_PROFILES=' .env && sed -i "s|^DEFAULT_PROFILES=.*|DEFAULT_PROFILES=all|" .env || echo "DEFAULT_PROFILES=all" >> .env
+
+          echo "== domainless: bootstrap -> start -> user add -> test =="
+          ./moav.sh bootstrap --yes
+          ./moav.sh start all
+          sleep 30
+          sudo chown -R "$(id -u):$(id -g)" configs state outputs 2>/dev/null || true
+          ./moav.sh user revoke e2e-dl 2>/dev/null || true
+          ./moav.sh user add e2e-dl
+          ./moav.sh test e2e-dl --json | tee e2e-domainless-raw.txt
+          awk '/^{/{p=1} p{print}' e2e-domainless-raw.txt > e2e-domainless.json
+          count=$(jq '.tests | length' e2e-domainless.json 2>/dev/null || echo 0)
+          [ "${count:-0}" -ge 1 ] || { echo "::error::domainless produced no results"; exit 1; }
+          jq -r '.tests | to_entries[] | "  \(.key): \(.value.status)"' e2e-domainless.json
+          fails=$(jq '[.tests[] | select(.status=="fail")] | length' e2e-domainless.json); fails=${fails:-1}
+          echo "domainless failed protocols: $fails"
+          [ "$fails" -eq 0 ] || { echo "::error::domainless: $fails protocol(s) failed"; exit 1; }
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          echo "::group::docker compose ps"
+          docker compose --profile all ps 2>&1 || true
+          echo "::endgroup::"
+          echo "::group::certbot log (cert issuance — the usual first-failure)"
+          docker compose --profile all logs --no-color --tail 120 certbot 2>&1 || true
+          echo "::endgroup::"
+          # Full logs to an artifact for anything else that crash-looped
+          docker compose --profile all logs --no-color 2>&1 > compose-logs.txt || true
+          echo "=== hint: 'certbot ... exit 1' almost always means the DOMAIN's" \
+               "A record doesn't point here yet, port 80 is closed, or the record" \
+               "is Cloudflare-proxied (must be DNS-only for HTTP-01)."
 
       - name: Upload results + logs
         if: always()
@@ -97,10 +232,44 @@ jobs:
           path: |
             e2e-results.json
             e2e-raw.txt
+            e2e-domainless.json
+            e2e-domainless-raw.txt
+            compose-logs.txt
           if-no-files-found: warn
 
-      - name: Teardown
+      - name: Teardown — exercise `moav uninstall`
         if: always()
         run: |
           ./moav.sh stop 2>/dev/null || true
-          docker compose --profile all down -v 2>/dev/null || true
+          # A DOMAIN run keeps the moav_certs volume so the next run reuses the
+          # Let's Encrypt cert instead of re-issuing (LE allows only 5/week per
+          # domain). A DOMAINLESS run has no trusted cert to preserve, and a FULL
+          # run is deliberately destructive — both --wipe for a clean slate, so
+          # the next run bootstraps fresh instead of inheriting stale state
+          # (persisted state couples runs: re-bootstrap can skip regenerating
+          # host configs, leaving `user add` with nothing). timeout guards a hang.
+          if [ "${{ inputs.domainless }}" = "true" ] || [ "${{ inputs.full }}" = "true" ]; then
+            IMG=""; [ "${{ inputs.full }}" = "true" ] && IMG="--remove-images"
+            echo "== moav uninstall --wipe --yes $IMG (fresh slate next run) =="
+            timeout 300 ./moav.sh uninstall --wipe --yes $IMG 2>&1 | tail -25 || echo "::warning::moav uninstall --wipe returned non-zero / timed out"
+          else
+            echo "== moav uninstall --yes (keeps cert volume for cert reuse) =="
+            timeout 300 ./moav.sh uninstall --yes 2>&1 | tail -25 || echo "::warning::moav uninstall returned non-zero / timed out"
+          fi
+
+      - name: Final cleanup — reclaim workspace
+        if: always()
+        run: |
+          # Domain runs: `down` WITHOUT -v, to keep the moav_certs volume so the
+          # next run reuses the LE cert (see Teardown). Domainless/FULL: -v for a
+          # clean slate (no cert to preserve / deliberately destructive).
+          if [ "${{ inputs.domainless }}" = "true" ] || [ "${{ inputs.full }}" = "true" ]; then
+            docker compose --profile all down -v 2>/dev/null || true
+          else
+            docker compose --profile all down 2>/dev/null || true
+          fi
+          # MoaV containers run as root and write into the bind-mounted host
+          # dirs (configs/, state/, outputs/), leaving root-owned files the
+          # runner user can't delete — the next checkout then fails to clean the
+          # workspace (EACCES rmdir). Hand ownership back to the runner user.
+          sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE" 2>/dev/null || true

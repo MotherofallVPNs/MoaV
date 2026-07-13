@@ -1050,7 +1050,7 @@ do_install() {
 }
 
 do_uninstall() {
-    local wipe=false
+    local wipe=false assume_yes=false remove_imgs=false
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -1059,9 +1059,17 @@ do_uninstall() {
                 wipe=true
                 shift
                 ;;
+            --yes|-y)
+                assume_yes=true
+                shift
+                ;;
+            --remove-images)
+                remove_imgs=true
+                shift
+                ;;
             *)
                 error "Unknown option: $1"
-                echo "Usage: moav uninstall [--wipe]"
+                echo "Usage: moav uninstall [--wipe] [--yes|-y] [--remove-images]"
                 return 1
                 ;;
         esac
@@ -1087,10 +1095,14 @@ do_uninstall() {
     fi
     echo ""
 
-    read -r -p "Continue? [y/N] " confirm
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-        info "Cancelled"
-        return 0
+    if [[ "$assume_yes" == "true" ]]; then
+        info "Proceeding non-interactively (--yes)"
+    else
+        read -r -p "Continue? [y/N] " confirm
+        if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+            info "Cancelled"
+            return 0
+        fi
     fi
 
     echo ""
@@ -1262,7 +1274,14 @@ do_uninstall() {
             fi
 
             echo ""
-            read -r -p "Also remove Docker images? [y/N] " remove_images
+            local remove_images
+            if [[ "$remove_imgs" == "true" ]]; then
+                remove_images="y"
+            elif [[ "$assume_yes" == "true" ]]; then
+                remove_images="n"   # --yes keeps images unless --remove-images
+            else
+                read -r -p "Also remove Docker images? [y/N] " remove_images
+            fi
             if [[ "$remove_images" =~ ^[Yy]$ ]]; then
                 info "Removing Docker images..."
                 # Remove moav-* images (include tag for images like moav-nginx:local)
@@ -5595,9 +5614,11 @@ show_usage() {
     echo ""
     echo "Setup & Maintenance:"
     echo "  install               Install 'moav' command globally"
-    echo "  uninstall [--wipe]    Remove containers and command (--wipe removes all data)"
+    echo "  uninstall [--wipe] [--yes] [--remove-images]  Remove containers + command"
+    echo "                        (--wipe removes all data; --yes skips prompts; --remove-images also deletes images)"
     echo "  update [-b BRANCH]    Update MoaV (git pull + rebuild)"
-    echo "  bootstrap             First-time setup (keys, configs, service selection)"
+    echo "  bootstrap [--yes]     First-time setup (keys, configs, service selection);"
+    echo "                        --yes re-runs non-interactively (idempotent)"
     echo "  domainless            Enable domainless mode"
     echo "  check                 Run prerequisites check"
     echo "  doctor [CHECK]        Run diagnostics (e.g. 'doctor dns', 'doctor ports')"
@@ -6927,6 +6948,15 @@ cmd_domainless() {
 }
 
 cmd_bootstrap() {
+    local assume_yes=false
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --yes|-y) assume_yes=true ;;
+            *) warn "Unknown bootstrap option: $1" ;;
+        esac
+        shift
+    done
+
     print_header
     check_prerequisites
     echo ""
@@ -6944,7 +6974,9 @@ cmd_bootstrap() {
         echo ""
         info "Existing client configurations will remain valid."
         echo ""
-        if ! confirm "Are you sure you want to re-run bootstrap?" "n"; then
+        if [[ "$assume_yes" == "true" ]]; then
+            info "Re-running bootstrap non-interactively (--yes)"
+        elif ! confirm "Are you sure you want to re-run bootstrap?" "n"; then
             info "Bootstrap cancelled."
             return 0
         fi
@@ -6961,7 +6993,7 @@ cmd_bootstrap() {
         echo "  • Configure enabled protocols"
         echo "  • Create initial users with connection links"
         echo ""
-        if ! confirm "Continue with bootstrap?" "y"; then
+        if [[ "$assume_yes" != "true" ]] && ! confirm "Continue with bootstrap?" "y"; then
             info "Bootstrap cancelled."
             return 0
         fi
@@ -7943,11 +7975,12 @@ cmd_test() {
 
     info "Testing connectivity for user: $user"
 
-    # Build client image if needed
-    if ! docker images --format "{{.Repository}}" 2>/dev/null | grep -q "^moav-client$"; then
-        info "Building client image..."
-        compose_build --profile client build client
-    fi
+    # Always (re)build the client image. Docker's layer cache makes this a
+    # near-noop when nothing changed, but a plain "skip if it exists" check
+    # silently reused a stale image — so `moav test` missed client Dockerfile /
+    # pinned-version changes (e.g. a new sing-box after `moav update`).
+    info "Building client image (cached if unchanged)..."
+    compose_build --profile client build client
 
     # Run test (mount bundle + dnstt/slipstream outputs)
     docker run --rm \
@@ -8199,6 +8232,15 @@ cmd_export() {
 }
 EOF
 
+    # The container-based `cp -a` steps above (state, conduit, certs) preserve
+    # root ownership, which a non-root operator's host-side tar then can't read
+    # ("Permission denied" on keys/conduit datastore). Hand the staged copy back
+    # to the invoking user via a root container so the tar can read everything.
+    if [[ "$(id -u)" -ne 0 ]]; then
+        docker run --rm -v "$temp_dir:/export" alpine \
+            chown -R "$(id -u):$(id -g)" /export 2>/dev/null || true
+    fi
+
     # 7. Create tarball
     info "  Creating archive..."
     tar -czf "$output_file" -C "$temp_dir" moav-export
@@ -8211,7 +8253,10 @@ EOF
     success "Backup created: $output_file ($size)"
     echo ""
     echo -e "${CYAN}Contents:${NC}"
-    tar -tzf "$output_file" | head -30
+    # `head` closes the pipe after 30 lines; tar then gets SIGPIPE and reports a
+    # write error, which under `set -o pipefail` would fail the whole command
+    # once a backup has >30 entries (any real deployment). Tolerate it.
+    tar -tzf "$output_file" 2>/dev/null | head -30 || true
     echo ""
     echo -e "${YELLOW}Security Note:${NC} This backup contains private keys."
     echo "  Transfer securely and delete after import."
@@ -9275,7 +9320,7 @@ main() {
             cmd_doctor "$@"
             ;;
         bootstrap)
-            cmd_bootstrap
+            cmd_bootstrap "$@"
             ;;
         domainless|domain-less|no-domain)
             cmd_domainless
