@@ -832,7 +832,7 @@ fi
 # -----------------------------------------------------------------------------
 # Generate README.html from template
 # -----------------------------------------------------------------------------
-TEMPLATE_FILE="/docs/client-guide-template.html"
+TEMPLATE_FILE="/templates/client-guide-template.html"
 OUTPUT_HTML="$OUTPUT_DIR/README.html"
 
 # Regenerate README.html if: bundle changed, doesn't exist, or template is newer

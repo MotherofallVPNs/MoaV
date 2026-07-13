@@ -898,7 +898,7 @@ services:
       - ./configs/monitoring/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
       - ./configs/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./configs/monitoring/grafana/provisioning/dashboards:/var/lib/grafana/dashboards:ro
-      - ./site/assets:/branding:ro
+      - ./branding:/branding:ro
       - ./scripts/grafana-entrypoint.sh:/scripts/grafana-entrypoint.sh:ro
       - moav_grafana:/var/lib/grafana
       - moav_certs:/certs:ro
@@ -1249,7 +1249,7 @@ services:
       - ./scripts/bootstrap.sh:/app/bootstrap.sh:ro
       - ./scripts/generate-user.sh:/app/generate-user.sh:ro
       - ./scripts/lib:/app/lib:ro
-      - ./docs:/docs:ro
+      - ./templates:/templates:ro
       - moav_state:/state
       - moav_certs:/certs
       - ./state:/host-state:ro    # Host state dir for users created via 'moav user add'

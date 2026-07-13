@@ -5,9 +5,9 @@
 > Placeholder `NEWPROTO` = protocol name (lowercase, no hyphens in env vars).
 >
 > **Also add the protocol to the single-source roster** `data/protocols.json`,
-> then run `python3 scripts/gen-protocol-docs.py --write` (regenerates the
-> `docs/protocols.md` overview table) and `--check` (CI gate — every protocol
-> must also appear in `site/index.html` + `README.md`).
+> then run `python3 scripts/gen-protocol-docs.py --check` (CI gate — every
+> protocol must appear in `README.md`). The overview table and the site surfaces
+> live in the `moav-site` repo; update them there.
 
 ---
 
@@ -347,33 +347,17 @@
 
 - [ ] Mirror all README.md changes in Farsi
 
-### 6c. `docs/SETUP.md`
+### 6c. Site docs ([`moav-site`](https://github.com/MotherofallVPNs/moav-site) repo)
 
-- [ ] Add to domain requirement note (~line 40) — required or not-required list
-- [ ] Add row to ports table (~line 51)
-- [ ] Add to profiles listing (~line 248)
-- [ ] Add firewall commands (~line 265)
-- [ ] Add to user bundle files listing (~line 312)
-- [ ] If domainless capable: add to domainless mode available list (~line 369)
+The end-user docs live in the `moav-site` repo now, not here. Add the new protocol
+there in the same PR cycle:
 
-### 6d. `docs/CLIENTS.md`
+- [ ] **SETUP** — domain-requirement list, ports table, profiles listing, firewall commands, user-bundle files listing, domainless-mode list (if capable)
+- [ ] **CLIENTS** — TOC entry, protocol table row, per-platform client-app entries (iOS/Android/Windows), full setup section
+- [ ] **TROUBLESHOOTING** — TOC entry + a troubleshooting section (container/log/port/cert checks, client config verification)
+- [ ] **protocols** — the overview table row (generated from `data/protocols.json` on the site side)
 
-- [ ] Add TOC entry (~line 19)
-- [ ] Add row to protocol table (~line 39)
-- [ ] Add client app entries per platform (iOS ~line 62, Android ~line 78, Windows ~line 92)
-- [ ] Add full setup section with config file descriptions and install instructions
-
-### 6e. `docs/TROUBLESHOOTING.md`
-
-- [ ] Add TOC entry (~line 19)
-- [ ] Add troubleshooting section:
-  - Container running check: `docker compose --profile newproto ps`
-  - Log check: `docker compose logs newproto`
-  - Port open check
-  - Certificate check (if TLS)
-  - Client config verification
-
-### 6f. `docs/client-guide-template.html` (User Bundle README)
+### 6f. `templates/client-guide-template.html` (User Bundle README)
 
 The HTML guide template generates per-user `README.html` files in each user's bundle.
 It has **two language sections** (English and Farsi) that must both be updated.

@@ -28,18 +28,14 @@ All files that contain the version number:
 [![Version](https://img.shields.io/badge/version-1.X.Y-blue.svg)](CHANGELOG.md)
 ```
 
-### 2c. `site/index.html` — JSON-LD schema
-```json
-"softwareVersion": "1.X.Y",
-```
-- Located in the `<script type="application/ld+json">` block near the top
+### 2c. Site version ([`moav-site`](https://github.com/MotherofallVPNs/moav-site) repo)
 
-### 2d. `site/style.css` — (check for version in footer/comments if applicable)
+The website version strings (`site/index.html` JSON-LD `softwareVersion`, footer/CSS)
+live in the `moav-site` repo now — bump them there as part of the coordinated release.
 
-### 2e. Files that do NOT need manual version updates
+### 2d. Files that do NOT need manual version updates
 - `moav.sh` — reads from `VERSION` file at runtime, no hardcoded version
 - `README-fa.md` — no version badge
-- `site/demos/install.yml` — may contain version strings from other tools (e.g., runc), not MoaV
 
 ---
 
@@ -103,7 +99,7 @@ Pattern: `.env.example` is the source, `docker-compose.yml` passes as build arg 
 
 ```bash
 # Stage all version-bumped files
-git add VERSION README.md CHANGELOG.md site/index.html
+git add VERSION README.md CHANGELOG.md
 
 # Commit
 git commit -m "release: v1.X.Y"
@@ -177,9 +173,8 @@ For a minimal release, the absolute minimum files to touch:
 1. `VERSION` — bump number
 2. `CHANGELOG.md` — add entry + update links
 3. `README.md` — update badge
-4. `site/index.html` — update softwareVersion
 
-That's 4 files. Everything else (`moav.sh`, docker images, etc.) picks up the version automatically.
+That's 3 files in this repo (plus the site version in the `moav-site` repo). Everything else (`moav.sh`, docker images, etc.) picks up the version automatically.
 
 ---
 

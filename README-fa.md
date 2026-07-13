@@ -82,14 +82,14 @@ moav help                 # نمایش تمام دستورات
 
 </div>
 
-برای دستورالعمل‌های کامل نصب به [راهنمای نصب](docs/SETUP.md)، برای لیست دستورات به [مرجع دستورات](docs/CLI.md)، یا [مستندات کامل](https://moav.sh/docs/) مراجعه کنید.
+برای دستورالعمل‌های کامل نصب به [راهنمای نصب](https://moav.sh/docs/SETUP)، برای لیست دستورات به [مرجع دستورات](https://moav.sh/docs/CLI)، یا [مستندات کامل](https://moav.sh/docs/) مراجعه کنید.
 
 ### راه‌اندازی سرور خود
 
-[![Deploy on Hetzner](https://img.shields.io/badge/نصب%20روی-Hetzner-d50c2d?style=for-the-badge&logo=hetzner&logoColor=white)](docs/DEPLOY.md#hetzner)
-[![Deploy on Linode](https://img.shields.io/badge/نصب%20روی-Linode-00a95c?style=for-the-badge&logo=linode&logoColor=white)](docs/DEPLOY.md#linode)
-[![Deploy on Vultr](https://img.shields.io/badge/نصب%20روی-Vultr-007bfc?style=for-the-badge&logo=vultr&logoColor=white)](docs/DEPLOY.md#vultr)
-[![Deploy on DigitalOcean](https://img.shields.io/badge/نصب%20روی-DigitalOcean-0080ff?style=for-the-badge&logo=digitalocean&logoColor=white)](docs/DEPLOY.md#digitalocean)
+[![Deploy on Hetzner](https://img.shields.io/badge/نصب%20روی-Hetzner-d50c2d?style=for-the-badge&logo=hetzner&logoColor=white)](https://moav.sh/docs/DEPLOY#hetzner)
+[![Deploy on Linode](https://img.shields.io/badge/نصب%20روی-Linode-00a95c?style=for-the-badge&logo=linode&logoColor=white)](https://moav.sh/docs/DEPLOY#linode)
+[![Deploy on Vultr](https://img.shields.io/badge/نصب%20روی-Vultr-007bfc?style=for-the-badge&logo=vultr&logoColor=white)](https://moav.sh/docs/DEPLOY#vultr)
+[![Deploy on DigitalOcean](https://img.shields.io/badge/نصب%20روی-DigitalOcean-0080ff?style=for-the-badge&logo=digitalocean&logoColor=white)](https://moav.sh/docs/DEPLOY#digitalocean)
 
 
 ## معماری
@@ -231,7 +231,7 @@ moav start                         # شروع سرویس‌ها
 
 </div>
 
-برای جزئیات بیشتر به [docs/SETUP.md](docs/SETUP.md#server-migration) مراجعه کنید.
+برای جزئیات بیشتر به [راهنمای نصب](https://moav.sh/docs/SETUP#server-migration) مراجعه کنید.
 
 MoaV شامل یک کانتینر کلاینت داخلی برای تست اتصال و اتصال از طریق سرور شماست.
 ## تست
@@ -256,18 +256,18 @@ moav client connect user1 # اتصال به عنوان کاربر (پراکسی 
 | Windows | Happ، v2rayN، Hiddify، WireGuard |
 | Linux | Hiddify، sing-box، WireGuard |
 
-برای دستورالعمل‌های راه‌اندازی به [docs/CLIENTS.md](docs/CLIENTS.md) مراجعه کنید.
+برای دستورالعمل‌های راه‌اندازی به [راهنمای کلاینت](https://moav.sh/docs/CLIENTS) مراجعه کنید.
 
 ## مستندات
 
-- [راهنمای نصب](docs/SETUP.md) - دستورالعمل‌های کامل نصب
-- [مرجع CLI](docs/CLI.md) - تمام دستورات و گزینه‌های moav
-- [پیکربندی DNS](docs/DNS.md) - تنظیم رکوردهای DNS
-- [راه‌اندازی کلاینت](docs/CLIENTS.md) - نحوه اتصال از دستگاه‌ها
-- [نصب روی VPS](docs/DEPLOY.md) - نصب یک‌کلیکی روی سرور ابری
-- [مانیتورینگ](docs/MONITORING.md) - Grafana + Prometheus برای نظارت
-- [عیب‌یابی](docs/TROUBLESHOOTING.md) - مشکلات رایج و راه‌حل‌ها
-- [راهنمای امنیت عملیاتی](docs/OPSEC.md) - بهترین روش‌های امنیتی
+- [راهنمای نصب](https://moav.sh/docs/SETUP) - دستورالعمل‌های کامل نصب
+- [مرجع CLI](https://moav.sh/docs/CLI) - تمام دستورات و گزینه‌های moav
+- [پیکربندی DNS](https://moav.sh/docs/DNS) - تنظیم رکوردهای DNS
+- [راه‌اندازی کلاینت](https://moav.sh/docs/CLIENTS) - نحوه اتصال از دستگاه‌ها
+- [نصب روی VPS](https://moav.sh/docs/DEPLOY) - نصب یک‌کلیکی روی سرور ابری
+- [مانیتورینگ](https://moav.sh/docs/MONITORING) - Grafana + Prometheus برای نظارت
+- [عیب‌یابی](https://moav.sh/docs/TROUBLESHOOTING) - مشکلات رایج و راه‌حل‌ها
+- [راهنمای امنیت عملیاتی](https://moav.sh/docs/OPSEC) - بهترین روش‌های امنیتی
 
 ## پیش‌نیازها
 
@@ -346,7 +346,7 @@ MoaV/
 │   └── bundles/
 ├── web/                    # وب‌سایت پوششی
 ├── admin/                  # داشبورد آمار
-└── docs/                   # مستندات
+└── docs/                   # مستندات توسعه و دارایی‌ها
 ```
 
 </div>
@@ -359,7 +359,7 @@ MoaV/
 - حداقل لاگ‌گیری (بدون URL، بدون محتوا)
 - TLS 1.3 همه جا
 
-برای راهنمای امنیتی به [docs/OPSEC.md](docs/OPSEC.md) مراجعه کنید.
+برای راهنمای امنیتی به [راهنمای امنیت عملیاتی](https://moav.sh/docs/OPSEC) مراجعه کنید.
 
 ## مجوز
 

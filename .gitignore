@@ -114,7 +114,6 @@ configs/dns-router/
 *.sqlite3
 
 # MkDocs build output (built in CI)
-site/docs/
 
 # Misc
 spec.yaml
