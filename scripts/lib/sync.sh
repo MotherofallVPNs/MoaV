@@ -23,9 +23,17 @@ sync_server_users() {
         [[ -d "$d" ]] || continue
         u=$(basename "$d")
         [[ -f "${d}credentials.env" ]] || continue
-        uuid=$(grep -oiE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "${d}credentials.env" | head -1)
-        pass=$(sed -n 's/^USER_PASSWORD=//p' "${d}credentials.env" | head -1)
-        ss=$(sed -n 's/^SS_USER_PSK=//p' "${d}shadowsocks.env" 2>/dev/null | head -1)
+        # `|| true` on every parse: this lib is sourced into bootstrap.sh, which
+        # runs under `set -euo pipefail`. A user with no SS (shadowsocks.env
+        # absent) makes sed exit non-zero → pipefail → the whole bootstrap aborts
+        # silently mid-reconcile. Same for a grep/sed that finds no match. Guard
+        # each so a missing file or empty field is a skip, never a fatal error.
+        uuid=$(grep -oiE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "${d}credentials.env" 2>/dev/null | head -1) || true
+        pass=$(sed -n 's/^USER_PASSWORD=//p' "${d}credentials.env" 2>/dev/null | head -1) || true
+        ss=""
+        if [[ -f "${d}shadowsocks.env" ]]; then
+            ss=$(sed -n 's/^SS_USER_PSK=//p' "${d}shadowsocks.env" 2>/dev/null | head -1) || true
+        fi
         [[ -n "$uuid" ]] || continue
 
         # sing-box: add this user to every enabled inbound they belong to, each
