@@ -926,7 +926,18 @@ fi
 # per-user entries that `moav user add` inserts incrementally — so re-add every
 # user from state (with their STORED credentials) or an update orphans them.
 # Idempotent: skips users already present. (lib/sync.sh)
+#
+# Force-mirror host state (/host-state, where `moav user add` writes) into the
+# volume FIRST: the import loop above skips dirs that already exist, so a
+# stale/partial volume dir (e.g. missing credentials.env from an aborted run)
+# is never repaired — and the reconcile would then skip that user for lack of
+# creds, re-orphaning them on every bootstrap. Host state is authoritative.
+# (mirrors what `moav regenerate-users` does)
 # -----------------------------------------------------------------------------
+if [[ -d /host-state/users ]]; then
+    mkdir -p "$STATE_DIR/users"
+    cp -a /host-state/users/. "$STATE_DIR/users/" 2>/dev/null || true
+fi
 sync_server_users "/configs/sing-box/config.json" "/configs/xray/config.json" "$STATE_DIR/users"
 
 # -----------------------------------------------------------------------------
