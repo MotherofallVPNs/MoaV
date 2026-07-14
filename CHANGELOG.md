@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`moav test`'s `readme` check false-failed on CDN** — it grepped the rendered README for a "…not configured" sentinel to detect an unfilled section, but the template's CDN QR fallback contains the literal static text `or CDN not configured`, so an enabled-and-filled CDN section still matched (the first post-1.9.0 domain e2e reported `readme: fail` with every protocol passing). The check now positively asserts each enabled protocol's actual **share link** is present in the README instead — immune to static sentinel text, and it still catches the unfilled-placeholder class.
+
 ## [1.9.0] - 2026-07-14
 
 ### Changed
