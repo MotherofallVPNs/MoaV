@@ -2153,32 +2153,20 @@ test_readme_bundle() {
     [[ -n "$leftover" ]] && problems+="unsubstituted placeholders: ${leftover}| "
 
     # (b) config file present + non-empty (enabled) but section shows disabled sentinel.
-    # pairs: "<bundle-file>::<sentinel>::<label>"
-    local pair file rest sentinel label
-    for pair in \
-        "reality.txt::No Reality config available::reality" \
-        "hysteria2.txt::No Hysteria2 config available::hysteria2" \
-        "trojan.txt::No Trojan config available::trojan" \
-        "anytls.txt::No AnyTLS config available::anytls" \
-        "shadowsocks.txt::No Shadowsocks config available::shadowsocks" \
-        "xhttp-vless.txt::XHTTP not enabled::xhttp" \
-        "cdn-vless.txt::CDN not configured::cdn" \
-        "wireguard.conf::No WireGuard config available::wireguard" \
-        "wireguard-wstunnel.conf::No WireGuard-wstunnel config available::wstunnel" \
-        "amneziawg.conf::No AmneziaWG config available::amneziawg" \
-        "slipstream-instructions.txt::Slipstream not enabled::slipstream" \
-        "xdns-config.json::XDNS not enabled::xdns" \
-        "masterdns-instructions.txt::MasterDNS not enabled::masterdns" \
-        "gooserelay-instructions.txt::GooseRelay not enabled::gooserelay" \
-        "telegram-proxy-link.txt::Telegram MTProxy not enabled::telemt" \
-    ; do
-        file="${pair%%::*}"
-        rest="${pair#*::}"
-        sentinel="${rest%%::*}"
-        label="${rest##*::}"
-        if [[ -s "$CONFIG_DIR/$file" ]] && grep -qF "$sentinel" "$readme"; then
-            problems+="${label} enabled but README section not filled| "
-        fi
+    # (b) each enabled share-link protocol must have its actual link rendered in
+    # the README. This is a POSITIVE check — grep for the real link from the
+    # bundle — rather than grepping for a "…not configured" sentinel, because
+    # those strings can also appear as static template text (e.g. the CDN QR
+    # fallback "QR not available or CDN not configured") and cause false fails.
+    local base f link
+    for base in reality.txt trojan.txt anytls.txt shadowsocks.txt hysteria2.txt \
+                cdn-vless.txt xhttp-vless.txt telegram-proxy-link.txt; do
+        f="$CONFIG_DIR/$base"
+        [[ -s "$f" ]] || continue
+        # the share link is the first scheme:// line in the file
+        link=$(grep -aoiE '^[a-z][a-z0-9+.-]*://[^[:space:]]+' "$f" | head -1 || true)
+        [[ -n "$link" ]] || continue
+        grep -qF "$link" "$readme" || problems+="${base%.txt} link missing from README| "
     done
 
     if [[ -n "$problems" ]]; then
