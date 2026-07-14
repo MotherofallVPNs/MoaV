@@ -28,7 +28,12 @@ source scripts/lib/common.sh
 
 compose_timeout() {
     if command -v timeout >/dev/null 2>&1; then
-        timeout "${COMPOSE_TIMEOUT:-20}" docker compose "$@"
+        # -k: if `docker compose` ignores the SIGTERM at the deadline (e.g. it's
+        # stuck in `exec` against a wedged container — the AmneziaWG hot-reload
+        # hang), SIGKILL it 5s later so `user add` can never block indefinitely.
+        # (No global stdin redirect here — callers like `echo KEY | ... awg pubkey`
+        # rely on the piped stdin.)
+        timeout -k 5 "${COMPOSE_TIMEOUT:-20}" docker compose "$@"
     else
         docker compose "$@"
     fi
@@ -285,17 +290,21 @@ for USERNAME in "${USERNAMES[@]}"; do
     if [[ "${ENABLE_AMNEZIAWG:-true}" == "true" ]] && [[ -f "configs/amneziawg/awg0.conf" ]]; then
         log_info "[3/3] Adding to AmneziaWG..."
         (
-            # Generate client keys (standard WG key format, compatible with AWG)
-            # Use running container for key generation (host may not have wg/awg)
+            # Generate client keys (standard WG key format, compatible with AWG).
+            # Use a running container (host may not have wg/awg). tr -d '\r\n':
+            # `docker compose exec` into some images emits CRLF, and $() strips
+            # only the trailing \n — a leftover \r makes the 44-char key 45 chars,
+            # so `awg/wg pubkey` rejects it ("Key is not the correct length"),
+            # silently writing a broken peer.
             if compose_timeout ps amneziawg --status running 2>/dev/null | tail -n +2 | grep -q .; then
-                AWG_CLIENT_PRIVATE=$(compose_timeout exec -T amneziawg awg genkey)
-                AWG_CLIENT_PUBLIC=$(echo "$AWG_CLIENT_PRIVATE" | compose_timeout exec -T amneziawg awg pubkey)
+                AWG_CLIENT_PRIVATE=$(compose_timeout exec -T amneziawg awg genkey | tr -d '\r\n')
+                AWG_CLIENT_PUBLIC=$(printf '%s' "$AWG_CLIENT_PRIVATE" | compose_timeout exec -T amneziawg awg pubkey | tr -d '\r\n')
             elif compose_timeout ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q .; then
-                AWG_CLIENT_PRIVATE=$(compose_timeout exec -T wireguard wg genkey)
-                AWG_CLIENT_PUBLIC=$(echo "$AWG_CLIENT_PRIVATE" | compose_timeout exec -T wireguard wg pubkey)
+                AWG_CLIENT_PRIVATE=$(compose_timeout exec -T wireguard wg genkey | tr -d '\r\n')
+                AWG_CLIENT_PUBLIC=$(printf '%s' "$AWG_CLIENT_PRIVATE" | compose_timeout exec -T wireguard wg pubkey | tr -d '\r\n')
             elif command -v wg &>/dev/null; then
-                AWG_CLIENT_PRIVATE=$(wg genkey)
-                AWG_CLIENT_PUBLIC=$(echo "$AWG_CLIENT_PRIVATE" | wg pubkey)
+                AWG_CLIENT_PRIVATE=$(wg genkey | tr -d '\r\n')
+                AWG_CLIENT_PUBLIC=$(printf '%s' "$AWG_CLIENT_PRIVATE" | wg pubkey | tr -d '\r\n')
             else
                 log_error "No wg/awg command available (install wireguard-tools or ensure amneziawg container is running)"
                 exit 1

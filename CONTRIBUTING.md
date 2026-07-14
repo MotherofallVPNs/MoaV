@@ -57,7 +57,7 @@ Run these locally before pushing:
 ```bash
 git ls-files '*.sh' 'moav.sh' | xargs shellcheck --severity=error
 ( cd dns-router && go test ./... )
-bash scripts/lib/test-singbox-links.sh          # share-link golden test
+bash tests/singbox-links-test.sh          # share-link golden test
 python3 scripts/gen-protocol-docs.py --check     # protocol-roster drift gate
 ```
 

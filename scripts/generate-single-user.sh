@@ -153,9 +153,9 @@ if [[ -f "$AWG_CONFIG" ]] && donate_needs amneziawg; then
     if grep -q "# $USER_ID" "$AWG_CONFIG" 2>/dev/null; then
         log_info "User $USER_ID already exists in AmneziaWG"
     else
-        # Generate client keys
-        AWG_CLIENT_PRIVATE=$(wg genkey)
-        AWG_CLIENT_PUBLIC=$(echo "$AWG_CLIENT_PRIVATE" | wg pubkey)
+        # Generate client keys (tr -d '\r\n': guard against a CRLF-emitting wg)
+        AWG_CLIENT_PRIVATE=$(wg genkey | tr -d '\r\n')
+        AWG_CLIENT_PUBLIC=$(printf '%s' "$AWG_CLIENT_PRIVATE" | wg pubkey | tr -d '\r\n')
 
         # Count existing peers for IP assignment
         AWG_PEER_COUNT=$(grep -c '^\[Peer\]' "$AWG_CONFIG" 2>/dev/null) || true

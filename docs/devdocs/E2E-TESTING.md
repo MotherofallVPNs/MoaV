@@ -1,6 +1,12 @@
 # End-to-End Testing (self-hosted runner)
 
-`moav test` (`scripts/client-test.sh`) verifies real connectivity through each
+> **Using Claude Code?** The `moav-e2e` skill (`.claude/skills/moav-e2e/`) is an
+> agent-facing runbook for this: how to trigger/watch the workflow, read the
+> pass/warn/skip/fail matrix, and a table of known failure modes → fixes. This
+> page is the human setup guide.
+
+
+`moav test` (`tests/client-test.sh`) verifies real connectivity through each
 protocol by standing up client-side tunnels against a **live** MoaV server and
 checking the exit IP. The per-PR CI (`.github/workflows/ci.yml`) only lints and
 unit-tests — it never brings the stack up. Full e2e is a separate workflow
@@ -11,23 +17,49 @@ unit-tests — it never brings the stack up. Full e2e is a separate workflow
   Hysteria2, AnyTLS, CDN), which a stock GitHub-hosted runner can't provide, and
 - exercises UDP/QUIC/DNS transports that ephemeral CI networks block.
 
-It runs **manually**, **on each published release**, and **nightly** (the
-"overnight" run). GitHub-hosted runners are intentionally not used.
+It runs **manually** (`workflow_dispatch`) and **on each published release**.
+(A nightly `schedule` trigger is available but disabled by default — re-add the
+`schedule:` block to `e2e.yml` to enable it.) GitHub-hosted runners are
+intentionally not used.
+
+> **The workflow must live on the repo's *default* branch** (`main`) for GitHub
+> to show "Run workflow" and to fire the `release`/`schedule` triggers — that's
+> a GitHub rule for `workflow_dispatch`. When you dispatch it, pick the branch
+> to test (e.g. `dev`) as the ref; `actions/checkout` runs that branch's code.
 
 ---
 
 ## What you need
 
-- A **test VPS** you can wipe freely (a $5 box is fine; monitoring off).
+- A **dedicated test VPS** you can wipe freely, with **no other MoaV install on
+  it** — the e2e job binds the standard MoaV host ports and would collide with a
+  running stack. **≥ 2 vCPU / 4 GB RAM** (it builds ~25 images, several compiled
+  from Go — 1 GB will OOM).
+- **Docker + Docker Compose installed on the VPS.** The e2e job runs
+  `moav build`/`docker compose` directly on the runner; **it does not install
+  Docker for you** — that's a host prerequisite (see step 0 below).
 - A **test domain** with DNS pointing at that VPS (A record, plus the DNS-tunnel
   NS records if you want those protocols to pass — see [DNS.md](../DNS.md)).
-- Docker + Docker Compose on the VPS.
 - Admin access to the GitHub repo (to add a runner + secrets).
 
 > Use a **dedicated throwaway domain**, not your production `moav.sh` — the e2e
 > run issues real certs and reconfigures the whole stack.
 
 ---
+
+## 0. Install Docker (prerequisite)
+
+The e2e job needs Docker on the runner, and the `docker` group must exist
+**before** you add the runner user to it. On a fresh Ubuntu box:
+
+```bash
+# as root
+curl -fsSL https://get.docker.com | sh      # installs Docker + the compose plugin
+docker --version && docker compose version  # verify both
+```
+
+If you skip this you'll see `usermod: group 'docker' does not exist` in the next
+step — that means Docker isn't installed, not that the e2e run will install it.
 
 ## 1. Register the self-hosted runner
 
@@ -83,6 +115,34 @@ The workflow selects this runner via `runs-on: [self-hosted, moav-e2e]`, so the
 > Escape hatch: `RUNNER_ALLOW_RUNASROOT=1 ./config.sh ...` lets it configure as
 > root, but running Actions as root is discouraged — prefer the dedicated user.
 
+### Reclaim-workspace pre-job hook (REQUIRED for repeat runs)
+
+MoaV's containers run as root and write root-owned files into the bind-mounted
+host dirs (`configs/`, `state/`, `outputs/`). The runner user can't delete those,
+so the **next** run's `actions/checkout` fails to clean the workspace
+(`Error: EACCES: permission denied, rmdir .../configs/amneziawg`). The e2e job's
+teardown chowns the workspace back, but that only helps if a run *reaches*
+teardown — a run that fails or is cancelled early leaves the mess, and the next
+checkout then can't self-heal.
+
+The robust fix is a **pre-job hook** that reclaims ownership *before* checkout,
+every job. Set it up once:
+
+```bash
+cat > /home/gh-runner/reclaim-workspace.sh <<'EOF'
+#!/bin/bash
+sudo chown -R "$(id -u):$(id -g)" "$HOME/actions-runner/_work" 2>/dev/null || true
+EOF
+chmod +x /home/gh-runner/reclaim-workspace.sh
+
+grep -q ACTIONS_RUNNER_HOOK_JOB_STARTED /home/gh-runner/actions-runner/.env \
+  || echo 'ACTIONS_RUNNER_HOOK_JOB_STARTED=/home/gh-runner/reclaim-workspace.sh' \
+       >> /home/gh-runner/actions-runner/.env
+```
+
+(The hook relies on the runner user's passwordless `sudo`, set up above.) Restart
+the service after adding it so it picks up the new `.env`.
+
 ### Run it as a service (survives reboots)
 
 Unlike `config.sh`, the service installer **does** use `sudo`, and takes the
@@ -111,16 +171,39 @@ trigger the workflow (§3).
 | `E2E_SERVER_IP` | *(optional)* the VPS public IP; auto-detected if omitted |
 
 The workflow writes these into a fresh `.env` (copied from `.env.example`) and
-sets `INITIAL_USERS=e2e-test` + `DEFAULT_PROFILES=all`.
+sets `INITIAL_USERS=1` + `DEFAULT_PROFILES=all` (`INITIAL_USERS` is a **count**,
+not a name; the run then adds a named `e2e-test` user to also exercise
+`moav user add`).
 
 ---
 
 ## 3. Run it
 
-- **Manually:** repo → **Actions → e2e → Run workflow** (optionally tick
-  *Verbose*). This is the recommended way to validate a branch before release.
+- **Manually:** repo → **Actions → e2e → Run workflow**, choose the branch to
+  test (e.g. `dev`), then optionally tick the inputs below. The recommended way
+  to validate a branch before release. If you don't see "e2e" in the Actions
+  list, the workflow isn't on the **default branch** yet (see the note at the top).
+- **On push to `main`:** runs automatically on every merge to `main` (domain
+  mode). Reuses the `moav_certs` volume, so it won't burn the LE rate limit.
 - **On release:** fires automatically when a GitHub Release is published.
-- **Nightly:** `03:00 UTC` via the `schedule` trigger.
+- **Nightly:** disabled by default (re-add the `schedule:` block to enable).
+
+**Run inputs:**
+
+| Input | Effect |
+|---|---|
+| `verbose` | Per-protocol debug output from `client-test.sh` (`-v`). |
+| `domainless` | **No DOMAIN / no cert** — certbot self-skips, so this **never touches the Let's Encrypt rate limit**. Runs the IP-only protocols (Reality, XHTTP, Shadowsocks, WireGuard…) and still builds the client image, so it's the fast way to validate everything *except* the TLS-domain protocols. Needs no `E2E_DOMAIN`/`E2E_ACME_EMAIL`. |
+| `full` | Also runs `build --local` (monitoring images from source), a second **domainless** phase after the domain phase, and `uninstall --wipe --remove-images` on teardown. Much slower, and it **does** re-issue a cert (see below). |
+
+**Cert reuse & the LE rate limit.** Let's Encrypt allows only **5 certs/week per
+exact domain**. A standard (domain) run therefore **keeps the `moav_certs`
+volume** on teardown (`uninstall --yes`, `down` without `-v`), so the next run
+reuses the existing cert instead of re-issuing — you can run it many times a day.
+Only `full` runs wipe the volume (fresh issuance); don't run `full` more than a
+few times a week against the same domain or you'll hit the limit
+("*too many certificates … retry after …*"). If you do get blocked, use
+`domainless` to keep testing in the meantime.
 
 The **e2e-results** artifact (JSON + raw log) is attached to every run. The job
 fails if any protocol reports `fail`; `warn`/`skip` (e.g. an unconfigured
@@ -136,7 +219,8 @@ You can reproduce exactly what the workflow does directly on the test VPS:
 git clone https://github.com/MotherofallVPNs/moav && cd moav
 cp .env.example .env
 # edit .env: set DOMAIN, ACME_EMAIL, ADMIN_PASSWORD, SERVER_IP,
-#            INITIAL_USERS=e2e-test, DEFAULT_PROFILES=all
+#            INITIAL_USERS=1, DEFAULT_PROFILES=all
+#            (leave DOMAIN empty to reproduce a domainless run — no cert)
 
 ./moav.sh build
 ./moav.sh bootstrap        # generates keys, obtains certs, creates the user

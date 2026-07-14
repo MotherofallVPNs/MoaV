@@ -30,8 +30,12 @@ jobs:
         run: |
           VERSION="${GITHUB_REF#refs/tags/v}"
           # Extract section for this version from CHANGELOG.md
+          # Literal prefix match — the header ("## [1.9.0]") contains regex
+          # metacharacters ([, ], .), so `$0 ~ ver` treated it as a pattern and
+          # matched nothing, yielding empty release notes. index()==1 matches the
+          # literal header at the start of the line.
           NOTES=$(awk -v ver="## [$VERSION]" '
-            $0 ~ ver { found=1; next }
+            index($0, ver)==1 { found=1; next }
             found && /^## \[/ { exit }
             found { print }
           ' CHANGELOG.md)
