@@ -83,9 +83,8 @@ wireguard_add_peer() {
         client_ip_v6="${WG_CLIENT_IP_V6:-}"
         log_info "Loaded existing WireGuard keys for $user_id"
     else
-        # Generate new client keys
-        client_private_key=$(wg genkey)
-        client_public_key=$(echo "$client_private_key" | wg pubkey)
+        # Generate new client keys (lib/keys.sh — CRLF-safe)
+        { read -r client_private_key && read -r client_public_key; } < <(wg_keypair)
 
         # Calculate client IP (IPv4)
         client_ip="10.66.66.$((peer_num + 1))"

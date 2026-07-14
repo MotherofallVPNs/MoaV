@@ -10,6 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR/.."
 
 source scripts/lib/common.sh
+source scripts/lib/keys.sh
 
 # Parse arguments
 USERNAME=""
@@ -110,21 +111,10 @@ if [[ -n "$SERVER_IPV6" ]]; then
     log_info "Assigned IPv6: $CLIENT_IP_V6"
 fi
 
-# Generate client keys using wg command in wireguard container or locally
-if docker compose ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q .; then
-    # Use running WireGuard container. tr -d '\r\n': container exec can emit CRLF,
-    # and $() strips only \n — a leftover \r makes the key 45 chars and pubkey
-    # rejects it, silently writing a broken peer.
-    CLIENT_PRIVATE_KEY=$(docker compose exec -T wireguard wg genkey | tr -d '\r\n')
-    CLIENT_PUBLIC_KEY=$(printf '%s' "$CLIENT_PRIVATE_KEY" | docker compose exec -T wireguard wg pubkey | tr -d '\r\n')
-elif command -v wg &>/dev/null; then
-    # Use local wg command
-    CLIENT_PRIVATE_KEY=$(wg genkey | tr -d '\r\n')
-    CLIENT_PUBLIC_KEY=$(printf '%s' "$CLIENT_PRIVATE_KEY" | wg pubkey | tr -d '\r\n')
-else
-    # Generate using docker
-    CLIENT_PRIVATE_KEY=$(docker run --rm lscr.io/linuxserver/wireguard wg genkey 2>/dev/null | tr -d '\r\n')
-    CLIENT_PUBLIC_KEY=$(printf '%s' "$CLIENT_PRIVATE_KEY" | docker run --rm -i lscr.io/linuxserver/wireguard wg pubkey 2>/dev/null | tr -d '\r\n')
+# Generate client keys (lib/keys.sh picks a wg/awg generator, CRLF-safe)
+if ! { read -r CLIENT_PRIVATE_KEY && read -r CLIENT_PUBLIC_KEY; } < <(wg_keypair); then
+    log_error "No wg/awg key generator available (install wireguard-tools or start the wireguard container)"
+    exit 1
 fi
 
 # Save credentials
