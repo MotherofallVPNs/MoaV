@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-07-14
+
 ### Fixed
+- **`moav update` / re-bootstrap silently orphaned every non-initial user's proxy access.** Bootstrap regenerates the sing-box + xray configs from templates (`envsubst`), which drops the per-user entries `moav user add` inserts incrementally — and the re-add loop never re-inserted them into those proxy configs. So after an update, every user created via `moav user add` failed with `unknown UUID` on Reality/Trojan/AnyTLS/Hysteria2/CDN/XHTTP (the TLS handshake succeeded, then auth rejected them). New `scripts/lib/sync.sh` `sync_server_users` re-inserts **every** user from state into the sing-box + xray configs using their **stored** credentials — idempotent, so already-distributed bundles keep working (no fresh UUIDs) — and it now runs automatically at the end of bootstrap and from `moav regenerate-users` (which also reloads the proxies). Also detects the xray `settings.clients` vs `settings.users` field so it matches whatever the running config uses. **If you're already affected:** `moav regenerate-users` reconciles the running server.
 - **`moav test`'s `readme` check false-failed on CDN** — it grepped the rendered README for a "…not configured" sentinel to detect an unfilled section, but the template's CDN QR fallback contains the literal static text `or CDN not configured`, so an enabled-and-filled CDN section still matched (the first post-1.9.0 domain e2e reported `readme: fail` with every protocol passing). The check now positively asserts each enabled protocol's actual **share link** is present in the README instead — immune to static sentinel text, and it still catches the unfilled-placeholder class.
 
 ## [1.9.0] - 2026-07-14
@@ -1206,7 +1209,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - uTLS fingerprint spoofing (Chrome)
 - Automatic short ID generation for Reality
 
-[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v1.9.1...HEAD
+[1.9.1]: https://github.com/MotherofallVPNs/moav/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/MotherofallVPNs/moav/compare/v1.8.5...v1.9.0
 [1.8.6]: https://github.com/MotherofallVPNs/moav/compare/v1.8.5...v1.8.6
 [1.8.5]: https://github.com/MotherofallVPNs/moav/compare/v1.8.4...v1.8.5

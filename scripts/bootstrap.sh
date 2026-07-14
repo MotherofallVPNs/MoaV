@@ -15,6 +15,7 @@ source /app/lib/slipstream.sh
 source /app/lib/masterdns.sh
 source /app/lib/gooserelay.sh
 source /app/lib/telemt.sh
+source /app/lib/sync.sh
 
 log_info "Starting MoaV bootstrap..."
 
@@ -918,6 +919,15 @@ if [[ "$singbox_needed" == "true" ]]; then
 else
     log_info "sing-box not needed (no TLS protocols enabled)"
 fi
+
+# -----------------------------------------------------------------------------
+# Reconcile ALL users into the freshly-regenerated proxy configs.
+# The envsubst regens above rebuild sing-box/xray from templates, dropping the
+# per-user entries that `moav user add` inserts incrementally — so re-add every
+# user from state (with their STORED credentials) or an update orphans them.
+# Idempotent: skips users already present. (lib/sync.sh)
+# -----------------------------------------------------------------------------
+sync_server_users "/configs/sing-box/config.json" "/configs/xray/config.json" "$STATE_DIR/users"
 
 # -----------------------------------------------------------------------------
 # Fix permissions on generated configs (admin container runs as non-root uid 1000)

@@ -219,6 +219,24 @@ nano .env  # Set DOMAIN, ACME_EMAIL, ADMIN_PASSWORD
 2. Distribute to all users
 3. Users must delete old configs and import new ones
 
+### "unknown UUID" — existing users can't connect after an update
+
+**Symptom:** after `moav update` or `moav bootstrap`, users created with `moav user add` can no longer connect via the proxy protocols (Reality, Trojan, AnyTLS, Hysteria2, CDN, XHTTP). The TLS handshake succeeds, then the connection is rejected — `moav logs sing-box` shows:
+
+```
+inbound/vless[vless-reality-in]: ... unknown UUID: <uuid>
+```
+
+**Cause:** bootstrap regenerates the sing-box/xray configs from templates, which dropped the per-user entries that `moav user add` inserts incrementally. Bundles and credentials were never lost — only the server config forgot the users.
+
+**Fix:** reconcile the server config from state. Credentials stay the same, so already-distributed bundles keep working:
+
+```bash
+moav regenerate-users
+```
+
+On **1.9.1+** this reconcile runs automatically at the end of every bootstrap, so an update can no longer orphan users.
+
 ### Switching branches
 
 **Switch to a feature/test branch:**

@@ -8987,6 +8987,20 @@ cmd_regenerate_users() {
 
     echo ""
 
+    # Reconcile the server proxy configs with user state — re-add every user
+    # (with their STORED credentials) into sing-box/xray, then reload. Heals a
+    # config that drifted from state (e.g. an update regenerated it from the
+    # template and dropped `moav user add` users). Idempotent. (lib/sync.sh)
+    echo -n "  Syncing server configs with user state... "
+    if docker compose run --rm -T --entrypoint /bin/bash bootstrap \
+        -c 'mkdir -p /state/users; cp -a /host-state/users/. /state/users/ 2>/dev/null || true; source /app/lib/common.sh; source /app/lib/sync.sh; sync_server_users' >/dev/null 2>&1; then
+        echo -e "${GREEN}✓${NC}"
+        docker compose restart sing-box xray >/dev/null 2>&1 || true
+    else
+        echo -e "${YELLOW}skipped${NC}"
+    fi
+    echo ""
+
     if [[ $user_count -gt 0 ]]; then
         success "Regenerated $user_count user bundle(s)"
         echo ""
