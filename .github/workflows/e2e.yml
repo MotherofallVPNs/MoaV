@@ -146,6 +146,22 @@ jobs:
           echo "bundle has $n config file(s):"; ls -1 outputs/bundles/e2e-test || true
           [ "$n" -ge 1 ] || { echo "::error::user add produced an empty bundle (only README.html) — provisioning skipped the protocols"; exit 1; }
 
+      - name: Regression — added user survives a re-bootstrap (orphan guard)
+        run: |
+          # THE orphan bug (1.9.1): bootstrap regenerates sing-box/xray from
+          # templates, wiping users that `moav user add` inserted incrementally;
+          # the reconcile (lib/sync.sh) must re-insert every one. Force a
+          # re-bootstrap — exactly what `moav update` does — then assert e2e-test
+          # still resolves in the proxy configs BEFORE connectivity runs, so a
+          # re-orphaning regression fails loudly here and the connectivity test
+          # below validates the reconciled config end-to-end.
+          docker run --rm -v moav_moav_state:/state alpine rm -f /state/.bootstrapped
+          docker compose --profile setup run --rm bootstrap
+          docker compose restart sing-box xray >/dev/null 2>&1 || true
+          sudo chown -R "$USER" configs state outputs 2>/dev/null || true
+          bash tests/assert-users-reconciled.sh
+          sleep 10
+
       - name: Run connectivity tests
         run: |
           set -o pipefail
