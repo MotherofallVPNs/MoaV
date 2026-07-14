@@ -5639,13 +5639,13 @@ show_usage() {
     echo "  user add --batch N [--prefix P]    Batch create (user01, user02...)"
     echo "  user revoke NAME      Revoke a user"
     echo "  user package NAME     Create zip bundle for existing user"
+    echo "  user base64 NAME      Base64 text-only bundle (for e2e / quick import)"
     echo "  admin password        Reset admin dashboard password"
     echo ""
     echo "Donate & Test:"
     echo "  donate                Donate VPN configs to MahsaNet/Psiphon/Snowflake"
     echo "  conduit [link|status] Psiphon Conduit claim link, QR & sharing guide"
     echo "  test USERNAME [-v]    Test connectivity for a user"
-    echo "  test generate NAME    Base64 text-only bundle (for e2e / quick import)"
     echo "  client connect USER   Client mode (connect as user, exposes local proxy)"
     echo ""
     echo "Backup & Migration:"
@@ -7592,8 +7592,11 @@ cmd_user() {
                 exit 1
             fi
             ;;
+        base64|b64)
+            cmd_user_base64 "$username"
+            ;;
         *)
-            error "Usage: moav user [list|add|revoke|package] [USERNAME]"
+            error "Usage: moav user [list|add|revoke|package|base64] [USERNAME]"
             exit 1
             ;;
     esac
@@ -7945,18 +7948,18 @@ update_env_var() {
 # Client Commands
 # =============================================================================
 
-# `moav test generate <user>` — emit base64 of a text-only bundle (the config
-# text files + subscription.txt; excludes the QR PNGs and README.html, which are
-# the bulk). Paste it into moav-client's e2e `bundle_b64` input, or use it for a
-# quick client import:  moav test generate alice | pbcopy
-cmd_test_generate() {
+# `moav user base64 <user>` — emit base64 of a text-only bundle (the config text
+# files + subscription.txt; excludes the QR PNGs and README.html, which are the
+# bulk). Paste it into moav-client's e2e `bundle_b64` input, or use it for a
+# quick client import:  moav user base64 alice | pbcopy
+cmd_user_base64() {
     local user="${1:-}"
     if [[ -z "$user" ]]; then
-        error "Usage: moav test generate USERNAME"
+        error "Usage: moav user base64 USERNAME"
         {
             echo ""
             echo "Emits base64 of a text-only bundle (configs + subscription.txt; no QR PNGs / README)."
-            echo "Paste into moav-client's e2e 'bundle_b64' input, or:  moav test generate alice | pbcopy"
+            echo "Paste into moav-client's e2e 'bundle_b64' input, or:  moav user base64 alice | pbcopy"
             echo ""
             echo "Available users:"
             ls -1 outputs/bundles/ 2>/dev/null || echo "  No users found"
@@ -7965,7 +7968,7 @@ cmd_test_generate() {
     fi
     local bundle="outputs/bundles/$user"
     [[ -d "$bundle" ]] || { error "User bundle not found: $bundle"; exit 1; }
-    command -v zip >/dev/null 2>&1 || { error "zip is required for 'moav test generate'"; exit 1; }
+    command -v zip >/dev/null 2>&1 || { error "zip is required for 'moav user base64'"; exit 1; }
 
     local tmp zip b64 size
     tmp="$(mktemp -d)"
@@ -7989,11 +7992,6 @@ cmd_test() {
     local user=""
     local json_flag=""
     local verbose_flag=""
-
-    if [[ "${1:-}" == "generate" ]]; then
-        cmd_test_generate "${2:-}"
-        return
-    fi
 
     # Parse flags
     for arg in "$@"; do
@@ -8124,7 +8122,6 @@ cmd_client() {
             echo ""
             echo "Commands:"
             echo "  test USERNAME [--json]        Test connectivity for a user"
-            echo "  test generate NAME            Base64 text-only bundle (e2e / quick import)"
             echo "  connect USERNAME [PROTOCOL]   Connect and expose local proxy"
             echo "  build                         Build the client image"
             echo ""
