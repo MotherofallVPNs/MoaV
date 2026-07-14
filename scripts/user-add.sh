@@ -28,7 +28,12 @@ source scripts/lib/common.sh
 
 compose_timeout() {
     if command -v timeout >/dev/null 2>&1; then
-        timeout "${COMPOSE_TIMEOUT:-20}" docker compose "$@"
+        # -k: if `docker compose` ignores the SIGTERM at the deadline (e.g. it's
+        # stuck in `exec` against a wedged container — the AmneziaWG hot-reload
+        # hang), SIGKILL it 5s later so `user add` can never block indefinitely.
+        # (No global stdin redirect here — callers like `echo KEY | ... awg pubkey`
+        # rely on the piped stdin.)
+        timeout -k 5 "${COMPOSE_TIMEOUT:-20}" docker compose "$@"
     else
         docker compose "$@"
     fi
