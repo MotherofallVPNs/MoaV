@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Bootstrap reconcile now heals a stale user-state volume — completes the 1.9.1 fix.** The 1.9.1 reconcile read the Docker state volume (`/state`), but `moav user add` writes to the host state dir (`/host-state`); bootstrap's import loop *skips* volume dirs that already exist, so a stale/partial dir (e.g. an aborted run's user missing `credentials.env`) was never repaired and the reconcile skipped that user — leaving `moav update`/`moav bootstrap` still emitting `unknown UUID` for them even on 1.9.1. Bootstrap now force-mirrors host state → volume immediately before the reconcile (as `moav regenerate-users` already did), so host state is authoritative and every user is re-inserted. (`moav regenerate-users` remains the manual heal for an already-running server.)
+
 ## [1.9.1] - 2026-07-14
 
 ### Fixed
