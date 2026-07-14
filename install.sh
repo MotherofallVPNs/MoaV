@@ -565,7 +565,7 @@ maybe_offer_net_tuning() {
     tmp=$(mktemp)
     cat > "$tmp" <<EOF
 # MoaV network tuning — generated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-# Reversible: moav net revert. Docs: docs/OPSEC.md → "Network tuning".
+# Reversible: moav net revert. Docs: https://moav.sh/docs/OPSEC → "Network tuning".
 
 # BBR needs fq for pacing.
 net.ipv4.tcp_congestion_control = bbr

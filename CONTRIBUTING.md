@@ -68,13 +68,13 @@ runs on a self-hosted runner, not per-PR — see
 ## The protocol roster is single-source
 
 The protocol list is defined once in [`data/protocols.json`](data/protocols.json).
-The overview table in `docs/protocols.md` is generated from it, and the site /
-READMEs are drift-checked against it. If you add, remove, or rename a protocol:
+The server README is drift-checked against it; the human-readable overview table
+and site copy live in the [moav-site](https://github.com/MotherofallVPNs/moav-site)
+repo. If you add, remove, or rename a protocol:
 
 ```bash
 # 1. edit data/protocols.json
-python3 scripts/gen-protocol-docs.py --write   # regenerate the docs table
-# 2. add the protocol's `seo` token to site/index.html + README.md (prose)
+# 2. add the protocol's `seo` token to README.md (prose)
 python3 scripts/gen-protocol-docs.py --check    # must pass (CI enforces it)
 ```
 
@@ -91,7 +91,7 @@ Maintainers follow [`docs/devdocs/VERSION-BUMP-CHECKLIST.md`](docs/devdocs/VERSI
 
 ## More references
 
-- [Architecture](docs/architecture.md) — container topology, dns-router fan-out, security model
-- [CLI reference](docs/CLI.md) — every `moav` command
-- [Supported protocols](docs/protocols.md) — per-protocol detail
-- [OPSEC](docs/OPSEC.md) — operator hardening + threat model
+- [Architecture](https://moav.sh/docs/architecture) — container topology, dns-router fan-out, security model
+- [CLI reference](https://moav.sh/docs/CLI) — every `moav` command
+- [Supported protocols](https://moav.sh/docs/protocols) — per-protocol detail
+- [OPSEC](https://moav.sh/docs/OPSEC) — operator hardening + threat model

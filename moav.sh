@@ -762,7 +762,7 @@ check_prerequisites() {
                     echo "    • Match: Hostname equals cdn.$input_domain"
                     echo "    • Action: Destination Port → Rewrite to 2082"
                     echo ""
-                    echo -e "  See docs/DNS.md for detailed instructions."
+                    echo -e "  See https://moav.sh/docs/DNS for detailed instructions."
                     echo ""
                     echo -e "  ${DIM}A BIND-format zone file is saved to outputs/dns-records.txt${NC}"
                     echo -e "  ${DIM}Import it in Cloudflare: DNS > Records > Import and Upload${NC}"
@@ -1543,7 +1543,7 @@ cmd_update() {
         echo "Troubleshooting:"
         echo "  - Check network: ping github.com"
         echo "  - View git status: cd $install_dir && git status"
-        echo "  - See docs: https://github.com/MotherofallVPNs/moav/blob/main/docs/TROUBLESHOOTING.md#git-update-issues"
+        echo "  - See docs: https://moav.sh/docs/TROUBLESHOOTING#git-update-issues"
         return 1
     fi
 }
@@ -2669,7 +2669,7 @@ nt_render_config() {
     local bmax="$1"
     cat <<EOF
 # MoaV network tuning — generated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-# Reversible: moav net revert. Docs: docs/OPSEC.md → "Network tuning".
+# Reversible: moav net revert. Docs: https://moav.sh/docs/OPSEC → "Network tuning".
 
 # BBR needs fq for pacing.
 net.ipv4.tcp_congestion_control = bbr
@@ -2859,7 +2859,7 @@ cmd_net() {
             echo "buffers + queue depth + 3 TCP hygiene flags. Does NOT enable TCP"
             echo "Fast Open (hostile in censored networks)."
             echo ""
-            echo "Docs: docs/OPSEC.md → \"Network tuning\""
+            echo "Docs: https://moav.sh/docs/OPSEC → \"Network tuning\""
             ;;
         *)
             error "Unknown net command: $sub"
@@ -3625,7 +3625,7 @@ doctor_check_dns() {
 
     if [[ $failures -gt 0 ]]; then
         echo ""
-        echo "See docs/DNS.md for record templates and provider-specific examples."
+        echo "See https://moav.sh/docs/DNS for record templates and provider-specific examples."
         # Generate zone file for easy import
         local zone_file
         zone_file=$(generate_dns_zone_file 2>/dev/null)

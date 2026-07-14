@@ -230,7 +230,7 @@ QR_WIREGUARD_WSTUNNEL_B64=$(qr_to_base64 "$QR_WIREGUARD_WSTUNNEL_FILE")
 
 log_info "Generating HTML guide..."
 
-TEMPLATE_FILE="docs/client-guide-template.html"
+TEMPLATE_FILE="templates/client-guide-template.html"
 OUTPUT_HTML="$PACKAGE_DIR/README.html"
 
 if [[ ! -f "$TEMPLATE_FILE" ]]; then

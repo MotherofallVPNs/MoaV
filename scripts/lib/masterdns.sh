@@ -197,7 +197,7 @@ $md_key
 # - DNS tunneling is slow by design but extremely hard to block.
 # - Faster and more stable under packet loss than dnstt/Slipstream.
 # - Traffic exits through the MoaV server (your IP appears as the server IP).
-# - The NS record for $md_domain must delegate to this server (see docs/DNS.md).
+# - The NS record for $md_domain must delegate to this server (see https://moav.sh/docs/DNS).
 EOF
 
     log_info "Generated MasterDNS instructions for $user_id"

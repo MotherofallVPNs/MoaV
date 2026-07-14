@@ -548,7 +548,7 @@ async def health():
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     """Serve favicon"""
-    for p in ["/project/site/assets/favicon.ico", "/app/site/assets/favicon.ico"]:
+    for p in ["/project/branding/favicon.ico", "/app/branding/favicon.ico"]:
         if Path(p).exists():
             return FileResponse(p, media_type="image/x-icon")
     raise HTTPException(status_code=404)
@@ -557,7 +557,7 @@ async def favicon():
 @app.get("/logo.png", include_in_schema=False)
 async def logo():
     """Serve logo"""
-    for p in ["/project/site/assets/favicon.png", "/app/site/assets/favicon.png"]:
+    for p in ["/project/branding/favicon.png", "/app/branding/favicon.png"]:
         if Path(p).exists():
             return FileResponse(p, media_type="image/png")
     raise HTTPException(status_code=404)

@@ -69,11 +69,11 @@ moav admin password       # Reset admin/Grafana password
 moav help                 # Show all commands
 ```
 
-See the [Setup Guide](docs/SETUP.md) for complete instructions, the [CLI Reference](docs/CLI.md) for all commands, or browse the [full documentation](https://moav.sh/docs/).
+See the [Setup Guide](https://moav.sh/docs/SETUP) for complete instructions, the [CLI Reference](https://moav.sh/docs/CLI) for all commands, or browse the [full documentation](https://moav.sh/docs/).
 
 ### Deploy Your Own
 
-[![Deploy on Hetzner](https://img.shields.io/badge/Deploy%20on-Hetzner-d50c2d?style=for-the-badge&logo=hetzner&logoColor=white)](docs/DEPLOY.md#hetzner)  [![Deploy on Linode](https://img.shields.io/badge/Deploy%20on-Linode-00a95c?style=for-the-badge&logo=linode&logoColor=white)](docs/DEPLOY.md#linode)  [![Deploy on Vultr](https://img.shields.io/badge/Deploy%20on-Vultr-007bfc?style=for-the-badge&logo=vultr&logoColor=white)](docs/DEPLOY.md#vultr)  [![Deploy on DigitalOcean](https://img.shields.io/badge/Deploy%20on-DigitalOcean-0080ff?style=for-the-badge&logo=digitalocean&logoColor=white)](docs/DEPLOY.md#digitalocean)
+[![Deploy on Hetzner](https://img.shields.io/badge/Deploy%20on-Hetzner-d50c2d?style=for-the-badge&logo=hetzner&logoColor=white)](https://moav.sh/docs/DEPLOY#hetzner)  [![Deploy on Linode](https://img.shields.io/badge/Deploy%20on-Linode-00a95c?style=for-the-badge&logo=linode&logoColor=white)](https://moav.sh/docs/DEPLOY#linode)  [![Deploy on Vultr](https://img.shields.io/badge/Deploy%20on-Vultr-007bfc?style=for-the-badge&logo=vultr&logoColor=white)](https://moav.sh/docs/DEPLOY#vultr)  [![Deploy on DigitalOcean](https://img.shields.io/badge/Deploy%20on-DigitalOcean-0080ff?style=for-the-badge&logo=digitalocean&logoColor=white)](https://moav.sh/docs/DEPLOY#digitalocean)
 
 
 
@@ -161,7 +161,7 @@ moav user package joe     # Create zip bundle
 
 Each user gets a bundle in `outputs/bundles/<username>/` with config files, QR codes, and a README.html guide.
 
-**MahsaNG / V2Ray users (MahsaNG has 2M+ in Iran):** every bundle includes a standard base64 **V2Ray subscription** — in `subscription.txt` and as a click-to-copy block at the top of the bundle's README — so users paste it once into [MahsaNG](https://github.com/GFW-knocker/MahsaNG), v2rayNG, Hiddify, or any V2Ray app to import all proxy protocols at once. See [docs/mahsanet.md](docs/mahsanet.md).
+**MahsaNG / V2Ray users (MahsaNG has 2M+ in Iran):** every bundle includes a standard base64 **V2Ray subscription** — in `subscription.txt` and as a click-to-copy block at the top of the bundle's README — so users paste it once into [MahsaNG](https://github.com/GFW-knocker/MahsaNG), v2rayNG, Hiddify, or any V2Ray app to import all proxy protocols at once. See the [MahsaNG import guide](https://moav.sh/docs/mahsanet).
 
 **Download bundles** from the admin dashboard at `https://your-server:9443` or via SCP.
 
@@ -187,7 +187,7 @@ moav donate               # Donate configs to MahsaNet/Psiphon/Snowflake
 moav conduit link         # Psiphon Conduit claim link, QR & sharing guide
 ```
 
-**Psiphon Conduit:** once `conduit` is running it already serves Psiphon users (including in Iran) through the public pool — no link to share. To give specific people a private path, `moav conduit link` prints the Ryve claim link/QR and the Personal Pairing steps. The claim link embeds the private key — keep it secret; share with users only via Personal Pairing inside Ryve. See [Psiphon Conduit in docs/protocols.md](docs/protocols.md#psiphon-conduit).
+**Psiphon Conduit:** once `conduit` is running it already serves Psiphon users (including in Iran) through the public pool — no link to share. To give specific people a private path, `moav conduit link` prints the Ryve claim link/QR and the Personal Pairing steps. The claim link embeds the private key — keep it secret; share with users only via Personal Pairing inside Ryve. See [Psiphon Conduit in docs/protocols.md](https://moav.sh/docs/protocols#psiphon-conduit).
 
 **Profiles:** `proxy`, `wireguard`, `amneziawg`, `dnstunnel`, `trusttunnel`, `telegram`, `xhttp`, `admin`, `conduit`, `snowflake`, `monitoring`, `all`
 
@@ -205,7 +205,7 @@ moav migrate-ip 1.2.3.4            # Update all configs to new IP
 moav start                         # Start services
 ```
 
-See [docs/SETUP.md](docs/SETUP.md#server-migration) for detailed migration workflow.
+See the [Setup Guide → Server Migration](https://moav.sh/docs/SETUP#server-migration) for detailed migration workflow.
 
 ## Testing
 
@@ -225,19 +225,19 @@ moav client connect user1 # Connect as user (exposes local SOCKS5/HTTP proxy)
 | Windows | Happ, v2rayN, Hiddify, WireGuard |
 | Linux | Hiddify, sing-box, WireGuard |
 
-See [docs/CLIENTS.md](docs/CLIENTS.md) for complete list and setup instructions.
+See the [Client Setup guide](https://moav.sh/docs/CLIENTS) for complete list and setup instructions.
 
 ## Documentation
 
-- [Setup Guide](docs/SETUP.md) - Complete installation instructions
-- [CLI Reference](docs/CLI.md) - All moav commands and options
-- [DNS Configuration](docs/DNS.md) - DNS records setup
-- [Client Setup](docs/CLIENTS.md) - How to connect from devices
-- [MahsaNG Import](docs/mahsanet.md) - Import MoaV configs into the MahsaNG app (Iran)
-- [VPS Deployment](docs/DEPLOY.md) - One-click cloud deployment
-- [Monitoring](docs/MONITORING.md) - Grafana + Prometheus observability
-- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
-- [OpSec Guide](docs/OPSEC.md) - Security best practices
+- [Setup Guide](https://moav.sh/docs/SETUP) - Complete installation instructions
+- [CLI Reference](https://moav.sh/docs/CLI) - All moav commands and options
+- [DNS Configuration](https://moav.sh/docs/DNS) - DNS records setup
+- [Client Setup](https://moav.sh/docs/CLIENTS) - How to connect from devices
+- [MahsaNG Import](https://moav.sh/docs/mahsanet) - Import MoaV configs into the MahsaNG app (Iran)
+- [VPS Deployment](https://moav.sh/docs/DEPLOY) - One-click cloud deployment
+- [Monitoring](https://moav.sh/docs/MONITORING) - Grafana + Prometheus observability
+- [Troubleshooting](https://moav.sh/docs/TROUBLESHOOTING) - Common issues and solutions
+- [OpSec Guide](https://moav.sh/docs/OPSEC) - Security best practices
 
 ## Requirements
 
@@ -315,7 +315,7 @@ MoaV/
 │   └── bundles/
 ├── web/                    # Decoy website
 ├── admin/                  # Stats dashboard
-└── docs/                   # Documentation
+└── docs/                   # Dev docs (devdocs/) + README assets
 ```
 
 ## Security
@@ -326,7 +326,7 @@ MoaV/
 - Minimal logging (no URLs, no content)
 - TLS 1.3 everywhere
 
-See [docs/OPSEC.md](docs/OPSEC.md) for security guidelines.
+See the [OPSEC guide](https://moav.sh/docs/OPSEC) for security guidelines.
 
 ## License
 
