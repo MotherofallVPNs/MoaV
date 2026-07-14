@@ -112,17 +112,19 @@ fi
 
 # Generate client keys using wg command in wireguard container or locally
 if docker compose ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q .; then
-    # Use running WireGuard container
-    CLIENT_PRIVATE_KEY=$(docker compose exec -T wireguard wg genkey)
-    CLIENT_PUBLIC_KEY=$(echo "$CLIENT_PRIVATE_KEY" | docker compose exec -T wireguard wg pubkey)
+    # Use running WireGuard container. tr -d '\r\n': container exec can emit CRLF,
+    # and $() strips only \n — a leftover \r makes the key 45 chars and pubkey
+    # rejects it, silently writing a broken peer.
+    CLIENT_PRIVATE_KEY=$(docker compose exec -T wireguard wg genkey | tr -d '\r\n')
+    CLIENT_PUBLIC_KEY=$(printf '%s' "$CLIENT_PRIVATE_KEY" | docker compose exec -T wireguard wg pubkey | tr -d '\r\n')
 elif command -v wg &>/dev/null; then
     # Use local wg command
-    CLIENT_PRIVATE_KEY=$(wg genkey)
-    CLIENT_PUBLIC_KEY=$(echo "$CLIENT_PRIVATE_KEY" | wg pubkey)
+    CLIENT_PRIVATE_KEY=$(wg genkey | tr -d '\r\n')
+    CLIENT_PUBLIC_KEY=$(printf '%s' "$CLIENT_PRIVATE_KEY" | wg pubkey | tr -d '\r\n')
 else
     # Generate using docker
-    CLIENT_PRIVATE_KEY=$(docker run --rm lscr.io/linuxserver/wireguard wg genkey 2>/dev/null)
-    CLIENT_PUBLIC_KEY=$(echo "$CLIENT_PRIVATE_KEY" | docker run --rm -i lscr.io/linuxserver/wireguard wg pubkey 2>/dev/null)
+    CLIENT_PRIVATE_KEY=$(docker run --rm lscr.io/linuxserver/wireguard wg genkey 2>/dev/null | tr -d '\r\n')
+    CLIENT_PUBLIC_KEY=$(printf '%s' "$CLIENT_PRIVATE_KEY" | docker run --rm -i lscr.io/linuxserver/wireguard wg pubkey 2>/dev/null | tr -d '\r\n')
 fi
 
 # Save credentials
@@ -244,6 +246,12 @@ EOF
 log_info "Generated wstunnel-mode config"
 
 # Generate wstunnel instructions
+WSTUNNEL_CMD="$(wstunnel_client_cmd)"
+if [[ -n "${DOMAIN:-}" && "${DOMAIN:-}" != "YOUR_DOMAIN" ]]; then
+    WSTUNNEL_SERVER_URL="wss://${DOMAIN}:8080"
+else
+    WSTUNNEL_SERVER_URL="ws://${SERVER_IP}:8080"
+fi
 cat > "$OUTPUT_DIR/wireguard-instructions.txt" <<EOF
 # WireGuard over WebSocket (wstunnel) Instructions
 # ================================================
@@ -260,7 +268,7 @@ cat > "$OUTPUT_DIR/wireguard-instructions.txt" <<EOF
 # ---------------------------
 # This creates a local UDP tunnel to the server:
 
-wstunnel client -L udp://127.0.0.1:51820:moav-wireguard:51820 ws://${SERVER_IP}:8080
+${WSTUNNEL_CMD}
 
 # Step 3: Connect WireGuard
 # -------------------------
@@ -275,12 +283,12 @@ wstunnel client -L udp://127.0.0.1:51820:moav-wireguard:51820 ws://${SERVER_IP}:
 
 # For desktop:
 # ------------
-# Terminal 1: wstunnel client -L udp://127.0.0.1:51820:moav-wireguard:51820 ws://${SERVER_IP}:8080
+# Terminal 1: ${WSTUNNEL_CMD}
 # Terminal 2: wg-quick up ./wireguard-wstunnel.conf
 
 # Server info:
 # ------------
-# wstunnel server: ws://${SERVER_IP}:8080
+# wstunnel server: ${WSTUNNEL_SERVER_URL}
 # Your WireGuard IP: $CLIENT_IP
 EOF
 
@@ -343,5 +351,5 @@ cat "$OUTPUT_DIR/wireguard.conf"
 echo ""
 echo "=== wstunnel Mode (for restrictive networks) ==="
 echo "Run wstunnel first:"
-echo "  wstunnel client -L udp://127.0.0.1:51820:moav-wireguard:51820 ws://${SERVER_IP}:8080"
+echo "  ${WSTUNNEL_CMD}"
 echo "Then use wireguard-wstunnel.conf"

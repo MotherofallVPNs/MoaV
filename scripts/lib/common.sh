@@ -38,3 +38,22 @@ command_exists() {
 ensure_dir() {
     mkdir -p "$1"
 }
+
+# Build the wstunnel client command for WireGuard-over-WebSocket bundles.
+# wss:// when a domain (hence a TLS cert) is configured, else plain ws://.
+# The per-install path secret (state/keys/wstunnel-path.secret, shared with the
+# server) becomes an HTTP-upgrade path prefix so scanners can't complete the
+# upgrade blind. Reads DOMAIN/SERVER_IP from the caller's environment.
+wstunnel_client_cmd() {
+    local state_dir="${1:-${STATE_DIR:-./state}}"
+    local secret="" pathopt="" url
+    [[ -f "$state_dir/keys/wstunnel-path.secret" ]] && \
+        secret=$(cat "$state_dir/keys/wstunnel-path.secret" 2>/dev/null)
+    [[ -n "$secret" ]] && pathopt="--http-upgrade-path-prefix $secret "
+    if [[ -n "${DOMAIN:-}" && "$DOMAIN" != "YOUR_DOMAIN" ]]; then
+        url="wss://${DOMAIN}:8080"
+    else
+        url="ws://${SERVER_IP:-YOUR_SERVER_IP}:8080"
+    fi
+    echo "wstunnel client -L udp://127.0.0.1:51820:moav-wireguard:51820 ${pathopt}${url}"
+}

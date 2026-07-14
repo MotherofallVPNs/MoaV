@@ -153,6 +153,8 @@ TTL: 300
 
 The container for any disabled tunnel stays down — `dns-router` just doesn't route to it. To opt a tunnel out, set its `ENABLE_*` to `false` in `.env`.
 
+**MasterDNS public subdomain:** By default, MasterDNS uses `MASTERDNS_SUBDOMAIN` (usually `m`) for both server routing and generated client bundles. If you need a separate public delegation name, set `MASTERDNS_PUBLIC_SUBDOMAIN=<name>` in `.env` and add an NS record for that name pointing at `dns.yourdomain.com`. MoaV will route both the base MasterDNS domain and the public domain, while generated MasterDNS bundles use the public domain.
+
 > **Client-side resolver choice**: All four tunnels rely on a public DNS resolver the *client* can reach. `1.1.1.1` / `8.8.8.8` are commonly throttled or null-routed during shutdowns. XDNS round-robins across multiple resolvers via `XDNS_RESOLVERS` in `.env`; dnstt and Slipstream take a `--dns-server` / `-doh` flag at the client. See [protocols.md → Reachable DNS resolvers](protocols.md#reachable-dns-resolvers) for resolver-scanning ([findns](https://github.com/SamNet-dev/findns), [dns-mns](https://gitlab.com/E-Gurl/dns-mns)).
 
 #### Which DNS tunnel should I use?
@@ -195,6 +197,7 @@ TTL: 300
 | NS | `t` | `dns.domain.com` | — | dnstt tunnel subdomain | Only for dnstt |
 | NS | `s` | `dns.domain.com` | — | Slipstream tunnel subdomain | Only for Slipstream |
 | NS | `m` | `dns.domain.com` | — | MasterDNS tunnel subdomain | Only for MasterDNS (MahsaNG v16) |
+| NS | custom `MASTERDNS_PUBLIC_SUBDOMAIN` | `dns.domain.com` | — | Optional public MasterDNS delegation used in generated bundles | Only if set |
 | NS | `x` | `dns.domain.com` | — | XDNS tunnel subdomain | Only for XDNS |
 | A | `cdn` | Server IP | **Proxied** | CDN-fronted VLESS | Only for CDN mode |
 | A | `www` | Server IP | **Proxied** | CDN stealth connect address | Optional (CDN stealth) |

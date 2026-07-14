@@ -263,6 +263,7 @@ export ENABLE_SLIPSTREAM="${ENABLE_SLIPSTREAM:-true}"
 export SLIPSTREAM_SUBDOMAIN="${SLIPSTREAM_SUBDOMAIN:-s}"
 export ENABLE_MASTERDNS="${ENABLE_MASTERDNS:-true}"
 export MASTERDNS_SUBDOMAIN="${MASTERDNS_SUBDOMAIN:-m}"
+export MASTERDNS_PUBLIC_SUBDOMAIN="${MASTERDNS_PUBLIC_SUBDOMAIN:-}"
 export ENABLE_GOOSERELAY="${ENABLE_GOOSERELAY:-false}"
 export ENABLE_TRUSTTUNNEL="${ENABLE_TRUSTTUNNEL:-true}"
 export ENABLE_XHTTP="${ENABLE_XHTTP:-true}"
@@ -355,6 +356,14 @@ if [[ "${ENABLE_WIREGUARD:-true}" == "true" ]]; then
             echo "$DERIVED_PUB" > "$STATE_DIR/keys/wg-server.pub"
             log_info "Fixed server.pub to match private key"
         fi
+    fi
+
+    # wstunnel HTTP-upgrade path secret — shared with client bundles so a scanner
+    # can't complete the WebSocket upgrade without knowing the path prefix.
+    if [[ ! -f "$STATE_DIR/keys/wstunnel-path.secret" ]]; then
+        mkdir -p "$STATE_DIR/keys"
+        openssl rand -hex 16 > "$STATE_DIR/keys/wstunnel-path.secret"
+        log_info "Generated wstunnel path secret"
     fi
 fi
 

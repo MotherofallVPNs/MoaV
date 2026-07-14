@@ -55,6 +55,40 @@ fi
 STATE_DIR="${STATE_DIR:-./state}"
 OUTPUT_DIR="outputs/bundles/$USERNAME"
 
+proxy_user_exists() {
+    if [[ -f "configs/sing-box/config.json" ]] && jq -e \
+        --arg name "$USERNAME" --arg email "${USERNAME}@moav" \
+        '
+        def match_user:
+            (.name == $name) or (.email == $email);
+        any(.inbounds[]?; any(((.users // []) + (.settings.users // []) + (.settings.clients // []))[]?; match_user))
+        ' \
+        "configs/sing-box/config.json" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if [[ -f "configs/xray/config.json" ]] && jq -e \
+        --arg name "$USERNAME" --arg email "${USERNAME}@moav" \
+        '
+        def match_user:
+            (.name == $name) or (.email == $email);
+        any(.inbounds[]?; any(((.settings.clients // []) + (.settings.users // []))[]?; match_user))
+        ' \
+        "configs/xray/config.json" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if [[ -f "configs/trusttunnel/credentials.toml" ]] && grep -q "username = \"$USERNAME\"" "configs/trusttunnel/credentials.toml" 2>/dev/null; then
+        return 0
+    fi
+
+    if [[ -f "configs/telemt/config.toml" ]] && grep -q "^${USERNAME} = " "configs/telemt/config.toml" 2>/dev/null; then
+        return 0
+    fi
+
+    return 1
+}
+
 log_info "========================================"
 log_info "Revoking user '$USERNAME' from all services"
 log_info "========================================"
@@ -63,20 +97,18 @@ echo ""
 REVOKED=false
 
 # -----------------------------------------------------------------------------
-# Revoke from sing-box
+# Revoke from proxy transports
 # -----------------------------------------------------------------------------
-if [[ -f "configs/sing-box/config.json" ]] && jq -e --arg n "$USERNAME" \
-        '.inbounds[]? | select(.users != null) | .users[]? | select(.name == $n)' \
-        "configs/sing-box/config.json" >/dev/null 2>&1; then
-    log_info "[1/3] Revoking from sing-box..."
+if proxy_user_exists; then
+    log_info "[1/3] Revoking from proxy transports..."
     if "$SCRIPT_DIR/singbox-user-revoke.sh" "$USERNAME"; then
-        log_info "✓ Revoked from sing-box"
+        log_info "✓ Revoked from proxy transports"
         REVOKED=true
     else
-        log_error "✗ Failed to revoke from sing-box"
+        log_error "✗ Failed to revoke from proxy transports"
     fi
 else
-    log_info "[1/3] User not found in sing-box (skipping)"
+    log_info "[1/3] User not found in proxy transports (skipping)"
 fi
 
 echo ""

@@ -14,6 +14,7 @@ source /app/lib/slipstream.sh
 source /app/lib/masterdns.sh
 source /app/lib/gooserelay.sh
 source /app/lib/telemt.sh
+source /app/lib/sing-box.sh
 
 # Default state directory if not set
 STATE_DIR="${STATE_DIR:-/state}"
@@ -103,7 +104,7 @@ if [[ "${ENABLE_REALITY:-true}" == "true" ]]; then
 EOF
 
     # Generate v2rayN/NekoBox compatible link (IPv4)
-    REALITY_LINK="vless://${USER_UUID}@${SERVER_IP}:443?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${REALITY_TARGET_HOST}&fp=random&pbk=${REALITY_PUBLIC_KEY}&sid=${REALITY_SHORT_ID}&type=tcp#MoaV-Reality-${USER_ID}"
+    REALITY_LINK=$(singbox_reality_link "$USER_ID" "$SERVER_IP")
     echo "$REALITY_LINK" > "$OUTPUT_DIR/reality.txt"
 
     # Generate QR code
@@ -111,7 +112,7 @@ EOF
 
     # Generate IPv6 link if available
     if [[ -n "${SERVER_IPV6:-}" ]]; then
-        REALITY_LINK_V6="vless://${USER_UUID}@[${SERVER_IPV6}]:443?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${REALITY_TARGET_HOST}&fp=random&pbk=${REALITY_PUBLIC_KEY}&sid=${REALITY_SHORT_ID}&type=tcp#MoaV-Reality-${USER_ID}-IPv6"
+        REALITY_LINK_V6=$(singbox_reality_link "${USER_ID}-IPv6" "[${SERVER_IPV6}]")
         echo "$REALITY_LINK_V6" > "$OUTPUT_DIR/reality-ipv6.txt"
         qrencode -o "$OUTPUT_DIR/reality-ipv6-qr.png" -s 6 "$REALITY_LINK_V6" 2>/dev/null || true
     fi
@@ -163,13 +164,13 @@ if [[ "${ENABLE_TROJAN:-true}" == "true" ]]; then
 EOF
 
     # Generate Trojan URI (IPv4)
-    TROJAN_LINK="trojan://${USER_PASSWORD}@${SERVER_IP}:8443?security=tls&sni=${DOMAIN}&type=tcp#MoaV-Trojan-${USER_ID}"
+    TROJAN_LINK=$(singbox_trojan_link "$USER_ID" "$SERVER_IP")
     echo "$TROJAN_LINK" > "$OUTPUT_DIR/trojan.txt"
     qrencode -o "$OUTPUT_DIR/trojan-qr.png" -s 6 "$TROJAN_LINK" 2>/dev/null || true
 
     # Generate IPv6 link if available
     if [[ -n "${SERVER_IPV6:-}" ]]; then
-        TROJAN_LINK_V6="trojan://${USER_PASSWORD}@[${SERVER_IPV6}]:8443?security=tls&sni=${DOMAIN}&type=tcp#MoaV-Trojan-${USER_ID}-IPv6"
+        TROJAN_LINK_V6=$(singbox_trojan_link "${USER_ID}-IPv6" "[${SERVER_IPV6}]")
         echo "$TROJAN_LINK_V6" > "$OUTPUT_DIR/trojan-ipv6.txt"
         qrencode -o "$OUTPUT_DIR/trojan-ipv6-qr.png" -s 6 "$TROJAN_LINK_V6" 2>/dev/null || true
     fi
@@ -214,13 +215,13 @@ if [[ "${ENABLE_ANYTLS:-false}" == "true" ]]; then
 EOF
 
     # Generate AnyTLS URI (IPv4)
-    ANYTLS_LINK="anytls://${USER_PASSWORD}@${SERVER_IP}:${PORT_ANYTLS:-8445}?sni=${DOMAIN}&insecure=0#MoaV-AnyTLS-${USER_ID}"
+    ANYTLS_LINK=$(singbox_anytls_link "$USER_ID" "$SERVER_IP")
     echo "$ANYTLS_LINK" > "$OUTPUT_DIR/anytls.txt"
     qrencode -o "$OUTPUT_DIR/anytls-qr.png" -s 6 "$ANYTLS_LINK" 2>/dev/null || true
 
     # Generate IPv6 link if available
     if [[ -n "${SERVER_IPV6:-}" ]]; then
-        ANYTLS_LINK_V6="anytls://${USER_PASSWORD}@[${SERVER_IPV6}]:${PORT_ANYTLS:-8445}?sni=${DOMAIN}&insecure=0#MoaV-AnyTLS-${USER_ID}-IPv6"
+        ANYTLS_LINK_V6=$(singbox_anytls_link "${USER_ID}-IPv6" "[${SERVER_IPV6}]")
         echo "$ANYTLS_LINK_V6" > "$OUTPUT_DIR/anytls-ipv6.txt"
         qrencode -o "$OUTPUT_DIR/anytls-ipv6-qr.png" -s 6 "$ANYTLS_LINK_V6" 2>/dev/null || true
     fi
@@ -287,13 +288,13 @@ EOF
 EOF
 
     # Hysteria2 URI (IPv4) - includes obfs parameter
-    HY2_LINK="hysteria2://${USER_PASSWORD}@${SERVER_IP}:443?sni=${DOMAIN}&obfs=salamander&obfs-password=${HYSTERIA2_OBFS_PASSWORD}#MoaV-Hysteria2-${USER_ID}"
+    HY2_LINK=$(singbox_hysteria2_link "$USER_ID" "$SERVER_IP")
     echo "$HY2_LINK" > "$OUTPUT_DIR/hysteria2.txt"
     qrencode -o "$OUTPUT_DIR/hysteria2-qr.png" -s 6 "$HY2_LINK" 2>/dev/null || true
 
     # Generate IPv6 link if available
     if [[ -n "${SERVER_IPV6:-}" ]]; then
-        HY2_LINK_V6="hysteria2://${USER_PASSWORD}@[${SERVER_IPV6}]:443?sni=${DOMAIN}&obfs=salamander&obfs-password=${HYSTERIA2_OBFS_PASSWORD}#MoaV-Hysteria2-${USER_ID}-IPv6"
+        HY2_LINK_V6=$(singbox_hysteria2_link "${USER_ID}-IPv6" "[${SERVER_IPV6}]")
         echo "$HY2_LINK_V6" > "$OUTPUT_DIR/hysteria2-ipv6.txt"
         qrencode -o "$OUTPUT_DIR/hysteria2-ipv6-qr.png" -s 6 "$HY2_LINK_V6" 2>/dev/null || true
     fi
@@ -357,13 +358,13 @@ EOF
 
         # Build ss:// URI per SIP002 with SS-2022 multi-user encoding
         # Format: ss://BASE64URL_NOPAD(method:server_psk:user_psk)@host:port#tag
-        SS_USERINFO=$(printf '%s' "${SS_METHOD_LOCAL}:${SS_SERVER_PSK_LOCAL}:${SS_USER_PSK}" | base64 | tr -d '\n=' | tr '/+' '_-')
-        SS_LINK="ss://${SS_USERINFO}@${SERVER_IP}:${SS_PORT}#MoaV-Shadowsocks-${USER_ID}"
+        SS_USERINFO=$(singbox_ss_userinfo "$SS_METHOD_LOCAL" "$SS_SERVER_PSK_LOCAL" "$SS_USER_PSK")
+        SS_LINK=$(singbox_ss_link "$USER_ID" "$SERVER_IP" "$SS_USERINFO" "$SS_PORT")
         echo "$SS_LINK" > "$OUTPUT_DIR/shadowsocks.txt"
         qrencode -o "$OUTPUT_DIR/shadowsocks-qr.png" -s 6 "$SS_LINK" 2>/dev/null || true
 
         if [[ -n "${SERVER_IPV6:-}" ]]; then
-            SS_LINK_V6="ss://${SS_USERINFO}@[${SERVER_IPV6}]:${SS_PORT}#MoaV-Shadowsocks-${USER_ID}-IPv6"
+            SS_LINK_V6=$(singbox_ss_link "${USER_ID}-IPv6" "[${SERVER_IPV6}]" "$SS_USERINFO" "$SS_PORT")
             echo "$SS_LINK_V6" > "$OUTPUT_DIR/shadowsocks-ipv6.txt"
             qrencode -o "$OUTPUT_DIR/shadowsocks-ipv6-qr.png" -s 6 "$SS_LINK_V6" 2>/dev/null || true
         fi
@@ -432,7 +433,7 @@ if [[ -n "${CDN_DOMAIN:-}" ]]; then
 }
 EOF
 
-    CDN_LINK="vless://${USER_UUID}@${CDN_ADDRESS}:443?security=tls&type=${CDN_TRANSPORT}&path=${CDN_WS_PATH}&sni=${CDN_SNI}&host=${CDN_DOMAIN}&fp=random&alpn=http/1.1#MoaV-CDN-${USER_ID}"
+    CDN_LINK=$(singbox_cdn_link "$USER_ID")
     echo "$CDN_LINK" > "$OUTPUT_DIR/cdn-vless.txt"
     qrencode -o "$OUTPUT_DIR/cdn-vless-qr.png" -s 6 "$CDN_LINK" 2>/dev/null || true
 
@@ -706,26 +707,34 @@ if [[ "${ENABLE_XDNS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
         # Multi-resolver round-robin for DNS-tunnel mode (Xray v26.4.13+, PR #5872).
         # Direct mode omits resolvers since it bypasses public DNS.
         _xdns_resolvers_csv="${XDNS_RESOLVERS:-1.1.1.1,8.8.8.8}"
-        _xdns_finalmask_settings=$(XDNS_DOMAIN="$_xdns_domain" XDNS_RESOLVERS_CSV="$_xdns_resolvers_csv" python3 -c '
+        # Record mode for the finalmask resolver: txt (default, widest client
+        # compat) or aaaa (Xray >= v26.6.1, higher throughput per query, #6123).
+        _xdns_method="${XDNS_METHOD:-txt}"
+        _xdns_finalmask_settings=$(XDNS_DOMAIN="$_xdns_domain" XDNS_RESOLVERS_CSV="$_xdns_resolvers_csv" XDNS_METHOD="$_xdns_method" python3 -c '
 import os, json
 domain = os.environ["XDNS_DOMAIN"]
 csv = os.environ.get("XDNS_RESOLVERS_CSV", "").strip()
+method = os.environ.get("XDNS_METHOD", "txt").strip().lower()
+# txt is the default record mode and is expressed by omitting the suffix.
+suffix = "" if method in ("", "txt") else ":" + method
 ips = [x.strip() for x in csv.split(",") if x.strip()] if csv else []
 if not ips:
     ips = ["1.1.1.1"]
 # Xray v26.x finalmask: the client side uses "resolvers", each formatted as
-# "domain[:method]+udp://server:port" (method defaults to txt). The old singular
-# "domain" field was removed; "domains" is server-side only.
-resolvers = [domain + "+udp://" + (ip if ":" in ip else ip + ":53") for ip in ips]
+# "domain[:method]+udp://server:port". The old singular "domain" field was
+# removed; "domains" is server-side only.
+resolvers = [domain + suffix + "+udp://" + (ip if ":" in ip else ip + ":53") for ip in ips]
 print(json.dumps({"resolvers": resolvers}))
 ')
-        _xdns_finalmask_settings_direct=$(XDNS_DOMAIN="$_xdns_domain" XDNS_DIRECT_TARGET="${SERVER_IP}:${PORT_XDNS:-5356}" python3 -c '
+        _xdns_finalmask_settings_direct=$(XDNS_DOMAIN="$_xdns_domain" XDNS_DIRECT_TARGET="${SERVER_IP}:${PORT_XDNS:-5356}" XDNS_METHOD="$_xdns_method" python3 -c '
 import os, json
 domain = os.environ["XDNS_DOMAIN"]
 target = os.environ["XDNS_DIRECT_TARGET"]
+method = os.environ.get("XDNS_METHOD", "txt").strip().lower()
+suffix = "" if method in ("", "txt") else ":" + method
 # Direct mode: send xdns-encoded queries straight to the server XDNS port
 # (host PORT_XDNS -> xray:5355), with no public recursive resolver in between.
-print(json.dumps({"resolvers": [domain + "+udp://" + target]}))
+print(json.dumps({"resolvers": [domain + suffix + "+udp://" + target]}))
 ')
 
         # Load user UUID. credentials.env (sourced above) already provides
@@ -839,6 +848,8 @@ elif [[ -f "$TEMPLATE_FILE" ]]; then
     CONFIG_WIREGUARD=$(cat "$OUTPUT_DIR/wireguard.conf" 2>/dev/null || echo "")
     CONFIG_WIREGUARD_WSTUNNEL=$(cat "$OUTPUT_DIR/wireguard-wstunnel.conf" 2>/dev/null || echo "")
     CONFIG_AMNEZIAWG=$(cat "$OUTPUT_DIR/amneziawg.conf" 2>/dev/null || echo "")
+    CONFIG_SHADOWSOCKS=$(cat "$OUTPUT_DIR/shadowsocks.txt" 2>/dev/null | tr -d '\n' || echo "")
+    CONFIG_XHTTP=$(cat "$OUTPUT_DIR/xhttp-vless.txt" 2>/dev/null | tr -d '\n' || echo "")
 
     # Get dnstt info
     DNSTT_DOMAIN="${DNSTT_SUBDOMAIN:-t}.${DOMAIN}"
@@ -883,6 +894,8 @@ elif [[ -f "$TEMPLATE_FILE" ]]; then
     QR_WIREGUARD_B64=$(qr_to_base64 "$OUTPUT_DIR/wireguard-qr.png")
     QR_WIREGUARD_WSTUNNEL_B64=$(qr_to_base64 "$OUTPUT_DIR/wireguard-wstunnel-qr.png")
     QR_AMNEZIAWG_B64=$(qr_to_base64 "$OUTPUT_DIR/amneziawg-qr.png")
+    QR_SHADOWSOCKS_B64=$(qr_to_base64 "$OUTPUT_DIR/shadowsocks-qr.png")
+    QR_XHTTP_B64=$(qr_to_base64 "$OUTPUT_DIR/xhttp-qr.png")
     QR_TELEMT_B64=$(qr_to_base64 "$OUTPUT_DIR/telegram-proxy-qr.png")
 
     GENERATED_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -894,6 +907,7 @@ elif [[ -f "$TEMPLATE_FILE" ]]; then
     sed -i "s|{{USERNAME}}|$USER_ID|g" "$OUTPUT_HTML"
     sed -i "s|{{SERVER_IP}}|$SERVER_IP|g" "$OUTPUT_HTML"
     sed -i "s|{{DOMAIN}}|$DOMAIN|g" "$OUTPUT_HTML"
+    sed -i "s|{{WSTUNNEL_CMD}}|$(wstunnel_client_cmd)|g" "$OUTPUT_HTML"
     sed -i "s|{{GENERATED_DATE}}|$GENERATED_DATE|g" "$OUTPUT_HTML"
     sed -i "s|{{DNSTT_DOMAIN}}|$DNSTT_DOMAIN|g" "$OUTPUT_HTML"
     sed -i "s|{{DNSTT_PUBKEY}}|$DNSTT_PUBKEY|g" "$OUTPUT_HTML"
@@ -969,6 +983,9 @@ elif [[ -f "$TEMPLATE_FILE" ]]; then
     sed -i "s|{{QR_WIREGUARD}}|$QR_WIREGUARD_B64|g" "$OUTPUT_HTML"
     sed -i "s|{{QR_WIREGUARD_WSTUNNEL}}|$QR_WIREGUARD_WSTUNNEL_B64|g" "$OUTPUT_HTML"
     sed -i "s|{{QR_AMNEZIAWG}}|$QR_AMNEZIAWG_B64|g" "$OUTPUT_HTML"
+    sed -i "s|{{QR_SHADOWSOCKS}}|$QR_SHADOWSOCKS_B64|g" "$OUTPUT_HTML"
+    sed -i "s|{{QR_XHTTP}}|$QR_XHTTP_B64|g" "$OUTPUT_HTML"
+    sed -i "s|{{PORT_SS}}|${PORT_SS:-8388}|g" "$OUTPUT_HTML"
     sed -i "s|{{QR_TELEMT}}|$QR_TELEMT_B64|g" "$OUTPUT_HTML"
 
     # Python-based placeholder replacement - handles special chars and multiline safely
@@ -1010,6 +1027,19 @@ with open(filepath, 'w') as f:
         replace_placeholder "{{CONFIG_ANYTLS}}" "$CONFIG_ANYTLS"
     else
         replace_placeholder "{{CONFIG_ANYTLS}}" "No AnyTLS config available"
+    fi
+
+    if [[ -n "$CONFIG_SHADOWSOCKS" ]]; then
+        replace_placeholder "{{CONFIG_SHADOWSOCKS}}" "$CONFIG_SHADOWSOCKS"
+    else
+        replace_placeholder "{{CONFIG_SHADOWSOCKS}}" "No Shadowsocks config available"
+    fi
+
+    # XHTTP (Xray-core) share link
+    if [[ -n "${CONFIG_XHTTP:-}" ]]; then
+        replace_placeholder "{{CONFIG_XHTTP}}" "$CONFIG_XHTTP"
+    else
+        replace_placeholder "{{CONFIG_XHTTP}}" "XHTTP not enabled"
     fi
 
     # CDN VLESS+WS config

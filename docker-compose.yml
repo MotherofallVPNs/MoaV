@@ -109,8 +109,16 @@ services:
       - WSTUNNEL_LISTEN=0.0.0.0:8080
       # Forward to wireguard container via Docker internal DNS
       - WSTUNNEL_RESTRICT=moav-wireguard:51820
+      # Enables wss:// (TLS) using the mounted Let's Encrypt cert; empty = ws://
+      - DOMAIN=${DOMAIN:-}
     cap_drop:
       - ALL
+    cap_add:
+      # Copy the root-owned cert to a tmpfs the moav user can read, then drop privs
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETUID
+      - SETGID
     security_opt:
       - no-new-privileges:true
     read_only: true
@@ -181,9 +189,10 @@ services:
     ports:
       - "${PORT_DNS:-53}:5353/udp"
     environment:
+      - DOMAIN=${DOMAIN}
       - DNSTT_DOMAIN=${DNSTT_SUBDOMAIN:-t}.${DOMAIN}
       - SLIPSTREAM_DOMAIN=${SLIPSTREAM_SUBDOMAIN:-s}.${DOMAIN}
-      - MASTERDNS_DOMAIN=${MASTERDNS_SUBDOMAIN:-m}.${DOMAIN}
+      - MASTERDNS_DOMAIN=${MASTERDNS_SUBDOMAIN:-m}.${DOMAIN}${MASTERDNS_PUBLIC_SUBDOMAIN:+,${MASTERDNS_PUBLIC_SUBDOMAIN}.${DOMAIN}}
       - XDNS_DOMAIN=${XDNS_SUBDOMAIN:-x}.${DOMAIN}
       - ENABLE_DNSTT=${ENABLE_DNSTT:-true}
       - ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM:-true}
@@ -297,6 +306,7 @@ services:
     environment:
       - ENABLE_MASTERDNS=${ENABLE_MASTERDNS:-true}
       - MASTERDNS_SUBDOMAIN=${MASTERDNS_SUBDOMAIN:-m}
+      - MASTERDNS_PUBLIC_SUBDOMAIN=${MASTERDNS_PUBLIC_SUBDOMAIN:-}
       - TZ=${TZ:-UTC}
     cap_drop:
       - ALL
@@ -542,6 +552,8 @@ services:
       dockerfile: dockerfiles/Dockerfile.gooserelay
       args:
         GOOSERELAY_VERSION: ${GOOSERELAY_VERSION:-v1.7.1}
+        GOPROXY: "${GOPROXY:-https://proxy.golang.org|https://goproxy.cn|direct}"
+        GOSUMDB: "${GOSUMDB:-off}"
     container_name: moav-gooserelay
     restart: unless-stopped
     logging: *default-logging
@@ -1278,6 +1290,7 @@ services:
       - PORT_XDNS=${PORT_XDNS:-5356}
       - ENABLE_MASTERDNS=${ENABLE_MASTERDNS:-true}
       - MASTERDNS_SUBDOMAIN=${MASTERDNS_SUBDOMAIN:-m}
+      - MASTERDNS_PUBLIC_SUBDOMAIN=${MASTERDNS_PUBLIC_SUBDOMAIN:-}
       - ENABLE_GOOSERELAY=${ENABLE_GOOSERELAY:-false}
       - PORT_GOOSE=${PORT_GOOSE:-8444}
       - ENABLE_ADMIN_UI=${ENABLE_ADMIN_UI:-true}

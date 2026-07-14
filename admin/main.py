@@ -101,7 +101,7 @@ async def check_for_updates() -> dict:
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             resp = await client.get(
-                "https://api.github.com/repos/shayanb/MoaV/releases/latest"
+                "https://api.github.com/repos/MotherofallVPNs/moav/releases/latest"
             )
             if resp.status_code == 200:
                 data = resp.json()

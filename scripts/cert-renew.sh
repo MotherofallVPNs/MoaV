@@ -20,7 +20,7 @@ fi
 
 # These copy /certs into the container at startup, so reload is not enough —
 # they need a restart to pick up renewed files.
-CERT_CONSUMERS="sing-box trusttunnel admin grafana grafana-proxy"
+CERT_CONSUMERS="sing-box wstunnel trusttunnel admin grafana grafana-proxy"
 
 # live/ symlinks into archive/; the resolved mtime changes on renewal
 cert_fingerprint() {

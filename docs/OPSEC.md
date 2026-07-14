@@ -161,6 +161,8 @@ sudo ufw-docker allow moav-admin 8443/tcp from YOUR_IP
 - Reset: `moav admin password`
 - IP whitelist: `ADMIN_IP_WHITELIST` in `.env`
 
+> **Fail-closed authentication.** The dashboard **refuses to serve** (HTTP 503) if `ADMIN_PASSWORD` is empty, unset, or one of the known-insecure defaults (`admin`, `change_me_to_something_secure`), rather than silently allowing access. This closes an edge case where an empty password would otherwise accept an empty `Authorization` header. Password comparison is constant-time. If you see a 503 with a remediation message, set a real `ADMIN_PASSWORD` in `.env` and `moav restart admin`.
+
 **Grafana** (`https://server:9444`):
 - Username: `admin`
 - Password: same as `ADMIN_PASSWORD`
@@ -220,12 +222,13 @@ moav regenerate-users
    ```bash
    moav user revoke compromised_user
    ```
-3. **Rotate server keys periodically** — re-bootstrap if concerned
-4. **Keep backups:**
+3. **Keep dnstt private keys private** — `state/keys/dnstt-server.key.hex` is the persistent dnstt server private key. It should be readable only by the dnstt container user (`100:101`, mode `0600`). If MoaV cannot set that ownership during bootstrap, fix the host permissions and re-run bootstrap rather than making the key world-readable.
+4. **Rotate server keys periodically** — re-bootstrap if concerned
+5. **Keep backups:**
    ```bash
    moav export    # Creates moav-backup-TIMESTAMP.tar.gz
    ```
-5. **Use strong admin password** — at least 16 characters, generated randomly
+6. **Use strong admin password** — at least 16 characters, generated randomly
 
 ### Monitoring
 

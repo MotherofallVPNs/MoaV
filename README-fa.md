@@ -52,8 +52,8 @@ curl -fsSL moav.sh/install.sh | bash
 <div dir="ltr">
 
 ```bash
-git clone https://github.com/shayanb/MoaV.git
-cd MoaV
+git clone https://github.com/MotherofallVPNs/moav.git
+cd moav
 cp .env.example .env
 nano .env  # تنظیم DOMAIN، ACME_EMAIL، ADMIN_PASSWORD
 ./moav.sh

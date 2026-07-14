@@ -63,8 +63,8 @@ All files that contain the version number:
 
 ### 3b. Add link reference at bottom of file
 ```markdown
-[Unreleased]: https://github.com/shayanb/MoaV/compare/v1.X.Y...HEAD
-[1.X.Y]: https://github.com/shayanb/MoaV/compare/v1.X-1.Z...v1.X.Y
+[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v1.X.Y...HEAD
+[1.X.Y]: https://github.com/MotherofallVPNs/moav/compare/v1.X-1.Z...v1.X.Y
 ```
 - Update the `[Unreleased]` link to compare from the NEW version
 - Add a new link for the new version comparing from the PREVIOUS version
@@ -72,7 +72,7 @@ All files that contain the version number:
 ### 3c. Changelog style
 - Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format
 - Group by: Added, Changed, Fixed, Security, Breaking Changes
-- Link GitHub issues where applicable: `([#48](https://github.com/shayanb/MoaV/issues/48))`
+- Link GitHub issues where applicable: `([#48](https://github.com/MotherofallVPNs/moav/issues/48))`
 - Bold the feature name, then dash, then description
 
 ---
@@ -150,7 +150,7 @@ moav update
 > **Breaking:** [description]. After updating, run `moav config rebuild` to regenerate configs.
 
 ## Full Changelog
-https://github.com/shayanb/MoaV/compare/v1.X-1.Z...v1.X.Y
+https://github.com/MotherofallVPNs/moav/compare/v1.X-1.Z...v1.X.Y
 ```
 
 ### 6c. Release creation

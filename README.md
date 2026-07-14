@@ -1,6 +1,6 @@
 # MoaV
 
-[![Website](https://img.shields.io/badge/website-moav.sh-cyan.svg)](https://moav.sh)  [![Docs](https://img.shields.io/badge/docs-moav.sh%2Fdocs-cyan.svg)](https://moav.sh/docs/)  [![Version](https://img.shields.io/badge/version-1.8.5-blue.svg)](CHANGELOG.md)  [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Website](https://img.shields.io/badge/website-moav.sh-cyan.svg)](https://moav.sh)  [![Docs](https://img.shields.io/badge/docs-moav.sh%2Fdocs-cyan.svg)](https://moav.sh/docs/)  [![Version](https://img.shields.io/badge/version-1.9.0-blue.svg)](CHANGELOG.md)  [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 English | **[فارسی](README-fa.md)** 
 
@@ -44,8 +44,8 @@ This will:
 **Manual install** (alternative):
 
 ```bash
-git clone https://github.com/shayanb/MoaV.git
-cd MoaV
+git clone https://github.com/MotherofallVPNs/moav.git
+cd moav
 cp .env.example .env
 nano .env  # Set DOMAIN, ACME_EMAIL, ADMIN_PASSWORD
 ./moav.sh

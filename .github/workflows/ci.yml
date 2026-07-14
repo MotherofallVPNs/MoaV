@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-bash:
+    name: shellcheck + bash -n
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: List shell scripts
+        id: files
+        run: |
+          files=$(git ls-files '*.sh' 'moav.sh' | sort -u)
+          echo "count=$(echo "$files" | wc -l)" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$files" > /tmp/shfiles
+      - name: bash -n (parse check)
+        run: |
+          rc=0
+          while IFS= read -r f; do
+            # Only parse-check bash scripts; some entrypoints are POSIX sh
+            head -1 "$f" | grep -qE 'bash' && { bash -n "$f" || rc=1; }
+          done < /tmp/shfiles
+          exit $rc
+      - name: shellcheck (severity=error)
+        run: xargs shellcheck --severity=error < /tmp/shfiles
+      - name: share-link golden test
+        run: bash tests/singbox-links-test.sh
+      - name: protocol-roster drift gate
+        run: python3 scripts/gen-protocol-docs.py --check
+
+  go-test:
+    name: go test dns-router
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: false   # dns-router is stdlib-only (no go.sum to hash)
+      - name: go vet
+        working-directory: dns-router
+        run: go vet ./...
+      - name: go test
+        working-directory: dns-router
+        run: go test -race ./...
+
+  compose-config:
+    name: docker compose config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate compose file
+        run: |
+          cp .env.example .env
+          docker compose config >/dev/null

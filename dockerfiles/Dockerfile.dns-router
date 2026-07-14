@@ -37,6 +37,7 @@ RUN apk add --no-cache ca-certificates tzdata bash
 RUN addgroup -S moav && adduser -S moav -G moav
 
 COPY --from=builder /dns-router /usr/local/bin/dns-router
+COPY VERSION /VERSION
 
 RUN mkdir -p /app && chown moav:moav /app
 

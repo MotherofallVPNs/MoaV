@@ -26,6 +26,19 @@ cd "$SCRIPT_DIR/.."
 
 source scripts/lib/common.sh
 
+compose_timeout() {
+    if command -v timeout >/dev/null 2>&1; then
+        # -k: if `docker compose` ignores the SIGTERM at the deadline (e.g. it's
+        # stuck in `exec` against a wedged container — the AmneziaWG hot-reload
+        # hang), SIGKILL it 5s later so `user add` can never block indefinitely.
+        # (No global stdin redirect here — callers like `echo KEY | ... awg pubkey`
+        # rely on the piped stdin.)
+        timeout -k 5 "${COMPOSE_TIMEOUT:-20}" docker compose "$@"
+    else
+        docker compose "$@"
+    fi
+}
+
 # Parse arguments
 USERNAMES=()
 CREATE_PACKAGE=false
@@ -254,7 +267,7 @@ for USERNAME in "${USERNAMES[@]}"; do
     # -------------------------------------------------------------------------
     if [[ "${ENABLE_WIREGUARD:-true}" == "true" ]] && [[ -f "configs/wireguard/wg0.conf" ]]; then
         # Check if WireGuard service is actually running or wg tools are available
-        if docker compose ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q . || command -v wg &>/dev/null; then
+        if compose_timeout ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q . || command -v wg &>/dev/null; then
             log_info "[2/3] Adding to WireGuard..."
             if "$SCRIPT_DIR/wg-user-add.sh" "$USERNAME" $RELOAD_FLAG; then
                 log_info "✓ WireGuard peer added"
@@ -277,17 +290,21 @@ for USERNAME in "${USERNAMES[@]}"; do
     if [[ "${ENABLE_AMNEZIAWG:-true}" == "true" ]] && [[ -f "configs/amneziawg/awg0.conf" ]]; then
         log_info "[3/3] Adding to AmneziaWG..."
         (
-            # Generate client keys (standard WG key format, compatible with AWG)
-            # Use running container for key generation (host may not have wg/awg)
-            if docker compose ps amneziawg --status running 2>/dev/null | tail -n +2 | grep -q .; then
-                AWG_CLIENT_PRIVATE=$(docker compose exec -T amneziawg awg genkey)
-                AWG_CLIENT_PUBLIC=$(echo "$AWG_CLIENT_PRIVATE" | docker compose exec -T amneziawg awg pubkey)
-            elif docker compose ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q .; then
-                AWG_CLIENT_PRIVATE=$(docker compose exec -T wireguard wg genkey)
-                AWG_CLIENT_PUBLIC=$(echo "$AWG_CLIENT_PRIVATE" | docker compose exec -T wireguard wg pubkey)
+            # Generate client keys (standard WG key format, compatible with AWG).
+            # Use a running container (host may not have wg/awg). tr -d '\r\n':
+            # `docker compose exec` into some images emits CRLF, and $() strips
+            # only the trailing \n — a leftover \r makes the 44-char key 45 chars,
+            # so `awg/wg pubkey` rejects it ("Key is not the correct length"),
+            # silently writing a broken peer.
+            if compose_timeout ps amneziawg --status running 2>/dev/null | tail -n +2 | grep -q .; then
+                AWG_CLIENT_PRIVATE=$(compose_timeout exec -T amneziawg awg genkey | tr -d '\r\n')
+                AWG_CLIENT_PUBLIC=$(printf '%s' "$AWG_CLIENT_PRIVATE" | compose_timeout exec -T amneziawg awg pubkey | tr -d '\r\n')
+            elif compose_timeout ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q .; then
+                AWG_CLIENT_PRIVATE=$(compose_timeout exec -T wireguard wg genkey | tr -d '\r\n')
+                AWG_CLIENT_PUBLIC=$(printf '%s' "$AWG_CLIENT_PRIVATE" | compose_timeout exec -T wireguard wg pubkey | tr -d '\r\n')
             elif command -v wg &>/dev/null; then
-                AWG_CLIENT_PRIVATE=$(wg genkey)
-                AWG_CLIENT_PUBLIC=$(echo "$AWG_CLIENT_PRIVATE" | wg pubkey)
+                AWG_CLIENT_PRIVATE=$(wg genkey | tr -d '\r\n')
+                AWG_CLIENT_PUBLIC=$(printf '%s' "$AWG_CLIENT_PRIVATE" | wg pubkey | tr -d '\r\n')
             else
                 log_error "No wg/awg command available (install wireguard-tools or ensure amneziawg container is running)"
                 exit 1
@@ -295,8 +312,8 @@ for USERNAME in "${USERNAMES[@]}"; do
 
             # Find next available IP (extract actual used IPs from config AND running interface)
             USED_AWG_IPS=$(grep 'AllowedIPs = 10\.67\.67\.' "configs/amneziawg/awg0.conf" 2>/dev/null | sed 's/.*10\.67\.67\.\([0-9]*\).*/\1/' || echo "")
-            if docker compose ps amneziawg --status running 2>/dev/null | tail -n +2 | grep -q .; then
-                RUNNING_AWG_IPS=$(docker compose exec -T amneziawg awg show awg0 allowed-ips 2>/dev/null | grep '10\.67\.67\.' | sed 's/.*10\.67\.67\.\([0-9]*\).*/\1/' || echo "")
+            if compose_timeout ps amneziawg --status running 2>/dev/null | tail -n +2 | grep -q .; then
+                RUNNING_AWG_IPS=$(compose_timeout exec -T amneziawg awg show awg0 allowed-ips 2>/dev/null | grep '10\.67\.67\.' | sed 's/.*10\.67\.67\.\([0-9]*\).*/\1/' || echo "")
                 USED_AWG_IPS="$USED_AWG_IPS $RUNNING_AWG_IPS"
             fi
             AWG_NEXT_IP=2  # Start from .2 (server is .1)
@@ -344,9 +361,9 @@ PEEREOF
 
             # Hot-add peer to running AmneziaWG (unless batch mode — batch reloads later)
             if [[ "$BATCH_MODE" != "true" ]]; then
-                if docker compose ps amneziawg --status running 2>/dev/null | tail -n +2 | grep -q .; then
+                if compose_timeout ps amneziawg --status running 2>/dev/null | tail -n +2 | grep -q .; then
                     log_info "Adding peer to running AmneziaWG..."
-                    if docker compose exec -T amneziawg awg set awg0 peer "$AWG_CLIENT_PUBLIC" allowed-ips "$AWG_ALLOWED" 2>/dev/null; then
+                    if compose_timeout exec -T amneziawg awg set awg0 peer "$AWG_CLIENT_PUBLIC" allowed-ips "$AWG_ALLOWED" 2>/dev/null; then
                         log_info "Peer added to running AmneziaWG (hot reload)"
                     else
                         log_info "Hot reload failed, you may need to restart AmneziaWG"
@@ -557,7 +574,7 @@ fi
 # the shared key is taken from outputs/masterdns/encrypt_key.txt (published by
 # bootstrap). Keep the text in sync with lib/masterdns.sh.
 if [[ "${ENABLE_MASTERDNS:-true}" == "true" ]] && [[ -f "outputs/masterdns/encrypt_key.txt" ]]; then
-    MASTERDNS_DOMAIN="${MASTERDNS_SUBDOMAIN:-m}.${DOMAIN}"
+    MASTERDNS_DOMAIN="${MASTERDNS_PUBLIC_SUBDOMAIN:-${MASTERDNS_SUBDOMAIN:-m}}.${DOMAIN}"
     MD_ENC_METHOD="${MASTERDNS_ENC_METHOD:-5}"
     MD_KEY=$(tr -d '\n\r ' < "outputs/masterdns/encrypt_key.txt")
     [[ -z "$MD_KEY" ]] && MD_KEY="KEY_NOT_GENERATED"
@@ -787,6 +804,7 @@ if [[ -f "$TEMPLATE_FILE" ]]; then
     sed -i.bak "s|{{USERNAME}}|$USERNAME|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{SERVER_IP}}|$SERVER_IP|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{DOMAIN}}|${DOMAIN:-YOUR_DOMAIN}|g" "$OUTPUT_HTML"
+    sed -i.bak "s|{{WSTUNNEL_CMD}}|$(wstunnel_client_cmd)|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{PORT_SS}}|${PORT_SS:-8388}|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{GENERATED_DATE}}|$GENERATED_DATE|g" "$OUTPUT_HTML"
     sed -i.bak "s|{{DNSTT_DOMAIN}}|$DNSTT_DOMAIN|g" "$OUTPUT_HTML"
@@ -1010,12 +1028,24 @@ fi
     # user-add.sh writes to host ./state/, but bootstrap reads from Docker volume.
     # -------------------------------------------------------------------------
     if [[ ${#ERRORS[@]} -eq 0 ]] && [[ -d "./state/users/$USERNAME" ]]; then
-        docker run --rm \
-            -v moav_moav_state:/state \
-            -v "$(pwd)/state/users/$USERNAME:/host-user:ro" \
-            alpine sh -c "mkdir -p /state/users/$USERNAME && cp -a /host-user/* /state/users/$USERNAME/" \
-            2>/dev/null && log_info "✓ Synced credentials to Docker volume" \
-            || log_warn "Could not sync to Docker volume (bootstrap will import on next run)"
+        if [[ -d "/state" ]]; then
+            # Admin container mounts the state volume :ro and runs unprivileged —
+            # the write fails there by design and bootstrap imports on its next run
+            if mkdir -p "/state/users/$USERNAME" 2>/dev/null && cp -a "./state/users/$USERNAME/." "/state/users/$USERNAME/" 2>/dev/null; then
+                log_info "✓ Synced credentials to Docker volume"
+            else
+                log_warn "Could not sync to Docker volume (read-only here; bootstrap will import on next run)"
+            fi
+        else
+            _tmo=""
+            command -v timeout >/dev/null 2>&1 && _tmo="timeout 15"
+            $_tmo docker run --rm \
+                -v moav_moav_state:/state \
+                -v "$(pwd)/state/users/$USERNAME:/host-user:ro" \
+                alpine sh -c "mkdir -p /state/users/$USERNAME && cp -a /host-user/. /state/users/$USERNAME/" \
+                2>/dev/null && log_info "✓ Synced credentials to Docker volume" \
+                || log_warn "Could not sync to Docker volume (bootstrap will import on next run)"
+        fi
     fi
 
     # -------------------------------------------------------------------------
@@ -1045,59 +1075,59 @@ if [[ "$BATCH_MODE" == "true" ]] && [[ ${#CREATED_USERS[@]} -gt 0 ]]; then
 
     # Reload sing-box
     if [[ -f "configs/sing-box/config.json" ]]; then
-        if docker compose ps sing-box --status running 2>/dev/null | tail -n +2 | grep -q .; then
+        if compose_timeout ps sing-box --status running 2>/dev/null | tail -n +2 | grep -q .; then
             log_info "Reloading sing-box..."
-            if docker compose exec -T sing-box sing-box reload 2>/dev/null; then
+            if compose_timeout exec -T sing-box sing-box reload 2>/dev/null; then
                 log_info "✓ sing-box reloaded"
             else
                 log_info "Hot reload failed, restarting sing-box..."
-                docker compose restart sing-box
+                compose_timeout restart sing-box || log_warn "Timed out restarting sing-box"
             fi
         fi
     fi
 
     # Reload WireGuard (needs to sync peers)
     if [[ "${ENABLE_WIREGUARD:-true}" == "true" ]] && [[ -f "configs/wireguard/wg0.conf" ]]; then
-        if docker compose ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q .; then
+        if compose_timeout ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q .; then
             log_info "Syncing WireGuard peers..."
-            docker compose exec -T wireguard wg syncconf wg0 <(docker compose exec -T wireguard wg-quick strip wg0) 2>/dev/null || \
-                docker compose restart wireguard
+            compose_timeout exec -T wireguard wg syncconf wg0 <(compose_timeout exec -T wireguard wg-quick strip wg0) 2>/dev/null || \
+                compose_timeout restart wireguard || log_warn "Timed out restarting WireGuard"
             log_info "✓ WireGuard synced"
         fi
     fi
 
     # Reload AmneziaWG
     if [[ "${ENABLE_AMNEZIAWG:-true}" == "true" ]] && [[ -f "configs/amneziawg/awg0.conf" ]]; then
-        if docker compose ps amneziawg --status running 2>/dev/null | tail -n +2 | grep -q .; then
+        if compose_timeout ps amneziawg --status running 2>/dev/null | tail -n +2 | grep -q .; then
             log_info "Restarting AmneziaWG..."
-            docker compose restart amneziawg
+            compose_timeout restart amneziawg || log_warn "Timed out restarting AmneziaWG"
             log_info "✓ AmneziaWG restarted"
         fi
     fi
 
     # Reload TrustTunnel
     if [[ -f "configs/trusttunnel/credentials.toml" ]]; then
-        if docker compose ps trusttunnel --status running 2>/dev/null | tail -n +2 | grep -q .; then
+        if compose_timeout ps trusttunnel --status running 2>/dev/null | tail -n +2 | grep -q .; then
             log_info "Restarting TrustTunnel..."
-            docker compose restart trusttunnel
+            compose_timeout restart trusttunnel || log_warn "Timed out restarting TrustTunnel"
             log_info "✓ TrustTunnel restarted"
         fi
     fi
 
     # Reload Xray (XHTTP)
     if [[ -f "configs/xray/config.json" ]]; then
-        if docker compose --profile xhttp ps xray --status running 2>/dev/null | tail -n +2 | grep -q .; then
+        if compose_timeout --profile xhttp ps xray --status running 2>/dev/null | tail -n +2 | grep -q .; then
             log_info "Restarting Xray..."
-            docker compose --profile xhttp restart xray
+            compose_timeout --profile xhttp restart xray || log_warn "Timed out restarting Xray"
             log_info "✓ Xray restarted"
         fi
     fi
 
     # Reload telemt
     if [[ -f "configs/telemt/config.toml" ]]; then
-        if docker compose --profile telegram ps telemt --status running 2>/dev/null | tail -n +2 | grep -q .; then
+        if compose_timeout --profile telegram ps telemt --status running 2>/dev/null | tail -n +2 | grep -q .; then
             log_info "Restarting telemt..."
-            docker compose --profile telegram restart telemt
+            compose_timeout --profile telegram restart telemt || log_warn "Timed out restarting telemt"
             log_info "✓ telemt restarted"
         fi
     fi

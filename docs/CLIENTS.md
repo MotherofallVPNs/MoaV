@@ -463,12 +463,18 @@ You need both WireGuard and wstunnel client:
 
 #### macOS / Linux Setup
 
+> **Use the exact command from your bundle.** `wireguard-instructions.txt` in
+> your user bundle has the ready-to-paste command — it uses `wss://YOUR_DOMAIN:8080`
+> (TLS) when the server has a domain, plus a per-install `--http-upgrade-path-prefix`
+> secret. The examples below are the generic (domainless) form.
+
 ```bash
 # 1. Download wstunnel from GitHub releases
 # https://github.com/erebe/wstunnel/releases
 
 # 2. Start wstunnel client (connect to server's port 8080)
-wstunnel client -L udp://127.0.0.1:51820:127.0.0.1:51820 ws://YOUR_SERVER_IP:8080
+#    Domain server: wss://YOUR_DOMAIN:8080 --http-upgrade-path-prefix <secret from bundle>
+wstunnel client -L udp://127.0.0.1:51820:moav-wireguard:51820 ws://YOUR_SERVER_IP:8080
 
 # 3. In another terminal, import WireGuard config
 # The config points to 127.0.0.1:51820 (local wstunnel)
@@ -480,7 +486,7 @@ sudo wg-quick up ./wireguard-wstunnel.conf
 1. Download wstunnel.exe from GitHub releases
 2. Open PowerShell/CMD and run:
    ```
-   wstunnel.exe client -L udp://127.0.0.1:51820:127.0.0.1:51820 ws://YOUR_SERVER_IP:8080
+   wstunnel.exe client -L udp://127.0.0.1:51820:moav-wireguard:51820 ws://YOUR_SERVER_IP:8080
    ```
 3. Keep this running
 4. Import `wireguard-wstunnel.conf` in WireGuard app

@@ -153,9 +153,9 @@ if [[ -f "$AWG_CONFIG" ]] && donate_needs amneziawg; then
     if grep -q "# $USER_ID" "$AWG_CONFIG" 2>/dev/null; then
         log_info "User $USER_ID already exists in AmneziaWG"
     else
-        # Generate client keys
-        AWG_CLIENT_PRIVATE=$(wg genkey)
-        AWG_CLIENT_PUBLIC=$(echo "$AWG_CLIENT_PRIVATE" | wg pubkey)
+        # Generate client keys (tr -d '\r\n': guard against a CRLF-emitting wg)
+        AWG_CLIENT_PRIVATE=$(wg genkey | tr -d '\r\n')
+        AWG_CLIENT_PUBLIC=$(printf '%s' "$AWG_CLIENT_PRIVATE" | wg pubkey | tr -d '\r\n')
 
         # Count existing peers for IP assignment
         AWG_PEER_COUNT=$(grep -c '^\[Peer\]' "$AWG_CONFIG" 2>/dev/null) || true
@@ -291,6 +291,7 @@ export TELEMT_MAX_UNIQUE_IPS="${TELEMT_MAX_UNIQUE_IPS:-10}"
 export DNSTT_SUBDOMAIN="${DNSTT_SUBDOMAIN:-t}"
 export SLIPSTREAM_SUBDOMAIN="${SLIPSTREAM_SUBDOMAIN:-s}"
 export MASTERDNS_SUBDOMAIN="${MASTERDNS_SUBDOMAIN:-m}"
+export MASTERDNS_PUBLIC_SUBDOMAIN="${MASTERDNS_PUBLIC_SUBDOMAIN:-}"
 # Construct CDN_DOMAIN from CDN_SUBDOMAIN + DOMAIN if not explicitly set
 if [[ -z "${CDN_DOMAIN:-}" && -n "${CDN_SUBDOMAIN:-}" && -n "${DOMAIN:-}" ]]; then
     export CDN_DOMAIN="${CDN_SUBDOMAIN}.${DOMAIN}"

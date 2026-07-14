@@ -1,7 +1,7 @@
 site_name: MoaV Docs
 site_url: https://moav.sh/docs/
-repo_url: https://github.com/shayanb/MoaV
-repo_name: shayanb/MoaV
+repo_url: https://github.com/MotherofallVPNs/moav
+repo_name: MotherofallVPNs/moav
 edit_uri: edit/main/docs/
 
 theme:

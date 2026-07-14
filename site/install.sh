@@ -22,7 +22,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Configuration
-REPO_URL="https://github.com/shayanb/MoaV.git"
+REPO_URL="https://github.com/MotherofallVPNs/moav.git"
 INSTALL_DIR="${MOAV_INSTALL_DIR:-/opt/moav}"
 BRANCH="${MOAV_BRANCH:-main}"
 
@@ -762,6 +762,6 @@ else
 fi
 
 echo ""
-echo -e "${CYAN}Documentation:${NC} https://github.com/shayanb/MoaV"
+echo -e "${CYAN}Documentation:${NC} https://github.com/MotherofallVPNs/moav"
 echo -e "${CYAN}Website:${NC} https://moav.sh"
 echo ""
