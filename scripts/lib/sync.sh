@@ -28,33 +28,44 @@ sync_server_users() {
         ss=$(sed -n 's/^SS_USER_PSK=//p' "${d}shadowsocks.env" 2>/dev/null | head -1)
         [[ -n "$uuid" ]] || continue
 
-        # sing-box: reality / trojan / anytls / hysteria2 / cdn(vless-ws) / ss.
-        # Skip if this user's UUID/name is already present anywhere in the config.
-        if ! grep -q "$uuid" "$sb"; then
-            tmp=$(mktemp)
-            jq --arg n "$u" --arg id "$uuid" '.inbounds|=map(if .tag=="vless-reality-in" then .users+=[{"name":$n,"uuid":$id,"flow":"xtls-rprx-vision"}] else . end)' "$sb" \
-             | jq --arg n "$u" --arg p "$pass" '.inbounds|=map(if .tag=="trojan-tls-in" then .users+=[{"name":$n,"password":$p}] else . end)' \
-             | jq --arg n "$u" --arg p "$pass" '.inbounds|=map(if .tag=="anytls-in" then .users+=[{"name":$n,"password":$p}] else . end)' \
-             | jq --arg n "$u" --arg p "$pass" '.inbounds|=map(if .tag=="hysteria2-in" then .users+=[{"name":$n,"password":$p}] else . end)' \
-             | jq --arg n "$u" --arg id "$uuid" '.inbounds|=map(if .tag=="vless-ws-in" then .users+=[{"name":$n,"uuid":$id}] else . end)' > "$tmp"
-            if [[ -n "$ss" ]]; then
-                jq --arg n "$u" --arg p "$ss" '.inbounds|=map(if .tag=="shadowsocks-in" then .users+=[{"name":$n,"password":$p}] else . end)' "$tmp" > "${tmp}.2" \
-                    && mv -f "${tmp}.2" "$tmp"
-            fi
-            if jq empty "$tmp" 2>/dev/null; then cat "$tmp" > "$sb"; added=$((added+1)); fi
-            rm -f "$tmp" "${tmp}.2"
+        # sing-box: add this user to every enabled inbound they belong to, each
+        # insert INDEPENDENTLY idempotent. Do NOT gate the block on the UUID:
+        # SS/Trojan/AnyTLS/Hysteria2 entries carry only a password (no UUID), so
+        # a "UUID already present" guard would skip repairing them the moment
+        # Reality re-added the UUID — leaving a user in the Reality inbound but
+        # missing from the password inbounds (the SS "invalid request" bug).
+        # Dedup UUID inbounds by uuid, password inbounds by name.
+        tmp=$(mktemp)
+        if jq --arg n "$u" --arg id "$uuid" --arg p "$pass" --arg ss "$ss" '
+                def addbyuuid($tag; $e):
+                  .inbounds |= map(if .tag==$tag and ((any(.users[]?; .uuid==$e.uuid)) | not)
+                                   then .users += [$e] else . end);
+                def addbyname($tag; $e):
+                  .inbounds |= map(if .tag==$tag and ((any(.users[]?; .name==$e.name)) | not)
+                                   then .users += [$e] else . end);
+                addbyuuid("vless-reality-in"; {name:$n, uuid:$id, flow:"xtls-rprx-vision"})
+                | addbyname("trojan-tls-in"; {name:$n, password:$p})
+                | addbyname("anytls-in";     {name:$n, password:$p})
+                | addbyname("hysteria2-in";  {name:$n, password:$p})
+                | addbyuuid("vless-ws-in";   {name:$n, uuid:$id})
+                | (if $ss != "" then addbyname("shadowsocks-in"; {name:$n, password:$ss}) else . end)
+            ' "$sb" > "$tmp" 2>/dev/null && jq empty "$tmp" 2>/dev/null; then
+            if ! cmp -s "$tmp" "$sb"; then cat "$tmp" > "$sb"; added=$((added+1)); fi
         fi
+        rm -f "$tmp"
 
-        # xray (XHTTP): append to whichever field the running config uses
-        # (older configs use settings.clients, newer settings.users).
-        if [[ -f "$xr" ]] && ! grep -q "$uuid" "$xr"; then
+        # xray (XHTTP): add to every vless inbound, idempotent by id, into
+        # whichever field the running config uses (older: settings.clients,
+        # newer: settings.users).
+        if [[ -f "$xr" ]]; then
             tmp=$(mktemp)
             if jq --arg id "$uuid" --arg e "${u}@moav" '
                     (.inbounds[] | select(.protocol=="vless" and (.tag // "" | startswith("vless-"))) | .settings) |=
-                      (if has("clients") then .clients += [{"id":$id,"email":$e,"flow":""}]
-                       else .users += [{"id":$id,"email":$e,"flow":""}] end)
+                      (if has("clients")
+                       then (if (any(.clients[]?; .id==$id) | not) then .clients += [{"id":$id,"email":$e,"flow":""}] else . end)
+                       else (if (any(.users[]?;   .id==$id) | not) then .users   += [{"id":$id,"email":$e,"flow":""}] else . end) end)
                 ' "$xr" > "$tmp" 2>/dev/null && jq empty "$tmp" 2>/dev/null; then
-                cat "$tmp" > "$xr"
+                if ! cmp -s "$tmp" "$xr"; then cat "$tmp" > "$xr"; fi
             fi
             rm -f "$tmp"
         fi
