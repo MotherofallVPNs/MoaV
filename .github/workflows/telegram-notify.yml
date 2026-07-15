@@ -14,8 +14,11 @@ on:
     types: [labeled]
   workflow_dispatch:
     inputs:
+      release_tag:
+        description: 'Send a REAL release notification for this tag (e.g. v1.9.1) — test against a past release. Blank = send the plain test text below.'
+        default: ''
       text:
-        description: 'Test message to send to the channel'
+        description: 'Plain test message (used only when release_tag is blank)'
         default: 'MoaV Telegram notifier test ✅'
 
 permissions:
@@ -32,6 +35,7 @@ jobs:
 
       - name: Build message
         env:
+          GH_TOKEN: ${{ github.token }}
           EVENT: ${{ github.event_name }}
           REPO: ${{ github.repository }}
           ANNOUNCE_LABEL: ${{ env.ANNOUNCE_LABEL }}
@@ -44,7 +48,20 @@ jobs:
           ISSUE_URL: ${{ github.event.issue.html_url }}
           ISSUE_NUM: ${{ github.event.issue.number }}
           DISPATCH_TEXT: ${{ github.event.inputs.text }}
-        run: python3 .github/scripts/telegram_format.py > message.txt
+          RELEASE_TAG_INPUT: ${{ github.event.inputs.release_tag }}
+        run: |
+          # Manual test against a real (e.g. previous) release: fetch it and
+          # format it exactly like the automatic release notification.
+          if [ "$EVENT" = "workflow_dispatch" ] && [ -n "$RELEASE_TAG_INPUT" ]; then
+            echo "Fetching release $RELEASE_TAG_INPUT for a test notification…"
+            gh api "repos/${REPO}/releases/tags/${RELEASE_TAG_INPUT}" > release.json
+            export EVENT=release
+            REL_NAME=$(jq -r '.name // .tag_name' release.json); export REL_NAME
+            REL_TAG=$(jq -r '.tag_name'           release.json); export REL_TAG
+            REL_URL=$(jq -r '.html_url'           release.json); export REL_URL
+            REL_BODY=$(jq -r '.body // ""'        release.json); export REL_BODY
+          fi
+          python3 .github/scripts/telegram_format.py > message.txt
 
       - name: Send to Telegram
         env:
