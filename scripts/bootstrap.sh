@@ -915,6 +915,22 @@ if [[ "$singbox_needed" == "true" ]]; then
         log_info "  Removed Shadowsocks inbound (disabled)"
     fi
 
+    # No server IPv6: re-resolve sniffed domains preferring IPv4 so proxied
+    # traffic doesn't try to dial AAAA targets the host can't route (the
+    # "network is unreachable" log spam + wasted dial per connection). Only when
+    # SERVER_IPV6 is empty — dual-stack servers keep their native behaviour.
+    # `prefer_ipv4` still falls back to IPv6, so it can't strand a destination.
+    # Inserted right after the DNS-hijack rule (needs the sniffed domain first).
+    if [[ -z "${SERVER_IPV6:-}" ]]; then
+        jq '
+          (.route.rules | map(.action == "hijack-dns") | index(true)) as $i
+          | .route.rules |= (if $i == null
+              then . + [{"action":"resolve","strategy":"prefer_ipv4"}]
+              else .[0:$i+1] + [{"action":"resolve","strategy":"prefer_ipv4"}] + .[$i+1:] end)
+        ' "$config_file" > "${config_file}.tmp" && mv -f "${config_file}.tmp" "$config_file"
+        log_info "  No server IPv6 — added prefer_ipv4 resolve rule (silences IPv6 dial failures)"
+    fi
+
     log_info "sing-box configuration written to /configs/sing-box/config.json"
 else
     log_info "sing-box not needed (no TLS protocols enabled)"
