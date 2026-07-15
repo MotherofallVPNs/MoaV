@@ -11,7 +11,11 @@ import html
 import os
 import re
 
-MAX_BODY = 900  # keep the whole message well under Telegram's 4096-char cap
+# Release-notes bodies are typically 1–3 KB; Telegram's hard cap is 4096 chars
+# (raw text incl. HTML tags). 3500 leaves ample room for the header + footer
+# links while fitting a full release section without truncation.
+MAX_BODY = 3500
+HEADER_EMOJI = "🛡️"  # release header icon — change here (or set to "" for none)
 
 
 def esc(s: str) -> str:
@@ -19,9 +23,13 @@ def esc(s: str) -> str:
 
 
 def demarkdown(s: str) -> str:
-    """Light-touch: strip markdown that renders as noise in HTML mode."""
-    s = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", s)  # [text](url) -> text
-    s = s.replace("**", "").replace("`", "")
+    """Light-touch: strip markdown that renders as literal noise in HTML mode."""
+    s = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", s)         # [text](url) -> text
+    s = re.sub(r"^```[a-zA-Z0-9]*[ \t]*$", "", s, flags=re.M)  # code-fence lines
+    s = re.sub(r"^#{1,6}[ \t]*", "", s, flags=re.M)        # # headers -> plain
+    s = re.sub(r"^[ \t]*[-*_]{3,}[ \t]*$", "", s, flags=re.M)  # --- hr rules
+    s = s.replace("**", "").replace("`", "")               # bold / code spans
+    s = re.sub(r"\n{3,}", "\n\n", s)                       # collapse blank runs
     return s
 
 
@@ -29,7 +37,13 @@ def trim(s: str, limit: int = MAX_BODY) -> str:
     s = s.strip()
     if len(s) <= limit:
         return s
-    return s[:limit].rsplit("\n", 1)[0].rstrip() + "\n…"
+    cut = s[:limit]
+    # Prefer to end on a newline, but only if one is near the end — otherwise a
+    # long single-line bullet would collapse the whole body back to its header.
+    nl = cut.rfind("\n")
+    if nl >= limit - 300:
+        cut = cut[:nl]
+    return cut.rstrip() + "\n…"
 
 
 def link(url: str, text: str) -> str:
@@ -40,7 +54,8 @@ def release() -> str:
     name = os.environ.get("REL_NAME") or os.environ.get("REL_TAG") or "New release"
     url = os.environ.get("REL_URL", "")
     body = trim(demarkdown(os.environ.get("REL_BODY", "")))
-    out = [f"🧅 <b>{esc(name)}</b> is out"]
+    head = f"{HEADER_EMOJI} " if HEADER_EMOJI else ""
+    out = [f"{head}<b>{esc(name)}</b> is out"]
     if body:
         out += ["", esc(body)]
     out += ["", f"📦 {link(url, 'Release notes & downloads')}",
