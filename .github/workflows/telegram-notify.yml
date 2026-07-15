@@ -1,0 +1,84 @@
+name: Telegram notify
+
+# Posts to the MoaV Telegram channel on:
+#   • a published GitHub Release  → title + notes excerpt + links
+#   • an issue labeled ANNOUNCE_LABEL → title + link (not every issue)
+#   • manual dispatch             → a test message
+# Requires repo secrets TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID; if either is
+# unset the send is skipped cleanly (no failed runs on forks).
+
+on:
+  release:
+    types: [published]
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Send a REAL release notification for this tag (e.g. v1.9.1) — test against a past release. Blank = send the plain test text below.'
+        default: ''
+      text:
+        description: 'Plain test message (used only when release_tag is blank)'
+        default: 'MoaV Telegram notifier test ✅'
+
+permissions:
+  contents: read
+
+env:
+  ANNOUNCE_LABEL: announce   # only issues with THIS label are posted
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build message
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          ANNOUNCE_LABEL: ${{ env.ANNOUNCE_LABEL }}
+          LABEL_ADDED: ${{ github.event.label.name }}
+          REL_NAME: ${{ github.event.release.name }}
+          REL_TAG: ${{ github.event.release.tag_name }}
+          REL_URL: ${{ github.event.release.html_url }}
+          REL_BODY: ${{ github.event.release.body }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_NUM: ${{ github.event.issue.number }}
+          DISPATCH_TEXT: ${{ github.event.inputs.text }}
+          RELEASE_TAG_INPUT: ${{ github.event.inputs.release_tag }}
+        run: |
+          # Manual test against a real (e.g. previous) release: fetch it and
+          # format it exactly like the automatic release notification.
+          if [ "$EVENT" = "workflow_dispatch" ] && [ -n "$RELEASE_TAG_INPUT" ]; then
+            echo "Fetching release $RELEASE_TAG_INPUT for a test notification…"
+            gh api "repos/${REPO}/releases/tags/${RELEASE_TAG_INPUT}" > release.json
+            export EVENT=release
+            REL_NAME=$(jq -r '.name // .tag_name' release.json); export REL_NAME
+            REL_TAG=$(jq -r '.tag_name'           release.json); export REL_TAG
+            REL_URL=$(jq -r '.html_url'           release.json); export REL_URL
+            REL_BODY=$(jq -r '.body // ""'        release.json); export REL_BODY
+          fi
+          python3 .github/scripts/telegram_format.py > message.txt
+
+      - name: Send to Telegram
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ ! -s message.txt ]; then
+            echo "Nothing to announce for this event — skipping."; exit 0
+          fi
+          if [ -z "${BOT_TOKEN}" ] || [ -z "${CHAT_ID}" ]; then
+            echo "::warning::TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not set — skipping send."; exit 0
+          fi
+          echo "Sending $(wc -c < message.txt) bytes to Telegram…"
+          curl -fsS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT_ID}" \
+            --data-urlencode "text@message.txt" \
+            -d parse_mode=HTML \
+            -d disable_web_page_preview=false \
+            -o /dev/null
+          echo "Sent."
