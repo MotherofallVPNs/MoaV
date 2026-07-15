@@ -45,7 +45,7 @@ echo "============================================================"
 # --- read / report commands (must not error) ---
 run must "moav help"                    -- "$MOAV" help
 run must "moav version"                 -- "$MOAV" version
-run must "install.sh --help"            -- bash site/install.sh --help
+run must "install.sh --help"            -- bash install.sh --help
 run must "moav status"                  -- "$MOAV" status
 run must "moav users"                   -- "$MOAV" users
 run must "moav profiles"                -- "$MOAV" profiles
