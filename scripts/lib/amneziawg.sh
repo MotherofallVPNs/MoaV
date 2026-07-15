@@ -142,9 +142,8 @@ amneziawg_add_peer() {
         client_ip_v6="${AWG_CLIENT_IP_V6:-}"
         log_info "Loaded existing AmneziaWG keys for $user_id"
     else
-        # Generate client keys (standard WG key format, compatible with AWG)
-        client_private_key=$(wg genkey)
-        client_public_key=$(echo "$client_private_key" | wg pubkey)
+        # Generate client keys (lib/keys.sh — CRLF-safe; standard WG format, AWG-compatible)
+        { read -r client_private_key && read -r client_public_key; } < <(wg_keypair)
 
         # Calculate client IP (IPv4)
         client_ip="10.67.67.$((peer_num + 1))"

@@ -7,6 +7,7 @@ set -euo pipefail
 # =============================================================================
 
 source /app/lib/common.sh
+source /app/lib/keys.sh
 source /app/lib/wireguard.sh
 source /app/lib/amneziawg.sh
 source /app/lib/dnstt.sh

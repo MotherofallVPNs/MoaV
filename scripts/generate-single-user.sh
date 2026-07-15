@@ -6,6 +6,7 @@ set -euo pipefail
 # =============================================================================
 
 source /app/lib/common.sh
+source /app/lib/keys.sh
 source /app/lib/wireguard.sh
 source /app/lib/amneziawg.sh
 source /app/lib/dnstt.sh
@@ -153,9 +154,8 @@ if [[ -f "$AWG_CONFIG" ]] && donate_needs amneziawg; then
     if grep -q "# $USER_ID" "$AWG_CONFIG" 2>/dev/null; then
         log_info "User $USER_ID already exists in AmneziaWG"
     else
-        # Generate client keys (tr -d '\r\n': guard against a CRLF-emitting wg)
-        AWG_CLIENT_PRIVATE=$(wg genkey | tr -d '\r\n')
-        AWG_CLIENT_PUBLIC=$(printf '%s' "$AWG_CLIENT_PRIVATE" | wg pubkey | tr -d '\r\n')
+        # Generate client keys (lib/keys.sh — CRLF-safe)
+        { read -r AWG_CLIENT_PRIVATE && read -r AWG_CLIENT_PUBLIC; } < <(wg_keypair)
 
         # Count existing peers for IP assignment
         AWG_PEER_COUNT=$(grep -c '^\[Peer\]' "$AWG_CONFIG" 2>/dev/null) || true
