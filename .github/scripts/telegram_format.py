@@ -55,9 +55,15 @@ def release() -> str:
     url = os.environ.get("REL_URL", "")
     body = trim(demarkdown(os.environ.get("REL_BODY", "")))
     head = f"{HEADER_EMOJI} " if HEADER_EMOJI else ""
-    out = [f"{head}<b>{esc(name)}</b> is out"]
+    # Both repos post to the same channel — prefix the product so a release is
+    # unambiguous. PRODUCT env wins; else the repo short-name. Skip if the
+    # release name already leads with it (avoids "MoaV MoaV v1.9.1").
+    product = os.environ.get("PRODUCT") or os.environ.get("REPO", "").split("/")[-1]
+    label = name if (product and name.lower().startswith(product.lower())) else f"{product} {name}".strip()
+    out = [f"{head}<b>{esc(label)}</b> is out"]
     if body:
-        out += ["", esc(body)]
+        # Render the notes in a monospace code box (Telegram <pre>).
+        out += ["", f"<pre>{esc(body)}</pre>"]
     out += ["", f"📦 {link(url, 'Release notes & downloads')}",
             f"🌐 {link('https://moav.sh', 'moav.sh')}"]
     return "\n".join(out)

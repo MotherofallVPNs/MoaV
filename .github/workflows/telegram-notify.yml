@@ -25,7 +25,8 @@ permissions:
   contents: read
 
 env:
-  ANNOUNCE_LABEL: announce   # only issues with THIS label are posted
+  ANNOUNCE_LABEL: announce     # only issues with THIS label are posted
+  PRODUCT: MoaV                # label releases in the shared channel
 
 jobs:
   notify:
