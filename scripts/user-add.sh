@@ -26,6 +26,7 @@ cd "$SCRIPT_DIR/.."
 
 source scripts/lib/common.sh
 source scripts/lib/keys.sh
+source scripts/lib/bundle-readme.sh
 
 compose_timeout() {
     if command -v timeout >/dev/null 2>&1; then
@@ -706,295 +707,26 @@ EOF
 fi
 
 # -----------------------------------------------------------------------------
-# Generate README.html from template
+# Generate README.html from template (shared renderer — lib/bundle-readme.sh)
 # -----------------------------------------------------------------------------
 TEMPLATE_FILE="templates/client-guide-template.html"
 OUTPUT_HTML="$OUTPUT_DIR/README.html"
 
 if [[ -f "$TEMPLATE_FILE" ]]; then
     log_info "Generating HTML guide..."
-
-    # Get server info
     SERVER_IP="${SERVER_IP:-$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || echo "YOUR_SERVER_IP")}"
-    GENERATED_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-
-    # Read config values
-    CONFIG_REALITY=$(cat "$OUTPUT_DIR/reality.txt" 2>/dev/null | tr -d '\n' || echo "")
-    CONFIG_HYSTERIA2=$(cat "$OUTPUT_DIR/hysteria2.txt" 2>/dev/null | tr -d '\n' || echo "")
-    CONFIG_TROJAN=$(cat "$OUTPUT_DIR/trojan.txt" 2>/dev/null | tr -d '\n' || echo "")
-    CONFIG_ANYTLS=$(cat "$OUTPUT_DIR/anytls.txt" 2>/dev/null | tr -d '\n' || echo "")
-    CONFIG_SHADOWSOCKS=$(cat "$OUTPUT_DIR/shadowsocks.txt" 2>/dev/null | tr -d '\n' || echo "")
-    CONFIG_CDN=$(cat "$OUTPUT_DIR/cdn-vless.txt" 2>/dev/null | tr -d '\n' || echo "")
-    CONFIG_WIREGUARD=$(cat "$OUTPUT_DIR/wireguard.conf" 2>/dev/null || echo "")
-    CONFIG_WIREGUARD_WSTUNNEL=$(cat "$OUTPUT_DIR/wireguard-wstunnel.conf" 2>/dev/null || echo "")
-    CONFIG_AMNEZIAWG=$(cat "$OUTPUT_DIR/amneziawg.conf" 2>/dev/null || echo "")
-    CONFIG_XHTTP=$(cat "$OUTPUT_DIR/xhttp-vless.txt" 2>/dev/null | tr -d '\n' || echo "")
-
-    # Construct CDN_DOMAIN from CDN_SUBDOMAIN + DOMAIN if not explicitly set
-    CDN_DOMAIN="${CDN_DOMAIN:-}"
-    if [[ -z "$CDN_DOMAIN" ]]; then
-        _cdn_sub="${CDN_SUBDOMAIN:-}"
-        _cdn_dom="${DOMAIN:-}"
-        if [[ -n "$_cdn_sub" && -n "$_cdn_dom" ]]; then
-            CDN_DOMAIN="${_cdn_sub}.${_cdn_dom}"
-        fi
+    # Context-specific inputs the shared renderer reads from the environment.
+    DNSTT_PUBKEY=$(cat "outputs/dnstt/server.pub" 2>/dev/null || echo "")
+    if [[ -z "${CDN_DOMAIN:-}" && -n "${CDN_SUBDOMAIN:-}" && -n "${DOMAIN:-}" ]]; then
+        CDN_DOMAIN="${CDN_SUBDOMAIN}.${DOMAIN}"
     fi
-    # CDN split SNI/Address for anti-DPI stealth
-    CDN_SNI="${CDN_SNI:-${DOMAIN:-}}"
-    CDN_ADDRESS="${CDN_ADDRESS:-${CDN_DOMAIN}}"
-    export CDN_SNI CDN_ADDRESS
-
-    # Read user password from trusttunnel.json or credentials
     if [[ -f "$OUTPUT_DIR/trusttunnel.json" ]]; then
         USER_PASSWORD=$(jq -r '.password // empty' "$OUTPUT_DIR/trusttunnel.json" 2>/dev/null || echo "")
     elif [[ -f "state/users/$USERNAME/credentials.env" ]]; then
         USER_PASSWORD=$(grep "^USER_PASSWORD=" "state/users/$USERNAME/credentials.env" 2>/dev/null | cut -d= -f2 || echo "")
-    else
-        USER_PASSWORD=""
     fi
-
-    # Get dnstt info
-    DNSTT_DOMAIN="${DNSTT_SUBDOMAIN:-t}.${DOMAIN}"
-    DNSTT_PUBKEY=$(cat "outputs/dnstt/server.pub" 2>/dev/null || echo "")
-
-    # Get Slipstream info
-    SLIPSTREAM_DOMAIN="${SLIPSTREAM_SUBDOMAIN:-s}.${DOMAIN}"
-    CONFIG_SLIPSTREAM=$(cat "$OUTPUT_DIR/slipstream-instructions.txt" 2>/dev/null || echo "")
-
-    # Get telemt info
-    CONFIG_TELEMT=$(cat "$OUTPUT_DIR/telegram-proxy-link.txt" 2>/dev/null | tr -d '\n' || echo "")
-
-    # Convert QR images to base64
-    qr_to_base64() {
-        local file="$1"
-        if [[ -f "$file" ]]; then
-            base64 < "$file" 2>/dev/null | tr -d '\n' || echo ""
-        else
-            echo ""
-        fi
-    }
-
-    QR_REALITY_B64=$(qr_to_base64 "$OUTPUT_DIR/reality-qr.png")
-    QR_HYSTERIA2_B64=$(qr_to_base64 "$OUTPUT_DIR/hysteria2-qr.png")
-    QR_TROJAN_B64=$(qr_to_base64 "$OUTPUT_DIR/trojan-qr.png")
-    QR_ANYTLS_B64=$(qr_to_base64 "$OUTPUT_DIR/anytls-qr.png")
-    QR_WIREGUARD_B64=$(qr_to_base64 "$OUTPUT_DIR/wireguard-qr.png")
-    QR_WIREGUARD_WSTUNNEL_B64=$(qr_to_base64 "$OUTPUT_DIR/wireguard-wstunnel-qr.png")
-    QR_AMNEZIAWG_B64=$(qr_to_base64 "$OUTPUT_DIR/amneziawg-qr.png")
-    QR_TELEMT_B64=$(qr_to_base64 "$OUTPUT_DIR/telegram-proxy-qr.png")
-    QR_XHTTP_B64=$(qr_to_base64 "$OUTPUT_DIR/xhttp-qr.png")
-    QR_SHADOWSOCKS_B64=$(qr_to_base64 "$OUTPUT_DIR/shadowsocks-qr.png")
-
-    # Copy template
-    cp "$TEMPLATE_FILE" "$OUTPUT_HTML"
-
-    # Simple replacements (use .bak for portability, then clean up)
-    sed -i.bak "s|{{USERNAME}}|$USERNAME|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{SERVER_IP}}|$SERVER_IP|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{DOMAIN}}|${DOMAIN:-YOUR_DOMAIN}|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{WSTUNNEL_CMD}}|$(wstunnel_client_cmd)|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{PORT_SS}}|${PORT_SS:-8388}|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{GENERATED_DATE}}|$GENERATED_DATE|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{DNSTT_DOMAIN}}|$DNSTT_DOMAIN|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{DNSTT_PUBKEY}}|$DNSTT_PUBKEY|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{SLIPSTREAM_DOMAIN}}|$SLIPSTREAM_DOMAIN|g" "$OUTPUT_HTML"
-
-    # Python-based placeholder replacement - handles special chars and multiline safely
-    replace_placeholder() {
-        local placeholder="$1"
-        local value="$2"
-        python3 -c "
-import sys
-placeholder = sys.argv[1]
-value = sys.argv[2]
-filepath = sys.argv[3]
-with open(filepath, 'r') as f:
-    content = f.read()
-content = content.replace(placeholder, value)
-with open(filepath, 'w') as f:
-    f.write(content)
-" "$placeholder" "$value" "$OUTPUT_HTML"
-    }
-
-    # TrustTunnel password
-    if [[ -n "${USER_PASSWORD:-}" ]]; then
-        replace_placeholder "{{TRUSTTUNNEL_PASSWORD}}" "$USER_PASSWORD"
-    else
-        replace_placeholder "{{TRUSTTUNNEL_PASSWORD}}" "See trusttunnel.txt"
-    fi
-
-    # Remove demo notice placeholders (not a demo user)
-    replace_placeholder "{{DEMO_NOTICE_EN}}" ""
-    replace_placeholder "{{DEMO_NOTICE_FA}}" ""
-
-    # QR codes (base64) - these are safe for sed (no special chars in base64)
-    sed -i.bak "s|{{QR_REALITY}}|$QR_REALITY_B64|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{QR_HYSTERIA2}}|$QR_HYSTERIA2_B64|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{QR_TROJAN}}|$QR_TROJAN_B64|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{QR_ANYTLS}}|$QR_ANYTLS_B64|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{QR_WIREGUARD}}|$QR_WIREGUARD_B64|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{QR_WIREGUARD_WSTUNNEL}}|$QR_WIREGUARD_WSTUNNEL_B64|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{QR_AMNEZIAWG}}|$QR_AMNEZIAWG_B64|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{QR_TELEMT}}|$QR_TELEMT_B64|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{QR_XHTTP}}|$QR_XHTTP_B64|g" "$OUTPUT_HTML"
-    sed -i.bak "s|{{QR_SHADOWSOCKS}}|$QR_SHADOWSOCKS_B64|g" "$OUTPUT_HTML"
-
-    if [[ -n "$CONFIG_REALITY" ]]; then
-        replace_placeholder "{{CONFIG_REALITY}}" "$CONFIG_REALITY"
-    else
-        replace_placeholder "{{CONFIG_REALITY}}" "No Reality config available"
-    fi
-
-    if [[ -n "$CONFIG_HYSTERIA2" ]]; then
-        replace_placeholder "{{CONFIG_HYSTERIA2}}" "$CONFIG_HYSTERIA2"
-    else
-        replace_placeholder "{{CONFIG_HYSTERIA2}}" "No Hysteria2 config available"
-    fi
-
-    if [[ -n "$CONFIG_TROJAN" ]]; then
-        replace_placeholder "{{CONFIG_TROJAN}}" "$CONFIG_TROJAN"
-    else
-        replace_placeholder "{{CONFIG_TROJAN}}" "No Trojan config available"
-    fi
-
-    if [[ -n "$CONFIG_ANYTLS" ]]; then
-        replace_placeholder "{{CONFIG_ANYTLS}}" "$CONFIG_ANYTLS"
-    else
-        replace_placeholder "{{CONFIG_ANYTLS}}" "No AnyTLS config available"
-    fi
-
-    if [[ -n "$CONFIG_SHADOWSOCKS" ]]; then
-        replace_placeholder "{{CONFIG_SHADOWSOCKS}}" "$CONFIG_SHADOWSOCKS"
-    else
-        replace_placeholder "{{CONFIG_SHADOWSOCKS}}" "No Shadowsocks config available"
-    fi
-
-    # CDN VLESS+WS config
-    if [[ -n "$CONFIG_CDN" ]]; then
-        replace_placeholder "{{CONFIG_CDN}}" "$CONFIG_CDN"
-        replace_placeholder "{{CDN_DOMAIN}}" "$CDN_DOMAIN"
-        # CDN QR code
-        QR_CDN_B64=$(qr_to_base64 "$OUTPUT_DIR/cdn-vless-qr.png")
-        sed -i.bak "s|{{QR_CDN}}|$QR_CDN_B64|g" "$OUTPUT_HTML"
-    else
-        replace_placeholder "{{CONFIG_CDN}}" "CDN not configured"
-        replace_placeholder "{{CDN_DOMAIN}}" "Not configured"
-        sed -i.bak "s|{{QR_CDN}}||g" "$OUTPUT_HTML"
-    fi
-
-    # WireGuard configs (multiline)
-    if [[ -n "$CONFIG_WIREGUARD" ]]; then
-        replace_placeholder "{{CONFIG_WIREGUARD}}" "$CONFIG_WIREGUARD"
-    else
-        replace_placeholder "{{CONFIG_WIREGUARD}}" "No WireGuard config available"
-    fi
-
-    if [[ -n "$CONFIG_WIREGUARD_WSTUNNEL" ]]; then
-        replace_placeholder "{{CONFIG_WIREGUARD_WSTUNNEL}}" "$CONFIG_WIREGUARD_WSTUNNEL"
-    else
-        replace_placeholder "{{CONFIG_WIREGUARD_WSTUNNEL}}" "No WireGuard-wstunnel config available"
-    fi
-
-    # AmneziaWG config (multiline)
-    if [[ -n "$CONFIG_AMNEZIAWG" ]]; then
-        replace_placeholder "{{CONFIG_AMNEZIAWG}}" "$CONFIG_AMNEZIAWG"
-    else
-        replace_placeholder "{{CONFIG_AMNEZIAWG}}" "No AmneziaWG config available"
-    fi
-
-    # Slipstream instructions
-    if [[ -n "${CONFIG_SLIPSTREAM:-}" ]]; then
-        replace_placeholder "{{CONFIG_SLIPSTREAM}}" "$CONFIG_SLIPSTREAM"
-    else
-        replace_placeholder "{{CONFIG_SLIPSTREAM}}" "Slipstream not enabled"
-    fi
-
-    # telemt (Telegram MTProxy) link
-    if [[ -n "${CONFIG_TELEMT:-}" ]]; then
-        replace_placeholder "{{CONFIG_TELEMT}}" "$CONFIG_TELEMT"
-    else
-        replace_placeholder "{{CONFIG_TELEMT}}" "Telegram MTProxy not enabled"
-    fi
-
-    # XHTTP (Xray-core) share link
-    if [[ -n "${CONFIG_XHTTP:-}" ]]; then
-        replace_placeholder "{{CONFIG_XHTTP}}" "$CONFIG_XHTTP"
-    else
-        replace_placeholder "{{CONFIG_XHTTP}}" "XHTTP not enabled"
-    fi
-
-    # XDNS configs (multiline JSON — use file-based replacement)
-    if [[ -f "$OUTPUT_DIR/xdns-config.json" ]]; then
-        python3 -c "
-import sys
-html_path = sys.argv[1]
-dns_path = sys.argv[2]
-direct_path = sys.argv[3]
-with open(html_path, 'r') as f: html = f.read()
-try:
-    with open(dns_path, 'r') as f: dns_cfg = f.read().strip()
-except: dns_cfg = 'XDNS config not available'
-try:
-    with open(direct_path, 'r') as f: direct_cfg = f.read().strip()
-except: direct_cfg = 'XDNS direct config not available'
-html = html.replace('{{CONFIG_XDNS}}', dns_cfg)
-html = html.replace('{{CONFIG_XDNS_DIRECT}}', direct_cfg)
-html = html.replace('{{XDNS_DISPLAY}}', '')
-with open(html_path, 'w') as f: f.write(html)
-" "$OUTPUT_HTML" "$OUTPUT_DIR/xdns-config.json" "$OUTPUT_DIR/xdns-direct-config.json"
-    else
-        replace_placeholder "{{CONFIG_XDNS}}" "XDNS not enabled"
-        replace_placeholder "{{CONFIG_XDNS_DIRECT}}" "XDNS not enabled"
-        replace_placeholder "{{XDNS_DISPLAY}}" "display:none"
-    fi
-
-    # MasterDNS / GooseRelay (MahsaNG v16). These use a server-shared key that
-    # lives in the docker state volume, so the host-side `moav user add` path
-    # can't generate the instructions — `moav regenerate-users` (which runs in
-    # the bootstrap container) populates them. Toggle the section off here unless
-    # an instructions file is already present in the bundle.
-    if [[ -f "$OUTPUT_DIR/masterdns-instructions.txt" ]]; then
-        replace_placeholder "{{CONFIG_MASTERDNS}}" "$(cat "$OUTPUT_DIR/masterdns-instructions.txt")"
-        replace_placeholder "{{MASTERDNS_DISPLAY}}" ""
-    else
-        replace_placeholder "{{CONFIG_MASTERDNS}}" "Run 'moav regenerate-users' to include MasterDNS"
-        replace_placeholder "{{MASTERDNS_DISPLAY}}" "display:none"
-    fi
-    if [[ -f "$OUTPUT_DIR/gooserelay-instructions.txt" ]]; then
-        replace_placeholder "{{CONFIG_GOOSERELAY}}" "$(cat "$OUTPUT_DIR/gooserelay-instructions.txt")"
-        replace_placeholder "{{GOOSERELAY_DISPLAY}}" ""
-    else
-        replace_placeholder "{{CONFIG_GOOSERELAY}}" "Run 'moav regenerate-users' to include GooseRelay"
-        replace_placeholder "{{GOOSERELAY_DISPLAY}}" "display:none"
-    fi
-
-    # V2Ray subscription: base64 of the newline-joined compatible share-links,
-    # so the user can paste it once into any V2Ray app (MahsaNG, v2rayNG,
-    # Hiddify, ...) to import all proxy protocols. DNS tunnels + GooseRelay are
-    # configured separately and intentionally excluded.
-    _mahsanet_uris=""
-    for _f in reality cdn-vless xhttp-vless trojan anytls shadowsocks hysteria2 \
-              reality-ipv6 trojan-ipv6 anytls-ipv6 shadowsocks-ipv6 hysteria2-ipv6; do
-        [[ -f "$OUTPUT_DIR/$_f.txt" ]] || continue
-        _u=$(tr -d '\r' < "$OUTPUT_DIR/$_f.txt" | grep -aE '^(vless|trojan|anytls|ss|hysteria2|vmess)://' | head -1 || true)
-        [[ -n "$_u" ]] && _mahsanet_uris+="$_u"$'\n'
-    done
-    if [[ -n "$_mahsanet_uris" ]]; then
-        _mahsanet_sub=$(printf '%s' "$_mahsanet_uris" | base64 | tr -d '\n')
-        # Also drop the subscription as a standalone file so the bundle isn't
-        # HTML-only (handy for hosting as a sub URL or importing from a file).
-        printf '%s\n' "$_mahsanet_sub" > "$OUTPUT_DIR/subscription.txt"
-        replace_placeholder "{{MAHSANET_SUB}}" "$_mahsanet_sub"
-        replace_placeholder "{{MAHSANET_DISPLAY}}" ""
-    else
-        replace_placeholder "{{MAHSANET_SUB}}" "No V2Ray-compatible configs in this bundle"
-        replace_placeholder "{{MAHSANET_DISPLAY}}" "display:none"
-    fi
-
-    # Clean up backup files
-    rm -f "$OUTPUT_HTML.bak"
-
-    log_info "✓ README.html generated"
+    IS_DEMO_USER=false
+    render_bundle_readme "$USERNAME" "$OUTPUT_DIR" "$TEMPLATE_FILE" "host"
 else
     log_warn "Template not found: $TEMPLATE_FILE - skipping HTML guide"
 fi
