@@ -192,18 +192,20 @@ not a name; the run then adds a named `e2e-test` user to also exercise
 
 | Input | Effect |
 |---|---|
+| `tier` | **`default`** — domain mode only (fast). **`full`** — domain **+** a second domainless phase. **`mega`** — full **+** `build --local` (monitoring images from source) **+** `uninstall --wipe --remove-images` on teardown. `full`/`mega` re-issue a cert (see below). |
 | `verbose` | Per-protocol debug output from `client-test.sh` (`-v`). |
-| `domainless` | **No DOMAIN / no cert** — certbot self-skips, so this **never touches the Let's Encrypt rate limit**. Runs the IP-only protocols (Reality, XHTTP, Shadowsocks, WireGuard…) and still builds the client image, so it's the fast way to validate everything *except* the TLS-domain protocols. Needs no `E2E_DOMAIN`/`E2E_ACME_EMAIL`. |
-| `full` | Also runs `build --local` (monitoring images from source), a second **domainless** phase after the domain phase, and `uninstall --wipe --remove-images` on teardown. Much slower, and it **does** re-issue a cert (see below). |
+| `domainless_only` | **No DOMAIN / no cert** — certbot self-skips, so this **never touches the Let's Encrypt rate limit**. Runs the IP-only protocols (Reality, XHTTP, Shadowsocks, WireGuard…) and still builds the client image — the fast way to validate everything *except* the TLS-domain protocols. Overrides the tier's domain portion; needs no `E2E_DOMAIN`/`E2E_ACME_EMAIL`. |
+
+> A future tier (or an extension of `full`) will also drive a real **moav-client** connection test end-to-end.
 
 **Cert reuse & the LE rate limit.** Let's Encrypt allows only **5 certs/week per
-exact domain**. A standard (domain) run therefore **keeps the `moav_certs`
+exact domain**. A `default` (domain) run therefore **keeps the `moav_certs`
 volume** on teardown (`uninstall --yes`, `down` without `-v`), so the next run
 reuses the existing cert instead of re-issuing — you can run it many times a day.
-Only `full` runs wipe the volume (fresh issuance); don't run `full` more than a
+`full`/`mega` runs wipe the volume (fresh issuance); don't run them more than a
 few times a week against the same domain or you'll hit the limit
 ("*too many certificates … retry after …*"). If you do get blocked, use
-`domainless` to keep testing in the meantime.
+`domainless_only` to keep testing in the meantime.
 
 The **e2e-results** artifact (JSON + raw log) is attached to every run. The job
 fails if any protocol reports `fail`; `warn`/`skip` (e.g. an unconfigured

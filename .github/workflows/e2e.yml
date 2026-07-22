@@ -6,21 +6,32 @@ name: e2e
 # This is NOT on the per-PR path — it builds ~25 images and needs real TLS
 # certs (a domain). It runs on a SELF-HOSTED runner (a test VPS with a test
 # domain). Setup + manual-run instructions: docs/devdocs/E2E-TESTING.md
+#
+# Tiers (workflow_dispatch `tier`; push/release use the default):
+#   default — domain mode only (fast)
+#   full    — domain + domainless
+#   mega    — domain + domainless + build --local (monitoring from source) + remove images
+# `domainless_only: true` overrides the domain portion for a Let's-Encrypt-free run.
+# TODO: a future tier (or full+) will also drive a real moav-client connection test.
 on:
   push:
     branches: [main]
   workflow_dispatch:
     inputs:
+      tier:
+        description: 'Test tier'
+        type: choice
+        default: default
+        options:
+          - default   # domain mode only (fast path)
+          - full      # domain + domainless
+          - mega      # domain + domainless + build --local + remove images on uninstall
       verbose:
         description: 'Verbose client-test output (-v)'
         type: boolean
         default: false
-      full:
-        description: 'FULL suite: also run domainless mode, build --local, and remove images on uninstall (much slower)'
-        type: boolean
-        default: false
-      domainless:
-        description: 'Domainless-only run: no DOMAIN/cert (skips Let''s Encrypt entirely). Validates the IP-only protocols without touching the LE rate limit.'
+      domainless_only:
+        description: 'Domainless-only: skip DOMAIN/cert entirely (no Let''s Encrypt, no LE rate-limit hit). Validates IP-only protocols. Overrides the tier''s domain portion.'
         type: boolean
         default: false
   release:
@@ -44,13 +55,17 @@ jobs:
       MOAV_ACME_EMAIL: ${{ secrets.E2E_ACME_EMAIL }}
       MOAV_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
       MOAV_SERVER_IP: ${{ secrets.E2E_SERVER_IP }}
+      # Tier + domainless-only, resolved once. Empty on push/release → 'default'
+      # (domain-only). See workflow_dispatch inputs above.
+      E2E_TIER: ${{ inputs.tier }}
+      E2E_DOMAINLESS_ONLY: ${{ inputs.domainless_only }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Preflight
         run: |
           # DOMAIN/ACME are only needed for the cert-bearing (domain) run.
-          if [ "${{ inputs.domainless }}" != "true" ]; then
+          if [ "$E2E_DOMAINLESS_ONLY" != "true" ]; then
             test -n "$MOAV_DOMAIN"          || { echo "::error::secret E2E_DOMAIN is not set"; exit 1; }
             test -n "$MOAV_ACME_EMAIL"      || { echo "::error::secret E2E_ACME_EMAIL is not set"; exit 1; }
           fi
@@ -62,7 +77,7 @@ jobs:
           cp .env.example .env
           sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${MOAV_ADMIN_PASSWORD}|" .env
           [ -n "$MOAV_SERVER_IP" ] && sed -i "s|^SERVER_IP=.*|SERVER_IP=${MOAV_SERVER_IP}|" .env
-          if [ "${{ inputs.domainless }}" = "true" ]; then
+          if [ "$E2E_DOMAINLESS_ONLY" = "true" ]; then
             # No DOMAIN → certbot self-skips (no LE cert, no rate-limit hit).
             # Disable protocols that need a domain cert or DNS delegation so
             # their services don't crash-loop without one.
@@ -83,12 +98,12 @@ jobs:
       - name: Build images
         run: ./moav.sh build
 
-      - name: Build monitoring images from source (full only)
-        if: inputs.full
+      - name: Build monitoring images from source (mega only)
+        if: inputs.tier == 'mega'
         run: ./moav.sh build --local
 
-      - name: Clean slate (domainless/full — start fresh, ignore prior state)
-        if: inputs.domainless || inputs.full
+      - name: Clean slate (domainless / full / mega — start fresh, ignore prior state)
+        if: inputs.domainless_only || inputs.tier == 'full' || inputs.tier == 'mega'
         run: |
           # The run-to-run coupling lives in the docker VOLUMES (moav_state
           # keeps .bootstrapped + keys, so re-bootstrap skips regenerating the
@@ -196,9 +211,10 @@ jobs:
       - name: CLI smoke test
         run: bash tests/cli-smoke-test.sh
 
-      - name: Full — domainless mode
-        # Skip when the primary run is already domainless (would just repeat it).
-        if: inputs.full && inputs.domainless != true && success()
+      - name: Full/Mega — domainless pass (after the domain run)
+        # full + mega run domain THEN domainless. Skip if the primary run is
+        # already domainless-only (would just repeat it).
+        if: (inputs.tier == 'full' || inputs.tier == 'mega') && inputs.domainless_only != true && success()
         env:
           MOAV_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
           MOAV_SERVER_IP: ${{ secrets.E2E_SERVER_IP }}
@@ -275,8 +291,8 @@ jobs:
           # the next run bootstraps fresh instead of inheriting stale state
           # (persisted state couples runs: re-bootstrap can skip regenerating
           # host configs, leaving `user add` with nothing). timeout guards a hang.
-          if [ "${{ inputs.domainless }}" = "true" ] || [ "${{ inputs.full }}" = "true" ]; then
-            IMG=""; [ "${{ inputs.full }}" = "true" ] && IMG="--remove-images"
+          if [ "$E2E_DOMAINLESS_ONLY" = "true" ] || [ "$E2E_TIER" = "full" ] || [ "$E2E_TIER" = "mega" ]; then
+            IMG=""; [ "$E2E_TIER" = "mega" ] && IMG="--remove-images"
             echo "== moav uninstall --wipe --yes $IMG (fresh slate next run) =="
             timeout 300 ./moav.sh uninstall --wipe --yes $IMG 2>&1 | tail -25 || echo "::warning::moav uninstall --wipe returned non-zero / timed out"
           else
@@ -288,9 +304,9 @@ jobs:
         if: always()
         run: |
           # Domain runs: `down` WITHOUT -v, to keep the moav_certs volume so the
-          # next run reuses the LE cert (see Teardown). Domainless/FULL: -v for a
-          # clean slate (no cert to preserve / deliberately destructive).
-          if [ "${{ inputs.domainless }}" = "true" ] || [ "${{ inputs.full }}" = "true" ]; then
+          # next run reuses the LE cert (see Teardown). Domainless / full / mega:
+          # -v for a clean slate (no cert to preserve / deliberately destructive).
+          if [ "$E2E_DOMAINLESS_ONLY" = "true" ] || [ "$E2E_TIER" = "full" ] || [ "$E2E_TIER" = "mega" ]; then
             docker compose --profile all down -v 2>/dev/null || true
           else
             docker compose --profile all down 2>/dev/null || true
