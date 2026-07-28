@@ -420,7 +420,7 @@ if [[ -f "$TEMPLATE_FILE" ]]; then
     if [[ -f "$OUTPUT_DIR/trusttunnel.json" ]]; then
         USER_PASSWORD=$(jq -r '.password // empty' "$OUTPUT_DIR/trusttunnel.json" 2>/dev/null || echo "")
     elif [[ -f "state/users/$USERNAME/credentials.env" ]]; then
-        USER_PASSWORD=$(grep "^USER_PASSWORD=" "state/users/$USERNAME/credentials.env" 2>/dev/null | cut -d= -f2 || echo "")
+        USER_PASSWORD=$(get_env_val "USER_PASSWORD" "state/users/$USERNAME/credentials.env")
     fi
     IS_DEMO_USER=false
     render_bundle_readme "$USERNAME" "$OUTPUT_DIR" "$TEMPLATE_FILE" "host"

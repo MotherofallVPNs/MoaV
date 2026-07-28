@@ -103,14 +103,31 @@ else
     printf '%s\n' "$stragglers" | cut -c1-100 | sed 's/^/          /'
 fi
 
-# NOTE (not a failure): get_env_val currently lives in moav.sh, so only the lib/
-# tree can call it. Migrating the scripts/ (container) scrapers in C1 proper
-# requires hoisting it into a shared location first. Recorded so the sequencing
-# is explicit rather than discovered mid-migration.
-if grep -q '^get_env_val()' "$ROOT/scripts/lib/common.sh" 2>/dev/null; then
-    ok "get_env_val available to scripts/ (container tree) — C1 can migrate those too"
+# get_env_val is defined TWICE on purpose: moav.sh serves the host CLI, and
+# scripts/lib/common.sh serves the provisioning tree (mounted into containers as
+# /app/lib, where moav.sh does not exist). The duplication is only safe while the
+# two bodies are identical — this check is what makes it safe rather than a
+# second implementation waiting to drift.
+extract_fn() { awk '/^get_env_val\(\) \{/,/^\}/' "$1"; }
+if ! grep -q '^get_env_val()' "$ROOT/scripts/lib/common.sh" 2>/dev/null; then
+    bad "scripts/lib/common.sh has no get_env_val — the container tree cannot resolve .env consistently"
+elif diff <(extract_fn "$ROOT/moav.sh") <(extract_fn "$ROOT/scripts/lib/common.sh") >/dev/null 2>&1; then
+    ok "both get_env_val definitions are byte-identical (host CLI + container tree)"
 else
-    ok "get_env_val is lib/-only for now (C1 must hoist it before touching scripts/)"
+    bad "the two get_env_val definitions have DRIFTED:"
+    diff <(extract_fn "$ROOT/moav.sh") <(extract_fn "$ROOT/scripts/lib/common.sh") | head -10 | sed 's/^/          /'
+fi
+
+# scripts/ must have no ad-hoc .env scrapers left. Permitted survivors read a
+# shell VARIABLE (`echo "$REALITY_ENV_CONTENT" | grep …`) or the docker volume —
+# neither is a .env read.
+leftover=$(grep -rn "cut -d= -f2" --include='*.sh' "$ROOT/scripts/" 2>/dev/null \
+           | grep -v 'moav_moav_state' | grep -v 'echo "\$' || true)
+if [[ -z "$leftover" ]]; then
+    ok "scripts/ tree has no ad-hoc .env scrapers left"
+else
+    bad "scripts/ tree still has ad-hoc .env scrapers:"
+    printf '%s\n' "$leftover" | cut -c1-100 | sed 's/^/          /'
 fi
 
 echo

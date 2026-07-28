@@ -271,26 +271,26 @@ fi
 
 # Generate CDN VLESS+WS link (if CDN configured)
 # Construct CDN_DOMAIN from CDN_SUBDOMAIN + DOMAIN if not explicitly set
-CDN_DOMAIN="${CDN_DOMAIN:-$(grep -E '^CDN_DOMAIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || echo "")}"
+CDN_DOMAIN="${CDN_DOMAIN:-$(get_env_val "CDN_DOMAIN" ".env" "")}"
 if [[ -z "$CDN_DOMAIN" ]]; then
-    CDN_SUBDOMAIN="${CDN_SUBDOMAIN:-$(grep -E '^CDN_SUBDOMAIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || echo "")}"
-    DOMAIN_FROM_ENV="${DOMAIN:-$(grep -E '^DOMAIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || echo "")}"
+    CDN_SUBDOMAIN="${CDN_SUBDOMAIN:-$(get_env_val "CDN_SUBDOMAIN" ".env" "")}"
+    DOMAIN_FROM_ENV="${DOMAIN:-$(get_env_val "DOMAIN" ".env" "")}"
     if [[ -n "$CDN_SUBDOMAIN" && -n "$DOMAIN_FROM_ENV" ]]; then
         CDN_DOMAIN="${CDN_SUBDOMAIN}.${DOMAIN_FROM_ENV}"
     fi
 fi
 # Load CDN WS path: .env → state file (bootstrap-generated) → fallback
-CDN_WS_PATH="${CDN_WS_PATH:-$(grep -E '^CDN_WS_PATH=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || true)}"
+CDN_WS_PATH="${CDN_WS_PATH:-$(get_env_val "CDN_WS_PATH" ".env")}"
 if [[ -z "${CDN_WS_PATH:-}" ]]; then
     # Check bootstrap-generated state (persisted random path)
     CDN_WS_PATH=$(docker run --rm -v moav_moav_state:/state alpine cat /state/keys/cdn.env 2>/dev/null | grep '^CDN_WS_PATH=' | cut -d= -f2 || true)
 fi
 CDN_WS_PATH="${CDN_WS_PATH:-/ws}"
-CDN_TRANSPORT="${CDN_TRANSPORT:-$(grep -E '^CDN_TRANSPORT=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || true)}"
+CDN_TRANSPORT="${CDN_TRANSPORT:-$(get_env_val "CDN_TRANSPORT" ".env")}"
 CDN_TRANSPORT="${CDN_TRANSPORT:-ws}"
-CDN_SNI="${CDN_SNI:-$(grep -E '^CDN_SNI=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || true)}"
+CDN_SNI="${CDN_SNI:-$(get_env_val "CDN_SNI" ".env")}"
 CDN_SNI="${CDN_SNI:-${DOMAIN_FROM_ENV:-}}"
-CDN_ADDRESS="${CDN_ADDRESS:-$(grep -E '^CDN_ADDRESS=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || true)}"
+CDN_ADDRESS="${CDN_ADDRESS:-$(get_env_val "CDN_ADDRESS" ".env")}"
 CDN_ADDRESS="${CDN_ADDRESS:-${CDN_DOMAIN}}"
 
 if [[ -n "$CDN_DOMAIN" ]]; then
@@ -318,8 +318,8 @@ if [[ "${ENABLE_SS:-true}" == "true" ]] && [[ -n "${SS_USER_PSK:-}" ]]; then
     if [[ -z "$SS_SERVER_PSK" ]]; then
         log_warn "Shadowsocks server PSK not found — skipping SS bundle for $USERNAME"
     else
-        SS_PORT_LOCAL="${PORT_SS:-$(grep -E '^PORT_SS=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || echo 8388)}"
-        SS_METHOD_LOCAL="${SS_METHOD:-$(grep -E '^SS_METHOD=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || echo 2022-blake3-aes-128-gcm)}"
+        SS_PORT_LOCAL="${PORT_SS:-$(get_env_val "PORT_SS" ".env" "8388")}"
+        SS_METHOD_LOCAL="${SS_METHOD:-$(get_env_val "SS_METHOD" ".env" "2022-blake3-aes-128-gcm")}"
 
         # SIP002 ss:// URI with SS-2022 multi-user encoding: BASE64URL_NOPAD(method:server_psk:user_psk)@host:port#tag
         SS_USERINFO=$(singbox_ss_userinfo "$SS_METHOD_LOCAL" "$SS_SERVER_PSK" "$SS_USER_PSK")

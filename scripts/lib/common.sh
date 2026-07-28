@@ -131,3 +131,23 @@ secure_state_keys() {
     [[ $fixed -gt 0 ]] && log_info "Secured $fixed key file(s) in $keys_dir (0600)"
     return 0
 }
+
+# Read a value from a .env-style file — handles duplicates (last wins), inline
+# comments, and quotes.
+#   val=$(get_env_val "ENABLE_XHTTP" "$env_file" "true")
+#
+# DELIBERATE DUPLICATE of the definition in moav.sh. The host CLI (lib/) and the
+# provisioning tree (scripts/lib/, mounted into containers as /app/lib) are
+# separate source trees — the container never sees moav.sh, and the CLI should
+# not pull in 15 protocol generators just to read a variable. The bodies are held
+# byte-identical by tests/env-resolution-test.sh, so the two cannot drift; that
+# check is what makes the duplication safe rather than a second implementation.
+#
+# Note `cut -d'=' -f2-`, not -f2: values legitimately contain '=' (base64
+# padding), and cutting at the first one silently truncates credentials.
+get_env_val() {
+    local key="$1" file="$2" default="${3:-}"
+    local val
+    val=$(grep "^${key}=" "$file" 2>/dev/null | tail -1 | cut -d'=' -f2- | sed 's/#.*//' | tr -d '"' | tr -d "'" | xargs) || true
+    echo "${val:-$default}"
+}
