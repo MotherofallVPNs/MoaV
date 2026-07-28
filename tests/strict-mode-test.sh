@@ -146,6 +146,44 @@ else
     ok "system bash is >= 4 (3.2 message path not exercised here)"
 fi
 
+# --- 8. a truncated per-user state file must not wedge provisioning ----------
+# Functional, not shape: sources the real lib and calls the real function with a
+# state file that exists but holds no keys (a previous run that died between the
+# mkdir and the heredoc write). It used to die on a bare $WG_PRIVATE_KEY and
+# never self-heal, because the broken file kept winning the [[ -f ]] branch.
+truncated_state_case() {
+    local lib="$1" envfile="$2" fn="$3" conf="$4" dirvar="$5"
+    local tmp; tmp=$(mktemp -d)
+    mkdir -p "$tmp/users/u1" "$tmp/conf"
+    printf '# truncated: died before writing keys\n' > "$tmp/users/u1/$envfile"
+    printf '[Interface]\nAddress = 10.66.66.1/24\n' > "$tmp/conf/$conf"
+    (
+      set -euo pipefail
+      export STATE_DIR="$tmp"
+      log_info(){ :; }; log_warn(){ :; }; log_error(){ :; }; log_success(){ :; }
+      ensure_dir(){ mkdir -p "$1"; }
+      wg_keypair(){ echo "PRIVKEYFAKE"; echo "PUBKEYFAKE"; }
+      net_next_free_octet(){ echo 42; }
+      # shellcheck disable=SC1090
+      source "$ROOT/$lib"
+      eval "$dirvar=\"\$tmp/conf\""
+      "$fn" u1 >/dev/null 2>&1
+    ) 2>/dev/null
+    local rc=$?
+    rm -rf "$tmp"
+    return $rc
+}
+if truncated_state_case scripts/lib/wireguard.sh wireguard.env wireguard_add_peer wg0.conf WG_CONFIG_DIR; then
+    ok "truncated wireguard.env recovers instead of wedging"
+else
+    bad "truncated wireguard.env still kills wireguard_add_peer"
+fi
+if truncated_state_case scripts/lib/amneziawg.sh amneziawg.env amneziawg_add_peer awg0.conf AWG_CONFIG_DIR; then
+    ok "truncated amneziawg.env recovers instead of wedging"
+else
+    bad "truncated amneziawg.env still kills amneziawg_add_peer"
+fi
+
 echo
 echo "  $pass passed, $fail failed"
 [[ $fail -eq 0 ]]

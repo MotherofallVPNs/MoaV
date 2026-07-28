@@ -77,8 +77,23 @@ wireguard_add_peer() {
     local client_ip_v6=""
 
     # Load existing client keys if available, only generate if missing
+    local have_state=false
     if [[ -f "$STATE_DIR/users/$user_id/wireguard.env" ]]; then
+        # Clear first: source does not unset, so without this a truncated file
+        # would silently validate against whatever a previous call left behind.
+        unset WG_PRIVATE_KEY WG_PUBLIC_KEY WG_CLIENT_IP WG_CLIENT_IP_V6
         source "$STATE_DIR/users/$user_id/wireguard.env"
+        # Validate before trusting it. A truncated state file -- a previous run
+        # that died between the mkdir and the heredoc write -- used to crash on
+        # the bare $WG_PRIVATE_KEY below and never self-heal, because the broken
+        # file kept winning this branch on every retry.
+        if [[ -n "${WG_PRIVATE_KEY:-}" && -n "${WG_PUBLIC_KEY:-}" && -n "${WG_CLIENT_IP:-}" ]]; then
+            have_state=true
+        else
+            log_warn "WireGuard: ignoring incomplete state file for $user_id"
+        fi
+    fi
+    if [[ "$have_state" == true ]]; then
         client_private_key="$WG_PRIVATE_KEY"
         client_public_key="$WG_PUBLIC_KEY"
         client_ip="$WG_CLIENT_IP"

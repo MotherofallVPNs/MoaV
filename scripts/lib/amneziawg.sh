@@ -136,8 +136,23 @@ amneziawg_add_peer() {
     local client_ip_v6=""
 
     # Load existing client keys if available, only generate if missing
+    local have_state=false
     if [[ -f "$STATE_DIR/users/$user_id/amneziawg.env" ]]; then
+        # Clear first: source does not unset, so without this a truncated file
+        # would silently validate against whatever a previous call left behind.
+        unset AWG_PRIVATE_KEY AWG_PUBLIC_KEY AWG_CLIENT_IP AWG_CLIENT_IP_V6
         source "$STATE_DIR/users/$user_id/amneziawg.env"
+        # Validate before trusting it. A truncated state file -- a previous run
+        # that died between the mkdir and the heredoc write -- used to crash on
+        # the bare $AWG_PRIVATE_KEY below and never self-heal, because the broken
+        # file kept winning this branch on every retry.
+        if [[ -n "${AWG_PRIVATE_KEY:-}" && -n "${AWG_PUBLIC_KEY:-}" && -n "${AWG_CLIENT_IP:-}" ]]; then
+            have_state=true
+        else
+            log_warn "AmneziaWG: ignoring incomplete state file for $user_id"
+        fi
+    fi
+    if [[ "$have_state" == true ]]; then
         client_private_key="$AWG_PRIVATE_KEY"
         client_public_key="$AWG_PUBLIC_KEY"
         client_ip="$AWG_CLIENT_IP"
