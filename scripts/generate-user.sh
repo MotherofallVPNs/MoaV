@@ -43,14 +43,37 @@ fi
 
 source "$USER_CREDS_FILE"
 
-# Load Reality keys (only if Reality is enabled)
-if [[ "${ENABLE_REALITY:-true}" == "true" ]] && [[ -f "$STATE_DIR/keys/reality.env" ]]; then
+# Load Reality keys whenever they exist. Deliberately NOT gated on
+# ENABLE_REALITY: XHTTP is VLESS+Reality-over-xhttp and needs the same keys, and
+# ENABLE_XHTTP defaults to true. Gating the source on ENABLE_REALITY meant
+# ENABLE_REALITY=false left REALITY_PUBLIC_KEY unset while the XHTTP bundle still
+# read it, so every user failed to regenerate.
+if [[ -f "$STATE_DIR/keys/reality.env" ]]; then
     source "$STATE_DIR/keys/reality.env"
 fi
 
-# Load Hysteria2 obfuscation password
-if [[ "${ENABLE_HYSTERIA2:-true}" == "true" ]] && [[ -f "$STATE_DIR/keys/clash-api.env" ]]; then
+# Same for the Hysteria2 obfuscation password.
+if [[ -f "$STATE_DIR/keys/clash-api.env" ]]; then
     source "$STATE_DIR/keys/clash-api.env"
+fi
+
+# Fail with a remediation hint rather than an opaque "unbound variable" when a
+# protocol is switched on but bootstrap never generated its key material.
+require_keys() {
+    local why="$1"; shift
+    local missing=() v
+    for v in "$@"; do [[ -n "${!v:-}" ]] || missing+=("$v"); done
+    if (( ${#missing[@]} )); then
+        log_error "$why needs ${missing[*]}, which is not in $STATE_DIR/keys/."
+        log_error "Run 'moav bootstrap' to generate the missing key material, then retry."
+        exit 1
+    fi
+}
+if [[ "${ENABLE_REALITY:-true}" == "true" || "${ENABLE_XHTTP:-true}" == "true" ]]; then
+    require_keys "Reality/XHTTP" REALITY_PUBLIC_KEY REALITY_SHORT_ID
+fi
+if [[ "${ENABLE_HYSTERIA2:-true}" == "true" ]]; then
+    require_keys "Hysteria2" HYSTERIA2_OBFS_PASSWORD
 fi
 
 # Create output directory

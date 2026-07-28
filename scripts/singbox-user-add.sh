@@ -153,9 +153,12 @@ if [[ -f "$STATE_DIR/keys/reality.env" ]]; then
 else
     # Try docker volume (load all keys including private for derivation fallback)
     REALITY_ENV_CONTENT=$(docker run --rm -v moav_moav_state:/state alpine cat /state/keys/reality.env 2>/dev/null || echo "")
-    REALITY_PRIVATE_KEY=$(echo "$REALITY_ENV_CONTENT" | grep REALITY_PRIVATE_KEY | cut -d= -f2)
-    REALITY_PUBLIC_KEY=$(echo "$REALITY_ENV_CONTENT" | grep REALITY_PUBLIC_KEY | cut -d= -f2)
-    REALITY_SHORT_ID=$(echo "$REALITY_ENV_CONTENT" | grep REALITY_SHORT_ID | cut -d= -f2)
+    # `|| true` on each: when the volume read comes back empty, grep exits 1 and
+    # pipefail propagates it to the assignment, which set -e turns into a silent
+    # exit -- the operator saw "Failed to add sing-box user" and nothing more.
+    REALITY_PRIVATE_KEY=$(echo "$REALITY_ENV_CONTENT" | grep REALITY_PRIVATE_KEY | cut -d= -f2 || true)
+    REALITY_PUBLIC_KEY=$(echo "$REALITY_ENV_CONTENT" | grep REALITY_PUBLIC_KEY | cut -d= -f2 || true)
+    REALITY_SHORT_ID=$(echo "$REALITY_ENV_CONTENT" | grep REALITY_SHORT_ID | cut -d= -f2 || true)
 fi
 
 # If public key is missing but private key exists, derive it
@@ -168,7 +171,7 @@ if [[ -z "${REALITY_PUBLIC_KEY:-}" ]] && [[ -n "${REALITY_PRIVATE_KEY:-}" ]]; th
     elif command -v wg &>/dev/null; then
         REALITY_PUBLIC_KEY=$(echo "$REALITY_KEY_B64" | wg pubkey 2>/dev/null | tr -d '\r\n' | tr '/+' '_-' | sed 's/=*$//' || echo "")
     fi
-    if [[ -n "$REALITY_PUBLIC_KEY" ]]; then
+    if [[ -n "${REALITY_PUBLIC_KEY:-}" ]]; then
         log_info "Derived Reality public key: ${REALITY_PUBLIC_KEY:0:10}..."
         # Save it back so future runs don't need to derive again
         if [[ -f "$STATE_DIR/keys/reality.env" ]]; then

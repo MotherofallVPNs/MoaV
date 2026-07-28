@@ -35,6 +35,8 @@ jobs:
         run: bash tests/singbox-links-test.sh
       - name: peer-IP allocator unit test
         run: bash tests/net-alloc-test.sh
+      - name: strict-mode regression test
+        run: bash tests/strict-mode-test.sh
       - name: protocol-roster drift gate
         run: python3 scripts/gen-protocol-docs.py --check
 

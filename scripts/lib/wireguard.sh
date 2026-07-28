@@ -97,7 +97,13 @@ wireguard_add_peer() {
         return 2
     else
         # Generate new client keys (lib/keys.sh — CRLF-safe)
-        { read -r client_private_key && read -r client_public_key; } < <(wg_keypair)
+        # Guarded: if wg_keypair fails it emits nothing, the first read returns 1,
+        # && short-circuits, and client_public_key stays declared-but-unset -- which
+        # under set -u kills the run later with a misleading "unbound variable".
+        if ! { read -r client_private_key && read -r client_public_key; } < <(wg_keypair); then
+            log_error "WireGuard: no wg/awg key generator available (install wireguard-tools or start the container)"
+            return 1
+        fi
 
         # Allocate the next free host octet (collision-safe across revoked-user
         # gaps; supersedes the old peer-count+1 scheme that reused freed IPs).
