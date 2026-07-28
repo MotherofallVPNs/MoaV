@@ -250,16 +250,33 @@ grafana non-root + secret handling *(with E4)*. Review pass produces the exact l
 6. ✅ **A7** (collapse entry points) + **B12–B13** (service/menu) — done last, as planned.
 7. ⬜ Cut **v2.0.0** once C/D/E close. **v2.0.0-rc.1** is published.
 
-### D — defects already logged (fix these first; they are real, not hypothetical)
+### D — defects, after the audit pass
 
-| # | Defect | Trigger |
-|---|---|---|
-| 1 | `ENABLE_REALITY: unbound variable` | `moav doctor` with no `.env` present |
-| 2 | `client_public_key: unbound variable` | `wireguard_add_peer` when key generation fails |
-| 3 | `declare -A` requires bash ≥ 4 | any `moav` run on stock macOS (ships bash 3.2) |
+| # | Defect | Trigger | Status |
+|---|---|---|---|
+| 1 | `REALITY_PUBLIC_KEY: unbound variable` — **every user fails to regenerate** | `ENABLE_REALITY=false` (XHTTP is Reality-over-xhttp and defaults on) | fixing |
+| 2 | `client_public_key` — empty key silently written (bash 3.2) / hard crash (bash ≥ 4) | `wireguard_add_peer` / `amneziawg_add_peer` when keygen fails | fixing |
+| 3 | `moav user add` dies **silently** | `grep\|cut` under `pipefail` when the Reality volume read is empty | fixing |
+| 4 | `declare -A` requires bash ≥ 4 | any `moav` run on stock macOS (bash 3.2) | open |
+| 5 | empty-array expansion `"${arr[@]}"` | bash ≤ 4.3 (RHEL/CentOS 7 ship 4.2) — affects `moav start`, `moav build` | open |
+| 6 | `--tail` / `-b` with no value → `$2: unbound variable` | `moav logs --tail`, `moav update -b` | open |
 
-Defect 3 is a portability bug rather than a strict-mode one, but it surfaces the
-same way — the script dies before doing anything — so it belongs in the same pass.
+**Retracted:** an earlier entry here claimed `moav doctor` dies with
+`ENABLE_REALITY: unbound variable` when no `.env` is present. The audit could not
+reproduce it and neither could I — every `ENABLE_*` read in `lib/doctor.sh` goes
+through `get_env_val "<KEY>" "$env_file" "<default>"`, and `doctor_check_env`
+bails out cleanly when `.env` is missing. It was either fixed earlier in the
+sprint or logged in error. Removed rather than left to send someone hunting.
+
+**Where the risk actually lives.** `lib/*.sh` and `moav.sh` are clean: 185
+`get_env_val` call sites and **zero** bare `.env`-sourced reads. The remaining
+strict-mode exposure is concentrated in `scripts/` and `scripts/lib/`.
+
+**Recurring shape** behind defects 1–3: *a value is loaded conditionally* (a
+`source` behind `[[ -f ]]`, or a paired `read` that can short-circuit) *and then
+read unconditionally.* The systemic guard is an explicit
+`: "${VAR:?<remediation>}"` at the top of each generator, which turns an opaque
+`unbound variable` into an actionable "run `moav bootstrap` first".
 
 **Every PR:** `bash -n` + `shellcheck --severity=error` + the relevant e2e/golden/
 smoke gate, behaviour-preserving, one concern at a time.
