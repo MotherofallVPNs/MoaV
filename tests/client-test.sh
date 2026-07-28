@@ -2312,10 +2312,22 @@ EOF
         if [[ -n "${RESULTS[$protocol]:-}" ]]; then
             [[ "$first" != "true" ]] && echo ","
             first=false
+            # JSON-escape the detail: it often carries a captured error message,
+            # and those contain double-quotes (awg-quick's `Cannot find device
+            # "x"`), backslashes and control chars. Emitting them raw produced
+            # invalid JSON that jq could not parse, so the harness reported "no
+            # protocol results" and failed a run that had actually passed.
+            # Order matters: backslash first, then quotes, then whitespace.
+            local d="${DETAILS[$protocol]:-}"
+            d="${d//\\/\\\\}"
+            d="${d//\"/\\\"}"
+            d="${d//$'\t'/ }"
+            d="${d//$'\r'/ }"
+            d="${d//$'\n'/ }"
             cat << EOF
     "$protocol": {
       "status": "${RESULTS[$protocol]}",
-      "detail": "${DETAILS[$protocol]:-}"
+      "detail": "$d"
     }
 EOF
         fi
