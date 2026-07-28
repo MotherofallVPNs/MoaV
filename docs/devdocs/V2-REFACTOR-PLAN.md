@@ -125,12 +125,33 @@ lib). Source order: `common` first → `nettune` before `doctor` → `menu` last
 **Sequenced PRs** (each: `bash -n` + `shellcheck --severity=error` + cli-smoke +
 `moav <subcmd>` dispatch spot-check):
 
-- **B0** — `lib/common.sh` + source scaffolding (21 helpers + domain/env helpers). Establishes the pattern.
-- **B1–B6** — self-contained/contiguous blocks, near-zero risk: `nettune`, `donate`, `schedulers`, `migrate`, `dns`, `update`.
-- **B7–B11** — `install`, `doctor` (gated on nettune), `bootstrap`, `users`, `build`.
-- **B12** — `service` (~1,500 ln, densest, most-called — deferred).
-- **B13** — `menu` + misc `cmd_admin/test/client/check/profiles/usage` (**last**).
-- **(optional) B*** — extract a `compose()` wrapper into `common` (100+ inlined `docker compose` calls with ad-hoc `--profile`/`sudo`). High-leverage; touches every service/build/doctor module — do as its own PR, either early (before B12) or fold into B12.
+- **B0** ✅ — `lib/common.sh` + source scaffolding (17 fns). Establishes the pattern.
+- **B1–B6** ✅ — `nettune`, `donate`, `cert`, `migrate`, `dns`, `update`. (`schedulers` was not a separate block in the end; `cert` took its slot.)
+- **B7–B11** ✅ — `install`, `bootstrap`, `users`, `build`, `doctor`.
+- **B12** ✅ — `service` (1,572 ln, densest, most-called — deferred as planned).
+- **B13** ✅ — `menu` + misc `cmd_check/conduit/admin/user base64/test/client/usage` (**last**, as planned).
+- **(bonus)** ✅ — `lib/peers.sh`: WG/AWG duplicate-peer-IP detection + repair (`moav doctor peers [--fix]`), added mid-stream in response to a live bug.
+- **(optional, NOT done) B*** — extract a `compose()` wrapper into `common` (100+ inlined `docker compose` calls with ad-hoc `--profile`/`sudo`). Still open, and now the single highest-leverage *reduction* item left.
+
+**Outcome.** `moav.sh` **9,483 → 1,038 lines (−89%)**, a dispatcher over fifteen
+modules: `common · nettune · donate · cert · peers · migrate · dns · update ·
+install · bootstrap · users · build · doctor · service · menu` (8,833 lines in
+`lib/`).
+
+**Honest accounting.** Workstream B is *relocation, not deletion* — the repo
+total is roughly flat. Genuine net reduction in this sprint came from
+Workstream A (~1,000 lines) plus B4's dead `get_cdn_url`. If code reduction is
+the goal, the remaining levers are the `compose()` wrapper above and a second
+A-style dedup pass, not further decomposition.
+
+**Method used for every B PR** (worth reusing): function count conserved across
+`moav.sh` + `lib/*.sh`; zero duplicate definitions (catches a module left
+defined in both places — this happened once, after a hunk-wise merge
+resolution); affected subcommands diffed **byte-for-byte including exit codes**
+against a clean worktree of the base, normalising the banner's
+`v<version> (<branch>)` line; full e2e before merge. When a base branch is
+squash-merged, **replay** the extraction on the new base rather than resolving
+conflicts hunk-wise.
 
 ---
 
@@ -221,13 +242,24 @@ grafana non-root + secret handling *(with E4)*. Review pass produces the exact l
 
 ## Cross-workstream sequencing
 
-1. **A1** (keys) + **B0/B1** (common + nettune) — warm-ups, near-zero risk, establish the lib pattern for both trees.
-2. **A5 ⭐** (bundle-readme) — earliest big win; retires the most bug risk.
-3. **A2–A4, A6** (provisioning dedup) interleaved with **B2–B11** (moav.sh modules) — independent files, parallelisable.
-4. **C** (env loader) after A4 — heaviest consumers stabilised first; golden-diff gated.
-5. **D** (pipefail) + **E** (security fixes) — anytime; D pairs with the compose-up smoke, E with the review pass.
-6. **A7** (collapse entry points) + **B12–B13** (service/menu) — last, highest-risk, after the net has proven the rest.
-7. Cut **v2.0.0** once the tree is decomposed, deduplicated, and the security pass is closed.
+1. ✅ **A1** (keys) + **B0/B1** (common + nettune) — warm-ups, established the lib pattern for both trees.
+2. ✅ **A5 ⭐** (bundle-readme) — earliest big win; retired the most bug risk.
+3. ✅ **A2–A4, A6** (provisioning dedup) interleaved with **B2–B11** — independent files, as planned.
+4. ⬜ **C** (env loader) — next up. A4 is done, so the heaviest consumers are stabilised.
+5. 🔄 **D** (strict mode) + ⬜ **E** (security fixes) — D in progress; three concrete defects already logged (below).
+6. ✅ **A7** (collapse entry points) + **B12–B13** (service/menu) — done last, as planned.
+7. ⬜ Cut **v2.0.0** once C/D/E close. **v2.0.0-rc.1** is published.
+
+### D — defects already logged (fix these first; they are real, not hypothetical)
+
+| # | Defect | Trigger |
+|---|---|---|
+| 1 | `ENABLE_REALITY: unbound variable` | `moav doctor` with no `.env` present |
+| 2 | `client_public_key: unbound variable` | `wireguard_add_peer` when key generation fails |
+| 3 | `declare -A` requires bash ≥ 4 | any `moav` run on stock macOS (ships bash 3.2) |
+
+Defect 3 is a portability bug rather than a strict-mode one, but it surfaces the
+same way — the script dies before doing anything — so it belongs in the same pass.
 
 **Every PR:** `bash -n` + `shellcheck --severity=error` + the relevant e2e/golden/
 smoke gate, behaviour-preserving, one concern at a time.
