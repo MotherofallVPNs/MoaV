@@ -124,7 +124,19 @@ secure_state_keys() {
                 ;;
         esac
         # Only touch what is actually loose, so the log stays meaningful.
-        if [[ -n "$(find "$f" -maxdepth 0 -perm /077 2>/dev/null)" ]]; then
+        #
+        # `find -perm /077` is GNU-only: BSD/macOS find rejects it, the test
+        # yields nothing, and this function then silently chmods NOTHING. In
+        # production it runs on Linux so it worked, but a helper that no-ops on
+        # a whole platform -- and a test that fails only there -- teaches people
+        # to ignore red output. Read the mode directly instead, GNU form first
+        # then BSD.
+        local mode
+        mode=$(stat -c '%a' "$f" 2>/dev/null || stat -f '%Lp' "$f" 2>/dev/null || echo "")
+        # Pad to 3 digits so 640 and 40 do not compare alike.
+        while [[ -n "$mode" && ${#mode} -lt 3 ]]; do mode="0$mode"; done
+        # Loose = any group or other bit set.
+        if [[ -n "$mode" && "${mode:1}" != "00" ]]; then
             chmod 600 "$f" 2>/dev/null && fixed=$((fixed + 1))
         fi
     done
