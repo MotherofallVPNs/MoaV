@@ -5,6 +5,11 @@
 # Uses raw ip/wg commands to avoid wg-quick shell compatibility issues
 # =============================================================================
 
+set -eu
+# busybox ash supports pipefail (verified on alpine:3.21). Guarded so the script
+# still starts on any image whose shell lacks it rather than dying on line 1.
+set -o pipefail 2>/dev/null || true
+
 CONFIG_FILE="/etc/wireguard/wg0.conf"
 INTERFACE="wg0"
 
@@ -19,16 +24,30 @@ fi
 
 # Show config info (without private keys)
 echo "[wireguard] Config file: $CONFIG_FILE"
-PEER_COUNT=$(grep -c '^\[Peer\]' "$CONFIG_FILE" || echo 0)
+# grep -c already prints 0 on no match (and exits 1); `|| echo 0` appended a
+# SECOND zero, so this used to report "Peer count: 0 0".
+PEER_COUNT=$(grep -c '^\[Peer\]' "$CONFIG_FILE" 2>/dev/null || true)
+[ -n "$PEER_COUNT" ] || PEER_COUNT=0
 echo "[wireguard] Peer count: $PEER_COUNT"
 
 # IP forwarding is set via docker-compose sysctls
 echo "[wireguard] IP forwarding: $(cat /proc/sys/net/ipv4/ip_forward)"
 
 # Parse config file - use cut -f2- to preserve = in base64 keys
-PRIVATE_KEY=$(grep -i 'PrivateKey' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n')
-ADDRESS=$(grep -i 'Address' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n')
-LISTEN_PORT=$(grep -i 'ListenPort' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n')
+# `|| true` on each: `grep | head -1` gets SIGPIPE (exit 141) once head closes
+# the pipe -- which pipefail propagates even on a SUCCESSFUL match -- and grep
+# exits 1 when the key is legitimately absent. Either would kill the container
+# at startup under `set -e`.
+PRIVATE_KEY=$(grep -i 'PrivateKey' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n' || true)
+ADDRESS=$(grep -i 'Address' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n' || true)
+LISTEN_PORT=$(grep -i 'ListenPort' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n' || true)
+
+# Fail loudly on missing essentials. Previously an empty PRIVATE_KEY sailed past
+# `wg set`, the script reached its monitor loop, and the container reported
+# healthy while the tunnel was dead.
+[ -n "$PRIVATE_KEY" ] || { echo "[wireguard] ERROR: no PrivateKey in $CONFIG_FILE"; exit 1; }
+[ -n "$ADDRESS" ]     || { echo "[wireguard] ERROR: no Address in $CONFIG_FILE"; exit 1; }
+[ -n "$LISTEN_PORT" ] || LISTEN_PORT=51820   # optional; wg default
 
 echo "[wireguard] Address: $ADDRESS"
 echo "[wireguard] Listen port: $LISTEN_PORT"

@@ -39,6 +39,8 @@ jobs:
         run: bash tests/strict-mode-test.sh
       - name: state key permission test
         run: bash tests/state-perms-test.sh
+      - name: entrypoint strict-mode test
+        run: bash tests/entrypoint-strict-test.sh
       - name: refactor verification (static)
         run: bash tests/refactor-verify.sh
       - name: protocol-roster drift gate

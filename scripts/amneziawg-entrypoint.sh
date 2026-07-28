@@ -5,6 +5,11 @@
 # Based on WireGuard entrypoint, adapted for AmneziaWG interface/tools
 # =============================================================================
 
+set -eu
+# busybox ash supports pipefail (verified on alpine:3.21). Guarded so the script
+# still starts on any image whose shell lacks it rather than dying on line 1.
+set -o pipefail 2>/dev/null || true
+
 CONFIG_FILE="/etc/amneziawg/awg0.conf"
 INTERFACE="awg0"
 
@@ -45,21 +50,29 @@ if ! ip link show "$INTERFACE" > /dev/null 2>&1; then
 fi
 
 # Parse config file - use cut -f2- to preserve = in base64 keys
-PRIVATE_KEY=$(grep -i 'PrivateKey' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n')
-ADDRESS=$(grep -i 'Address' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n')
-LISTEN_PORT=$(grep -i 'ListenPort' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n')
-MTU=$(grep -i 'MTU' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n')
+PRIVATE_KEY=$(grep -i 'PrivateKey' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n' || true)
+ADDRESS=$(grep -i 'Address' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n' || true)
+LISTEN_PORT=$(grep -i 'ListenPort' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n' || true)
+MTU=$(grep -i 'MTU' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n' || true)
 
 # Parse AmneziaWG obfuscation params
-JC=$(grep -i '^Jc' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n')
-JMIN=$(grep -i '^Jmin' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n')
-JMAX=$(grep -i '^Jmax' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n')
-S1=$(grep -i '^S1' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n')
-S2=$(grep -i '^S2' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n')
-H1=$(grep -i '^H1' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n')
-H2=$(grep -i '^H2' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n')
-H3=$(grep -i '^H3' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n')
-H4=$(grep -i '^H4' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n')
+JC=$(grep -i '^Jc' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n' || true)
+JMIN=$(grep -i '^Jmin' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n' || true)
+JMAX=$(grep -i '^Jmax' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n' || true)
+S1=$(grep -i '^S1' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n' || true)
+S2=$(grep -i '^S2' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n' || true)
+H1=$(grep -i '^H1' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n' || true)
+H2=$(grep -i '^H2' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n' || true)
+H3=$(grep -i '^H3' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n' || true)
+H4=$(grep -i '^H4' "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d ' \t\r\n' || true)
+
+# Fail loudly on missing essentials rather than proceeding to the monitor loop
+# with an empty key -- that left the container reporting healthy while the
+# tunnel was dead. The obfuscation params above are genuinely optional, which is
+# exactly why every scraper needed `|| true`: absence is their normal case.
+[ -n "$PRIVATE_KEY" ] || { echo "[amneziawg] ERROR: no PrivateKey in $CONFIG_FILE"; exit 1; }
+[ -n "$ADDRESS" ]     || { echo "[amneziawg] ERROR: no Address in $CONFIG_FILE"; exit 1; }
+[ -n "$LISTEN_PORT" ] || LISTEN_PORT=51821   # optional; awg default
 
 echo "[amneziawg] Address: $ADDRESS"
 echo "[amneziawg] Listen port: $LISTEN_PORT"
