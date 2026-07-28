@@ -420,7 +420,7 @@ cmd_donate_mahsanet_remove() {
 _get_donate_api_key() {
     local api_key=""
     if [[ -f ".env" ]]; then
-        api_key=$(grep -E "^MAHSANET_API_KEY=" .env 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
+        api_key=$(get_env_val "MAHSANET_API_KEY" ".env")
     fi
     if [[ -z "$api_key" ]]; then
         error "No donation service configured"
@@ -993,7 +993,7 @@ cmd_donate() {
             case "$donate_choice" in
                 1)
                     local api_key=""
-                    [[ -f ".env" ]] && api_key=$(grep -E "^MAHSANET_API_KEY=" .env 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
+                    [[ -f ".env" ]] && api_key=$(get_env_val "MAHSANET_API_KEY" ".env")
                     if [[ -z "$api_key" ]]; then
                         error "MahsaNet API key not configured"
                         echo -e "  Run ${CYAN}moav donate setup${NC} to configure."

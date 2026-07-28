@@ -359,7 +359,7 @@ ensure_admin_password() {
     # Check if admin password is unset, empty, or still the insecure default
     local current_password=""
     if [[ -f ".env" ]]; then
-        current_password=$(grep -E "^ADMIN_PASSWORD=" .env 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
+        current_password=$(get_env_val "ADMIN_PASSWORD" ".env")
     fi
 
     if [[ -z "$current_password" || "$current_password" == "change_me_to_something_secure" || "$current_password" == "admin" ]]; then
