@@ -131,7 +131,51 @@ lib). Source order: `common` first → `nettune` before `doctor` → `menu` last
 - **B12** ✅ — `service` (1,572 ln, densest, most-called — deferred as planned).
 - **B13** ✅ — `menu` + misc `cmd_check/conduit/admin/user base64/test/client/usage` (**last**, as planned).
 - **(bonus)** ✅ — `lib/peers.sh`: WG/AWG duplicate-peer-IP detection + repair (`moav doctor peers [--fix]`), added mid-stream in response to a live bug.
-- **(optional, NOT done) B*** — extract a `compose()` wrapper into `common` (100+ inlined `docker compose` calls with ad-hoc `--profile`/`sudo`). Still open, and now the single highest-leverage *reduction* item left.
+- **(optional, NOT done) B*** — extract a `compose()` wrapper into `common`. **Surveyed; premise is partly false — see below. Do not start this on the original description.**
+
+### `compose()` wrapper — survey before starting (do not skip this)
+
+The plan described "100+ inlined `docker compose` calls with ad-hoc
+`--profile`/`sudo`" and called it the highest-leverage reduction item. Measured
+on `dev`:
+
+| | count |
+|---|---|
+| `docker compose` call sites | 149 |
+| …using `sudo` | **0** |
+| …using `--profile` | 29 (16 of them literally `--profile all`) |
+| …using `-f`/`--file` | 6 |
+| …ending in `2>/dev/null` | 37 |
+| existing `compose()` wrapper | none |
+
+**The `sudo` half of the premise is simply wrong** — no compose call uses it.
+The rest are heterogeneous (`ps`, `exec`, `restart`, `up`, `run`, `logs`, each
+with different flags, redirections and error handling), so a blanket wrapper
+buys indirection more than it buys reduction. The genuinely repeated fragments
+are narrow: `--profile all` (16) and `-f` handling (6).
+
+**Revised recommendation:** skip the blanket wrapper. If it is done at all,
+scope it to a `compose_all()` helper for the 16 `--profile all` sites, which is
+mechanical and safe.
+
+### `sudo` detection — also smaller than it looks
+
+Four copies of the idiom exist (`_root_prefix()` in `moav.sh`, three inline in
+`lib/nettune.sh`), but they are **not interchangeable**:
+
+- `_root_prefix()` and `lib/nettune.sh:21` are best-effort — no sudo, return
+  empty, let the privileged operation fail on its own.
+- `lib/nettune.sh:83` and `:119` deliberately **error and `return 1`** when sudo
+  is missing, with a specific message naming the file they cannot write.
+
+Consolidating all four onto `_root_prefix()` would delete those two error paths
+and replace a clear message with a later, vaguer failure. If unified, it needs
+*two* helpers (best-effort and must-have), which is close to break-even on line
+count. Left alone deliberately.
+
+**General lesson from both surveys:** the reduction estimates in this plan were
+made by grepping for a pattern, not by reading the call sites. Re-measure before
+committing to any remaining reduction item.
 
 **Outcome.** `moav.sh` **9,483 → 1,038 lines (−89%)**, a dispatcher over fifteen
 modules: `common · nettune · donate · cert · peers · migrate · dns · update ·
@@ -250,16 +294,48 @@ grafana non-root + secret handling *(with E4)*. Review pass produces the exact l
 6. ✅ **A7** (collapse entry points) + **B12–B13** (service/menu) — done last, as planned.
 7. ⬜ Cut **v2.0.0** once C/D/E close. **v2.0.0-rc.1** is published.
 
-### D — defects, after the audit pass
+### D — DONE. Audit pass + three fix PRs.
 
-| # | Defect | Trigger | Status |
+| # | Defect | Trigger | Outcome |
 |---|---|---|---|
-| 1 | `REALITY_PUBLIC_KEY: unbound variable` — **every user fails to regenerate** | `ENABLE_REALITY=false` (XHTTP is Reality-over-xhttp and defaults on) | fixing |
-| 2 | `client_public_key` — empty key silently written (bash 3.2) / hard crash (bash ≥ 4) | `wireguard_add_peer` / `amneziawg_add_peer` when keygen fails | fixing |
-| 3 | `moav user add` dies **silently** | `grep\|cut` under `pipefail` when the Reality volume read is empty | fixing |
-| 4 | `declare -A` requires bash ≥ 4 | any `moav` run on stock macOS (bash 3.2) | open |
-| 5 | empty-array expansion `"${arr[@]}"` | bash ≤ 4.3 (RHEL/CentOS 7 ship 4.2) — affects `moav start`, `moav build` | open |
-| 6 | `--tail` / `-b` with no value → `$2: unbound variable` | `moav logs --tail`, `moav update -b` | open |
+| 1 | `REALITY_PUBLIC_KEY: unbound variable` — **every user fails to regenerate** | `ENABLE_REALITY=false` (XHTTP is Reality-over-xhttp and defaults on) | ✅ D1 |
+| 2 | `client_public_key` — empty key silently written (bash 3.2) / hard crash (bash ≥ 4) | `wireguard_add_peer` / `amneziawg_add_peer` when keygen fails | ✅ D1 |
+| 3 | `moav user add` dies **silently** | `grep\|cut` under `pipefail` when the Reality volume read is empty | ✅ D1 |
+| 4 | `declare -A` requires bash ≥ 4 | any `moav` run on stock macOS (bash 3.2) | ✅ D2 |
+| 5 | `--tail` / `-b` with no value → `$2: unbound variable` | `moav logs --tail`, `moav update -b` | ✅ D2 |
+| 6 | truncated per-user WG/AWG state file wedges that user permanently | a prior run died between `mkdir` and the key write | ✅ D3 |
+| 7 | empty-array expansion `"${arr[@]}"` on bash ≤ 4.3 | RHEL/CentOS 7 (bash 4.2) — `moav start`, `moav build` | ⛔ **declined** |
+| 8 | bare `${DOMAIN}` / `${SERVER_IP}` in bundle generators | a hand-written `.env` missing the key entirely | ⛔ **declined** |
+
+**Why 7 is declined:** README.md:245 supports Debian 12 / Ubuntu 22.04/24.04,
+which ship bash 5.x. RHEL 7 (bash 4.2) is EOL. Revisit only if an older distro
+enters scope.
+
+**Why 8 is declined:** not reachable from any first-party path — `.env.example`
+always defines both keys, and `docker-compose.yml` supplies them in-container.
+More importantly the obvious fix is wrong: `${DOMAIN:-}` would trade a loud
+crash for a **silently broken client bundle**. If touched, it should become a
+required-value assertion, not a default.
+
+**Where the risk was, and wasn't.** `lib/*.sh` and `moav.sh` came out clean —
+185 `get_env_val` call sites, **zero** bare `.env` reads. All real exposure was
+in `scripts/` and `scripts/lib/`.
+
+**Recurring shape** behind defects 1–3 and 6: *a value is loaded conditionally*
+(a `source` behind `[[ -f ]]`, or a paired `read` that can short-circuit) *and
+then read unconditionally.* Worth grepping for on any new generator.
+
+**Retracted:** an earlier entry claimed `moav doctor` dies with
+`ENABLE_REALITY: unbound variable` when no `.env` is present. It does not
+reproduce — every `ENABLE_*` read in `lib/doctor.sh` goes through
+`get_env_val "<KEY>" "$env_file" "<default>"`. Logged in error or fixed earlier
+in the sprint.
+
+**Testing note worth keeping:** `set +e` cannot catch a `set -u` violation — the
+shell exits outright. A test for this class must assert on *process survival*,
+not on a return code. `tests/strict-mode-test.sh` (15 cases, wired into
+`ci.yml`) does that, and every case in it was verified to **fail against
+unfixed `dev`** — a test that passes everywhere proves nothing.
 
 **Retracted:** an earlier entry here claimed `moav doctor` dies with
 `ENABLE_REALITY: unbound variable` when no `.env` is present. The audit could not
