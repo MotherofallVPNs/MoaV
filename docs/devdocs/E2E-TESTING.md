@@ -264,16 +264,28 @@ connects and fetches an exit IP through the tunnel.
 
 | Strength | Protocols |
 |---|---|
-| **Live exit-IP** | reality, trojan, hysteria2, ss, xhttp, anytls, **wireguard**, **amneziawg** (WG/AWG live since the TUN grant below; anytls since `ENABLE_ANYTLS=true` in the domain pass — its test had never once run before that) |
+| **Live exit-IP** | reality, trojan, hysteria2, ss, xhttp |
 | Live, warn-gated | cdn (operator Cloudflare), xdns (resolver-sensitive) |
 | Live if binary present, else warn | dnstt, slipstream, trusttunnel |
+| Live **only where a WG kernel module exists** | wireguard, amneziawg (see below) |
 | Handshake probe only | telemt (Fake-TLS handshake, no MTProto session) |
-| Config-parse + reachability, capped at **warn** | wireguard/amneziawg on hosts without TUN (a DNS resolve used to count as *pass* here) |
+| Never runs in CI yet | anytls (test exists; blocked on a provisioning bug — enabling it breaks bootstrap; tracked on the board) |
 | Untestable from harness, always skip | masterdns (no standalone client), gooserelay (needs deployed Apps Script) |
 
-The WG/AWG live tests run **inside the `moav-client` container**, which
-`moav test` grants `NET_ADMIN` + `/dev/net/tun` (own netns; host routing
-untouched). The e2e preflight hard-fails if the runner lacks `/dev/net/tun`.
+**WireGuard / AmneziaWG — read this before trusting a green.** The live test
+runs inside the `moav-client` container (`moav test` grants it `NET_ADMIN` +
+`/dev/net/tun`). But bringing up a WG interface needs *either* the `wireguard`
+kernel module *or* a userspace impl (wireguard-go / boringtun) — the CI runner's
+container has **neither**, so `wg-quick up` cannot create the interface and the
+test reports **warn** (an honest "no WG capability here"), not pass. It only
+reaches a real exit-IP pass on a host with the kernel module — i.e. a real
+server, which is the upgrade-in-place milestone, not the fresh-install CI.
+
+So in CI today, WG/AWG are **warn**, and the fresh-install guarantee rests on
+the five live-exit-IP protocols above. This is a deliberate honesty fix: WG used
+to report *pass* on a mere DNS resolve of the endpoint. To make WG/AWG genuinely
+live in CI, add a userspace impl to `Dockerfile.client` and set
+`WG_QUICK_USERSPACE_IMPLEMENTATION` — filed as a follow-up.
 
 Lifecycle covered: bootstrap → start → `user add` (bundle non-empty) → forced
 **re-bootstrap** (orphan guard + per-inbound reconcile assert) →
