@@ -163,6 +163,39 @@ jobs:
       - name: Let services settle
         run: sleep 45
 
+      - name: Assert every long-lived service is actually RUNNING
+        run: |
+          # `docker compose ps` previously appeared ONLY in the failure-diagnostics
+          # step, so nothing checked container health on a green path: a service
+          # that crash-looped at startup went unnoticed, because the protocol
+          # tests can still pass (and WG/AWG warn without a kernel module either
+          # way). This matters most for the entrypoints — a bad `set -euo
+          # pipefail` change kills a container instantly and silently.
+          echo "::group::container states"
+          docker ps -a --filter 'name=^moav-' --format '{{.Names}}\t{{.State}}\t{{.Status}}'
+          echo "::endgroup::"
+          bad=0
+          while IFS=$'\t' read -r name state status; do
+            [ -n "$name" ] || continue
+            case "$name" in
+              # One-shot jobs: exiting is correct for them, not a failure.
+              moav-certbot|moav-bootstrap|moav-*-init) continue ;;
+            esac
+            case "$state" in
+              running) ;;
+              restarting) echo "::error::$name is RESTARTING ($status) — crash loop"; bad=1 ;;
+              *)          echo "::error::$name is $state ($status) — expected running"; bad=1 ;;
+            esac
+          done < <(docker ps -a --filter 'name=^moav-' --format '{{.Names}}\t{{.State}}\t{{.Status}}')
+          if [ "$bad" -ne 0 ]; then
+            echo "--- logs from the failed container(s) ---"
+            docker ps -a --filter 'name=^moav-' --format '{{.Names}}\t{{.State}}' \
+              | awk -F'\t' '$2!="running"{print $1}' \
+              | while read -r c; do echo "::group::$c"; docker logs --tail 30 "$c" 2>&1; echo "::endgroup::"; done
+            exit 1
+          fi
+          echo "All long-lived moav-* containers are running."
+
       - name: Reclaim config/state ownership for the host CLI
         run: |
           # build/bootstrap/start containers run as root and write configs/,
