@@ -299,6 +299,75 @@ must still start and pass its protocol check).
 
 ## Workstream E — Security / edge-case review
 
+### Verification pass result (2026-07-28, dev@9080811)
+
+The list below was written by spotting shapes, not by tracing exploitability.
+Verified item by item; **three were dropped as non-issues, one downgraded, and
+the two most severe findings on the server were not in the list at all.**
+
+**🔴 CRITICAL — boarded, need design, NOT in the original list**
+
+1. **`docker-proxy` is reachable from every container on `moav_net`.** It has no
+   authentication; the socket-proxy filters path+method only, never the request
+   body, so `POST /containers/create` with `{"Binds":["/:/host"],"Privileged":true}`
+   is permitted → host root. The list says *"if admin is compromised"*; the real
+   precondition is compromise of **any** of the 29 containers on the single flat
+   bridge — including every service terminating untrusted internet traffic
+   (`sing-box`, `xray`, `wireguard`, `wstunnel`, `telemt`, `snowflake`,
+   `trusttunnel`). The capability is load-bearing (`singbox-user-add.sh` needs
+   arbitrary-bind create + `EXEC`), so it cannot just be disabled.
+   *Minimal fix:* dedicated network for `docker-proxy` + `admin` only.
+2. **`cadvisor` privileged with `/:/rootfs` and the raw docker socket**, plus
+   four exporters mounting the real socket (`:ro` prevents unlink, not API
+   writes). Five direct host-root pivots with no proxy in between.
+
+**✅ Fixed (#217)** — admin IP whitelist never matched a CIDR (failed closed, but
+locked operators out); `.env` created 0644 → 0600; grafana gained
+`no-new-privileges` + `cap_drop: ALL`.
+
+**⬜ Still true, not yet fixed**
+
+- **Admin serves plaintext HTTP when Let's Encrypt has not issued.** The
+  self-signed fallback is only generated in *domainless* mode
+  (`bootstrap.sh:75`), so in the normal domain deployment any certbot failure
+  silently downgrades the panel to cleartext and the HTTP-Basic credential goes
+  over the wire. **HIGH.** Fix: fail closed, or generate self-signed
+  unconditionally (`find_certificates` already prefers LE, so ordering is safe).
+- **Bundles/configs are world-WRITABLE, not merely group-readable as stated.**
+  `admin-entrypoint.sh:44-45` does `chmod -R a+rwX` on `outputs`, `state` and six
+  config dirs on every start; `configs/sing-box/config.json` holds the Reality
+  private key and every user credential. Real breakage risk to fix (host root and
+  the uid-100 admin write the same files), so treat as its own scoped task.
+- **Password reuse admin ↔ grafana** (`ADMIN_PASSWORD` feeds both). MEDIUM.
+- **No rate limiting on `verify_auth`** — narrow, since generated passwords are
+  ~95 bits; only bites when an operator types a weak one. MEDIUM.
+
+**❌ Dropped — verified non-issues**
+
+- *`protocols` → `DONATE_ONLY_PROTOCOLS` injection*: the value is quoted, is
+  grep's **input** not its pattern, and reaches `subprocess.run` as an argv list
+  with no `shell=True`. No injection possible.
+- *snowflake unquoted `${RATE_KBIT}`*: result of an arithmetic expansion, so it
+  is always an integer literal and cannot word-split.
+- *"`GF_SECURITY_ADMIN_PASSWORD` visible via `docker inspect`"*: reading it
+  requires docker API access, which is already host root. Adds nothing.
+- *`eval "$cmd"`*: cited file:line has no `eval`. The real one
+  (`lib/common.sh:225`) is fed a locally-typed username by the operator already
+  running as root, and prompts for confirmation first. Downgraded to a
+  robustness nit — `lib/users.sh:199` should get the same regex guard
+  `:145` already has.
+
+**Note on `grafana user:"0"`** — filed as though root were the bug. Root and the
+writable filesystem are *load-bearing*: the entrypoint patches branding into
+`/usr/share/grafana/public`, which uid 472 cannot write. Dropping to 472 needs a
+build-time branding layer **and** a chown of the existing `moav_grafana` volume,
+i.e. an upgrade migration that breaks existing installs if done blind.
+
+---
+
+### Original list (kept for reference)
+
+
 Run as an **adversarial review pass** (dedicated code-review agent) against the
 concentrated targets, then land fixes as small PRs. Several overlap Epic 4
 (`&hardened` anchor / grafana-root) — coordinate so a fix lands once.
