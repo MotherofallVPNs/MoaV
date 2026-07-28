@@ -543,8 +543,8 @@ cmd_client() {
             local http_port="18080"
 
             if [[ -f ".env" ]]; then
-                local env_socks=$(grep -E "^CLIENT_SOCKS_PORT=" .env 2>/dev/null | cut -d= -f2 | tr -d ' "')
-                local env_http=$(grep -E "^CLIENT_HTTP_PORT=" .env 2>/dev/null | cut -d= -f2 | tr -d ' "')
+                local env_socks=$(get_env_val "CLIENT_SOCKS_PORT" ".env")
+                local env_http=$(get_env_val "CLIENT_HTTP_PORT" ".env")
                 [[ -n "$env_socks" ]] && socks_port="$env_socks"
                 [[ -n "$env_http" ]] && http_port="$env_http"
             fi

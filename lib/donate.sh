@@ -445,7 +445,7 @@ cmd_donate_mahsanet_donate() {
     local protocols="reality hysteria2"
     if [[ -f ".env" ]]; then
         local env_protocols
-        env_protocols=$(grep -E "^MAHSANET_PROTOCOLS=" .env 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
+        env_protocols=$(get_env_val "MAHSANET_PROTOCOLS" ".env")
         [[ -n "$env_protocols" ]] && protocols="$env_protocols"
     fi
 
@@ -453,7 +453,7 @@ cmd_donate_mahsanet_donate() {
     local pool="mahsa"
     if [[ -f ".env" ]]; then
         local env_pool
-        env_pool=$(grep -E "^MAHSANET_POOL=" .env 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
+        env_pool=$(get_env_val "MAHSANET_POOL" ".env")
         [[ -n "$env_pool" ]] && pool="$env_pool"
     fi
 

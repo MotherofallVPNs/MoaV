@@ -31,7 +31,7 @@ check_bootstrap() {
 run_bootstrap() {
     print_section "First-Time Setup (Bootstrap)"
 
-    local domain=$(grep -E '^DOMAIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+    local domain=$(get_env_val "DOMAIN" ".env")
 
     info "Bootstrap will:"
     echo "  • Generate encryption keys and secrets"
@@ -49,7 +49,7 @@ run_bootstrap() {
     fi
 
     # Detect and save SERVER_IP to .env if not already set
-    local current_ip=$(grep -E '^SERVER_IP=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+    local current_ip=$(get_env_val "SERVER_IP" ".env")
     if [[ -z "$current_ip" ]]; then
         info "Detecting server public IP..."
         local detected_ip=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || curl -s --max-time 5 https://ifconfig.me 2>/dev/null || echo "")
@@ -298,7 +298,7 @@ cmd_bootstrap() {
         info "Clearing bootstrap flag..."
         docker run --rm -v moav_moav_state:/state alpine rm -f /state/.bootstrapped
     else
-        local domain=$(grep -E '^DOMAIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+        local domain=$(get_env_val "DOMAIN" ".env")
         info "Bootstrap will perform first-time setup:"
         echo "  • Generate encryption keys and secrets"
         if [[ -n "$domain" ]]; then

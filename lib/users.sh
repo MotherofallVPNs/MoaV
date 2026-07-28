@@ -88,8 +88,8 @@ migration_menu() {
             ;;
         3)
             echo ""
-            local current_ip=$(grep -E '^SERVER_IP=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
-            local current_ipv6=$(grep -E '^SERVER_IPV6=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+            local current_ip=$(get_env_val "SERVER_IP" ".env")
+            local current_ipv6=$(get_env_val "SERVER_IPV6" ".env")
             local detected_ip=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || echo "")
             local detected_ipv6=$(curl -6 -s --max-time 3 https://api6.ipify.org 2>/dev/null || echo "")
             [[ -n "$current_ip" ]] && echo "Current IP in .env: $current_ip"
@@ -356,9 +356,9 @@ cmd_regenerate_users() {
     fi
 
     # Load current settings
-    local server_ip=$(grep -E '^SERVER_IP=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
-    local server_ipv6=$(grep -E '^SERVER_IPV6=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
-    local domain=$(grep -E '^DOMAIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+    local server_ip=$(get_env_val "SERVER_IP" ".env")
+    local server_ipv6=$(get_env_val "SERVER_IPV6" ".env")
+    local domain=$(get_env_val "DOMAIN" ".env")
 
     # Auto-detect IP if not set
     if [[ -z "$server_ip" ]]; then
@@ -384,7 +384,7 @@ cmd_regenerate_users() {
     echo -e "  Domain:      ${CYAN}${domain:-not set}${NC}"
 
     # Show CDN domain if configured
-    local cdn_subdomain_preview=$(grep -E '^CDN_SUBDOMAIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+    local cdn_subdomain_preview=$(get_env_val "CDN_SUBDOMAIN" ".env")
     if [[ -n "$cdn_subdomain_preview" && -n "$domain" ]]; then
         echo -e "  CDN Domain:  ${CYAN}${cdn_subdomain_preview}.${domain}${NC}"
     fi
@@ -430,22 +430,22 @@ cmd_regenerate_users() {
     info "Regenerating bundles..."
 
     # Construct CDN_DOMAIN from CDN_SUBDOMAIN + DOMAIN if not explicitly set
-    local cdn_domain=$(grep -E '^CDN_DOMAIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
-    local cdn_subdomain=$(grep -E '^CDN_SUBDOMAIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+    local cdn_domain=$(get_env_val "CDN_DOMAIN" ".env")
+    local cdn_subdomain=$(get_env_val "CDN_SUBDOMAIN" ".env")
     if [[ -z "$cdn_domain" && -n "$cdn_subdomain" && -n "$domain" ]]; then
         cdn_domain="${cdn_subdomain}.${domain}"
     fi
-    local cdn_ws_path=$(grep -E '^CDN_WS_PATH=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+    local cdn_ws_path=$(get_env_val "CDN_WS_PATH" ".env")
     # Fall back to bootstrap-generated path from state
     if [[ -z "$cdn_ws_path" ]]; then
         cdn_ws_path=$(docker run --rm -v moav_moav_state:/state alpine cat /state/keys/cdn.env 2>/dev/null | grep '^CDN_WS_PATH=' | cut -d= -f2 || true)
     fi
     cdn_ws_path="${cdn_ws_path:-/ws}"
-    local cdn_transport=$(grep -E '^CDN_TRANSPORT=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+    local cdn_transport=$(get_env_val "CDN_TRANSPORT" ".env")
     cdn_transport="${cdn_transport:-httpupgrade}"
-    local cdn_sni=$(grep -E '^CDN_SNI=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+    local cdn_sni=$(get_env_val "CDN_SNI" ".env")
     cdn_sni="${cdn_sni:-${domain}}"
-    local cdn_address=$(grep -E '^CDN_ADDRESS=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+    local cdn_address=$(get_env_val "CDN_ADDRESS" ".env")
     cdn_address="${cdn_address:-${cdn_domain}}"
 
     # Load ENABLE_* settings from .env

@@ -139,8 +139,8 @@ cmd_export() {
     "created": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
     "moav_version": "${MOAV_VERSION:-unknown}",
     "hostname": "$(hostname)",
-    "server_ip": "$(grep -E '^SERVER_IP=' .env 2>/dev/null | cut -d= -f2 | tr -d '\"' || echo 'unknown')",
-    "domain": "$(grep -E '^DOMAIN=' .env 2>/dev/null | cut -d= -f2 | tr -d '\"' || echo 'unknown')"
+    "server_ip": "$(get_env_val "SERVER_IP" ".env" "unknown")",
+    "domain": "$(get_env_val "DOMAIN" ".env" "unknown")"
 }
 EOF
 
@@ -330,7 +330,7 @@ cmd_import() {
     echo ""
 
     # Check if IP migration is needed
-    local old_ip=$(grep -E '^SERVER_IP=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+    local old_ip=$(get_env_val "SERVER_IP" ".env")
     local current_ip=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || echo "")
 
     if [[ -n "$old_ip" ]] && [[ -n "$current_ip" ]] && [[ "$old_ip" != "$current_ip" ]]; then
@@ -374,7 +374,7 @@ cmd_migrate_ip() {
         exit 1
     fi
 
-    local old_ip=$(grep -E '^SERVER_IP=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+    local old_ip=$(get_env_val "SERVER_IP" ".env")
 
     # If old_ip is empty (auto-detect mode), try to detect current IP for config updates
     if [[ -z "$old_ip" ]]; then
@@ -403,7 +403,7 @@ cmd_migrate_ip() {
 
     # Detect IPv6 if available
     local new_ipv6=""
-    local old_ipv6=$(grep -E '^SERVER_IPV6=' .env 2>/dev/null | cut -d= -f2 | tr -d '"')
+    local old_ipv6=$(get_env_val "SERVER_IPV6" ".env")
     if [[ "$old_ipv6" != "disabled" ]]; then
         new_ipv6=$(curl -6 -s --max-time 3 https://api6.ipify.org 2>/dev/null || echo "")
         if [[ -n "$new_ipv6" ]]; then

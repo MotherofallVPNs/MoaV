@@ -92,6 +92,17 @@ for f in lib/donate.sh moav.sh; do
     fi
 done
 
+# C1a: the lib/ tree must no longer carry ad-hoc .env scrapers. The one
+# permitted survivor reads state/keys/cdn.env out of the docker volume, which is
+# not a .env read at all.
+stragglers=$(grep -rn "cut -d= -f2 " --include='*.sh' "$ROOT/lib/" "$ROOT/moav.sh" 2>/dev/null | grep -v 'moav_moav_state' || true)
+if [[ -z "$stragglers" ]]; then
+    ok "lib/ tree has no ad-hoc .env scrapers left (all on get_env_val)"
+else
+    bad "lib/ tree still has ad-hoc .env scrapers:"
+    printf '%s\n' "$stragglers" | cut -c1-100 | sed 's/^/          /'
+fi
+
 # NOTE (not a failure): get_env_val currently lives in moav.sh, so only the lib/
 # tree can call it. Migrating the scripts/ (container) scrapers in C1 proper
 # requires hoisting it into a shared location first. Recorded so the sequencing
