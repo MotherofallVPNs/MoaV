@@ -294,7 +294,17 @@ grafana non-root + secret handling *(with E4)*. Review pass produces the exact l
 6. ✅ **A7** (collapse entry points) + **B12–B13** (service/menu) — done last, as planned.
 7. ⬜ Cut **v2.0.0** once C/D/E close. **v2.0.0-rc.1** is published.
 
-### D — DONE. Audit pass + three fix PRs.
+### D — PARTIALLY done. Host-side audit shipped; **container entrypoints NOT started**.
+
+> **Scope correction (2026-07-28).** D1-D3 below audited and hardened the *host*
+> tree (`moav.sh`, `lib/*.sh`, `scripts/*.sh`, `scripts/lib/*.sh`) and fixed six
+> real defects. That was valuable but it is **not the Workstream D described
+> above**, which is specifically about the ~12 **container entrypoints** running
+> under `sh` / bare `set -e`. Those remain untouched — verified 2026-07-28:
+> `amneziawg`, `wireguard`, `sing-box`, `admin`, `grafana`, `grafana-proxy`,
+> `snowflake`, `wstunnel` have **no `set` line at all**; `conduit`, `dnstt`,
+> `trusttunnel`, `xray` have bare `set -e`. D was marked done in error; the
+> remaining work is tracked as **D4** (below).
 
 | # | Defect | Trigger | Outcome |
 |---|---|---|---|
@@ -330,6 +340,14 @@ then read unconditionally.* Worth grepping for on any new generator.
 reproduce — every `ENABLE_*` read in `lib/doctor.sh` goes through
 `get_env_val "<KEY>" "$env_file" "<default>"`. Logged in error or fixed earlier
 in the sprint.
+
+**D4 (NOT started) — the original D: container entrypoints.** Fix the landmine
+classes first (`grep KEY file | head -1 | cut` scrapers returning nonzero when a
+key is legitimately absent; `cmd | head -N` SIGPIPE under pipefail; optional
+`${VAR}` reads under `-u`), *then* add `set -euo pipefail`. Keep
+`conduit-offsets-watch.sh` as-is (`set -uo` without `-e` on purpose — a daemon
+loop must not die on a transient failure). Gate: compose-up smoke + full e2e —
+every service must still start and pass its protocol check.
 
 **Testing note worth keeping:** `set +e` cannot catch a `set -u` violation — the
 shell exits outright. A test for this class must assert on *process survival*,
