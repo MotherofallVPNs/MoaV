@@ -37,6 +37,8 @@ jobs:
         run: bash tests/net-alloc-test.sh
       - name: strict-mode regression test
         run: bash tests/strict-mode-test.sh
+      - name: refactor verification (static)
+        run: bash tests/refactor-verify.sh
       - name: protocol-roster drift gate
         run: python3 scripts/gen-protocol-docs.py --check
 
