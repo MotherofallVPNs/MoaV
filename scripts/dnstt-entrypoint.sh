@@ -1,5 +1,7 @@
 #!/bin/sh
-set -e
+set -eu
+# busybox ash supports pipefail; guarded so the script still starts without it.
+set -o pipefail 2>/dev/null || true
 
 # =============================================================================
 # dnstt server entrypoint

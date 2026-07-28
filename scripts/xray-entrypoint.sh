@@ -1,6 +1,6 @@
 #!/bin/bash
 # Xray-core entrypoint script (VLESS+XHTTP+Reality)
-set -e
+set -euo pipefail
 
 CONFIG_FILE="/etc/xray/config.json"
 
@@ -14,7 +14,9 @@ fi
 
 echo "[Xray] Configuration:"
 echo "  - Config: $CONFIG_FILE"
-echo "  - Version: $(xray version | head -1)"
+# `|| true`: `xray version | head -1` raises SIGPIPE (141) once head closes the
+# pipe, which pipefail turns into a fatal error -- on a purely cosmetic line.
+echo "  - Version: $(xray version 2>/dev/null | head -1 || true)"
 
 # Check for Stats API configuration
 if grep -q '"api-in"' "$CONFIG_FILE"; then

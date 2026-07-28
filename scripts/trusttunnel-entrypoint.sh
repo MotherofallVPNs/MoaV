@@ -1,6 +1,6 @@
 #!/bin/bash
 # TrustTunnel entrypoint script
-set -e
+set -euo pipefail
 
 CONFIG_DIR="/etc/trusttunnel"
 RUNTIME_DIR="/tmp/trusttunnel"

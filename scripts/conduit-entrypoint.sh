@@ -1,5 +1,7 @@
 #!/bin/sh
-set -e
+set -eu
+# busybox ash supports pipefail; guarded so the script still starts without it.
+set -o pipefail 2>/dev/null || true
 
 # =============================================================================
 # Psiphon Conduit v2 entrypoint
@@ -43,8 +45,12 @@ show_ryve_link() {
     fi
 
     # Extract private key from JSON (without jq)
+    # `|| true` is REQUIRED here, not defensive: grep exits 1 when the key is
+    # absent, and the very next line (`if [ -z "$PRIVATE_KEY" ]`) exists to
+    # handle exactly that case. Under pipefail the script would die before
+    # reaching its own guard.
     PRIVATE_KEY=$(grep -o '"privateKeyBase64"[[:space:]]*:[[:space:]]*"[^"]*"' \
-        "$CONDUIT_DATA_DIR/conduit_key.json" | sed 's/.*:.*"\([^"]*\)".*/\1/')
+        "$CONDUIT_DATA_DIR/conduit_key.json" | sed 's/.*:.*"\([^"]*\)".*/\1/' || true)
 
     if [ -z "$PRIVATE_KEY" ]; then
         echo "[conduit] Warning: Could not extract key from conduit_key.json"

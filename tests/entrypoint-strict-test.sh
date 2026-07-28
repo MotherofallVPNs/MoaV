@@ -37,6 +37,29 @@ for e in wireguard amneziawg; do
     fi
 done
 
+# --- D4b-1: entrypoints upgraded from bare `set -e` -------------------------
+for e in conduit dnstt trusttunnel xray; do
+    f="$ROOT/scripts/${e}-entrypoint.sh"
+    grep -qE '^set -(eu|euo pipefail)' "$f" && ok "$e: strict mode (was bare set -e)" \
+                                            || bad "$e: still bare set -e"
+    grep -q 'pipefail' "$f" && ok "$e: enables pipefail" || bad "$e: no pipefail"
+done
+
+# conduit's key extraction MUST keep `|| true`: grep exits 1 when the key is
+# absent and the next line (`if [ -z "$PRIVATE_KEY" ]`) exists to handle that.
+# Under pipefail without the guard the script dies before reaching its own check.
+if grep -qE "sed .*\\|\\| true\\)$" "$ROOT/scripts/conduit-entrypoint.sh"; then
+    ok "conduit: key extraction guarded so its own empty-key branch stays reachable"
+else
+    bad "conduit: unguarded key extraction — pipefail kills it before the [ -z ] check"
+fi
+
+# xray prints its version via `xray version | head -1`, which SIGPIPEs under
+# pipefail on a purely cosmetic line.
+grep -q 'xray version 2>/dev/null | head -1 || true' "$ROOT/scripts/xray-entrypoint.sh" \
+    && ok "xray: version line guarded against SIGPIPE" \
+    || bad "xray: unguarded 'xray version | head -1' dies on SIGPIPE"
+
 # --- functional coverage lives in the e2e, deliberately ------------------------
 # A docker-based harness was written here and removed: capturing a container that
 # ends in a monitor loop hung the suite, and a flaky CI test is worse than no
