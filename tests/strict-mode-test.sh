@@ -54,8 +54,9 @@ out=$(
   f
 ) 2>&1 || out="crashed:$out"
 case "$out" in
-    *"unbound variable"*)      ok "unguarded read fails loudly on this bash (>=4.x)";;
+    *"unbound variable"*)      ok "unguarded read fails loudly on this bash (>=4.x, bare read)";;
     "present=yes value=[]")    ok "unguarded read yields an empty key on this bash (3.2)";;
+    "present= value=[]")       ok "unguarded read leaves the key unset on this bash (>=4.x)";;
     *) bad "unguarded read produced something unexpected: '$out'";;
 esac
 
