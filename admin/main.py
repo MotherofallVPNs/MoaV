@@ -5,6 +5,7 @@ Simple stats viewer for the circumvention stack
 """
 
 import os
+import ipaddress
 import json
 import asyncio
 import zipfile
@@ -141,11 +142,27 @@ def verify_auth(request: Request, credentials: HTTPBasicCredentials = Depends(se
 
     # Check IP whitelist if configured
     if ADMIN_IP_WHITELIST:
-        ip_allowed = any(
-            client_ip.startswith(allowed.rstrip("0123456789").rstrip("."))
-            if "/" in allowed else client_ip == allowed
-            for allowed in ADMIN_IP_WHITELIST
-        )
+        # CIDR entries used to be matched with
+        #   client_ip.startswith(allowed.rstrip("0123456789").rstrip("."))
+        # which for "10.0.0.0/8" strips the digits to "10.0.0.0/" -- the trailing
+        # rstrip(".") then does nothing because the last char is "/" -- so the
+        # startswith() could never be true and EVERY CIDR entry denied everyone.
+        # It failed closed, so it was not a bypass, but an operator setting a
+        # CIDR locked themselves out and would most likely drop the whitelist
+        # entirely. Use real network containment instead.
+        def _ip_matches(ip: str, allowed: str) -> bool:
+            allowed = allowed.strip()
+            if not allowed:
+                return False
+            try:
+                if "/" in allowed:
+                    return ipaddress.ip_address(ip) in ipaddress.ip_network(allowed, strict=False)
+                return ipaddress.ip_address(ip) == ipaddress.ip_address(allowed)
+            except ValueError:
+                # Malformed entry, or an IPv4/IPv6 family mismatch: deny.
+                return ip == allowed
+
+        ip_allowed = any(_ip_matches(client_ip, a) for a in ADMIN_IP_WHITELIST)
         if not ip_allowed:
             raise HTTPException(status_code=403, detail="IP not allowed")
 

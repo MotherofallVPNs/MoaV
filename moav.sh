@@ -484,6 +484,10 @@ check_prerequisites() {
         if [[ -f ".env.example" ]]; then
             if confirm "Copy .env.example to .env?" "y"; then
                 cp .env.example .env
+                # .env holds ADMIN_PASSWORD, REALITY_PRIVATE_KEY, CLASH_API_SECRET and the
+                # Hysteria2 obfs password. It is never bind-mounted into a container and
+                # compose reads it as the invoking (host) user, so 0600 costs nothing.
+                chmod 600 .env 2>/dev/null || true
                 success "Created .env from .env.example"
                 echo ""
                 echo -e "${CYAN}Configure your MoaV installation:${NC}"

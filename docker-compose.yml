@@ -912,6 +912,15 @@ services:
       - GRAFANA_APP_TITLE=${GRAFANA_APP_TITLE:-}
       - TZ=${TZ:-UTC}
     # Note: read_only not set - grafana entrypoint writes branding files to container filesystem
+    # user:"0" and the writable FS above are load-bearing (the entrypoint
+    # patches branding into /usr/share/grafana/public, which uid 472 cannot
+    # write). These two are orthogonal to that and cost nothing: grafana needs
+    # no capabilities, and it is a first-hop target -- internet-facing, mounts
+    # moav_certs, and shares moav_net with docker-proxy.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     tmpfs:
       - /tmp:rw,size=100m
     mem_limit: 512m
