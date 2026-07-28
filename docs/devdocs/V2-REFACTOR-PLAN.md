@@ -341,6 +341,29 @@ reproduce — every `ENABLE_*` read in `lib/doctor.sh` goes through
 `get_env_val "<KEY>" "$env_file" "<default>"`. Logged in error or fixed earlier
 in the sprint.
 
+**D4 (PARTIALLY done) — the original D: container entrypoints.**
+
+| PR | Scope | State |
+|---|---|---|
+| D4a (#207) | `wireguard`, `amneziawg` — full `set -eu` + pipefail | ✅ |
+| D4b-1 (#210) | `conduit`, `dnstt`, `trusttunnel`, `xray` — `set -e` → `set -eu` + pipefail | ✅ |
+| D4b-2 (#211) | `admin`, `grafana`, `grafana-proxy`, `sing-box`, `snowflake`, `wstunnel` — **`-u` + pipefail only** | ⚠️ partial |
+| **D4c** | **enable `-e` on the six from D4b-2** | ⬜ **open** |
+
+**Why D4c is still open:** those six had *no* `set` line at all, so enabling `-e`
+makes every currently-tolerated non-zero exit fatal. That needs a per-command
+review of ~579 lines across six services (grafana alone is 227). Adding it blind
+to six long-running services at once risks taking the stack down. Each entrypoint
+carries an inline note saying so.
+
+Bugs found while doing D4: WireGuard/AmneziaWG could report healthy with a dead
+tunnel (empty `PrivateKey` reached the monitor loop); the WG peer count printed
+`0 0`; conduit's key extraction would have died under pipefail *before reaching
+its own empty-key check*; and `set -o pipefail 2>/dev/null || true` is fatal in
+dash — see REFACTOR-VERIFICATION.md rule 8.
+
+Original description follows.
+
 **D4 (NOT started) — the original D: container entrypoints.** Fix the landmine
 classes first (`grep KEY file | head -1 | cut` scrapers returning nonzero when a
 key is legitimately absent; `cmd | head -N` SIGPIPE under pipefail; optional

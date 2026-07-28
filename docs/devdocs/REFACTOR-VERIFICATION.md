@@ -73,7 +73,42 @@ docker run --rm -v "$PWD":/r -w /r bash:5.2 bash tests/strict-mode-test.sh
 a bare-read crash; CI's bash 5 produced a third outcome and **CI was red for
 four merged PRs** before anyone noticed.
 
-### 8. Re-measure any plan estimate before acting on it
+### 8. Verify in the environment the code actually runs in
+
+Before editing anything that runs inside a container, establish **which image and
+therefore which shell** it uses. Before changing file permissions, establish
+**which user the process actually runs as**.
+
+```bash
+grep -m1 '^FROM' dockerfiles/Dockerfile.<svc>      # base image -> /bin/sh flavour
+grep -nE 'USER|su-exec|setpriv|gosu' dockerfiles/Dockerfile.<svc> scripts/<svc>-entrypoint.sh
+```
+
+*Incidents, all in one sprint:*
+
+- **`set -o pipefail` is fatal in dash.** `set` is a POSIX **special builtin**, so
+  a failed `set -o pipefail` exits a non-interactive shell **immediately** —
+  `|| true` never runs. dash (debian's `/bin/sh`) has no pipefail. Verified on
+  alpine, where busybox ash *does* support it, so the guard never fired and it
+  looked correct; on debian it killed the conduit container at line 3 with exit 2
+  and **no output at all**. Portable form:
+  ```sh
+  if ( set -o pipefail 2>/dev/null ); then set -o pipefail; fi   # probe in a subshell
+  ```
+- **The compose `user:` field does not tell you who the process runs as.**
+  Entrypoints drop privileges themselves — admin via `su-exec moav`, conduit via
+  `setpriv --reuid=moav`. Reading the compose field and concluding "root"
+  produced a `chmod 600` that crash-looped the admin container with
+  `PermissionError`, and it shipped to `dev`.
+- **A skip is not a repair.** State volumes persist across upgrades, so a fix that
+  only handles fresh installs leaves damaged ones broken. Repair must be
+  bidirectional: the first attempt at the above `continue`d past the file,
+  leaving it at the bad mode it already had.
+
+*The shape common to all three: verifying at the layer that is convenient rather
+than the layer where the behaviour lives.*
+
+### 9. Re-measure any plan estimate before acting on it
 Grep counts are not call-site reading.
 *Incidents:* the plan's `compose()` item claimed "100+ calls with ad-hoc
 `--profile`/`sudo`" — measured: 149 calls, **zero** sudo. The four "duplicate"
