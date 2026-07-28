@@ -60,6 +60,26 @@ grep -q 'xray version 2>/dev/null | head -1 || true' "$ROOT/scripts/xray-entrypo
     && ok "xray: version line guarded against SIGPIPE" \
     || bad "xray: unguarded 'xray version | head -1' dies on SIGPIPE"
 
+# --- the pipefail idiom must be subshell-probed, never `|| true` --------------
+# `set` is a POSIX SPECIAL builtin: if `set -o pipefail` fails, a non-interactive
+# shell EXITS IMMEDIATELY and `|| true` does not save it. dash (debian's /bin/sh)
+# has no pipefail, so the naive guard killed the conduit container at line 3 with
+# exit 2 and no output at all. Any `#!/bin/sh` entrypoint on a debian-based image
+# hits this.
+if grep -rln 'set -o pipefail 2>/dev/null || true' "$ROOT/scripts/" >/dev/null 2>&1; then
+    bad "some entrypoint still uses '|| true' to guard pipefail — fatal under dash:"
+    grep -rln 'set -o pipefail 2>/dev/null || true' "$ROOT/scripts/" | sed 's/^/          /'
+else
+    ok "no entrypoint guards pipefail with '|| true' (fatal in dash)"
+fi
+
+for e in conduit dnstt wireguard amneziawg; do
+    f="$ROOT/scripts/${e}-entrypoint.sh"
+    grep -q 'if ( set -o pipefail 2>/dev/null ); then' "$f" \
+        && ok "$e: probes pipefail in a subshell (portable ash + dash)" \
+        || bad "$e: pipefail not subshell-probed"
+done
+
 # --- functional coverage lives in the e2e, deliberately ------------------------
 # A docker-based harness was written here and removed: capturing a container that
 # ends in a monitor loop hung the suite, and a flaky CI test is worse than no

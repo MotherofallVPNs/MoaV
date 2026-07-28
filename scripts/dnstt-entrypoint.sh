@@ -1,7 +1,11 @@
 #!/bin/sh
 set -eu
-# busybox ash supports pipefail; guarded so the script still starts without it.
-set -o pipefail 2>/dev/null || true
+# `set` is a POSIX SPECIAL builtin: when `set -o pipefail` fails, a
+# non-interactive shell exits immediately -- `|| true` does NOT save it. dash
+# (debian's /bin/sh) has no pipefail, so the naive guard silently killed the
+# conduit container at line 3 with exit 2 and no output. Probe in a SUBSHELL,
+# where the exit is contained, then enable it for real only if supported.
+if ( set -o pipefail 2>/dev/null ); then set -o pipefail; fi
 
 # =============================================================================
 # dnstt server entrypoint
