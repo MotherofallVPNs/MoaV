@@ -969,6 +969,12 @@ chmod -R g+r /configs/ 2>/dev/null || true
 chown -R 0:1000 /outputs/ 2>/dev/null || true
 chmod -R g+r /outputs/ 2>/dev/null || true
 
+# state/keys is deliberately NOT part of the g+r pass above: the admin container
+# must read /configs and /outputs, but nothing needs group or world read on the
+# server's private key material. Tighten it here — this covers files just
+# generated AND repairs installs created before this landed.
+secure_state_keys "$STATE_DIR/keys"
+
 # -----------------------------------------------------------------------------
 # Mark as bootstrapped
 # -----------------------------------------------------------------------------

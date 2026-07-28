@@ -81,3 +81,35 @@ net_next_free_octet() {
     (( next > 254 )) && return 1
     printf '%s\n' "$next"
 }
+
+# Secret material under state/keys must not be world-readable.
+#
+# Files created with `(umask 077 && ...)` came out 0600 correctly, but everything
+# written via `cat > … <<EOF` or `echo … >` inherited umask 022 and landed 0644 —
+# world-readable. On a live server that left REALITY_PRIVATE_KEY (reality.env),
+# the Clash API secret and Hysteria2 obfs password (clash-api.env), the
+# Shadowsocks PSK, the MasterDNS/GooseRelay keys and the wstunnel path secret all
+# at 0644, while the raw *.key files beside them were correctly 0600.
+#
+# Idempotent: safe to call on every bootstrap, and it repairs existing installs.
+# Public counterparts (*.pub, certs) are skipped — other parties must read those.
+# Every container that mounts the state volume runs as root, so tightening the
+# mode cannot lock a service out of its own key material.
+secure_state_keys() {
+    local keys_dir="${1:-$STATE_DIR/keys}"
+    [[ -d "$keys_dir" ]] || return 0
+    local f base fixed=0
+    for f in "$keys_dir"/*; do
+        [[ -f "$f" ]] || continue
+        base="$(basename "$f")"
+        case "$base" in
+            *.pub|*.pub.hex|*-cert.pem|*.crt|*.csr) continue ;;   # public by design
+        esac
+        # Only touch what is actually loose, so the log stays meaningful.
+        if [[ -n "$(find "$f" -maxdepth 0 -perm /077 2>/dev/null)" ]]; then
+            chmod 600 "$f" 2>/dev/null && fixed=$((fixed + 1))
+        fi
+    done
+    [[ $fixed -gt 0 ]] && log_info "Secured $fixed key file(s) in $keys_dir (0600)"
+    return 0
+}
