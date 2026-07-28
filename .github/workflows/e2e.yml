@@ -109,10 +109,12 @@ jobs:
           else
             sed -i "s|^DOMAIN=.*|DOMAIN=${MOAV_DOMAIN}|"             .env
             sed -i "s|^ACME_EMAIL=.*|ACME_EMAIL=${MOAV_ACME_EMAIL}|" .env
-            # AnyTLS is false in .env.example, so its full live test (sing-box
-            # SOCKS + exit-IP) had NEVER once run in CI — it skipped in every
-            # pass. The domain run has the cert it needs; turn it on.
-            sed -i "s|^ENABLE_ANYTLS=.*|ENABLE_ANYTLS=true|" .env
+            # NOTE: ENABLE_ANYTLS is deliberately NOT turned on here yet.
+            # Enabling it (PR #203) made `bootstrap` leave sing-box unconfigured
+            # — `moav user add` then reported "Skipping sing-box (not configured)"
+            # and every bundle came out empty, every protocol skipped. Tracked
+            # as a real AnyTLS-provisioning bug; re-enable once that is fixed and
+            # reproduced. AnyTLS therefore still has no live CI coverage.
           fi
           # INITIAL_USERS is a COUNT (not a name) — 1 creates the 'demouser'.
           # We add a named 'e2e-test' user after start (also exercises `user add`).
@@ -179,11 +181,16 @@ jobs:
           ./moav.sh user add e2e-test
           test -d outputs/bundles/e2e-test \
             || { echo "::error::user add did not produce outputs/bundles/e2e-test"; exit 1; }
-          # Require real protocol configs, not just the README.html — an empty
-          # bundle means provisioning silently skipped everything.
-          n=$(find outputs/bundles/e2e-test -maxdepth 1 -type f ! -name 'README.html' 2>/dev/null | wc -l)
-          echo "bundle has $n config file(s):"; ls -1 outputs/bundles/e2e-test || true
-          [ "$n" -ge 1 ] || { echo "::error::user add produced an empty bundle (only README.html) — provisioning skipped the protocols"; exit 1; }
+          # Require real protocol configs, not just the always-present README.html
+          # and subscription.txt — an empty bundle means provisioning silently
+          # skipped everything. subscription.txt is EXCLUDED here on purpose: it is
+          # emitted unconditionally (A5), so counting it let a config-less bundle
+          # (README + subscription only) pass with n=1 while every protocol test
+          # then skipped. That is exactly how a hollow run slipped through.
+          n=$(find outputs/bundles/e2e-test -maxdepth 1 -type f \
+                ! -name 'README.html' ! -name 'subscription.txt' 2>/dev/null | wc -l)
+          echo "bundle has $n protocol config file(s):"; ls -1 outputs/bundles/e2e-test || true
+          [ "$n" -ge 1 ] || { echo "::error::user add produced no protocol configs (only README.html/subscription.txt) — provisioning skipped every protocol"; exit 1; }
 
       - name: Regression — added user survives a re-bootstrap (orphan guard)
         run: |
@@ -248,6 +255,40 @@ jobs:
             echo "::error::e2e connectivity test failed for $fails protocol(s)"
             exit 1
           fi
+          # HOLLOW-RUN GUARD. `skip` never counted as failure, so a broken
+          # bootstrap that left every protocol unconfigured produced all-skip
+          # and passed green — the run tested nothing. (This actually shipped:
+          # ENABLE_ANYTLS=true broke sing-box config generation, every protocol
+          # skipped, e2e stayed green.) Require the core sing-box protocols that
+          # run in EVERY domain pass to actually PASS. reality+ss also run in
+          # the domainless pass, so gate the domain-only ones on DOMAIN.
+          require_pass() {
+            local p="$1"
+            local st=$(jq -r --arg p "$p" '.tests[$p].status // "absent"' e2e-results.json)
+            if [ "$st" != "pass" ]; then
+              echo "::error::core protocol '$p' did not pass (status: $st) — a fresh install that can't stand up $p is not a passing install"
+              return 1
+            fi
+            echo "core protocol '$p': pass"
+          }
+          bad=0
+          require_pass reality      || bad=1
+          require_pass shadowsocks  || bad=1
+          # DOMAIN set => the cert-bearing protocols must work too.
+          DOMAIN_VAL=$(grep -E '^DOMAIN=' .env | cut -d= -f2- | tr -d '"')
+          if [ -n "$DOMAIN_VAL" ]; then
+            require_pass trojan     || bad=1
+            require_pass hysteria2  || bad=1
+          fi
+          # Absolute floor regardless of which protocols are on: a real run
+          # produces several live passes, never just readme.
+          passes=$(jq '[.tests[] | select(.status=="pass")] | length' e2e-results.json)
+          echo "Total protocols passing live: $passes"
+          if [ "${passes:-0}" -lt 3 ]; then
+            echo "::error::only ${passes:-0} protocol(s) passed — the bundle is empty or the stack never came up (hollow run)"
+            bad=1
+          fi
+          [ "$bad" -eq 0 ]
 
       - name: CLI smoke test
         run: bash tests/cli-smoke-test.sh
