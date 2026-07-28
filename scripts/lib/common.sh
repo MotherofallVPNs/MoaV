@@ -112,7 +112,16 @@ secure_state_keys() {
             # `chown -R 0:1000` never applied to it either -- /configs and
             # /outputs only work for admin because they are world-readable.
             # Tracked: admin should get this secret without a world-readable file.
-            clash-api.env) continue ;;
+            #
+            # Actively RESTORE readability rather than merely skipping: an
+            # earlier build of this function already tightened the file, and the
+            # state volume persists across upgrades, so a plain `continue` would
+            # leave those installs permanently broken. Repair must be
+            # bidirectional to be a repair at all.
+            clash-api.env)
+                chmod 644 "$f" 2>/dev/null || true
+                continue
+                ;;
         esac
         # Only touch what is actually loose, so the log stays meaningful.
         if [[ -n "$(find "$f" -maxdepth 0 -perm /077 2>/dev/null)" ]]; then

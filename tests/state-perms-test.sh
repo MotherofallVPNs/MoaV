@@ -49,6 +49,16 @@ done
 # container runs as a NON-root user (uid 100), so 0600 crash-loops it with
 # PermissionError. Tightening this one regressed a live e2e -- assert it stays
 # readable so the exception cannot be "helpfully" removed later.
+# REPAIR case: an earlier build of secure_state_keys already tightened this file,
+# and the state volume survives upgrades -- so the exemption must actively restore
+# readability, not merely skip. A skip-only version passed the test above while
+# leaving already-damaged installs permanently crash-looping.
+chmod 600 "$STATE_DIR/keys/clash-api.env"
+secure_state_keys "$STATE_DIR/keys" >/dev/null 2>&1
+m=$(mode "$STATE_DIR/keys/clash-api.env")
+[[ "$m" == "644" ]] && ok "clash-api.env already at 0600 is REPAIRED back to readable" \
+                    || bad "clash-api.env stayed $m — an install damaged by the earlier bug stays broken"
+
 m=$(mode "$STATE_DIR/keys/clash-api.env")
 [[ "$m" == "644" ]] && ok "clash-api.env left readable for the non-root admin ($m)" \
                     || bad "clash-api.env is $m — the admin container cannot read it and will crash-loop"
