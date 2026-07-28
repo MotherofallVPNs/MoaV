@@ -225,6 +225,49 @@ bootstrap + user-add run as golden files; (2) land `lib/env.sh` **in parallel** 
 legitimate diffs are the empty-shadow cases — i.e. the bug — and they are the
 regression guard (should appear only for short_id-class vars).
 
+### C status (2026-07-28)
+
+**C1 — DONE** (#213/#214/#215). All 40 ad-hoc `.env` scrapers across both trees
+now use the single `get_env_val` accessor, gated by
+`tests/env-resolution-test.sh`, which enumerates exactly how the old and new
+resolution differ (duplicates last-wins, inline comments stripped, whitespace
+trimmed, `=` preserved). Building that gate found a live bug: `cut -d= -f2` cut
+a base64 `MAHSANET_API_KEY` at its first `=`, so authentication failed in a way
+that looked like a wrong key.
+
+The accessor is defined **twice** on purpose — `moav.sh` for the host CLI,
+`scripts/lib/common.sh` for the provisioning tree (mounted into containers as
+`/app/lib`, which never sees `moav.sh`). A test holds the two bodies
+byte-identical; that check, not the copy, is what keeps it one implementation.
+
+**C2 — DESCOPED. Its motivating bug class is already fully defended.**
+
+C2 exists to kill the "empty injected value shadows authoritative state"
+class (the Reality short_id desync). Traced on 2026-07-28: **exactly three**
+state-authoritative variables are injected into the bootstrap container, and
+each is already defended —
+
+| variable | compose injects | defence |
+|---|---|---|
+| `REALITY_SHORT_ID` | `${REALITY_SHORT_ID:-}` (empty) | re-source `reality.env` immediately before each `envsubst` render |
+| `REALITY_PRIVATE_KEY` | `${REALITY_PRIVATE_KEY:-}` (empty) | same |
+| `CDN_WS_PATH` | `${CDN_WS_PATH:-/ws}` (**non-empty**) | bootstrap treats the literal `/ws` as "unset" and regenerates |
+
+**The proposed fix would have been weaker than the code it replaced.** A generic
+`state wins when non-empty` loader does not defend `CDN_WS_PATH`, whose injected
+default is non-empty — a wrong-but-non-empty value passes that rule. The
+existing sentinel check does defend it.
+
+So rewriting the 35 `source .env` sites would churn the highest-risk code in the
+repo, with a failure mode (a silently wrong resolved value) that no current gate
+detects, to fix **no active bug**. Instead the three defences are pinned by
+assertions in `tests/env-resolution-test.sh`, mutation-tested to confirm they
+fail when a defence is removed. That preserves C2's actual goal — the bug class
+cannot silently return — at a fraction of the risk.
+
+Revisit only if a fourth exposed variable appears, or if the defences become
+hard to reason about. The plan's original C2 PR list is kept below for context.
+
 PRs: **C1** — introduce `lib/env.sh` + `moav_get` accessor, migrate the ~40
 `grep .env` sites (mechanical, no order change). **C2** — migrate the `source .env`
 + state-sourcing sites to the state-wins loader behind the golden-diff gate; drop

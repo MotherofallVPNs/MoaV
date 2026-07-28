@@ -231,6 +231,14 @@ install_qrencode() {
 
 # Read a value from .env file — handles duplicates (last wins), inline comments, and quotes
 # Usage: val=$(get_env_val "ENABLE_XHTTP" "$env_file" "true")
+#
+# TWIN: an identical definition lives in scripts/lib/common.sh. The host CLI and
+# the provisioning tree are separate source trees — containers mount scripts/lib
+# as /app/lib and never see this file. tests/env-resolution-test.sh asserts the
+# two bodies stay byte-identical; edit both or neither.
+#
+# `cut -d'=' -f2-`, not -f2: values legitimately contain '=' (base64 padding),
+# and cutting at the first one silently truncates credentials.
 get_env_val() {
     local key="$1" file="$2" default="${3:-}"
     local val

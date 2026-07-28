@@ -130,6 +130,45 @@ else
     printf '%s\n' "$leftover" | cut -c1-100 | sed 's/^/          /'
 fi
 
+# --- state-vs-.env precedence: pin the defences (Workstream C2) --------------
+# Some values are authoritative in state/keys/*.env, but docker-compose ALSO
+# injects them into the bootstrap container from .env. If the injected value
+# wins, the render silently uses a wrong value. For REALITY_SHORT_ID that means
+# an empty short_id that rejects EVERY Reality client.
+#
+# Three variables are exposed this way and each is defended differently. C2
+# proposed replacing these with a generic "state wins when non-empty" loader --
+# which would NOT have covered CDN_WS_PATH, whose injected default `/ws` is
+# non-empty. The existing defences are correct; these assertions stop them being
+# removed as "redundant" by someone who has not traced the trap.
+BOOT="$ROOT/scripts/bootstrap.sh"
+COMPOSE="$ROOT/docker-compose.yml"
+
+# 1+2. Reality: re-source state immediately before each envsubst render.
+resources=$(grep -c 'source "\$STATE_DIR/keys/reality.env"' "$BOOT" || true)
+if [[ "${resources:-0}" -ge 2 ]]; then
+    ok "bootstrap re-sources reality.env before both renders ($resources sites)"
+else
+    bad "only $resources reality.env re-source(s) in bootstrap.sh — an injected empty REALITY_SHORT_ID can shadow state and render a short_id that rejects every Reality client"
+fi
+
+# 3. CDN_WS_PATH: injected default is NON-empty (/ws), so "empty means unset"
+# cannot defend it. bootstrap treats the literal /ws as unset and regenerates.
+if grep -q 'CDN_WS_PATH.*==.*"/ws"' "$BOOT"; then
+    ok "bootstrap treats the injected /ws default as unset (regenerates a real path)"
+else
+    bad "bootstrap no longer sentinel-checks CDN_WS_PATH == /ws — the compose default would shadow the real path and break CDN clients"
+fi
+
+# The defences above assume specific compose injection forms. If those change,
+# the assumptions silently stop holding -- so pin them too.
+grep -qE '^\s*- REALITY_SHORT_ID=\$\{REALITY_SHORT_ID:-\}' "$COMPOSE" \
+    && ok "compose still injects REALITY_SHORT_ID with an empty default (defence assumption holds)" \
+    || bad "compose REALITY_SHORT_ID injection changed — re-verify the re-source defence still applies"
+grep -qE '^\s*- CDN_WS_PATH=\$\{CDN_WS_PATH:-/ws\}' "$COMPOSE" \
+    && ok "compose still injects CDN_WS_PATH default /ws (sentinel matches)" \
+    || bad "compose CDN_WS_PATH default changed — the /ws sentinel in bootstrap.sh no longer matches it"
+
 echo
 echo "  $pass passed, $fail failed"
 [[ $fail -eq 0 ]]
