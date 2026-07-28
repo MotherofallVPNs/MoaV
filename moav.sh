@@ -6,6 +6,27 @@
 
 set -euo pipefail
 
+# Require bash >= 4. `declare -A` (lib/service.sh, lib/doctor.sh) is a bash 4
+# builtin option, so on stock macOS bash 3.2 commands like `moav status` failed
+# with "declare: -A: invalid option" -- unactionable, and misleading given this
+# script has macos) branches elsewhere that suggest it should work.
+# Deliberately written in bash 3.2-compatible syntax so it can report the
+# problem rather than become another parse error.
+# MOAV_SKIP_BASH_CHECK=1 bypasses this for development on a bash 3.2 box (the
+# refactor harness diffs read-only subcommands like `version`/`help`, which do
+# not touch declare -A). Anything that reaches an associative array will still
+# fail there -- the escape hatch buys a diagnostic, not support.
+if [ "${MOAV_SKIP_BASH_CHECK:-0}" != "1" ] \
+   && { [ -z "${BASH_VERSINFO:-}" ] || [ "${BASH_VERSINFO[0]}" -lt 4 ]; }; then
+    echo "MoaV requires bash 4.0 or newer (found ${BASH_VERSION:-unknown})." >&2
+    echo "" >&2
+    echo "macOS ships bash 3.2. Install a newer one and re-run with it:" >&2
+    echo "    brew install bash && /opt/homebrew/bin/bash $0 $*" >&2
+    echo "" >&2
+    echo "Supported servers (Debian 12, Ubuntu 22.04/24.04) already ship bash 5.x." >&2
+    exit 1
+fi
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'

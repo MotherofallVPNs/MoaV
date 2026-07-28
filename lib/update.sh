@@ -18,6 +18,10 @@ cmd_update() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -b|--branch)
+                if [[ $# -lt 2 ]]; then
+                    error "-b/--branch requires a branch name"
+                    return 1
+                fi
                 target_branch="$2"
                 shift 2
                 ;;

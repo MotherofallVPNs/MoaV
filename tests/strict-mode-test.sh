@@ -112,6 +112,40 @@ for f in scripts/lib/wireguard.sh scripts/lib/amneziawg.sh; do
     fi
 done
 
+# --- 6. flags that take a value must reject a missing one ---------------------
+# `moav logs --tail` / `moav update -b` used to die on a bare "$2" with
+# "$2: unbound variable" and no usage hint.
+for spec in "lib/service.sh:--tail requires a value" "lib/update.sh:-b/--branch requires a branch name"; do
+    f="${spec%%:*}"; msg="${spec#*:}"
+    if grep -qF -- "$msg" "$ROOT/$f"; then ok "$f validates its flag argument"
+    else bad "$f does not validate its flag argument"; fi
+done
+
+# The guards must call a helper that actually exists in these modules. `lib/`
+# defines error(), not log_error() -- using the wrong one turned a clean message
+# back into "log_error: command not found".
+if grep -q 'log_error' "$ROOT/lib/service.sh" "$ROOT/lib/update.sh"; then
+    bad "lib/ modules call log_error(), which is a scripts/lib helper -- use error()"
+else
+    ok "lib/ modules use the error() helper they actually define"
+fi
+
+# --- 7. bash version guard ----------------------------------------------------
+# declare -A is a bash 4 builtin option; on bash 3.2 it failed with
+# "declare: -A: invalid option". The guard must itself parse under 3.2.
+if grep -q 'BASH_VERSINFO' "$ROOT/moav.sh"; then
+    ok "moav.sh guards on bash version"
+else
+    bad "moav.sh has no bash-version guard but uses declare -A"
+fi
+if command -v /bin/bash >/dev/null && [[ "$(/bin/bash -c 'echo ${BASH_VERSINFO[0]}')" -lt 4 ]]; then
+    out=$(/bin/bash "$ROOT/moav.sh" version 2>&1 | head -1)
+    case "$out" in *"requires bash 4"*) ok "bash 3.2 gets an actionable message";;
+                    *) bad "bash 3.2 got: '$out'";; esac
+else
+    ok "system bash is >= 4 (3.2 message path not exercised here)"
+fi
+
 echo
 echo "  $pass passed, $fail failed"
 [[ $fail -eq 0 ]]

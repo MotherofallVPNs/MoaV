@@ -1544,6 +1544,12 @@ cmd_logs() {
                 shift
                 ;;
             --tail)
+                # Without the guard, `moav logs --tail` (no value) dies on the
+                # bare "$2" with "$2: unbound variable" and no usage hint.
+                if [[ $# -lt 2 ]]; then
+                    error "--tail requires a value (e.g. --tail 100)"
+                    return 1
+                fi
                 tail_lines="$2"
                 shift 2
                 ;;
