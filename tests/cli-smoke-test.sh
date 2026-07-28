@@ -55,11 +55,19 @@ run must "moav logs --no-follow"        -- "$MOAV" logs --no-follow --tail 20
 # --- diagnostics / state-dependent (any clean exit is fine) ---
 run info "moav check"                   -- "$MOAV" check
 run info "moav doctor"                  -- "$MOAV" doctor
+# doctor peers: duplicate-IP detection must exit 0 on a healthy fresh install
+# (built for a real incident — 45 WG / 50 AWG peers sharing addresses).
+run must "moav doctor peers"            -- "$MOAV" doctor peers
 run info "moav net status"              -- "$MOAV" net status
 run info "moav conduit-offsets status"  -- "$MOAV" conduit-offsets status
 
 # --- user lifecycle (mutating but reversible) ---
 run must "moav user add $SMOKE_USER"    -- "$MOAV" user add "$SMOKE_USER"
+run must "moav user base64"             -- "$MOAV" user base64 "$SMOKE_USER"
+# The packager standalone (not via --package): callable on any existing bundle;
+# previously only reachable through `user add --package`, so a packager-only
+# breakage would surface as a confusing --package failure.
+run must "user-package.sh (standalone)" -- ./scripts/user-package.sh "$SMOKE_USER"
 run info "moav user revoke $SMOKE_USER" -- "$MOAV" user revoke "$SMOKE_USER"
 
 # --package must ship the FULLY RENDERED guide. The packager used to re-render the

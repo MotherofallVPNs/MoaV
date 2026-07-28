@@ -86,6 +86,11 @@ jobs:
               || { echo "::error::$t is required by the e2e suite and could not be installed"; exit 1; }
           done
           echo "suite tooling: zip=$(command -v zip) unzip=$(command -v unzip) qrencode=$(command -v qrencode)"
+          # WG/AWG live-tunnel tests need TUN passed into the test container.
+          # Without it they silently degrade to config checks (that is exactly
+          # how WireGuard "passed" on a DNS resolve for months) — so hard-fail.
+          test -c /dev/net/tun \
+            || { echo "::error::/dev/net/tun missing on the runner — WG/AWG live tests need it"; exit 1; }
 
       - name: Prepare .env
         run: |
@@ -104,6 +109,10 @@ jobs:
           else
             sed -i "s|^DOMAIN=.*|DOMAIN=${MOAV_DOMAIN}|"             .env
             sed -i "s|^ACME_EMAIL=.*|ACME_EMAIL=${MOAV_ACME_EMAIL}|" .env
+            # AnyTLS is false in .env.example, so its full live test (sing-box
+            # SOCKS + exit-IP) had NEVER once run in CI — it skipped in every
+            # pass. The domain run has the cert it needs; turn it on.
+            sed -i "s|^ENABLE_ANYTLS=.*|ENABLE_ANYTLS=true|" .env
           fi
           # INITIAL_USERS is a COUNT (not a name) — 1 creates the 'demouser'.
           # We add a named 'e2e-test' user after start (also exercises `user add`).
@@ -191,6 +200,23 @@ jobs:
           sudo chown -R "$USER" configs state outputs 2>/dev/null || true
           bash tests/assert-users-reconciled.sh
           sleep 10
+
+      - name: Exercise `moav regenerate-users` (the command, not just bootstrap's reconcile)
+        run: |
+          # The sprint's worst bug lived exactly here (every user FAILED when
+          # ENABLE_REALITY=false) and the command itself had never been run by
+          # any test — only bootstrap's internal reconcile was exercised.
+          ./moav.sh regenerate-users
+          sudo chown -R "$USER" configs state outputs 2>/dev/null || true
+          bash tests/assert-users-reconciled.sh
+          # Every regenerated guide must come back fully rendered.
+          bad=0
+          for b in outputs/bundles/*/README.html; do
+            [ -f "$b" ] || continue
+            left=$(grep -oE '\{\{[A-Z0-9_]+\}\}' "$b" | sort -u | tr '\n' ' ')
+            if [ -n "$left" ]; then echo "::error::unrendered placeholders in $b after regenerate-users: $left"; bad=1; fi
+          done
+          [ "$bad" -eq 0 ]
 
       - name: Run connectivity tests
         run: |

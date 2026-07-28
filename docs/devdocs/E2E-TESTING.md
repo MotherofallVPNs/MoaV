@@ -254,3 +254,46 @@ If a DNS-tunnel protocol (dnstt/Slipstream/MasterDNS/XDNS) warns or fails,
 first check the NS delegation for its subdomain (`moav doctor dns`) and that the
 resolver in the bundle is reachable from the runner — DNS tunnels are the most
 environment-sensitive transports.
+
+---
+
+## Coverage map (audited 2026-07-28)
+
+What each protocol's green result actually proves. "Live" = a real client
+connects and fetches an exit IP through the tunnel.
+
+| Strength | Protocols |
+|---|---|
+| **Live exit-IP** | reality, trojan, hysteria2, ss, xhttp, anytls, **wireguard**, **amneziawg** (WG/AWG live since the TUN grant below; anytls since `ENABLE_ANYTLS=true` in the domain pass — its test had never once run before that) |
+| Live, warn-gated | cdn (operator Cloudflare), xdns (resolver-sensitive) |
+| Live if binary present, else warn | dnstt, slipstream, trusttunnel |
+| Handshake probe only | telemt (Fake-TLS handshake, no MTProto session) |
+| Config-parse + reachability, capped at **warn** | wireguard/amneziawg on hosts without TUN (a DNS resolve used to count as *pass* here) |
+| Untestable from harness, always skip | masterdns (no standalone client), gooserelay (needs deployed Apps Script) |
+
+The WG/AWG live tests run **inside the `moav-client` container**, which
+`moav test` grants `NET_ADMIN` + `/dev/net/tun` (own netns; host routing
+untouched). The e2e preflight hard-fails if the runner lacks `/dev/net/tun`.
+
+Lifecycle covered: bootstrap → start → `user add` (bundle non-empty) → forced
+**re-bootstrap** (orphan guard + per-inbound reconcile assert) →
+**`regenerate-users`** (command itself; asserts reconcile + zero unrendered
+placeholders) → per-protocol connectivity → CLI smoke (~25 subcommands incl.
+`--package` zip render assert, `user base64`, standalone packager,
+`doctor peers`) → uninstall.
+
+## Known gaps (deliberate, tracked)
+
+- **`moav update` end-to-end** (self-update, migrations, template-change
+  detection): deferred with the upgrade-in-place test to near v2.0.0 —
+  fresh-install proof is the current bar.
+- **`migrate-ip`, `setup-dns` / `switch-dns`, `domainless` (the command)**: not
+  exercised; domainless is simulated by editing `.env`.
+- **Config matrix**: only "all-on" (domain) and the IP-only subset (domainless)
+  run. No `ENABLE_REALITY=false` pass (its worst regression is unit-tested in
+  `tests/strict-mode-test.sh`), no single-protocol-in-isolation pass.
+- **wstunnel**: TLS handshake on the wss port only — no tunnel traffic.
+- **telemt**: handshake-level by design (no headless MTProto client).
+
+When any of these bites during development: per project policy, add the test in
+the same PR that fixes the bug — failing on the unfixed tree first.

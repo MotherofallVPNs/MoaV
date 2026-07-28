@@ -1053,8 +1053,58 @@ test_wireguard() {
 
     log_debug "Parsed: server=$server port=$port"
 
-    # Test endpoint reachability (UDP is hard to test, try TCP or just DNS resolve)
-    # For IPv6, ping6 or ping -6 might be needed
+    # Full VPN test when wg-quick + TUN are available (`moav test` grants the
+    # container NET_ADMIN + /dev/net/tun; the image ships wireguard-tools).
+    # Mirrors the AmneziaWG full test: tunnel up -> exit-IP through it -> down.
+    if command -v wg-quick >/dev/null 2>&1 && [[ -c /dev/net/tun ]]; then
+        log_debug "Starting WireGuard tunnel with wg-quick..."
+        local error_log="$TEMP_DIR/wireguard-error.log"
+        local test_config="$TEMP_DIR/wgtest.conf"
+        # Strip DNS= : wg-quick would need resolvconf for it, and the
+        # container's own resolver is fine for the exit-IP fetch.
+        grep -vi '^[[:space:]]*DNS[[:space:]]*=' "$config_file" > "$test_config"
+
+        if ! wg-quick up "$test_config" 2>"$error_log"; then
+            detail="wg-quick failed to bring up interface"
+            if [[ -s "$error_log" ]]; then
+                detail="WireGuard error: $(tail -3 "$error_log" 2>/dev/null | tr '\n' ' ')"
+            fi
+            log_error "$detail"
+            RESULTS[wireguard]="fail"
+            DETAILS[wireguard]="$detail"
+            rm -f "$test_config"
+            return
+        fi
+
+        local exit_ip=""
+        exit_ip=$(curl -sf --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+        # Handshake epoch is the ground truth if the IP services are unreachable.
+        local handshake
+        handshake=$(wg show wgtest latest-handshakes 2>/dev/null | awk '{print $2}' | head -1)
+        wg-quick down "$test_config" 2>/dev/null || true
+        rm -f "$test_config"
+
+        if [[ -n "$exit_ip" ]]; then
+            log_success "WireGuard VPN connection successful (exit IP: $exit_ip)"
+            RESULTS[wireguard]="pass"
+            DETAILS[wireguard]="Connected via WireGuard VPN, exit IP: $exit_ip"
+        elif [[ -n "${handshake:-}" && "$handshake" != "0" ]]; then
+            log_success "WireGuard handshake completed (exit-IP fetch failed)"
+            RESULTS[wireguard]="pass"
+            DETAILS[wireguard]="Handshake with $endpoint completed; exit-IP services unreachable through tunnel"
+        else
+            detail="Tunnel came up but no handshake with $endpoint"
+            log_error "$detail"
+            RESULTS[wireguard]="fail"
+            DETAILS[wireguard]="$detail"
+        fi
+        return
+    fi
+
+    # Degraded path (no wg-quick / no TUN): reachability only. Caps at WARN --
+    # a DNS resolve used to count as a full "pass" here while no packet had
+    # ever crossed the tunnel.
     local ping_result=false
     if echo "$server" | grep -q ':'; then
         # IPv6 address
@@ -1066,9 +1116,9 @@ test_wireguard() {
     fi
 
     if [[ "$ping_result" == "true" ]]; then
-        log_success "WireGuard config valid, endpoint reachable: $endpoint"
-        RESULTS[wireguard]="pass"
-        DETAILS[wireguard]="Config valid, endpoint $server reachable"
+        log_warn "WireGuard config valid, endpoint reachable (no wg-quick/TUN for a live test)"
+        RESULTS[wireguard]="warn"
+        DETAILS[wireguard]="Config valid, endpoint $server reachable (no live-tunnel capability on this host)"
     else
         # Can't reach server, but config is valid
         log_warn "WireGuard config valid, but endpoint not reachable: $endpoint"
@@ -1173,9 +1223,11 @@ test_amneziawg() {
         fi
 
         if [[ "$reachable" == "true" ]]; then
-            log_success "AmneziaWG config valid, endpoint reachable: $endpoint"
-            RESULTS[amneziawg]="pass"
-            DETAILS[amneziawg]="Config valid, endpoint ${server_ip}:${port} reachable (awg-quick not available for full VPN test)"
+            # WARN, not pass: reachability proves a port answers, not that the
+            # tunnel works. The full test below is the only pass-worthy proof.
+            log_warn "AmneziaWG config valid, endpoint reachable (no awg-quick/TUN for a live test)"
+            RESULTS[amneziawg]="warn"
+            DETAILS[amneziawg]="Config valid, endpoint ${server_ip}:${port} reachable (no live-tunnel capability on this host)"
         else
             log_warn "AmneziaWG config valid, but endpoint not reachable: $endpoint"
             RESULTS[amneziawg]="warn"
@@ -1188,7 +1240,9 @@ test_amneziawg() {
     log_debug "Starting AmneziaWG tunnel with awg-quick..."
     local error_log="$TEMP_DIR/amneziawg-error.log"
     local test_config="$TEMP_DIR/amneziawg-test.conf"
-    cp "$config_file" "$test_config"
+    # Strip DNS= : awg-quick would need resolvconf for it, and the container's
+    # own resolver is fine for the exit-IP fetch.
+    grep -vi '^[[:space:]]*DNS[[:space:]]*=' "$config_file" > "$test_config"
 
     awg-quick up "$test_config" 2>"$error_log"
     local awg_exit=$?

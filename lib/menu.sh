@@ -474,8 +474,17 @@ cmd_test() {
     info "Building client image (cached if unchanged)..."
     compose_build --profile client build client
 
+    # TUN + NET_ADMIN let the WireGuard/AmneziaWG tests bring up a real tunnel
+    # inside the test container (its own netns — host routing untouched). The
+    # image has wg-quick/awg-quick; without the device those tests can only
+    # degrade to config checks, which is how WG "passed" on a DNS resolve for
+    # months. Conditional so `moav test` still runs on TUN-less hosts.
+    local tun_flags=()
+    [[ -c /dev/net/tun ]] && tun_flags=(--cap-add=NET_ADMIN --device=/dev/net/tun)
+
     # Run test (mount bundle + dnstt/slipstream outputs)
     docker run --rm \
+        ${tun_flags[@]+"${tun_flags[@]}"} \
         -v "$(pwd)/$bundle_path:/config:ro" \
         -v "$(pwd)/outputs/dnstt:/dnstt:ro" \
         -v "$(pwd)/outputs/slipstream:/slipstream:ro" \

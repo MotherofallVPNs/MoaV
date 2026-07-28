@@ -119,6 +119,7 @@ RUN apk add --no-cache \
     iproute2 \
     bind-tools \
     tor \
+    wireguard-tools \
     && rm -rf /var/cache/apk/*
 
 # Real glibc alongside musl. The prebuilt sing-box release (and other prebuilt
