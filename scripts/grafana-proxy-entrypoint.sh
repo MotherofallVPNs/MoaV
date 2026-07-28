@@ -3,6 +3,19 @@
 # Grafana Proxy entrypoint - finds SSL certs and configures nginx
 # =============================================================================
 
+
+# Strict mode, minus `-e` (see below).
+set -u
+# `set` is a POSIX SPECIAL builtin: a failed `set -o pipefail` exits a
+# non-interactive shell outright and `|| true` does NOT save it. dash (debian's
+# /bin/sh, used by sing-box and wstunnel) has no pipefail. Probe in a subshell,
+# where the exit is contained, then enable it only if supported.
+if ( set -o pipefail 2>/dev/null ); then set -o pipefail; fi
+# NOTE: `-e` is deliberately NOT enabled here yet. This entrypoint has never run
+# under it, so every currently-tolerated non-zero exit would become fatal. That
+# needs a per-command review, tracked separately -- adding it blind to six
+# long-running services at once is how you take down a stack.
+
 echo "[grafana-proxy] Starting Grafana CDN Proxy"
 
 # Find SSL certificates (same logic as other services)

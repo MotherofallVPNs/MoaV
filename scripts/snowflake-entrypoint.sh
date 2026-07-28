@@ -3,6 +3,19 @@
 # Snowflake Proxy entrypoint with bandwidth limiting and logging
 # =============================================================================
 
+
+# Strict mode, minus `-e` (see below).
+set -u
+# `set` is a POSIX SPECIAL builtin: a failed `set -o pipefail` exits a
+# non-interactive shell outright and `|| true` does NOT save it. dash (debian's
+# /bin/sh, used by sing-box and wstunnel) has no pipefail. Probe in a subshell,
+# where the exit is contained, then enable it only if supported.
+if ( set -o pipefail 2>/dev/null ); then set -o pipefail; fi
+# NOTE: `-e` is deliberately NOT enabled here yet. This entrypoint has never run
+# under it, so every currently-tolerated non-zero exit would become fatal. That
+# needs a per-command review, tracked separately -- adding it blind to six
+# long-running services at once is how you take down a stack.
+
 SNOWFLAKE_BANDWIDTH="${SNOWFLAKE_BANDWIDTH:-50}"
 SNOWFLAKE_CAPACITY="${SNOWFLAKE_CAPACITY:-20}"
 LOG_FILE="/var/log/snowflake/snowflake.log"
@@ -19,7 +32,9 @@ echo "[snowflake] Log file: ${LOG_FILE}"
 # This requires NET_ADMIN capability
 setup_bandwidth_limit() {
     # Find the default interface
-    IFACE=$(ip route | grep default | awk '{print $5}' | head -1)
+    # `|| true`: grep exits 1 when there is no default route, and `| head -1`
+    # SIGPIPEs -- both fatal under pipefail. Empty IFACE is handled below.
+    IFACE=$(ip route | grep default | awk '{print $5}' | head -1 || true)
 
     if [ -z "$IFACE" ]; then
         echo "[snowflake] WARNING: Could not determine network interface, skipping bandwidth limit"

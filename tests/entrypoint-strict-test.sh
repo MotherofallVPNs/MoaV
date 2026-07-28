@@ -80,6 +80,26 @@ for e in conduit dnstt wireguard amneziawg; do
         || bad "$e: pipefail not subshell-probed"
 done
 
+# --- D4b-2: the six that had NO `set` line at all ----------------------------
+# `-u` + pipefail only. `-e` is deliberately deferred (see the entrypoint notes):
+# these have never run under it, so every tolerated non-zero exit would become
+# fatal, and that needs a per-command review rather than a blind sweep.
+for e in admin grafana grafana-proxy sing-box snowflake wstunnel; do
+    f="$ROOT/scripts/${e}-entrypoint.sh"
+    grep -qE '^set -u$' "$f" && ok "$e: set -u" || bad "$e: no set -u"
+    grep -q 'if ( set -o pipefail 2>/dev/null ); then' "$f" \
+        && ok "$e: pipefail subshell-probed (sing-box/wstunnel are dash — no pipefail)" \
+        || bad "$e: pipefail not subshell-probed"
+done
+
+# SIGPIPE guards that pipefail would otherwise make fatal.
+grep -q 'head -1 || true)' "$ROOT/scripts/admin-entrypoint.sh" \
+    && ok "admin: cert-dir lookup guarded" || bad "admin: unguarded find|tail|head"
+grep -q 'head -10 .*|| true)' "$ROOT/scripts/sing-box-entrypoint.sh" \
+    && ok "sing-box: inbound-tag scan guarded" || bad "sing-box: unguarded grep|head|sed"
+grep -q 'head -1 || true)' "$ROOT/scripts/snowflake-entrypoint.sh" \
+    && ok "snowflake: default-route lookup guarded" || bad "snowflake: unguarded ip route|grep|awk|head"
+
 # --- functional coverage lives in the e2e, deliberately ------------------------
 # A docker-based harness was written here and removed: capturing a container that
 # ends in a monitor loop hung the suite, and a flaky CI test is worse than no
