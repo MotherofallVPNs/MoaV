@@ -45,6 +45,8 @@ jobs:
         run: bash tests/env-resolution-test.sh
       - name: docker management-plane isolation
         run: bash tests/network-isolation-test.sh
+      - name: monitoring socket removal
+        run: bash tests/exporter-socket-test.sh
       - name: refactor verification (static)
         run: bash tests/refactor-verify.sh
       - name: protocol-roster drift gate

@@ -9,7 +9,6 @@ Polls Clash API for source IPs to provide GeoIP country metrics.
 import re
 import os
 import time
-import subprocess
 import threading
 import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -24,6 +23,7 @@ except ImportError:
 
 # Metrics storage
 user_connections = defaultdict(int)  # user -> total connections
+counted_connection_ids = set()  # Clash connection ids already counted (see poll_clash_connections)
 user_last_seen = {}  # user -> timestamp
 active_users = set()  # users seen in last 5 minutes
 protocol_connections = defaultdict(int)  # protocol -> total connections
@@ -52,7 +52,19 @@ PROTOCOL_PATTERN = re.compile(r'inbound/(\w+)\[')
 ACTIVE_WINDOW = 300
 
 # GeoIP poll interval (seconds)
-GEOIP_POLL_INTERVAL = 30
+# Poll interval for the Clash API. This drives BOTH the GeoIP country stats and
+# (since the docker-logs tailer was removed) per-user connection counting.
+#
+# FIDELITY TRADEOFF, stated plainly: the old log tailer saw every "inbound
+# connection" event. A poller only sees connections that are still open when it
+# looks, so a connection that opens and closes entirely within one interval is
+# not counted. Long-lived sessions -- which is what the user-activity panels are
+# actually for -- are unaffected, and `user_last_seen` / active-user counts still
+# work. Short bursty connections will read low.
+#
+# 15s halves the window versus the previous 30s at modest extra API cost. Tune
+# with SINGBOX_POLL_INTERVAL if a deployment wants tighter or cheaper sampling.
+GEOIP_POLL_INTERVAL = int(os.environ.get("SINGBOX_POLL_INTERVAL", "15"))
 
 
 def load_clash_secret():
@@ -140,11 +152,15 @@ def poll_clash_connections():
             connections = data.get("connections", []) or []
             seen_countries = defaultdict(int)
             seen_user_country = {}
+            current_ids = set()
+            new_user_hits = defaultdict(int)
+            new_proto_hits = defaultdict(int)
 
             for conn in connections:
                 meta = conn.get("metadata", {})
                 source_ip = meta.get("sourceIP", "")
                 user = meta.get("inboundUser", "")
+                conn_id = conn.get("id", "")
 
                 if source_ip:
                     country = geoip.lookup(source_ip)
@@ -152,10 +168,35 @@ def poll_clash_connections():
                     if user:
                         seen_user_country[user] = country
 
+                # Count each connection ONCE, the first time we see it. The old
+                # log tailer counted "inbound connection" events; a polled
+                # snapshot would otherwise re-count every still-open connection
+                # on every poll.
+                if conn_id:
+                    current_ids.add(conn_id)
+                    if conn_id not in counted_connection_ids:
+                        counted_connection_ids.add(conn_id)
+                        if user:
+                            new_user_hits[user] += 1
+                        proto = (meta.get("inboundName") or meta.get("type")
+                                 or meta.get("network") or "unknown")
+                        new_proto_hits[proto] += 1
+
+            # Forget IDs that are gone so the set cannot grow without bound.
+            counted_connection_ids.intersection_update(current_ids)
+
+            now = time.time()
             with metrics_lock:
                 for country, count in seen_countries.items():
                     country_connections[country] += count
                 user_country.update(seen_user_country)
+                for user, hits in new_user_hits.items():
+                    user_connections[user] += hits
+                    user_last_seen[user] = now
+                for proto, hits in new_proto_hits.items():
+                    protocol_connections[proto] += hits
+                if new_user_hits:
+                    update_active_users()
 
             if poll_count <= 3 or poll_count % 100 == 0:
                 print(f"GeoIP poll #{poll_count}: {len(connections)} connections, "
@@ -168,32 +209,12 @@ def poll_clash_connections():
         time.sleep(GEOIP_POLL_INTERVAL)
 
 
-def tail_docker_logs():
-    """Tail sing-box container logs and parse user connections."""
-    print("Starting log tailer for moav-sing-box...")
-
-    while True:
-        try:
-            process = subprocess.Popen(
-                ['docker', 'logs', '-f', '--tail', '100', 'moav-sing-box'],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1
-            )
-
-            for line in process.stdout:
-                if 'inbound connection' in line and '[' in line:
-                    if parse_log_line(line):
-                        update_active_users()
-
-            process.wait()
-        except Exception as e:
-            print(f"Error tailing logs: {e}")
-
-        print("Log tailer disconnected, retrying in 5s...")
-        time.sleep(5)
-
+# NOTE: this exporter previously tailed `docker logs moav-sing-box` to attribute
+# connections to users, which required mounting the raw Docker socket -- an
+# unauthenticated path to host root for anything that could reach it. The Clash
+# API already returns `metadata.inboundUser` for every connection and this
+# process was already polling it for GeoIP, so the log tailer was redundant.
+# Connection counting now happens in poll_clash_connections().
 
 def periodic_update():
     """Periodically update active users set."""
@@ -284,10 +305,6 @@ def main():
 
     # Load Clash API secret
     load_clash_secret()
-
-    # Start log tailer in background thread
-    tailer_thread = threading.Thread(target=tail_docker_logs, daemon=True)
-    tailer_thread.start()
 
     # Start periodic update thread
     update_thread = threading.Thread(target=periodic_update, daemon=True)

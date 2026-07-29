@@ -1,7 +1,8 @@
 FROM python:3.11-alpine
 
-# Install docker CLI (needed to tail container logs)
-RUN apk add --no-cache docker-cli
+# No docker CLI here on purpose: this exporter no longer shells out to the
+# container runtime. User attribution comes from the Clash API it already polls,
+# which let the raw Docker socket mount be removed (see docker-compose.yml).
 
 RUN pip install --no-cache-dir maxminddb
 

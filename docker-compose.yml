@@ -1090,7 +1090,7 @@ services:
     networks:
       - moav_net
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Raw Docker socket removed: user attribution now comes from the Clash API.
       - moav_geoip:/geoip:ro
       - moav_state:/state:ro
     environment:
