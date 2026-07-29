@@ -1310,9 +1310,14 @@ test_dnstt() {
     local config_file=""
     local detail=""
 
-    # Find dnstt config file - handle glob expansion safely
+    # Find dnstt config. README.html is listed FIRST because it is now the only
+    # per-user carrier: the dnstt-instructions.txt this used to glob for was
+    # removed when the instruction .txt files were retired, so the loop found
+    # nothing and returned "skip" -- and skip is not a failure, so dnstt silently
+    # stopped being tested at all while the suite stayed green.
+    # The legacy names are kept for older bundles.
     # shellcheck disable=SC2044
-    for f in "$CONFIG_DIR"/dnstt*.txt "$CONFIG_DIR"/*dnstt* "$CONFIG_DIR"/dnstt-instructions.txt; do
+    for f in "$CONFIG_DIR"/README.html "$CONFIG_DIR"/dnstt*.txt "$CONFIG_DIR"/*dnstt* "$CONFIG_DIR"/dnstt-instructions.txt; do
         if [[ -f "$f" ]]; then
             config_file="$f"
             break
@@ -1331,7 +1336,13 @@ test_dnstt() {
 
     # Extract domain - look for t.domain.com pattern
     # Note: grep returns non-zero if no match, so we use || true to avoid pipefail exit
-    local domain=$(grep -oE 't\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$config_file" 2>/dev/null | head -1 || true)
+    # The guide renders `dnstt-client -doh <url> -pubkey <hex> <domain> 127.0.0.1:1080`,
+    # so pull the domain from that exact shape first -- a bare `t\.<something>`
+    # regex over a whole HTML page also matches things like "client.example.com".
+    local domain
+    domain=$(grep -oE 'dnstt-client [^<]*-pubkey [0-9a-fA-F]{64} [a-zA-Z0-9.-]+' "$config_file" 2>/dev/null \
+             | head -1 | awk '{print $NF}' || true)
+    [[ -z "$domain" ]] && domain=$(grep -oE 't\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$config_file" 2>/dev/null | head -1 || true)
 
     # Extract pubkey - look for hex string (64 chars) in the config
     local pubkey=""
@@ -1343,6 +1354,13 @@ test_dnstt() {
     if [[ -z "$pubkey" ]] && [[ -f "$CONFIG_DIR/server.pub" ]]; then
         pubkey=$(cat "$CONFIG_DIR/server.pub" | tr -d '\n\r ')
         log_debug "Found pubkey in bundle: server.pub"
+    fi
+
+    # `moav test` mounts outputs/dnstt at /dnstt (lib/menu.sh), so check the real
+    # mount point. The two paths below never existed inside this container.
+    if [[ -z "$pubkey" ]] && [[ -f "/dnstt/server.pub" ]]; then
+        pubkey=$(tr -d '\n\r ' < "/dnstt/server.pub")
+        log_debug "Found pubkey in /dnstt/server.pub (the actual mount)"
     fi
 
     # Check for server.pub in default dnstt outputs location
