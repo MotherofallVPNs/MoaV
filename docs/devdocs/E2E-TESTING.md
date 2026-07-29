@@ -267,6 +267,13 @@ connects and fetches an exit IP through the tunnel.
 | **Live exit-IP** | reality, trojan, hysteria2, ss, xhttp |
 | Live, warn-gated | cdn (operator Cloudflare), xdns (resolver-sensitive) |
 | Live if binary present, else warn | dnstt, slipstream, trusttunnel |
+
+> **`skip` is not a pass, and it is not a failure either.** dnstt sat at `skip`
+> for months after its per-user instruction file was retired — the test globbed
+> for a name that no longer existed, found nothing, and returned early. The
+> suite stayed green while a DNS tunnel went entirely unexercised. When a
+> protocol's status changes to `skip`, treat it as lost coverage and find out
+> why; the same pattern is still open for AnyTLS.
 | Live **only where a WG kernel module exists** | wireguard, amneziawg (see below) |
 | Handshake probe only | telemt (Fake-TLS handshake, no MTProto session) |
 | Never runs in CI yet | anytls (test exists; blocked on a provisioning bug — enabling it breaks bootstrap; tracked on the board) |
