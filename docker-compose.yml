@@ -14,6 +14,18 @@ x-logging: &default-logging
 networks:
   moav_net:
     driver: bridge
+  # Management plane: carries ONLY admin -> docker-proxy. docker-proxy is an
+  # unauthenticated Docker API endpoint (the socket-proxy filters path and
+  # method, never the request body), so anything able to reach it can create a
+  # privileged container with arbitrary bind mounts = host root. On the shared
+  # moav_net that meant all 29 containers could reach it -- including every
+  # service terminating untrusted internet traffic. Only admin needs it.
+  #
+  # internal: true -> no gateway. docker-proxy reaches Docker through the
+  # mounted unix socket, not the network, so it needs no outbound route.
+  moav_mgmt:
+    driver: bridge
+    internal: true
 
 volumes:
   moav_certs:
@@ -767,7 +779,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     networks:
-      - moav_net
+      - moav_mgmt
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -800,6 +812,7 @@ services:
     logging: *default-logging
     networks:
       - moav_net
+      - moav_mgmt   # docker-proxy; stays on moav_net for the service APIs
     ports:
       - "${PORT_ADMIN:-9443}:8443"
     volumes:
