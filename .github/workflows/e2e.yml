@@ -241,6 +241,41 @@ jobs:
           bash tests/assert-users-reconciled.sh
           sleep 10
 
+      - name: Assert the admin panel serves TLS only
+        run: |
+          # The panel accepts an HTTP-Basic credential (same secret as Grafana) and
+          # manages provisioning, on a published port. It used to fall back to
+          # plain HTTP whenever certbot had not succeeded. This asserts the
+          # end-to-end result rather than grepping logs: HTTPS must work, and a
+          # plain-HTTP request must NOT be served.
+          PORT="${PORT_ADMIN:-9443}"
+          echo "::group::admin TLS probe on :$PORT"
+          # -k because a self-signed fallback is legitimate here; we are testing
+          # that TLS is spoken at all, not that the chain is trusted.
+          code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 15 "https://127.0.0.1:$PORT/" || echo 000)
+          echo "https -> $code"
+          # A TLS-only listener cannot answer a cleartext request. curl reports 000
+          # (or a non-2xx/3xx) rather than a served page.
+          plain=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:$PORT/" || echo 000)
+          echo "http  -> $plain"
+          # Which certificate did it bind? Informational, but this is exactly what
+          # was invisible before: a domain install must prefer Let's Encrypt.
+          subject=$(echo | openssl s_client -connect "127.0.0.1:$PORT" -servername "${MOAV_DOMAIN:-localhost}" 2>/dev/null \
+                    | openssl x509 -noout -subject -issuer 2>/dev/null || true)
+          echo "cert: ${subject:-<could not read>}"
+          echo "::endgroup::"
+
+          # 401 is the expected answer: the panel is up and demanding auth.
+          case "$code" in
+            2*|3*|401) echo "admin answers over HTTPS (code $code)" ;;
+            *) echo "::error::admin did not answer over HTTPS (code $code) - TLS may not be bound"; exit 1 ;;
+          esac
+          if [ "$plain" != "000" ] && [ "$plain" -ge 200 ] && [ "$plain" -lt 400 ]; then
+            echo "::error::admin served a PLAINTEXT request (code $plain) - the TLS-only guarantee is broken"
+            exit 1
+          fi
+          echo "admin refuses plain HTTP as expected (code $plain)"
+
       - name: Exercise `moav regenerate-users` (the command, not just bootstrap's reconcile)
         run: |
           # The sprint's worst bug lived exactly here (every user FAILED when
