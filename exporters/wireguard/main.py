@@ -2,11 +2,11 @@
 """
 WireGuard Prometheus Exporter
 
-Runs 'wg show' via docker exec and exposes metrics.
+Reads the wg state file published by the tunnel container and exposes metrics.
 """
 
 import re
-import subprocess
+import os
 import threading
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -146,18 +146,29 @@ def extract_ip_from_endpoint(endpoint: str) -> str:
 def collect_metrics():
     """Run wg show and collect metrics."""
     try:
-        result = subprocess.run(
-            ['docker', 'exec', 'moav-wireguard', 'wg', 'show'],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-
-        if result.returncode != 0:
-            print(f"wg show failed: {result.stderr}")
+        # Read the state file published by the moav-wireguard entrypoint instead of
+        # `docker exec … wg show`. That exec required mounting the raw Docker
+        # socket -- unrestricted Docker API access, a path to host root, for a
+        # read-only scrape. `wg show` needs that container's netns, so there is no
+        # API to call: the container publishes its state and we read it.
+        state_file = os.environ.get(
+            "WG_STATE_FILE", "/var/lib/moav-metrics/wg-show.txt")
+        try:
+            with open(state_file) as fh:
+                show_output = fh.read()
+        except FileNotFoundError:
+            print(f"wg state file not found yet: {state_file} "
+                  f"(the moav-wireguard container publishes it every 15s)")
+            return
+        except OSError as exc:
+            print(f"cannot read {state_file}: {exc}")
             return
 
-        interface, peers = parse_wg_show(result.stdout)
+        if not show_output.strip():
+            print(f"wg state file is empty: {state_file}")
+            return
+
+        interface, peers = parse_wg_show(show_output)
 
         # Add country to each peer
         for pubkey, peer in peers.items():

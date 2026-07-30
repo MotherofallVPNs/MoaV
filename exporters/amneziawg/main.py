@@ -2,12 +2,12 @@
 """
 AmneziaWG Prometheus Exporter (per-peer metrics)
 
-Runs 'awg show' via docker exec and exposes per-peer metrics.
+Reads the awg state file published by the tunnel container and exposes per-peer metrics.
 Complements the official amneziawg-exporter (which provides DAU/MAU/online).
 """
 
 import re
-import subprocess
+import os
 import threading
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -146,18 +146,29 @@ def extract_ip_from_endpoint(endpoint: str) -> str:
 def collect_metrics():
     """Run awg show and collect metrics."""
     try:
-        result = subprocess.run(
-            ['docker', 'exec', 'moav-amneziawg', 'awg', 'show'],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-
-        if result.returncode != 0:
-            print(f"awg show failed: {result.stderr}")
+        # Read the state file published by the moav-amneziawg entrypoint instead of
+        # `docker exec … awg show`. That exec required mounting the raw Docker
+        # socket -- unrestricted Docker API access, a path to host root, for a
+        # read-only scrape. `awg show` needs that container's netns, so there is no
+        # API to call: the container publishes its state and we read it.
+        state_file = os.environ.get(
+            "AWG_STATE_FILE", "/var/lib/moav-metrics/awg-show.txt")
+        try:
+            with open(state_file) as fh:
+                show_output = fh.read()
+        except FileNotFoundError:
+            print(f"awg state file not found yet: {state_file} "
+                  f"(the moav-amneziawg container publishes it every 15s)")
+            return
+        except OSError as exc:
+            print(f"cannot read {state_file}: {exc}")
             return
 
-        interface, peers = parse_awg_show(result.stdout)
+        if not show_output.strip():
+            print(f"awg state file is empty: {state_file}")
+            return
+
+        interface, peers = parse_awg_show(show_output)
 
         # Add country to each peer
         for pubkey, peer in peers.items():

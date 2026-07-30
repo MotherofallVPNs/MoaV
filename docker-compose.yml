@@ -28,6 +28,10 @@ networks:
     internal: true
 
 volumes:
+  # Interface state published by the wireguard/amneziawg containers for their
+  # exporters to read. Exists so those exporters do not need the raw Docker
+  # socket just to run `wg show` -- see the publish_state() in each entrypoint.
+  moav_metrics:
   moav_certs:
   moav_state:
   moav_logs:
@@ -156,6 +160,7 @@ services:
     ports:
       - "${PORT_WIREGUARD:-51820}:51820/udp"
     volumes:
+      - moav_metrics:/var/lib/moav-metrics
       - ./configs/wireguard:/etc/wireguard
       - /lib/modules:/lib/modules:ro
     environment:
@@ -647,6 +652,7 @@ services:
     ports:
       - "${PORT_AMNEZIAWG:-51821}:51821/udp"
     volumes:
+      - moav_metrics:/var/lib/moav-metrics
       - ./configs/amneziawg:/etc/amneziawg
       - /lib/modules:/lib/modules:ro
     environment:
@@ -1181,7 +1187,7 @@ services:
     networks:
       - moav_net
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - moav_metrics:/var/lib/moav-metrics:ro   # replaces the raw Docker socket
       - ./configs/wireguard:/etc/wireguard:ro
       - moav_geoip:/geoip:ro
     environment:
@@ -1210,7 +1216,7 @@ services:
     networks:
       - moav_net
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - moav_metrics:/var/lib/moav-metrics:ro   # replaces the raw Docker socket
       - ./configs/amneziawg:/etc/amneziawg:ro
       - moav_geoip:/geoip:ro
     environment:

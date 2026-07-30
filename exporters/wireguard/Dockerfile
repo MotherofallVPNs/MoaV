@@ -1,7 +1,9 @@
 FROM python:3.11-alpine
 
+# No docker CLI: this exporter reads the state file its tunnel container
+# publishes, so it needs no access to the container runtime.
+
 # Install docker CLI (to run docker exec)
-RUN apk add --no-cache docker-cli
 
 RUN pip install --no-cache-dir maxminddb
 

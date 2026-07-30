@@ -178,10 +178,38 @@ cleanup() {
 }
 trap cleanup SIGTERM SIGINT
 
-# Keep running
+# Publish interface state for the metrics exporter.
+#
+# The exporter used to obtain this by mounting the raw Docker socket and running
+# `docker exec moav-amneziawg awg show` -- unrestricted Docker API access, i.e. a
+# path to host root, for a read-only metrics scrape. `awg show` genuinely needs
+# this container's network namespace, so there is no API to query instead: the
+# state is published here and the exporter reads a file.
+#
+# Written tmp-then-rename so a scrape can never observe a half-written file.
+METRICS_STATE_DIR="${METRICS_STATE_DIR:-/var/lib/moav-metrics}"
+METRICS_STATE_FILE="$METRICS_STATE_DIR/awg-show.txt"
+publish_state() {
+    [ -d "$METRICS_STATE_DIR" ] || return 0
+    if awg show > "$METRICS_STATE_FILE.tmp" 2>/dev/null; then
+        mv -f "$METRICS_STATE_FILE.tmp" "$METRICS_STATE_FILE" 2>/dev/null || true
+    else
+        rm -f "$METRICS_STATE_FILE.tmp" 2>/dev/null || true
+    fi
+}
+publish_state
+
+# Keep running.
+# Publishes every 15s (Prometheus scrapes ~15s); the daemon/interface health check
+# below stays on its original 60s cadence, so this adds sampling without changing
+# recovery behaviour.
 KERNEL_MODE=0
+_tick=0
 while true; do
-    sleep 60
+    sleep 15
+    publish_state
+    _tick=$((_tick + 1))
+    [ "$((_tick % 4))" -eq 0 ] || continue
     # Check if amneziawg-go process is still alive
     if ! kill -0 $AWG_PID 2>/dev/null; then
         # Process exited — check if interface is still up (kernel module took over)
