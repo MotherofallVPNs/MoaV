@@ -11,7 +11,7 @@
 
 
 # Strict mode, minus `-e` (see below).
-set -u
+set -eu
 # `set` is a POSIX SPECIAL builtin: a failed `set -o pipefail` exits a
 # non-interactive shell outright and `|| true` does NOT save it. dash (debian's
 # /bin/sh, used by sing-box and wstunnel) has no pipefail. Probe in a subshell,

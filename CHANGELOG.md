@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Full strict mode (`set -eu` + pipefail) for the admin, sing-box, snowflake and wstunnel entrypoints.** `-e` was previously held back on these because they had never run under it. Each was reviewed per command and then executed in its real base image (alpine/ash and debian/dash) to confirm it still reaches its `exec`, including the graceful-degradation branches such as snowflake continuing when it cannot detect a network interface.
+- **The admin entrypoint now reports the certificate it will actually use.** It checked only `/certs/live`, so it printed "SSL: Disabled" even when a self-signed fallback existed and TLS was about to be served.
+
 ## [2.0.0-rc.2] - 2026-07-30
 
 > ## ⚠️ EXPERIMENTAL. Do not run this on a production server.

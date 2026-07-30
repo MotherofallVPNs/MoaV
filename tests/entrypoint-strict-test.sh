@@ -84,9 +84,18 @@ done
 # `-u` + pipefail only. `-e` is deliberately deferred (see the entrypoint notes):
 # these have never run under it, so every tolerated non-zero exit would become
 # fatal, and that needs a per-command review rather than a blind sweep.
-for e in admin grafana grafana-proxy sing-box snowflake wstunnel; do
+# D4c: -e enabled per-service after a per-command review, smallest first.
+for e in admin sing-box snowflake wstunnel; do
     f="$ROOT/scripts/${e}-entrypoint.sh"
-    grep -qE '^set -u$' "$f" && ok "$e: set -u" || bad "$e: no set -u"
+    grep -qE '^set -eu$' "$f" && ok "$e: full strict mode (set -eu)" \
+                              || bad "$e: lost set -e"
+done
+# grafana and grafana-proxy are larger and still pending their review; they must
+# keep -u + pipefail in the meantime rather than silently losing them.
+for e in grafana grafana-proxy; do
+    f="$ROOT/scripts/${e}-entrypoint.sh"
+    grep -qE '^set -(u|eu)$' "$f" && ok "$e: set -u (or better) still present" \
+                                  || bad "$e: lost set -u"
     grep -q 'if ( set -o pipefail 2>/dev/null ); then' "$f" \
         && ok "$e: pipefail subshell-probed (sing-box/wstunnel are dash — no pipefail)" \
         || bad "$e: pipefail not subshell-probed"

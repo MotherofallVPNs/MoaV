@@ -6,7 +6,7 @@
 
 
 # Strict mode, minus `-e` (see below).
-set -u
+set -eu
 # `set` is a POSIX SPECIAL builtin: a failed `set -o pipefail` exits a
 # non-interactive shell outright and `|| true` does NOT save it. dash (debian's
 # /bin/sh, used by sing-box and wstunnel) has no pipefail. Probe in a subshell,
@@ -50,11 +50,20 @@ fi
 # Check for SSL certificates
 # `|| true`: `… | head -1` SIGPIPEs (141) once head closes the pipe, which
 # pipefail makes fatal. An empty result is also a legitimate "no certs yet".
+# Report what main.py will ACTUALLY bind, which is /tmp/certs (Let's Encrypt if
+# present, else the self-signed fallback, else the last-resort cert generated
+# above). Checking only /certs/live printed "SSL: Disabled" even when a fallback
+# certificate existed and TLS was about to be served -- an operator reading that
+# would reasonably think the panel was plaintext when it was not. main.py refuses
+# to start without TLS, so "Disabled" is now genuinely a failure state.
 CERT_DIRS=$(find /certs/live -maxdepth 1 -type d 2>/dev/null | tail -n +2 | head -1 || true)
+FALLBACK_CERT=$(find /tmp/certs -name fullchain.pem 2>/dev/null | head -1 || true)
 if [ -n "$CERT_DIRS" ]; then
-    echo "[admin] SSL: Enabled (found certificates)"
+    echo "[admin] SSL: Enabled (Let's Encrypt certificate)"
+elif [ -n "$FALLBACK_CERT" ]; then
+    echo "[admin] SSL: Enabled (self-signed fallback; browser warning expected)"
 else
-    echo "[admin] SSL: Disabled (no certificates found)"
+    echo "[admin] SSL: no certificate found - the dashboard will refuse to start"
 fi
 
 # Ensure required directories exist and are writable by moav user
