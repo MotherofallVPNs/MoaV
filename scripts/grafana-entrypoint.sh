@@ -5,7 +5,7 @@
 
 
 # Strict mode, minus `-e` (see below).
-set -u
+set -eu
 # `set` is a POSIX SPECIAL builtin: a failed `set -o pipefail` exits a
 # non-interactive shell outright and `|| true` does NOT save it. dash (debian's
 # /bin/sh, used by sing-box and wstunnel) has no pipefail. Probe in a subshell,
@@ -20,11 +20,14 @@ echo "[grafana] Starting MoaV Grafana Dashboard"
 
 # Determine app title (for PWA name on phone home screen)
 # Priority: GRAFANA_APP_TITLE > "MoaV - DOMAIN" > "MoaV - SERVER_IP" > "MoaV"
-if [ -n "$GRAFANA_APP_TITLE" ]; then
-    APP_TITLE="$GRAFANA_APP_TITLE"
-elif [ -n "$DOMAIN" ]; then
+# `:-` on each: compose always supplies these (as ${VAR:-}), but the entrypoint
+# should not depend on that to survive `set -u`. Running it outside compose, or
+# a compose file that drops one, would otherwise abort the container here.
+if [ -n "${GRAFANA_APP_TITLE:-}" ]; then
+    APP_TITLE="${GRAFANA_APP_TITLE:-}"
+elif [ -n "${DOMAIN:-}" ]; then
     APP_TITLE="MoaV Grafana - ${DOMAIN}"
-elif [ -n "$SERVER_IP" ]; then
+elif [ -n "${SERVER_IP:-}" ]; then
     APP_TITLE="MoaV Grafana - ${SERVER_IP}"
 else
     APP_TITLE="MoaV Grafana"
@@ -32,7 +35,7 @@ fi
 echo "[grafana] App title: $APP_TITLE"
 
 # Construct Grafana root URL from subdomain + domain
-if [ -n "$GRAFANA_SUBDOMAIN" ] && [ -n "$DOMAIN" ]; then
+if [ -n "${GRAFANA_SUBDOMAIN:-}" ] && [ -n "${DOMAIN:-}" ]; then
     export GF_SERVER_ROOT_URL="https://${GRAFANA_SUBDOMAIN}.${DOMAIN}:2083/"
     echo "[grafana] Root URL: $GF_SERVER_ROOT_URL"
 fi
@@ -78,15 +81,18 @@ SVGEOF
             [ -f "$js_file" ] || continue
             if grep -q 'AppTitle' "$js_file" 2>/dev/null; then
                 # Try multiple patterns (varies by Grafana version)
-                sed -i "s/\"AppTitle\",\"Grafana\"/\"AppTitle\",\"$APP_TITLE\"/g" "$js_file" 2>/dev/null
-                sed -i "s/AppTitle:\"Grafana\"/AppTitle:\"$APP_TITLE\"/g" "$js_file" 2>/dev/null
-                sed -i "s/AppTitle=\"Grafana\"/AppTitle=\"$APP_TITLE\"/g" "$js_file" 2>/dev/null
+                # `|| true`: branding is cosmetic. Under `set -e` a failed in-place edit
+                # (read-only layer, a Grafana upgrade renaming these bundles) would take the
+                # whole container down over a page title.
+                sed -i "s/\"AppTitle\",\"Grafana\"/\"AppTitle\",\"$APP_TITLE\"/g" "$js_file" 2>/dev/null || true
+                sed -i "s/AppTitle:\"Grafana\"/AppTitle:\"$APP_TITLE\"/g" "$js_file" 2>/dev/null || true
+                sed -i "s/AppTitle=\"Grafana\"/AppTitle=\"$APP_TITLE\"/g" "$js_file" 2>/dev/null || true
                 echo "[grafana] Patched AppTitle in $(basename "$js_file")"
                 patched=1
             fi
             # Also patch generic title references
             if grep -q 'title:"Grafana"' "$js_file" 2>/dev/null; then
-                sed -i "s/title:\"Grafana\"/title:\"$APP_TITLE\"/g" "$js_file" 2>/dev/null
+                sed -i "s/title:\"Grafana\"/title:\"$APP_TITLE\"/g" "$js_file" 2>/dev/null || true
             fi
         done
         [ "$patched" -eq 0 ] && echo "[grafana] WARNING: AppTitle pattern not found in JS bundles"
@@ -129,7 +135,11 @@ find_certificates() {
 waited=0
 max_wait=30
 while [ $waited -lt $max_wait ]; do
-    certs=$(find_certificates)
+    # `|| true`: find_certificates returns 1 when no certificate exists yet, and a
+    # plain `var=$(cmd)` assignment PROPAGATES that status (unlike `local x=$(cmd)`,
+    # which masks it). Under `set -e` that killed grafana on every install before
+    # certbot had issued -- which is exactly the state this loop exists to wait out.
+    certs=$(find_certificates) || true
     if [ -n "$certs" ]; then
         break
     fi
@@ -138,7 +148,7 @@ while [ $waited -lt $max_wait ]; do
     waited=$((waited + 5))
 done
 
-certs=$(find_certificates)
+certs=$(find_certificates) || true
 if [ -n "$certs" ]; then
     key_file=$(echo "$certs" | cut -d' ' -f1)
     cert_file=$(echo "$certs" | cut -d' ' -f2)

@@ -85,21 +85,25 @@ done
 # these have never run under it, so every tolerated non-zero exit would become
 # fatal, and that needs a per-command review rather than a blind sweep.
 # D4c: -e enabled per-service after a per-command review, smallest first.
-for e in admin sing-box snowflake wstunnel; do
+for e in admin sing-box snowflake wstunnel grafana grafana-proxy; do
     f="$ROOT/scripts/${e}-entrypoint.sh"
     grep -qE '^set -eu$' "$f" && ok "$e: full strict mode (set -eu)" \
                               || bad "$e: lost set -e"
 done
-# grafana and grafana-proxy are larger and still pending their review; they must
-# keep -u + pipefail in the meantime rather than silently losing them.
-for e in grafana grafana-proxy; do
-    f="$ROOT/scripts/${e}-entrypoint.sh"
-    grep -qE '^set -(u|eu)$' "$f" && ok "$e: set -u (or better) still present" \
-                                  || bad "$e: lost set -u"
-    grep -q 'if ( set -o pipefail 2>/dev/null ); then' "$f" \
-        && ok "$e: pipefail subshell-probed (sing-box/wstunnel are dash — no pipefail)" \
-        || bad "$e: pipefail not subshell-probed"
-done
+# grafana's cert lookup returns non-zero when no certificate exists yet, and a
+# plain `var=$(cmd)` assignment propagates that (unlike `local x=$(cmd)`). Without
+# the guard, -e killed grafana on every install before certbot had issued, which
+# is exactly the state its wait loop exists to handle.
+grep -q 'certs=$(find_certificates) || true' "$ROOT/scripts/grafana-entrypoint.sh" \
+    && ok "grafana: cert lookup guarded (survives a pre-certbot install)" \
+    || bad "grafana: unguarded certs=\$(find_certificates) — dies before certbot issues"
+
+# Branding is cosmetic; a failed in-place edit must not take the container down.
+unguarded=$(grep -cE '^\s*sed -i .*2>/dev/null$' "$ROOT/scripts/grafana-entrypoint.sh" || true)
+[ "${unguarded:-0}" -eq 0 ] \
+    && ok "grafana: all in-place branding edits guarded" \
+    || bad "grafana: $unguarded unguarded 'sed -i' — a read-only layer would kill the container"
+
 
 # SIGPIPE guards that pipefail would otherwise make fatal.
 grep -q 'head -1 || true)' "$ROOT/scripts/admin-entrypoint.sh" \
