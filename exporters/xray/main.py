@@ -8,8 +8,8 @@ Xray Stats API (gRPC via dokodemo-door) for per-user traffic data.
 
 import json
 import re
+import os
 import time
-import subprocess
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from collections import defaultdict
@@ -100,69 +100,55 @@ def update_active_users():
 
 
 def _run_statsquery(pattern):
-    """Run xray api statsquery with given pattern. Returns output string or None."""
-    try:
-        result = subprocess.run(
-            ['docker', 'exec', 'moav-xray', 'xray', 'api', 'statsquery',
-             '-s', '127.0.0.1:10085', '-pattern', pattern],
-            capture_output=True, text=True, timeout=10
-        )
-        if result.returncode != 0:
-            result = subprocess.run(
-                ['docker', 'exec', 'moav-xray', '/usr/local/bin/xray', 'api', 'statsquery',
-                 '-s', '127.0.0.1:10085', '-pattern', pattern],
-                capture_output=True, text=True, timeout=10
-            )
-        if result.returncode != 0:
-            return None
-        output = result.stdout.strip()
-        if not output:
-            output = result.stderr.strip()
-        return output if output else None
-    except Exception:
-        return None
+    """Read a stats snapshot published by the xray container.
 
+    Previously this ran `docker exec moav-xray xray api statsquery`, which needed
+    the raw Docker socket mounted -- unrestricted Docker API access, i.e. a path
+    to host root, for a read-only scrape. The stats API listens on 127.0.0.1
+    inside the xray container, so rather than exposing it on the container
+    network the container publishes snapshots to a shared volume (same mechanism
+    as the wireguard/amneziawg exporters). Returns the raw output, or None.
+    """
+    state_dir = os.environ.get("XRAY_STATE_DIR", "/var/lib/moav-metrics")
+    path = os.path.join(state_dir, f"xray-stats-{pattern}.json")
+    try:
+        with open(path) as fh:
+            data = fh.read()
+    except FileNotFoundError:
+        print(f"xray stats snapshot not found yet: {path} "
+              f"(the xray container publishes it every 15s)")
+        return None
+    except OSError as exc:
+        print(f"cannot read {path}: {exc}")
+        return None
+    if not data.strip():
+        print(f"xray stats snapshot is empty: {path}")
+        return None
+    return data
 
 def query_xray_stats():
     """Query Xray Stats API for per-user and per-inbound traffic data."""
     # User stats
     try:
-        result = subprocess.run(
-            ['docker', 'exec', 'moav-xray', 'xray', 'api', 'statsquery',
-             '-s', '127.0.0.1:10085', '-pattern', 'user'],
-            capture_output=True, text=True, timeout=10
-        )
-
-        if result.returncode != 0:
-            result = subprocess.run(
-                ['docker', 'exec', 'moav-xray', '/usr/local/bin/xray', 'api', 'statsquery',
-                 '-s', '127.0.0.1:10085', '-pattern', 'user'],
-                capture_output=True, text=True, timeout=10
-            )
-
-        if result.returncode != 0:
-            stderr = result.stderr.strip() if result.stderr else "no stderr"
-            print(f"Stats API error (rc={result.returncode}): {stderr}")
+        user_output = _run_statsquery("user")
+        if user_output is None:
             return
 
         if stats_query_count == 0:
-            print(f"Stats API raw: stdout={len(result.stdout)} bytes, stderr={len(result.stderr)} bytes")
-            if result.stdout:
-                print(f"Stats stdout preview: {result.stdout[:200]}")
-            if result.stderr and not result.stdout:
+            print(f"Stats API raw: stdout={len(user_output)} bytes, stderr={len(result.stderr)} bytes")
+            if user_output:
+                print(f"Stats stdout preview: {user_output[:200]}")
+            if result.stderr and not user_output:
                 print(f"Stats stderr preview: {result.stderr[:200]}")
 
         # xray may output to stdout or stderr depending on version
-        output = result.stdout.strip()
+        output = user_output.strip()
         if not output:
             output = result.stderr.strip()
         if not output:
             return
 
         parse_stats_output(output)
-
-    except subprocess.TimeoutExpired:
-        print("Stats API query timed out")
     except Exception as e:
         print(f"Stats API error: {e}")
 
@@ -235,32 +221,64 @@ def parse_inbound_stats(output: str):
                     inbound_download[tag] = value
 
 
-def tail_docker_logs():
-    """Tail Xray container logs and parse user connections."""
-    print("Starting log tailer for moav-xray...")
+def tail_access_log():
+    """Tail the xray access log published to the shared metrics volume.
 
+    Previously this ran `docker logs -f moav-xray`, which needed the raw Docker
+    socket mounted. xray writes its ACCESS log to a file (its error log still goes
+    to stdout, so `moav logs xray` is unchanged), so the events are read from
+    there instead. Handles truncation: the xray container caps this file, and on
+    shrink we reopen from the start rather than sitting at a stale offset.
+    """
+    state_dir = os.environ.get("XRAY_STATE_DIR", "/var/lib/moav-metrics")
+    path = os.path.join(state_dir, "xray-access.log")
+    print(f"Starting access-log tailer: {path}")
+
+    fh = None
+    inode = None
     while True:
         try:
-            process = subprocess.Popen(
-                ['docker', 'logs', '-f', '--tail', '100', 'moav-xray'],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1
-            )
+            if fh is None:
+                if not os.path.exists(path):
+                    time.sleep(5)
+                    continue
+                fh = open(path, "r", errors="replace")
+                st = os.fstat(fh.fileno())
+                inode = st.st_ino
+                fh.seek(0, os.SEEK_END)   # only new events matter
+                print(f"Access-log tailer attached to {path}")
 
-            for line in process.stdout:
-                if 'accepted' in line and 'moav' in line:
+            line = fh.readline()
+            if line:
+                if "accepted" in line and "moav" in line:
                     if parse_log_line(line):
                         update_active_users()
+                continue
 
-            process.wait()
-        except Exception as e:
-            print(f"Error tailing logs: {e}")
+            # No data: detect truncation (file shrank) or replacement (new inode).
+            try:
+                st_path = os.stat(path)
+                pos = fh.tell()
+                if st_path.st_size < pos or st_path.st_ino != inode:
+                    print("Access log rotated/truncated - reattaching")
+                    fh.close()
+                    fh = None
+                    continue
+            except FileNotFoundError:
+                fh.close()
+                fh = None
+                continue
+            time.sleep(1)
 
-        print("Log tailer disconnected, retrying in 5s...")
-        time.sleep(5)
-
+        except Exception as exc:
+            print(f"Access-log tailer error: {exc}")
+            if fh is not None:
+                try:
+                    fh.close()
+                except Exception:
+                    pass
+                fh = None
+            time.sleep(5)
 
 def periodic_update():
     """Periodically update active users and query stats API."""
@@ -379,7 +397,7 @@ def main():
     port = 9103
 
     # Start log tailer in background thread
-    tailer_thread = threading.Thread(target=tail_docker_logs, daemon=True)
+    tailer_thread = threading.Thread(target=tail_access_log, daemon=True)
     tailer_thread.start()
 
     # Start periodic update thread (active users + stats API)

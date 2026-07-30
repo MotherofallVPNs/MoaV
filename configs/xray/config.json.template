@@ -1,6 +1,7 @@
 {
   "log": {
-    "loglevel": "info"
+    "loglevel": "info",
+    "access": "/var/lib/moav-metrics/xray-access.log"
   },
   "stats": {},
   "api": {

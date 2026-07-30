@@ -29,7 +29,7 @@ while read -r ln; do
 done <<< "$(grep -n '^      - /var/run/docker.sock' "$C" | cut -d: -f1)"
 
 # Converted already -- these must never regain the socket.
-for svc in singbox-exporter wireguard-exporter amneziawg-exporter; do
+for svc in singbox-exporter wireguard-exporter amneziawg-exporter xray-exporter; do
     if printf '%s' "$holders" | grep -qx "$svc"; then
         bad "$svc has a raw Docker socket again"
     else
@@ -41,14 +41,14 @@ done
 for h in $holders; do
     case "$h" in
         docker-proxy) ok "docker-proxy keeps its socket (brokering it is its purpose)" ;;
-        cadvisor|xray-exporter)
+        cadvisor)
             printf '  todo  %s still holds a raw socket (tracked)\n' "$h" ;;
         *) bad "$h holds a raw Docker socket and is not an expected holder" ;;
     esac
 done
 
 # Converted exporters must not shell out to the container runtime at all.
-for e in singbox wireguard amneziawg; do
+for e in singbox wireguard amneziawg xray; do
     if grep -qE "\['docker'|\"docker\"," "$ROOT/exporters/$e/main.py"; then
         bad "$e exporter still shells out to the docker CLI"
     else
@@ -81,6 +81,22 @@ grep -q '      - moav_metrics:/var/lib/moav-metrics$' "$C" \
 grep -q 'moav_metrics:/var/lib/moav-metrics:ro' "$C" \
     && ok "exporters mount moav_metrics read-only" \
     || bad "exporters do not mount moav_metrics read-only"
+
+# xray publishes its ACCESS log to the shared volume (its error log still goes to
+# stdout, so `moav logs xray` is unchanged) and caps it from the same loop that
+# publishes stats -- no separate rotation process.
+grep -q '"access": "/var/lib/moav-metrics/xray-access.log"' "$ROOT/configs/xray/config.json.template" \
+    && ok "xray writes its access log to the shared volume" \
+    || bad "xray access log is not published — its exporter has no event source"
+grep -q '"loglevel"' "$ROOT/configs/xray/config.json.template" \
+    && ok "xray error log still goes to stdout (moav logs xray unaffected)" \
+    || bad "xray loglevel missing — check the log block"
+grep -q 'cap_access_log' "$ROOT/scripts/xray-entrypoint.sh" \
+    && ok "xray caps its access log (no unbounded growth)" \
+    || bad "xray access log has no size cap — it will fill the volume"
+grep -q 'publish_stats' "$ROOT/scripts/xray-entrypoint.sh" \
+    && ok "xray publishes stats snapshots for its exporter" \
+    || bad "xray no longer publishes stats snapshots"
 
 echo
 echo "  $pass passed, $fail failed"

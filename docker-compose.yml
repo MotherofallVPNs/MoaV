@@ -751,6 +751,7 @@ services:
       - "${PORT_XHTTP:-2096}:${PORT_XHTTP:-2096}/tcp"
       - "${PORT_XDNS:-5356}:5355/udp"
     volumes:
+      - moav_metrics:/var/lib/moav-metrics
       - ./configs/xray:/etc/xray:ro
       - moav_state:/state:ro
     environment:
@@ -1157,7 +1158,7 @@ services:
     networks:
       - moav_net
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - moav_metrics:/var/lib/moav-metrics:ro   # replaces the raw Docker socket
       - moav_geoip:/geoip:ro
     environment:
       - TZ=${TZ:-UTC}

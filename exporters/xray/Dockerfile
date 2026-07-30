@@ -1,7 +1,9 @@
 FROM python:3.11-alpine
 
+# No docker CLI: this exporter reads the stats snapshots and access log the
+# xray container publishes, so it needs no access to the container runtime.
+
 # Install docker CLI (needed to tail container logs)
-RUN apk add --no-cache docker-cli
 
 RUN pip install --no-cache-dir maxminddb
 
