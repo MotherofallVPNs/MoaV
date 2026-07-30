@@ -30,6 +30,23 @@ for d in /certs/live/*/; do
 done
 chown -R moav:moav /tmp/certs 2>/dev/null || true
 
+# Last-resort TLS: if neither a Let's Encrypt nor a bootstrap self-signed cert
+# made it here, mint one now. main.py refuses to serve plaintext, so without this
+# a certs volume that is empty for any reason (wiped, admin started before
+# bootstrap) would mean no dashboard at all. /tmp is a writable tmpfs and we are
+# still root at this point, so this always succeeds.
+if [ -z "$(find /tmp/certs -name fullchain.pem 2>/dev/null | head -1)" ]; then
+    echo "[admin] No certificate present - generating a last-resort self-signed cert"
+    mkdir -p /tmp/certs/selfsigned
+    openssl req -x509 -newkey rsa:2048 \
+        -keyout /tmp/certs/selfsigned/privkey.pem \
+        -out /tmp/certs/selfsigned/fullchain.pem \
+        -days 365 -nodes -subj "/CN=MoaV Admin" 2>/dev/null \
+        && echo "[admin] Last-resort certificate created (browser warning expected)" \
+        || echo "[admin] WARNING: could not generate a certificate"
+    chown -R moav:moav /tmp/certs 2>/dev/null || true
+fi
+
 # Check for SSL certificates
 # `|| true`: `… | head -1` SIGPIPEs (141) once head closes the pipe, which
 # pipefail makes fatal. An empty result is also a legitimate "no certs yet".

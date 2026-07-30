@@ -5,6 +5,7 @@ Simple stats viewer for the circumvention stack
 """
 
 import os
+import sys
 import ipaddress
 import json
 import asyncio
@@ -1145,10 +1146,15 @@ def find_certificates(wait_for_letsencrypt=True, max_wait=60):
                     print(f"Found Let's Encrypt certificate from {cert_dir}")
                     return key_path, cert_path
 
-            # If we have self-signed, we might be in domainless mode
-            # Don't wait too long in that case
-            if has_selfsigned and waited >= 15:
-                print("Self-signed cert exists, assuming domainless mode")
+            # Short-circuit only when genuinely domainless. This used to test
+            # `has_selfsigned` alone as a PROXY for domainless mode, which stopped
+            # being valid once bootstrap began generating a self-signed fallback in
+            # every mode: a domain install would then abandon the Let's Encrypt
+            # wait after 15s and bind the self-signed cert, showing a browser
+            # warning on every fresh install until the container was restarted.
+            # DOMAIN is the actual signal.
+            if not DOMAIN and has_selfsigned and waited >= 15:
+                print("Domainless mode with a self-signed cert - not waiting for Let's Encrypt")
                 break
 
             time.sleep(check_interval)
@@ -1180,9 +1186,23 @@ if __name__ == "__main__":
     ssl_keyfile, ssl_certfile = find_certificates(wait_for_letsencrypt=True, max_wait=60)
 
     if not ssl_keyfile:
-        print("WARNING: No SSL certificates found, running without HTTPS")
+        # FAIL CLOSED. This used to print a warning and serve plain HTTP, which
+        # sent the operator's HTTP-Basic credential -- the same secret as the
+        # Grafana password -- in cleartext to a port published on the internet.
+        # It happened on any install where certbot had not yet succeeded.
+        #
+        # Both the bootstrap and this container's entrypoint now generate a
+        # self-signed fallback, so reaching here means certificate provisioning
+        # is genuinely broken; refusing is safer than downgrading silently.
+        print("ERROR: refusing to start without TLS.", file=sys.stderr)
+        print("  No certificate found in /tmp/certs/live/ or /tmp/certs/selfsigned/.",
+              file=sys.stderr)
+        print("  This panel accepts a password and manages users, so it will not "
+              "serve plain HTTP.", file=sys.stderr)
+        print("  Fix: run `moav bootstrap` (generates a self-signed fallback), or "
+              "check certbot with `moav logs certbot`.", file=sys.stderr)
+        sys.exit(1)
 
-    # Run with SSL if certs found
     uvicorn.run(
         app,
         host="0.0.0.0",

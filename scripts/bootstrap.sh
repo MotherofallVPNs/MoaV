@@ -85,23 +85,33 @@ if [[ -z "${DOMAIN:-}" ]]; then
     [[ "${ENABLE_GOOSERELAY:-false}" == "true" ]] && _domainless_protos="$_domainless_protos, GooseRelay"
     log_info "Running in domainless mode ($_domainless_protos)"
 
-    # Generate self-signed certificate for admin UI (if not exists)
-    if [[ "${ENABLE_ADMIN_UI:-true}" == "true" ]]; then
-        SELFSIGNED_DIR="/certs/selfsigned"
-        if [[ ! -f "$SELFSIGNED_DIR/fullchain.pem" ]]; then
-            log_info "Generating self-signed certificate for admin dashboard..."
-            mkdir -p "$SELFSIGNED_DIR"
-            openssl req -x509 -newkey rsa:4096 \
-                -keyout "$SELFSIGNED_DIR/privkey.pem" \
-                -out "$SELFSIGNED_DIR/fullchain.pem" \
-                -days 365 -nodes \
-                -subj "/CN=MoaV Admin" \
-                2>/dev/null
-            log_info "Self-signed certificate created (valid for 365 days)"
-            log_info "Note: Browser will show security warning - this is expected"
-        else
-            log_info "Self-signed certificate already exists"
-        fi
+fi
+
+# Self-signed certificate for the admin dashboard — generated in EVERY mode, not
+# just domainless. It is a FALLBACK, never a preference: admin/main.py checks
+# certs/live/ (Let's Encrypt) first and only uses this if none is present.
+#
+# Previously this lived inside the domainless branch above, so a DOMAIN install
+# whose certbot had not yet succeeded — every fresh install for its first
+# minutes, and any install with a DNS or rate-limit problem — had no cert at all
+# and the admin panel fell back to plaintext HTTP, sending the operator's
+# HTTP-Basic credential (also the Grafana password) over the wire.
+# Generate self-signed certificate for admin UI (if not exists)
+if [[ "${ENABLE_ADMIN_UI:-true}" == "true" ]]; then
+    SELFSIGNED_DIR="/certs/selfsigned"
+    if [[ ! -f "$SELFSIGNED_DIR/fullchain.pem" ]]; then
+        log_info "Generating self-signed certificate for admin dashboard..."
+        mkdir -p "$SELFSIGNED_DIR"
+        openssl req -x509 -newkey rsa:4096 \
+            -keyout "$SELFSIGNED_DIR/privkey.pem" \
+            -out "$SELFSIGNED_DIR/fullchain.pem" \
+            -days 365 -nodes \
+            -subj "/CN=MoaV Admin" \
+            2>/dev/null
+        log_info "Self-signed certificate created (valid for 365 days)"
+        log_info "Note: Browser will show security warning - this is expected"
+    else
+        log_info "Self-signed certificate already exists"
     fi
 fi
 

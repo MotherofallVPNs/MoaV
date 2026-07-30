@@ -47,6 +47,8 @@ jobs:
         run: bash tests/network-isolation-test.sh
       - name: monitoring socket removal
         run: bash tests/exporter-socket-test.sh
+      - name: admin TLS enforcement
+        run: bash tests/admin-tls-test.sh
       - name: refactor verification (static)
         run: bash tests/refactor-verify.sh
       - name: protocol-roster drift gate
