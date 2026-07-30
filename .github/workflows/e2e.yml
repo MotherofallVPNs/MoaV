@@ -252,11 +252,15 @@ jobs:
           echo "::group::admin TLS probe on :$PORT"
           # -k because a self-signed fallback is legitimate here; we are testing
           # that TLS is spoken at all, not that the chain is trusted.
-          code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 15 "https://127.0.0.1:$PORT/" || echo 000)
+          # No `|| echo 000`: curl's %{http_code} ALREADY emits 000 when the
+          # connection fails, so the fallback appended a second one and produced
+          # "000000". The numeric guard below still behaved (000000 evaluates to
+          # 0) but only by luck, and the reported code was nonsense.
+          code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 15 "https://127.0.0.1:$PORT/") || true
           echo "https -> $code"
           # A TLS-only listener cannot answer a cleartext request. curl reports 000
           # (or a non-2xx/3xx) rather than a served page.
-          plain=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:$PORT/" || echo 000)
+          plain=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:$PORT/") || true
           echo "http  -> $plain"
           # Which certificate did it bind? Informational, but this is exactly what
           # was invisible before: a domain install must prefer Let's Encrypt.
@@ -270,7 +274,7 @@ jobs:
             2*|3*|401) echo "admin answers over HTTPS (code $code)" ;;
             *) echo "::error::admin did not answer over HTTPS (code $code) - TLS may not be bound"; exit 1 ;;
           esac
-          if [ "$plain" != "000" ] && [ "$plain" -ge 200 ] && [ "$plain" -lt 400 ]; then
+          if [ -n "$plain" ] && [ "$plain" != "000" ] && [ "$plain" -ge 200 ] && [ "$plain" -lt 400 ]; then
             echo "::error::admin served a PLAINTEXT request (code $plain) - the TLS-only guarantee is broken"
             exit 1
           fi
