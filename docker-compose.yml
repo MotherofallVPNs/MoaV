@@ -32,6 +32,11 @@ volumes:
   # exporters to read. Exists so those exporters do not need the raw Docker
   # socket just to run `wg show` -- see the publish_state() in each entrypoint.
   moav_metrics:
+  # Separate from moav_metrics on purpose: xray runs as a non-root user, and a
+  # named volume only inherits image ownership while it is EMPTY. The wireguard
+  # container (root) writes to moav_metrics immediately, which would leave it
+  # root-owned and unwritable by xray.
+  moav_xray_metrics:
   moav_certs:
   moav_state:
   moav_logs:
@@ -751,7 +756,7 @@ services:
       - "${PORT_XHTTP:-2096}:${PORT_XHTTP:-2096}/tcp"
       - "${PORT_XDNS:-5356}:5355/udp"
     volumes:
-      - moav_metrics:/var/lib/moav-metrics
+      - moav_xray_metrics:/var/lib/moav-metrics
       - ./configs/xray:/etc/xray:ro
       - moav_state:/state:ro
     environment:
@@ -1158,7 +1163,7 @@ services:
     networks:
       - moav_net
     volumes:
-      - moav_metrics:/var/lib/moav-metrics:ro   # replaces the raw Docker socket
+      - moav_xray_metrics:/var/lib/moav-metrics:ro   # replaces the raw Docker socket
       - moav_geoip:/geoip:ro
     environment:
       - TZ=${TZ:-UTC}

@@ -98,6 +98,18 @@ grep -q 'publish_stats' "$ROOT/scripts/xray-entrypoint.sh" \
     && ok "xray publishes stats snapshots for its exporter" \
     || bad "xray no longer publishes stats snapshots"
 
+# xray runs as a NON-ROOT user, and a named volume only inherits image ownership
+# while it is EMPTY. Sharing moav_metrics with the root wireguard container (which
+# writes to it immediately) left it root-owned, and xray died with exit 23,
+# "failed to initialize access logger". Hence a dedicated volume plus a
+# pre-created, chowned mountpoint in the image. Both halves are required.
+grep -q 'moav_xray_metrics' "$C" \
+    && ok "xray has a dedicated metrics volume (not shared with a root writer)" \
+    || bad "xray shares moav_metrics — a root container writing first makes it unwritable for xray"
+grep -q 'chown -R moav:moav /etc/xray /state /var/lib/moav-metrics' "$ROOT/dockerfiles/Dockerfile.xray" \
+    && ok "xray image pre-creates and chowns its metrics mountpoint" \
+    || bad "xray image does not chown /var/lib/moav-metrics — a fresh volume will be root-owned and xray will exit 23"
+
 echo
 echo "  $pass passed, $fail failed"
 [[ $fail -eq 0 ]]

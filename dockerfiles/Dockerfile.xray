@@ -60,7 +60,15 @@ RUN chmod +x /usr/local/bin/xray
 
 RUN addgroup -S moav && adduser -S moav -G moav
 
-RUN mkdir -p /etc/xray /state && chown -R moav:moav /etc/xray /state
+# /var/lib/moav-metrics is pre-created and chowned so a FRESH named volume
+# inherits this ownership: Docker applies the image directory's uid/gid when it
+# initialises an empty volume. xray runs as `moav` (USER below), so without
+# this it cannot create its stats snapshots or access log and exits 23 with
+# "failed to initialize access logger". It gets a DEDICATED volume for the same
+# reason -- ownership is only applied while the volume is empty, so sharing one
+# with a root container that writes first would leave it root-owned.
+RUN mkdir -p /etc/xray /state /var/lib/moav-metrics \
+    && chown -R moav:moav /etc/xray /state /var/lib/moav-metrics
 
 COPY scripts/xray-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
