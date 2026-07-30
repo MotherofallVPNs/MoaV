@@ -62,7 +62,22 @@ jobs:
         id: body
         run: |
           # Define the install guide section
-          cat > install_guide.txt << 'GUIDE_EOF'
+          # A prerelease page must not imply the one-liner installs it: install.sh
+          # serves the latest STABLE release, so on an rc that command gives the
+          # reader something other than what they are reading about.
+          if echo "${GITHUB_REF#refs/tags/}" | grep -qE "(alpha|beta|rc)"; then
+            cat > install_guide.txt << 'PREGUIDE_EOF'
+
+---
+
+> **Note:** the install command below fetches the latest **stable** release, not this
+> candidate. To try this build specifically, use the `git checkout` steps in the notes above.
+PREGUIDE_EOF
+          else
+            : > install_guide.txt
+          fi
+
+          cat >> install_guide.txt << 'GUIDE_EOF'
 
           ---
 
