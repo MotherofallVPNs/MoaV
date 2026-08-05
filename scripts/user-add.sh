@@ -203,18 +203,19 @@ FAILED_USERS=()
 
 # Ensure directories exist and are writable (Docker creates them as root)
 # Try: direct mkdir → sudo mkdir → su-exec root mkdir (admin container has su-exec)
-# Root-owned dirs are chowned to the admin uid (was chmod 777 — world-writable
-# bundles hold client private keys).
+# Unwritable dirs go to owner=caller, group=admin, setgid 2770 (was chmod 777 —
+# world-writable bundles hold client private keys): the invoking user and the
+# uid-2000 admin app can both write, nobody else can even read.
 _fix_perms() {
     local dir="$1"
     mkdir -p "$dir" 2>/dev/null || \
         sudo mkdir -p "$dir" 2>/dev/null || \
         su-exec root mkdir -p "$dir" 2>/dev/null || true
     if [[ -d "$dir" ]] && [[ ! -w "$dir" ]]; then
-        sudo chown "$ADMIN_UID:$ADMIN_GID" "$dir" 2>/dev/null || \
-            su-exec root chown "$ADMIN_UID:$ADMIN_GID" "$dir" 2>/dev/null || true
-        sudo chmod 770 "$dir" 2>/dev/null || \
-            su-exec root chmod 770 "$dir" 2>/dev/null || true
+        sudo chown "$(id -u):$ADMIN_GID" "$dir" 2>/dev/null || \
+            su-exec root chown "$(id -u):$ADMIN_GID" "$dir" 2>/dev/null || true
+        sudo chmod 2770 "$dir" 2>/dev/null || \
+            su-exec root chmod 2770 "$dir" 2>/dev/null || true
     fi
 }
 
@@ -228,15 +229,15 @@ for _dir in "state" "configs/amneziawg" "configs/wireguard"; do
     # world-writable 666 — wg0.conf/awg0.conf hold the server private key)
     for _f in "$_dir"/*.conf; do
         if [[ -f "$_f" ]] && [[ ! -w "$_f" ]]; then
-            sudo chown "$ADMIN_UID:$ADMIN_GID" "$_f" 2>/dev/null || \
-                su-exec root chown "$ADMIN_UID:$ADMIN_GID" "$_f" 2>/dev/null || true
+            sudo chown "$(id -u):$ADMIN_GID" "$_f" 2>/dev/null || \
+                su-exec root chown "$(id -u):$ADMIN_GID" "$_f" 2>/dev/null || true
             sudo chmod 660 "$_f" 2>/dev/null || \
                 su-exec root chmod 660 "$_f" 2>/dev/null || true
         fi
     done
 done
 if [[ ! -w "outputs/bundles" ]]; then
-    log_error "Cannot write to outputs/bundles/ — try: sudo chown -R $ADMIN_UID:$ADMIN_GID outputs/bundles && sudo chmod -R ug+rwX outputs/bundles"
+    log_error "Cannot write to outputs/bundles/ — try: sudo chown -R $(id -u):$ADMIN_GID outputs/bundles && sudo chmod -R ug+rwX,o-rwx outputs/bundles"
     exit 1
 fi
 
