@@ -41,6 +41,26 @@ SERVER_IP = os.environ.get("SERVER_IP", "")
 DOMAIN = os.environ.get("DOMAIN", "")
 
 
+def ip_matches(ip: str, allowed: str) -> bool:
+    """True if client IP `ip` is covered by whitelist entry `allowed`.
+
+    `allowed` may be a single IP or a CIDR (IPv4 or IPv6). Module-level and pure
+    so it is unit-testable -- it was previously nested in verify_auth, where a
+    CIDR-matching bug (every CIDR entry denied everyone) shipped untested. Fails
+    CLOSED on a malformed entry or an address-family mismatch.
+    """
+    allowed = allowed.strip()
+    if not allowed:
+        return False
+    try:
+        if "/" in allowed:
+            return ipaddress.ip_address(ip) in ipaddress.ip_network(allowed, strict=False)
+        return ipaddress.ip_address(ip) == ipaddress.ip_address(allowed)
+    except ValueError:
+        # Malformed entry, or an IPv4/IPv6 family mismatch: deny.
+        return ip == allowed
+
+
 def get_system_uptime() -> int:
     """Get system uptime in seconds from /proc/uptime."""
     try:
@@ -151,19 +171,7 @@ def verify_auth(request: Request, credentials: HTTPBasicCredentials = Depends(se
         # It failed closed, so it was not a bypass, but an operator setting a
         # CIDR locked themselves out and would most likely drop the whitelist
         # entirely. Use real network containment instead.
-        def _ip_matches(ip: str, allowed: str) -> bool:
-            allowed = allowed.strip()
-            if not allowed:
-                return False
-            try:
-                if "/" in allowed:
-                    return ipaddress.ip_address(ip) in ipaddress.ip_network(allowed, strict=False)
-                return ipaddress.ip_address(ip) == ipaddress.ip_address(allowed)
-            except ValueError:
-                # Malformed entry, or an IPv4/IPv6 family mismatch: deny.
-                return ip == allowed
-
-        ip_allowed = any(_ip_matches(client_ip, a) for a in ADMIN_IP_WHITELIST)
+        ip_allowed = any(ip_matches(client_ip, a) for a in ADMIN_IP_WHITELIST)
         if not ip_allowed:
             raise HTTPException(status_code=403, detail="IP not allowed")
 

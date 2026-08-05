@@ -49,6 +49,8 @@ jobs:
         run: bash tests/exporter-socket-test.sh
       - name: admin TLS enforcement
         run: bash tests/admin-tls-test.sh
+      - name: admin IP whitelist (CIDR) unit test
+        run: python3 tests/admin-ip-whitelist-test.py
       - name: refactor verification (static)
         run: bash tests/refactor-verify.sh
       - name: protocol-roster drift gate

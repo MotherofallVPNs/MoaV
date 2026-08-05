@@ -87,6 +87,28 @@ else
     bad "bootstrap.sh never calls secure_state_keys — secrets stay 0644 in practice"
 fi
 
+# --- .env is created 0600 -------------------------------------------------------
+# .env holds ADMIN_PASSWORD, REALITY_PRIVATE_KEY, CLASH_API_SECRET and the
+# Hysteria2 obfs password. Both creation sites `chmod 600 .env || true`; the
+# `|| true` means a silent regression (e.g. chmod removed) would go unnoticed.
+# Assert the chmod is present at both sites rather than the runtime mode, since
+# these run before any .env exists.
+env_chmod_sites=0
+for f in lib/bootstrap.sh moav.sh; do
+    if grep -qE 'chmod 600 \.env' "$ROOT/$f"; then
+        env_chmod_sites=$((env_chmod_sites + 1))
+    else
+        bad "$f creates .env but does not chmod 600 it"
+    fi
+done
+[[ "$env_chmod_sites" -eq 2 ]] && ok ".env is chmod 600 at both creation sites (bootstrap + moav.sh)"
+
+# And functionally: chmod 600 on a freshly-created file yields 0600.
+tmp_env="$STATE_DIR/env-probe"
+printf 'ADMIN_PASSWORD=x\n' > "$tmp_env"; chmod 600 "$tmp_env"
+m=$(mode "$tmp_env")
+[[ "$m" == "600" ]] && ok ".env probe: chmod 600 produces 0600" || bad ".env probe is $m, not 600"
+
 echo
 echo "  $pass passed, $fail failed"
 [[ $fail -eq 0 ]]

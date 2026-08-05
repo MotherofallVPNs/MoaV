@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Internal
+- **Regression tests for two security fixes that had none.** The admin CIDR-whitelist matcher is now unit-tested (13 cases incl. IPv6, family mismatch, and malformed-fails-closed) after being lifted to a module-level `ip_matches` function; and `.env` being created `0600` is now asserted at both creation sites. The whitelist bug (every CIDR entry denied everyone) had shipped untested because the repo had no Python tests.
+
 ### Fixed
 - **Three strict-mode crashes in cert-wait/fallback paths (grafana, grafana-proxy, trusttunnel).** D4c enabled `set -e`/`-u` on these but left code written for a tolerant shell in the branches that only run *before* Let's Encrypt has issued, invisible to the happy-path e2e. grafana-proxy had the unguarded `certs=$(find_certificates)` that was fixed in grafana but missed in its twin; grafana read `GF_SERVER_CERT_KEY` unbound on the no-cert path, making its HTTP fallback unreachable; and trusttunnel's `((CERT_WAIT_COUNT++))` returned non-zero from zero, killing its cert-wait one second in. Each crashed a fresh install until certbot succeeded.
 
