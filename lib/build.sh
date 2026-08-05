@@ -233,17 +233,26 @@ cmd_build() {
     prune_build_cache
 }
 
-# Reclaim BuildKit cache after a build. On the bitchat upgrade the build cache
-# had grown to ~4 GB (the bulk of a "disk 81% full" scare) while images and
-# logs were fine — every `moav build` layers more cache and nothing evicted it.
-# Cache only, never images: pulling the next build's base layers from cache is
-# a speed nicety, but images back the running stack and a possible rollback.
+# Bound the BuildKit cache after a build. On the bitchat upgrade it had grown to
+# ~4 GB (the bulk of a "disk 81% full" scare) while images and logs were fine —
+# every `moav build` layers more cache and nothing evicted it.
+#
+# CRITICAL: this must NOT wipe the cache — that is what makes the *next* build
+# fast (base layers, Go/Rust module downloads, compile output). We only cap it:
+# keep the most-recently-used ~4 GB and evict the older overflow. So a normal
+# rebuild keeps its warm cache; only unbounded accumulation is trimmed.
+# Cache only, never images (they back the running stack and any rollback).
+MOAV_BUILD_CACHE_KEEP="${MOAV_BUILD_CACHE_KEEP:-4GB}"
 prune_build_cache() {
     command -v docker >/dev/null 2>&1 || return 0
-    local before after
-    before=$(docker system df --format '{{.Type}} {{.Reclaimable}}' 2>/dev/null | awk '/Build Cache/{print $3$4}')
-    docker builder prune -f >/dev/null 2>&1 || true
-    info "Pruned build cache${before:+ (was reclaiming $before)}"
+    # --keep-storage caps retained cache (Docker 18.09+; a deprecation alias for
+    # --reserved-space on 27+, still honored). Fall back to an age filter on the
+    # rare daemon that rejects it, still preserving recent layers.
+    if docker builder prune -f --keep-storage "$MOAV_BUILD_CACHE_KEEP" >/dev/null 2>&1; then
+        info "Capped build cache at ~${MOAV_BUILD_CACHE_KEEP} (recent layers kept for fast rebuilds)"
+    elif docker builder prune -f --filter until=336h >/dev/null 2>&1; then
+        info "Pruned build cache older than 14 days (recent layers kept)"
+    fi
 }
 
 # Map of services that can be built locally

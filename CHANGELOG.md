@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **`moav test` and the built-in client no longer bundle `snowflake-client`.** Snowflake is a Tor pluggable transport that belongs to the standalone `MotherofallVPNs/moav-client`; the server's built-in client exists to validate a user's bundle and the server's net perms. Dropping it removes a heavy Go build stage from every `moav test`.
-- **`moav build` now prunes the BuildKit cache when it finishes.** The cache had grown to ~4 GB on a live server (most of a "disk 81% full" scare) while images and logs were fine; nothing evicted it. Cache only — never images, which back the running stack and any rollback.
+- **`moav build` now caps the BuildKit cache when it finishes.** The cache had grown to ~4 GB on a live server (most of a "disk 81% full" scare) while images and logs were fine; nothing evicted it. It is *capped, not wiped* (keep ~4 GB of the most-recent layers via `--keep-storage`, tunable with `MOAV_BUILD_CACHE_KEEP`) so the next build stays fast and only unbounded accumulation is trimmed. Cache only — never images, which back the running stack and any rollback.
 - **Community links in `moav start` / `moav status` / goodbye now include GitHub issues.** The start success block and the status footer show Telegram, X and the GitHub issues URL; the exit banner points to Telegram for questions and GitHub for bugs. The marketing-flavored "serving Psiphon users (incl. Iran) via the public pool" line after start is gone; the useful `moav conduit link` hint stays.
 
 
