@@ -1,57 +1,59 @@
 #!/bin/bash
-# Guards the slim .env.example / full-reference split (E4-1).
+# Guards the .env.example structure: a single file with the commonly-configured
+# vars up top and an "ADVANCED" separator, everything below it optional.
 #
-# .env.example is a CURATED minimal first-run surface; .env.example.full is the
-# complete reference (every tunable, with defaults). The invariants below keep
-# the two from drifting: slim must be a strict subset of full, slim must stay
-# slim (no re-bloat), and the essentials a fresh `cp .env.example .env` install
-# needs must be present.
+# The point is a small first-run surface WITHOUT removing anything (a fresh
+# `cp .env.example .env` still carries every var at its intended value), so the
+# checks are: the separator exists, the essentials sit ABOVE it, a sampling of
+# advanced vars sit BELOW it, and no variable was dropped.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+F="$ROOT/.env.example"
 pass=0; fail=0
 ok()  { printf '  ok    %s\n' "$1"; pass=$((pass+1)); }
 bad() { printf '  FAIL  %s\n' "$1"; fail=$((fail+1)); }
 
-SLIM="$ROOT/.env.example"
-FULL="$ROOT/.env.example.full"
+echo ".env.example structure tests"
 
-echo ".env.example split tests"
+[[ -f "$F" ]] && ok ".env.example exists" || { bad "missing"; echo "  $pass/$fail"; exit 1; }
 
-[[ -f "$SLIM" ]] && ok ".env.example exists" || { bad ".env.example missing"; echo "  $pass/$fail"; exit 1; }
-[[ -f "$FULL" ]] && ok ".env.example.full (reference) exists" || bad ".env.example.full missing — the full reference was lost"
+# The single-file split replaced the old .env.example.full two-file scheme.
+[[ ! -f "$ROOT/.env.example.full" ]] && ok ".env.example.full removed (single-file)" \
+                                     || bad ".env.example.full still present"
 
-# var keys (LHS of KEY=), ignoring commented lines
-keys() { grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' "$1" 2>/dev/null | sed 's/=$//' | sort -u; }
+# Line number of the ADVANCED separator.
+sep=$(grep -n '^# ADVANCED' "$F" | head -1 | cut -d: -f1)
+[[ -n "$sep" ]] && ok "ADVANCED separator present (line $sep)" \
+                || { bad "no ADVANCED separator"; sep=999999; }
 
-# 1. slim ⊆ full: every key in the minimal file must also be in the reference,
-#    or an operator copying a line "from the full reference" could find it absent.
-missing_from_full=$(comm -23 <(keys "$SLIM") <(keys "$FULL") 2>/dev/null | tr '\n' ' ')
-[[ -z "$missing_from_full" ]] && ok "every slim key is present in the full reference" \
-    || bad "slim keys missing from full reference (drift): $missing_from_full"
+# line number of a KEY=... assignment (commented or not)
+line_of() { grep -nE "^#?$1=" "$F" | head -1 | cut -d: -f1; }
 
-# 2. slim stays slim: guard against a future edit re-bloating it back toward the
-#    old 118-var / 475-line surface this split exists to remove.
-n=$(keys "$SLIM" | wc -l | tr -d ' ')
-[[ "$n" -le 40 ]] && ok "slim .env.example is curated ($n vars, ceiling 40)" \
-                  || bad "slim .env.example has $n vars (> 40) — re-bloating; move advanced tunables to .env.example.full"
-
-# 3. full is genuinely the superset (has the advanced classes slim dropped).
-for k in SINGBOX_VERSION PORT_HTTPS TELEMT_POOL_SIZE CDN_TRANSPORT REALITY_TARGET; do
-    grep -qE "^${k}=" "$FULL" && ok "full reference carries $k" \
-        || bad "full reference missing $k — advanced tunable lost, not just moved"
+# Essentials must sit ABOVE the separator.
+for v in DOMAIN ACME_EMAIL ADMIN_PASSWORD SERVER_IP REALITY_TARGET \
+         ENABLE_REALITY ENABLE_WIREGUARD INITIAL_USERS DEFAULT_PROFILES TZ ADMIN_IP_WHITELIST; do
+    n=$(line_of "$v")
+    if [[ -n "$n" && "$n" -lt "$sep" ]]; then ok "essential $v above separator"
+    else bad "$v not in the top block (line ${n:-none}, separator $sep)"; fi
 done
 
-# 4. the version-outdated check reads .env.example.full — it must hold versions.
-grep -qE '^[A-Z_]+_VERSION=' "$FULL" \
-    && ok "full reference carries *_VERSION lines (moav update version check)" \
-    || bad "no *_VERSION in full reference — check_component_versions goes silent"
-
-# 5. essentials a bare `cp .env.example .env` install needs.
-for k in DOMAIN ACME_EMAIL ADMIN_PASSWORD COMPOSE_PROJECT_NAME INITIAL_USERS; do
-    grep -qE "^#?${k}=" "$SLIM" && ok "slim has essential $k" \
-        || bad "slim .env.example dropped essential $k"
+# Advanced vars must sit BELOW the separator.
+for v in SINGBOX_VERSION PORT_HTTPS TELEMT_POOL_SIZE CDN_SUBDOMAIN CLASH_API_SECRET \
+         CLIENT_SOCKS_PORT GOPROXY COMPOSE_PROJECT_NAME; do
+    n=$(line_of "$v")
+    if [[ -n "$n" && "$n" -gt "$sep" ]]; then ok "advanced $v below separator"
+    else bad "$v not below the separator (line ${n:-none}, separator $sep)"; fi
 done
+
+# Completeness: a fresh copy still carries every var it needs, and sources clean.
+cp "$F" /tmp/moav-env-struct-test
+if bash -c 'set -a; source /tmp/moav-env-struct-test; set +a; [[ -n "$COMPOSE_PROJECT_NAME" && -n "$ENABLE_REALITY" && -n "$REALITY_TARGET" && -n "$SINGBOX_VERSION" ]]'; then
+    ok "a fresh copy sources cleanly and carries top + advanced values"
+else
+    bad "fresh copy missing values or fails to source"
+fi
+rm -f /tmp/moav-env-struct-test
 
 echo ""
 echo "  $pass passed, $fail failed"

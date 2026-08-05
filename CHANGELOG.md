@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`.env.example` is one reorganized file again, not a slim/full split.** The E4-1 split into `.env.example` + `.env.example.full` is replaced by a single file: the ~29 commonly-configured vars (domain, ACME email, admin password, server identity, protocol toggles, Reality target, common options) sit in a labeled block on top, then a hard `ADVANCED - only change things below if you know what you're doing` separator, then every other tunable with its original comments. Nothing is removed, so a fresh `cp .env.example .env` carries every variable at its intended value (this also un-does the four fresh-install default drifts the split had introduced: CDN on, conduit/snowflake bandwidth, client ports). `moav update`'s version-outdated check and new-variable auto-add read the single file again.
+
+
 ### Fixed
 - **Grafana no longer crash-loops over cosmetic branding.** The entrypoint patches a logo into the grafana image's `public/img` dir; on images/hosts where that dir is not writable even as root (seen live on a DigitalOcean droplet with `grafana/grafana:latest`), the one unguarded `cat >` write failed with "Permission denied" and, under `set -e`, killed the entrypoint and restart-looped the container. The write is now best-effort (`if cat … else skip`), so branding degrades gracefully and grafana stays up. A restart-storming grafana was also starving the box's docker daemon, which is the likely trigger for the intermittent "no wg/awg key generator" on `moav user add` right after start.
 - **`moav test` no longer warns "couldn't parse the wstunnel server".** It read the endpoint from a `wireguard-instructions.txt` that bundles do not contain; it now reads the `wstunnel client -L … wss://host:port` command from `README.html` (matching the command line, not the surrounding prose) and validates that endpoint.
