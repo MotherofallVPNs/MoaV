@@ -95,6 +95,7 @@ print_header() {
     echo "║                                                    ║"
     echo "║  Multi-protocol Circumvention Stack                ║"
     printf "║  %-49s ║\n" "$version_line"
+    printf "║  %-49s ║\n" "t.me/motherofallvpns"
     if [[ -n "$update_line" ]]; then
         printf "║  ${NC}${YELLOW}%-49s${CYAN} ║\n" "$update_line"
     fi

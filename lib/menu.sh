@@ -162,6 +162,11 @@ show_usage() {
     echo "  moav doctor dns                      # Check DNS configuration"
     echo "  moav export                          # Backup to moav-backup-TIMESTAMP.tar.gz"
     echo "  moav migrate-ip 1.2.3.4              # Update to new server IP"
+    echo ""
+    echo "Community & support:"
+    echo "  Telegram:  https://t.me/motherofallvpns"
+    echo "  Twitter/X: https://x.com/motherofallvpns"
+    echo "  Docs:      https://moav.sh/docs"
 }
 
 cmd_check() {

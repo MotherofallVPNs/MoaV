@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Community links in the CLI and README.** The `moav` banner and `moav help` footer now show the Telegram support channel (t.me/motherofallvpns) and Twitter/X; the README gained badges and a Community & support section.
+
 ### Changed
 - **Full strict mode (`set -eu` + pipefail) for every container entrypoint.** The last six (admin, sing-box, snowflake, wstunnel, grafana, grafana-proxy) had never run under `-e`, so each was reviewed per command and then executed in its real base image. Two real hazards were fixed on the way: grafana's certificate lookup returns non-zero before certbot has issued, and a plain `var=$(cmd)` assignment propagates that, so `-e` would have killed grafana on every fresh install; and its cosmetic branding edits could take the container down if the target layer were read-only.
 - **Full strict mode for the admin, sing-box, snowflake and wstunnel entrypoints.** `-e` was previously held back on these because they had never run under it. Each was reviewed per command and then executed in its real base image (alpine/ash and debian/dash) to confirm it still reaches its `exec`, including the graceful-degradation branches such as snowflake continuing when it cannot detect a network interface.

@@ -76,6 +76,7 @@ LATEST_VERSION=""
 goodbye() {
     echo ""
     echo -e "${CYAN}Goodbye! Stay safe out there.${NC}"
+    echo -e "${DIM}Questions or issues? https://t.me/motherofallvpns${NC}"
     echo ""
     exit 0
 }

@@ -1,6 +1,6 @@
 # MoaV
 
-[![Website](https://img.shields.io/badge/website-moav.sh-cyan.svg)](https://moav.sh)  [![Docs](https://img.shields.io/badge/docs-moav.sh%2Fdocs-cyan.svg)](https://moav.sh/docs/)  [![Version](https://img.shields.io/badge/version-1.9.0-blue.svg)](CHANGELOG.md)  [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Website](https://img.shields.io/badge/website-moav.sh-cyan.svg)](https://moav.sh)  [![Docs](https://img.shields.io/badge/docs-moav.sh%2Fdocs-cyan.svg)](https://moav.sh/docs/)  [![Version](https://img.shields.io/badge/version-1.9.0-blue.svg)](CHANGELOG.md)  [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)  [![Telegram](https://img.shields.io/badge/Telegram-motherofallvpns-2CA5E0.svg?logo=telegram)](https://t.me/motherofallvpns)  [![Twitter](https://img.shields.io/badge/X-@motherofallvpns-000000.svg?logo=x)](https://x.com/motherofallvpns)
 
 English | **[فارسی](README-fa.md)** 
 
@@ -336,6 +336,15 @@ MIT
 See [CHANGELOG.md](CHANGELOG.md) for release notes and version history.
 
 
+
+## Community & support
+
+- **Telegram:** [t.me/motherofallvpns](https://t.me/motherofallvpns) — questions, help, and release announcements
+- **Twitter/X:** [@motherofallvpns](https://x.com/motherofallvpns)
+- **Issues:** [GitHub Issues](https://github.com/MotherofallVPNs/MoaV/issues) for bugs and feature requests
+- **Docs:** [moav.sh/docs](https://moav.sh/docs)
+
+---
 ## Disclaimer
 
 This project provides **general-purpose open-source networking software** only.
