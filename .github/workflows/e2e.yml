@@ -109,12 +109,13 @@ jobs:
           else
             sed -i "s|^DOMAIN=.*|DOMAIN=${MOAV_DOMAIN}|"             .env
             sed -i "s|^ACME_EMAIL=.*|ACME_EMAIL=${MOAV_ACME_EMAIL}|" .env
-            # NOTE: ENABLE_ANYTLS is deliberately NOT turned on here yet.
-            # Enabling it (PR #203) made `bootstrap` leave sing-box unconfigured
-            # — `moav user add` then reported "Skipping sing-box (not configured)"
-            # and every bundle came out empty, every protocol skipped. Tracked
-            # as a real AnyTLS-provisioning bug; re-enable once that is fixed and
-            # reproduced. AnyTLS therefore still has no live CI coverage.
+            # AnyTLS is on for the domain pass. The earlier failure (PR #203) was a
+            # STATE-REUSE artifact, not a provisioning bug: the default tier does not
+            # wipe the state volume, so a stale .bootstrapped made bootstrap skip config
+            # regeneration and the anytls inbound was never added. The template renders
+            # valid with AnyTLS on (verified), full/mega wipe state first, and the
+            # hollow-run guard now fails a run that tests nothing.
+            sed -i "s|^ENABLE_ANYTLS=.*|ENABLE_ANYTLS=true|" .env
           fi
           # INITIAL_USERS is a COUNT (not a name) — 1 creates the 'demouser'.
           # We add a named 'e2e-test' user after start (also exercises `user add`).
