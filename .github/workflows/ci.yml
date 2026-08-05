@@ -49,6 +49,8 @@ jobs:
         run: bash tests/env-resolution-test.sh
       - name: .env.example slim/full split
         run: bash tests/env-example-test.sh
+      - name: reality short_id desync guard
+        run: bash tests/reality-desync-test.sh
       - name: docker management-plane isolation
         run: bash tests/network-isolation-test.sh
       - name: monitoring socket removal

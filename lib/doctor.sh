@@ -953,6 +953,26 @@ EOF
     [[ "$enable_reality" == "true" ]] && _doctor_reality_one "VLESS Reality (:443)" "sing-box" "REALITY_TARGET" "www.cloudflare.com:443"
     [[ "$enable_xhttp"    == "true" ]] && _doctor_reality_one "XHTTP-Reality (:2096)" "xray" "XHTTP_REALITY_TARGET" "www.cloudflare.com:443"
 
+    # state<->config short_id desync guard (E4-4). The short_id lives in state;
+    # if a render read an empty .env-injected value instead, config.json ships
+    # an empty short_id and EVERY Reality client is rejected with no error
+    # anywhere (PR #152 class). Compare the rendered config against state.
+    if [[ "$enable_reality" == "true" ]]; then
+        local rcfg="$SCRIPT_DIR/configs/sing-box/config.json" state_sid=""
+        state_sid=$(docker run --rm -v moav_moav_state:/state alpine sh -c \
+            'grep "^REALITY_SHORT_ID=" /state/keys/reality.env 2>/dev/null | cut -d= -f2-' 2>/dev/null | tr -d '\r\n ')
+        if [[ -n "$state_sid" && -f "$rcfg" ]]; then
+            if grep -qF "$state_sid" "$rcfg"; then
+                echo -e "    ${GREEN}✓${NC} Reality short_id in config.json matches state"
+            else
+                echo -e "    ${RED}✗${NC} Reality short_id from state is ABSENT in config.json"
+                echo -e "      ${DIM}config↔state desync — every Reality client is rejected (issue class of PR #152).${NC}"
+                echo -e "      ${DIM}Fix: moav bootstrap (re-renders sing-box from state).${NC}"
+                pass=false
+            fi
+        fi
+    fi
+
     unset -f _doctor_reality_tcp_probe
     unset -f _doctor_reality_one
     $pass && return 0 || return 1

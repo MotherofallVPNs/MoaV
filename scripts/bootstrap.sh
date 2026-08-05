@@ -19,6 +19,56 @@ source /app/lib/telemt.sh
 source /app/lib/sync.sh
 source /app/lib/provision.sh   # shared "materialize every user" path (see A8)
 
+# ---------------------------------------------------------------------------
+# state <-> .env desync guards (E4-4)
+#
+# Generated secrets live in state/keys, but docker-compose injects them into
+# this container as env vars from .env (usually EMPTY, since the values are not
+# in .env). Any render that reads the empty env var instead of state silently
+# blanks the secret. PR #152 was exactly this for the Reality short_id: an
+# empty rendered short_id rejected EVERY Reality client, with no error anywhere.
+# ---------------------------------------------------------------------------
+
+# Re-load the whole generated-secret class from state, right before a render, so
+# state (the source of truth) wins over a shadowing empty .env value. Uniform
+# across reality/clash/cdn/ss — not just reality, which was the only one #152
+# covered. Safe to call repeatedly.
+load_state_secrets() {
+    [[ -f "$STATE_DIR/keys/reality.env"   ]] && source "$STATE_DIR/keys/reality.env"
+    [[ -f "$STATE_DIR/keys/clash-api.env" ]] && source "$STATE_DIR/keys/clash-api.env"
+    [[ -f "$STATE_DIR/keys/cdn.env"       ]] && source "$STATE_DIR/keys/cdn.env"
+    [[ -f "$STATE_DIR/keys/shadowsocks-server.psk" ]] && \
+        SS_SERVER_PSK=$(cat "$STATE_DIR/keys/shadowsocks-server.psk" 2>/dev/null)
+    export REALITY_SHORT_ID REALITY_PRIVATE_KEY REALITY_PUBLIC_KEY \
+           CLASH_API_SECRET HYSTERIA2_OBFS_PASSWORD CDN_WS_PATH SS_SERVER_PSK 2>/dev/null || true
+}
+
+# Fail LOUDLY if a render dropped the Reality identity that state holds. Compares
+# the state short_id / private key against the rendered file: if state has a
+# value (so this install uses Reality) but the render does not contain it, the
+# secret desynced and every client would be rejected. Aborting a bootstrap is
+# strictly better than serving a config that silently rejects everyone.
+# No false positive on a deliberate empty-short_id setup: state would be empty
+# too, and we skip.
+assert_reality_in_render() {
+    local cfg="$1"
+    [[ "${ENABLE_REALITY:-true}" == "true" ]] || return 0
+    [[ -f "$cfg" && -f "$STATE_DIR/keys/reality.env" ]] || return 0
+    local sid pk
+    sid=$(source "$STATE_DIR/keys/reality.env"; printf '%s' "${REALITY_SHORT_ID:-}")
+    pk=$(source "$STATE_DIR/keys/reality.env"; printf '%s' "${REALITY_PRIVATE_KEY:-}")
+    if [[ -n "$sid" ]] && ! grep -qF "$sid" "$cfg"; then
+        log_error "FATAL: Reality short_id from state is absent in $cfg."
+        log_error "  The render read an empty value instead of state — every Reality client"
+        log_error "  would be rejected (PR #152 class). Not writing a silently-broken config."
+        exit 1
+    fi
+    if [[ -n "$pk" ]] && ! grep -qF "$pk" "$cfg"; then
+        log_error "FATAL: Reality private key from state is absent in $cfg — Reality would not authenticate."
+        exit 1
+    fi
+}
+
 log_info "Starting MoaV bootstrap..."
 
 # -----------------------------------------------------------------------------
@@ -796,14 +846,14 @@ if [[ "${ENABLE_XHTTP:-true}" == "true" ]]; then
     XHTTP_REALITY_TARGET_HOST="${XHTTP_REALITY_TARGET%%:*}"
     export XHTTP_REALITY_TARGET_HOST
 
-    # Reuse Reality keys from sing-box. Re-load from state first so an empty
-    # REALITY_SHORT_ID injected from .env can't blank the rendered shortIds
-    # (same trap as the sing-box render below).
-    [[ -f "$STATE_DIR/keys/reality.env" ]] && source "$STATE_DIR/keys/reality.env"
+    # Re-load the whole secret class from state so an empty .env-injected value
+    # can't blank the render (see load_state_secrets / PR #152).
+    load_state_secrets
     export REALITY_PRIVATE_KEY
     export REALITY_SHORT_ID
 
     envsubst < /configs/xray/config.json.template > /configs/xray/config.json
+    assert_reality_in_render /configs/xray/config.json
 
     # Add XDNS inbound if enabled
     if [[ "${ENABLE_XDNS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
@@ -874,12 +924,13 @@ singbox_needed=false
 if [[ "$singbox_needed" == "true" ]]; then
     log_info "Generating sing-box configuration (using existing keys)..."
 
-    # Re-load the authoritative Reality identity from state right before the
-    # render. docker-compose injects REALITY_SHORT_ID=${REALITY_SHORT_ID:-} from
-    # .env into this container; since the short id lives in state (not .env),
-    # that value is usually empty and would shadow the real one — rendering an
-    # empty short_id that silently rejects EVERY Reality client. State wins.
-    [[ -f "$STATE_DIR/keys/reality.env" ]] && source "$STATE_DIR/keys/reality.env"
+    # Re-load the authoritative generated secrets from state right before the
+    # render. docker-compose injects these (REALITY_SHORT_ID, CLASH_API_SECRET,
+    # CDN_WS_PATH, ...) from .env into this container; since they live in state,
+    # the injected values are usually empty and would shadow the real ones —
+    # rendering e.g. an empty short_id that silently rejects EVERY Reality
+    # client. State wins. (Uniform re-source; PR #152 covered only reality.)
+    load_state_secrets
 
     export REALITY_USERS_JSON
     export TROJAN_USERS_JSON
@@ -947,6 +998,7 @@ if [[ "$singbox_needed" == "true" ]]; then
         log_info "  No server IPv6 — added prefer_ipv4 resolve rule (silences IPv6 dial failures)"
     fi
 
+    assert_reality_in_render /configs/sing-box/config.json
     log_info "sing-box configuration written to /configs/sing-box/config.json"
 else
     log_info "sing-box not needed (no TLS protocols enabled)"

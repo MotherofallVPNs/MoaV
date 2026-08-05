@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Hardened the whole state↔.env generated-secret desync class (the Reality short_id total-outage family).** Generated secrets live in `state/keys`, but docker-compose injects them into the bootstrap container from `.env` — usually empty, since the values are not in `.env`. A render that read the empty injected value silently blanked the secret; for the Reality short_id that rejected *every* client with no error anywhere (PR #152 fixed only Reality, only in two spots). Now a single `load_state_secrets` re-sources the entire class (reality, clash-api, cdn, shadowsocks PSK) from state right before every render, and a post-render assert aborts the bootstrap if state holds a Reality short_id or private key the rendered config does not contain — refusing to ship a config that would silently reject everyone. `moav doctor` gained a matching config↔state short_id check.
+
+
 ### Changed
 - **`.env.example` slimmed from 118 vars / 475 lines to a curated 28-var first-run surface.** A new operator now sees only what they actually set (domain, ACME email, admin password, server IP, protocol toggles, and a few common options). Every advanced tunable (component versions, ports, Reality/XHTTP targets, DNS-tunnel subdomains, Telegram/telemt tuning, CDN, bandwidth donation, monitoring, client mode, registry overrides) has a working code/compose default and moved to a new complete reference, **`.env.example.full`** — copy any line into your `.env` to override it. Existing installs are unaffected (their `.env` is untouched; removed keys fall back to the same defaults). `moav update`'s version-outdated check now reads the full reference; its new-variable auto-add still reads the slim file, so an update never re-bloats your `.env` with the advanced set. A drift test keeps the slim file a strict subset of the reference and under a 40-var ceiling.
 
