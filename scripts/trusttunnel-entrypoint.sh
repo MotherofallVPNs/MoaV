@@ -40,7 +40,10 @@ if [[ -n "$DOMAIN" ]]; then
     echo "[TrustTunnel] Waiting for TLS certificate at $CERT_PATH..."
     while [[ ! -f "$CERT_PATH" ]] && [[ $CERT_WAIT_COUNT -lt $CERT_WAIT_TIMEOUT ]]; do
         sleep 1
-        ((CERT_WAIT_COUNT++))
+        # `$((...))` not `((...))`: the arithmetic-command form returns exit 1 when
+        # the pre-increment value is 0, which `set -e` treats as fatal -- so the
+        # container died one second into this very wait loop.
+        CERT_WAIT_COUNT=$((CERT_WAIT_COUNT + 1))
     done
 
     if [[ ! -f "$CERT_PATH" ]]; then
