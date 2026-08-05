@@ -87,7 +87,7 @@ fi
 log_info "Adding user '$USERNAME' to sing-box..."
 
 # Generate credentials
-USER_UUID=$(docker compose exec -T sing-box sing-box generate uuid 2>/dev/null || uuidgen | tr '[:upper:]' '[:lower:]')
+USER_UUID=$(compose_timeout exec -T sing-box sing-box generate uuid 2>/dev/null || uuidgen | tr '[:upper:]' '[:lower:]')
 USER_PASSWORD=$(openssl rand -base64 18 | tr -d '/+=' | head -c 24)
 
 # Save credentials
@@ -168,8 +168,8 @@ if [[ -z "${REALITY_PUBLIC_KEY:-}" ]] && [[ -n "${REALITY_PRIVATE_KEY:-}" ]]; th
     log_info "Reality public key missing, deriving from private key..."
     # x25519 uses the same curve as WireGuard — convert base64url→base64, use wg pubkey, convert back
     REALITY_KEY_B64=$(echo "${REALITY_PRIVATE_KEY}==" | tr '_-' '/+' | head -c 44)
-    if docker compose ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q .; then
-        REALITY_PUBLIC_KEY=$(echo "$REALITY_KEY_B64" | docker compose exec -T wireguard wg pubkey 2>/dev/null | tr -d '\r\n' | tr '/+' '_-' | sed 's/=*$//' || echo "")
+    if compose_timeout ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q .; then
+        REALITY_PUBLIC_KEY=$(echo "$REALITY_KEY_B64" | compose_timeout exec -T wireguard wg pubkey 2>/dev/null | tr -d '\r\n' | tr '/+' '_-' | sed 's/=*$//' || echo "")
     elif command -v wg &>/dev/null; then
         REALITY_PUBLIC_KEY=$(echo "$REALITY_KEY_B64" | wg pubkey 2>/dev/null | tr -d '\r\n' | tr '/+' '_-' | sed 's/=*$//' || echo "")
     fi
@@ -437,13 +437,13 @@ fi
 
 # Try to reload sing-box (hot reload) unless --no-reload was passed
 if [[ "$NO_RELOAD" != "true" ]]; then
-    if docker compose ps sing-box --status running 2>/dev/null | tail -n +2 | grep -q .; then
+    if compose_timeout ps sing-box --status running 2>/dev/null | tail -n +2 | grep -q .; then
         log_info "Reloading sing-box..."
-        if docker compose exec -T sing-box sing-box reload 2>/dev/null; then
+        if compose_timeout exec -T sing-box sing-box reload 2>/dev/null; then
             log_info "sing-box reloaded successfully"
         else
             log_info "Hot reload failed, restarting sing-box..."
-            docker compose restart sing-box
+            COMPOSE_TIMEOUT=60 compose_timeout restart sing-box
         fi
     else
         log_info "sing-box not running, config will apply on next start"
@@ -451,25 +451,25 @@ if [[ "$NO_RELOAD" != "true" ]]; then
 
     # Try to reload TrustTunnel (if running)
     if [[ -f "$TRUSTTUNNEL_CREDS" ]]; then
-        if docker compose ps trusttunnel --status running 2>/dev/null | tail -n +2 | grep -q .; then
+        if compose_timeout ps trusttunnel --status running 2>/dev/null | tail -n +2 | grep -q .; then
             log_info "Restarting TrustTunnel to apply new credentials..."
-            docker compose restart trusttunnel
+            COMPOSE_TIMEOUT=60 compose_timeout restart trusttunnel
         fi
     fi
 
     # Try to reload Xray (if running)
     if [[ -f "$XRAY_CONFIG" ]] && [[ "${ENABLE_XHTTP:-true}" == "true" ]]; then
-        if docker compose --profile xhttp ps xray --status running 2>/dev/null | tail -n +2 | grep -q .; then
+        if compose_timeout --profile xhttp ps xray --status running 2>/dev/null | tail -n +2 | grep -q .; then
             log_info "Restarting Xray to apply new user..."
-            docker compose --profile xhttp restart xray
+            COMPOSE_TIMEOUT=60 compose_timeout --profile xhttp restart xray
         fi
     fi
 
     # Try to reload telemt (if running)
     if [[ -f "$TELEMT_CONFIG" ]]; then
-        if docker compose --profile telegram ps telemt --status running 2>/dev/null | tail -n +2 | grep -q .; then
+        if compose_timeout --profile telegram ps telemt --status running 2>/dev/null | tail -n +2 | grep -q .; then
             log_info "Restarting telemt to apply new user..."
-            docker compose --profile telegram restart telemt
+            COMPOSE_TIMEOUT=60 compose_timeout --profile telegram restart telemt
         fi
     fi
 fi

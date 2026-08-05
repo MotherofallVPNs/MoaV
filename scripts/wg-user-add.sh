@@ -69,63 +69,52 @@ fi
 mkdir -p "$OUTPUT_DIR"
 mkdir -p "$STATE_DIR/users/$USERNAME"
 
-# Check if peer already exists
-if grep -q "# $USERNAME\$" "$WG_CONFIG_DIR/wg0.conf" 2>/dev/null; then
-    log_error "WireGuard peer '$USERNAME' already exists."
-    exit 1
-fi
-
 log_info "Adding WireGuard peer '$USERNAME'..."
 
-# Find next available IP: scan the config file (via net_next_free_octet) plus the
-# running interface's allowed-ips, so a config/runtime drift can't hand out a
-# colliding octet.
-RUNNING_IPS=""
-if docker compose ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q .; then
-    RUNNING_IPS=$(docker compose exec -T wireguard wg show wg0 allowed-ips 2>/dev/null | grep '10\.66\.66\.' | sed 's/.*10\.66\.66\.\([0-9]*\).*/\1/' || echo "")
-fi
-
-NEXT_IP=$(net_next_free_octet "$WG_CONFIG_DIR/wg0.conf" "10.66.66" $RUNNING_IPS) || {
-    log_error "No available IPs in WireGuard network"
-    exit 1
-}
-
-CLIENT_IP="10.66.66.$NEXT_IP"
-log_info "Assigned IP: $CLIENT_IP"
-
-# Assign IPv6 if server has IPv6
-CLIENT_IP_V6=""
+# IPv6 autodetect must happen before the lib call — wireguard_add_peer assigns
+# a v6 address only when SERVER_IPV6 is set.
 if [[ -z "${SERVER_IPV6:-}" ]] && [[ "${SERVER_IPV6:-}" != "disabled" ]]; then
     SERVER_IPV6=$(curl -6 -s --max-time 3 https://api6.ipify.org 2>/dev/null || echo "")
 fi
 [[ "${SERVER_IPV6:-}" == "disabled" ]] && SERVER_IPV6=""
 
-if [[ -n "$SERVER_IPV6" ]]; then
-    CLIENT_IP_V6="fd00:cafe:beef::$NEXT_IP"
-    log_info "Assigned IPv6: $CLIENT_IP_V6"
+# Scrape the running interface's in-use octets so a config/runtime drift can't
+# hand out a colliding address (the lib merges these with its config scan).
+# compose_timeout: a wedged container must not hang user provisioning (#220).
+RUNNING_IPS=""
+if compose_timeout ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q .; then
+    RUNNING_IPS=$(compose_timeout exec -T wireguard wg show wg0 allowed-ips 2>/dev/null | grep '10\.66\.66\.' | sed 's/.*10\.66\.66\.\([0-9]*\).*/\1/' || echo "")
 fi
 
-# Generate client keys (lib/keys.sh picks a wg/awg generator, CRLF-safe)
-if ! { read -r CLIENT_PRIVATE_KEY && read -r CLIENT_PUBLIC_KEY; } < <(wg_keypair); then
-    log_error "No wg/awg key generator available (install wireguard-tools or start the wireguard container)"
+# Keygen, IP allocation, state write and wg0.conf append all live in the shared
+# lib — the same code the container path runs. This was an inline copy that had
+# drifted: it hard-errored on an existing peer instead of reusing state (the
+# lib re-issues the bundle idempotently), always minted fresh keys, and lacked
+# the incomplete-state-file and third-state guards.
+# shellcheck disable=SC2086  # word-splitting is intended: one arg per octet
+rc=0
+wireguard_add_peer "$USERNAME" $RUNNING_IPS || rc=$?
+if [[ $rc -eq 2 ]]; then
+    # Server has a peer but state has no keys — unrecoverable without revoke.
+    exit 1
+elif [[ $rc -ne 0 ]]; then
+    log_error "Failed to add WireGuard peer for $USERNAME"
     exit 1
 fi
 
-# Save credentials
-cat > "$STATE_DIR/users/$USERNAME/wireguard.env" <<EOF
-WG_PRIVATE_KEY=$CLIENT_PRIVATE_KEY
-WG_PUBLIC_KEY=$CLIENT_PUBLIC_KEY
-WG_CLIENT_IP=$CLIENT_IP
-WG_CLIENT_IP_V6=$CLIENT_IP_V6
-CREATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-EOF
+# Read back what the lib allocated (or reused) for the hot-add and summary.
+# shellcheck source=/dev/null
+source "$STATE_DIR/users/$USERNAME/wireguard.env"
+CLIENT_PUBLIC_KEY="$WG_PUBLIC_KEY"
+CLIENT_IP="$WG_CLIENT_IP"
+CLIENT_IP_V6="${WG_CLIENT_IP_V6:-}"
 
 # Get server public key - prefer from running WireGuard, fallback to file
 SERVER_PUBLIC_KEY=""
 
 # If WireGuard is running, get the actual public key and sync it
-if docker compose ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q .; then
-    SERVER_PUBLIC_KEY=$(docker compose exec -T wireguard wg show wg0 public-key 2>/dev/null | tr -d '\r\n')
+if compose_timeout ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q .; then
+    SERVER_PUBLIC_KEY=$(compose_timeout exec -T wireguard wg show wg0 public-key 2>/dev/null | tr -d '\r\n')
     if [[ -n "$SERVER_PUBLIC_KEY" ]]; then
         # Best-effort sync to server.pub. If the caller (e.g. the admin container
         # running as uid 1000) only has read perms on configs/ — set by bootstrap
@@ -154,22 +143,12 @@ log_info "Using server public key: $SERVER_PUBLIC_KEY"
 # Get server IP
 SERVER_IP="${SERVER_IP:-$(curl -s --max-time 5 https://api.ipify.org || echo "YOUR_SERVER_IP")}"
 
-# Build AllowedIPs (IPv4 + optional IPv6)
+# Build AllowedIPs (IPv4 + optional IPv6) — the wg0.conf append itself already
+# happened inside wireguard_add_peer.
 ALLOWED_IPS="$CLIENT_IP/32"
 if [[ -n "$CLIENT_IP_V6" ]]; then
     ALLOWED_IPS="$CLIENT_IP/32, $CLIENT_IP_V6/128"
 fi
-
-# Add peer to server config file
-cat >> "$WG_CONFIG_DIR/wg0.conf" <<EOF
-
-[Peer]
-# $USERNAME
-PublicKey = $CLIENT_PUBLIC_KEY
-AllowedIPs = $ALLOWED_IPS
-EOF
-
-log_info "Added peer to wg0.conf"
 
 # Generate the client configs (direct + optional IPv6 + wstunnel) via the shared
 # lib, so host and container WireGuard bundles are byte-identical. It reads the
@@ -183,11 +162,11 @@ WSTUNNEL_CMD="$(wstunnel_client_cmd)"
 
 # Hot-add peer to running WireGuard if available (unless --no-reload)
 if [[ "$NO_RELOAD" != "true" ]]; then
-    if docker compose ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q .; then
+    if compose_timeout ps wireguard --status running 2>/dev/null | tail -n +2 | grep -q .; then
         log_info "Adding peer to running WireGuard..."
 
         # Use wg set to add peer dynamically
-        if docker compose exec -T wireguard wg set wg0 peer "$CLIENT_PUBLIC_KEY" allowed-ips "$ALLOWED_IPS" 2>/dev/null; then
+        if compose_timeout exec -T wireguard wg set wg0 peer "$CLIENT_PUBLIC_KEY" allowed-ips "$ALLOWED_IPS" 2>/dev/null; then
             log_info "Peer added to running WireGuard (hot reload)"
         else
             log_info "Hot reload failed, you may need to restart WireGuard"

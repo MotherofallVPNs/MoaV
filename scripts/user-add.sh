@@ -34,18 +34,8 @@ source scripts/lib/masterdns.sh
 source scripts/lib/gooserelay.sh
 source scripts/lib/telemt.sh
 
-compose_timeout() {
-    if command -v timeout >/dev/null 2>&1; then
-        # -k: if `docker compose` ignores the SIGTERM at the deadline (e.g. it's
-        # stuck in `exec` against a wedged container — the AmneziaWG hot-reload
-        # hang), SIGKILL it 5s later so `user add` can never block indefinitely.
-        # (No global stdin redirect here — callers like `echo KEY | ... awg pubkey`
-        # rely on the piped stdin.)
-        timeout -k 5 "${COMPOSE_TIMEOUT:-20}" docker compose "$@"
-    else
-        docker compose "$@"
-    fi
-}
+# compose_timeout moved to scripts/lib/common.sh (shared with wg-user-add.sh,
+# which had the same wedge-prone bare `docker compose exec` calls).
 
 # Parse arguments
 USERNAMES=()

@@ -82,6 +82,20 @@ net_next_free_octet() {
     printf '%s\n' "$next"
 }
 
+# docker compose with a hard deadline, for host scripts that touch running
+# containers. -k: if `docker compose` ignores the SIGTERM at the deadline (e.g.
+# it's stuck in `exec` against a wedged container — the AmneziaWG hot-reload
+# hang, #220), SIGKILL it 5s later so provisioning can never block
+# indefinitely. (No global stdin redirect here — callers like
+# `echo KEY | ... awg pubkey` rely on the piped stdin.)
+compose_timeout() {
+    if command -v timeout >/dev/null 2>&1; then
+        timeout -k 5 "${COMPOSE_TIMEOUT:-20}" docker compose "$@"
+    else
+        docker compose "$@"
+    fi
+}
+
 # The admin container's fixed uid/gid (Dockerfile.admin: adduser -u 2000).
 # Bundles and user state must be writable by the non-root admin app AND by the
 # root-run provisioning paths; the old answer was chmod 777 / a+rwX, which left
