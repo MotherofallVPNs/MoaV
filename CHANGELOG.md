@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **User bundles show only the protocols the user actually has (#73).** The README guide used to render every protocol section, with "No X config available" filler for anything disabled — a 12-protocol wall where half the entries were dead. Each section and its table-of-contents entry (English and Farsi) is now hidden when the user's bundle has no artifact for that protocol, keyed on the same per-user files the config values already read. `subscription.txt` is untouched (same unconditional format, so `moav-client` and V2Ray apps see no change). Migration for existing users: `moav regenerate-users` — and `moav update` now detects bundle-guide/renderer changes and lists that step in its post-update instructions.
+
+
 ### Fixed
 - **Hardened the whole state↔.env generated-secret desync class (the Reality short_id total-outage family).** Generated secrets live in `state/keys`, but docker-compose injects them into the bootstrap container from `.env` — usually empty, since the values are not in `.env`. A render that read the empty injected value silently blanked the secret; for the Reality short_id that rejected *every* client with no error anywhere (PR #152 fixed only Reality, only in two spots). Now a single `load_state_secrets` re-sources the entire class (reality, clash-api, cdn, shadowsocks PSK) from state right before every render, and a post-render assert aborts the bootstrap if state holds a Reality short_id or private key the rendered config does not contain — refusing to ship a config that would silently reject everyone. `moav doctor` gained a matching config↔state short_id check.
 

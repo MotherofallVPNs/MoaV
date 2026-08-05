@@ -51,6 +51,8 @@ jobs:
         run: bash tests/env-example-test.sh
       - name: reality short_id desync guard
         run: bash tests/reality-desync-test.sh
+      - name: bundle enabled-only (#73)
+        run: bash tests/bundle-enabled-only-test.sh
       - name: docker management-plane isolation
         run: bash tests/network-isolation-test.sh
       - name: monitoring socket removal

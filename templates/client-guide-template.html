@@ -619,22 +619,22 @@
             <h3>Quick Navigation</h3>
             <ul class="toc-list">
                 <li style="{{MAHSANET_DISPLAY}}"><a href="#en" onclick="scrollToSection('mahsang-en')"> Import All ★ <span class="toc-badge badge-primary">V2Ray sub</span></a></li>
-                <li><a href="#en" onclick="scrollToSection('reality-en')">1. Reality (VLESS) <span class="toc-badge badge-primary">Primary</span></a></li>
-                <li><a href="#en" onclick="scrollToSection('hysteria2-en')">2. Hysteria2 <span class="toc-badge badge-secondary">Fast</span></a></li>
-                <li><a href="#en" onclick="scrollToSection('trojan-en')">3. Trojan <span class="toc-badge badge-secondary">Backup</span></a></li>
-                <li><a href="#en" onclick="scrollToSection('anytls-en')">3c. AnyTLS <span class="toc-badge badge-secondary">Anti-Fingerprint</span></a></li>
-                <li><a href="#en" onclick="scrollToSection('shadowsocks-en')">3b. Shadowsocks-2022</a></li>
-                <li><a href="#en" onclick="scrollToSection('cdn-en')">4. CDN VLESS+WS <span class="toc-badge badge-secondary">IP Blocked?</span></a></li>
-                <li><a href="#en" onclick="scrollToSection('xhttp-en')">4b. XHTTP <span class="toc-badge badge-secondary">Xray-core</span></a></li>
-                <li><a href="#en" onclick="scrollToSection('amneziawg-en')">5. AmneziaWG <span class="toc-badge badge-secondary">Anti-DPI</span></a></li>
-                <li><a href="#en" onclick="scrollToSection('wireguard-en')">6. WireGuard <span class="toc-badge badge-secondary">Full VPN</span></a></li>
-                <li><a href="#en" onclick="scrollToSection('trusttunnel-en')">7. TrustTunnel <span class="toc-badge badge-secondary">Stealth VPN</span></a></li>
-                <li><a href="#en" onclick="scrollToSection('dns-tunnel-en')">8. DNS Tunnel <span class="toc-badge badge-fallback">Last Resort</span></a></li>
+                <li style="{{REALITY_DISPLAY}}"><a href="#en" onclick="scrollToSection('reality-en')">1. Reality (VLESS) <span class="toc-badge badge-primary">Primary</span></a></li>
+                <li style="{{HYSTERIA2_DISPLAY}}"><a href="#en" onclick="scrollToSection('hysteria2-en')">2. Hysteria2 <span class="toc-badge badge-secondary">Fast</span></a></li>
+                <li style="{{TROJAN_DISPLAY}}"><a href="#en" onclick="scrollToSection('trojan-en')">3. Trojan <span class="toc-badge badge-secondary">Backup</span></a></li>
+                <li style="{{ANYTLS_DISPLAY}}"><a href="#en" onclick="scrollToSection('anytls-en')">3c. AnyTLS <span class="toc-badge badge-secondary">Anti-Fingerprint</span></a></li>
+                <li style="{{SHADOWSOCKS_DISPLAY}}"><a href="#en" onclick="scrollToSection('shadowsocks-en')">3b. Shadowsocks-2022</a></li>
+                <li style="{{CDN_DISPLAY}}"><a href="#en" onclick="scrollToSection('cdn-en')">4. CDN VLESS+WS <span class="toc-badge badge-secondary">IP Blocked?</span></a></li>
+                <li style="{{XHTTP_DISPLAY}}"><a href="#en" onclick="scrollToSection('xhttp-en')">4b. XHTTP <span class="toc-badge badge-secondary">Xray-core</span></a></li>
+                <li style="{{AMNEZIAWG_DISPLAY}}"><a href="#en" onclick="scrollToSection('amneziawg-en')">5. AmneziaWG <span class="toc-badge badge-secondary">Anti-DPI</span></a></li>
+                <li style="{{WIREGUARD_DISPLAY}}"><a href="#en" onclick="scrollToSection('wireguard-en')">6. WireGuard <span class="toc-badge badge-secondary">Full VPN</span></a></li>
+                <li style="{{TRUSTTUNNEL_DISPLAY}}"><a href="#en" onclick="scrollToSection('trusttunnel-en')">7. TrustTunnel <span class="toc-badge badge-secondary">Stealth VPN</span></a></li>
+                <li style="{{DNSTT_DISPLAY}}"><a href="#en" onclick="scrollToSection('dns-tunnel-en')">8. DNS Tunnel <span class="toc-badge badge-fallback">Last Resort</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('slipstream-en')">8b. Slipstream <span class="toc-badge badge-fallback">Fast DNS</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('xdns-en')">8c. XDNS <span class="toc-badge badge-fallback">mKCP DNS</span></a></li>
                 <li style="{{MASTERDNS_DISPLAY}}"><a href="#en" onclick="scrollToSection('masterdns-en')">8d. MasterDNS <span class="toc-badge badge-fallback">DNS · MahsaNG</span></a></li>
                 <li style="{{GOOSERELAY_DISPLAY}}"><a href="#en" onclick="scrollToSection('gooserelay-en')">8e. GooseRelay <span class="toc-badge badge-standalone">via Google</span></a></li>
-                <li><a href="#en" onclick="scrollToSection('telemt-en')">9. Telegram MTProxy <span class="toc-badge badge-secondary">Telegram</span></a></li>
+                <li style="{{TELEMT_DISPLAY}}"><a href="#en" onclick="scrollToSection('telemt-en')">9. Telegram MTProxy <span class="toc-badge badge-secondary">Telegram</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('tor-en')">10. Tor <span class="toc-badge badge-standalone">Standalone</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('psiphon-en')">11. Psiphon <span class="toc-badge badge-standalone">Standalone</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('apps-en')">Recommended Apps</a></li>
@@ -678,7 +678,7 @@
         </div>
 
         <!-- Reality (VLESS) -->
-        <details class="protocol-section" id="reality-en">
+        <details class="protocol-section" id="reality-en" style="{{REALITY_DISPLAY}}">
             <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>1. Reality (VLESS)</h2>
@@ -715,7 +715,7 @@
         </details>
 
         <!-- Hysteria2 -->
-        <details class="protocol-section" id="hysteria2-en">
+        <details class="protocol-section" id="hysteria2-en" style="{{HYSTERIA2_DISPLAY}}">
             <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>2. Hysteria2</h2>
@@ -746,7 +746,7 @@
         </details>
 
         <!-- Trojan -->
-        <details class="protocol-section" id="trojan-en">
+        <details class="protocol-section" id="trojan-en" style="{{TROJAN_DISPLAY}}">
             <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>3. Trojan</h2>
@@ -783,7 +783,7 @@
         </details>
 
         <!-- AnyTLS -->
-        <details class="protocol-section" id="anytls-en">
+        <details class="protocol-section" id="anytls-en" style="{{ANYTLS_DISPLAY}}">
             <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>3c. AnyTLS</h2>
@@ -818,7 +818,7 @@
         </details>
 
         <!-- Shadowsocks-2022 -->
-        <details class="protocol-section" id="shadowsocks-en">
+        <details class="protocol-section" id="shadowsocks-en" style="{{SHADOWSOCKS_DISPLAY}}">
             <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>3b. Shadowsocks-2022</h2>
@@ -848,7 +848,7 @@
         </details>
 
         <!-- CDN VLESS+WS -->
-        <details class="protocol-section" id="cdn-en">
+        <details class="protocol-section" id="cdn-en" style="{{CDN_DISPLAY}}">
             <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>4. CDN VLESS+WS</h2>
@@ -891,7 +891,7 @@
         </details>
 
         <!-- XHTTP (Xray-core) -->
-        <details class="protocol-section" id="xhttp-en">
+        <details class="protocol-section" id="xhttp-en" style="{{XHTTP_DISPLAY}}">
             <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>4b. XHTTP</h2>
@@ -931,7 +931,7 @@
         </details>
 
         <!-- AmneziaWG -->
-        <div class="protocol-section" id="amneziawg-en">
+        <div class="protocol-section" id="amneziawg-en" style="{{AMNEZIAWG_DISPLAY}}">
             <div class="protocol-header">
                 <div class="protocol-title">
                     <h2>5. AmneziaWG</h2>
@@ -968,7 +968,7 @@
         </div>
 
         <!-- WireGuard -->
-        <div class="protocol-section" id="wireguard-en">
+        <div class="protocol-section" id="wireguard-en" style="{{WIREGUARD_DISPLAY}}">
             <div class="protocol-header">
                 <div class="protocol-title">
                     <h2>6. WireGuard</h2>
@@ -1043,7 +1043,7 @@
         </div>
 
         <!-- TrustTunnel -->
-        <div class="protocol-section" id="trusttunnel-en">
+        <div class="protocol-section" id="trusttunnel-en" style="{{TRUSTTUNNEL_DISPLAY}}">
             <div class="protocol-header">
                 <div class="protocol-title">
                     <h2>7. TrustTunnel</h2>
@@ -1093,7 +1093,7 @@
         </div>
 
         <!-- DNS Tunnel -->
-        <div class="protocol-section" id="dns-tunnel-en">
+        <div class="protocol-section" id="dns-tunnel-en" style="{{DNSTT_DISPLAY}}">
             <div class="protocol-header">
                 <div class="protocol-title">
                     <h2>8. DNS Tunnel</h2>
@@ -1266,7 +1266,7 @@
         </div>
 
         <!-- Telegram MTProxy -->
-        <div class="protocol-section" id="telemt-en">
+        <div class="protocol-section" id="telemt-en" style="{{TELEMT_DISPLAY}}">
             <div class="protocol-header">
                 <div class="protocol-title">
                     <h2>9. Telegram MTProxy</h2>
@@ -1557,22 +1557,22 @@
             <h3>فهرست</h3>
             <ul class="toc-list">
                 <li style="{{MAHSANET_DISPLAY}}"><a href="#fa" onclick="scrollToSection('mahsang-fa')">Import All ★<span class="toc-badge badge-primary">اشتراک V2Ray</span></a></li>
-                <li><a href="#fa" onclick="scrollToSection('reality-fa')">۱. Reality (VLESS) <span class="toc-badge badge-primary">اصلی</span></a></li>
-                <li><a href="#fa" onclick="scrollToSection('hysteria2-fa')">۲. Hysteria2 <span class="toc-badge badge-secondary">سریع</span></a></li>
-                <li><a href="#fa" onclick="scrollToSection('trojan-fa')">۳. Trojan <span class="toc-badge badge-secondary">پشتیبان</span></a></li>
-                <li><a href="#fa" onclick="scrollToSection('anytls-fa')">۳پ. AnyTLS <span class="toc-badge badge-secondary">ضد اثرانگشت</span></a></li>
-                <li><a href="#fa" onclick="scrollToSection('shadowsocks-fa')">۳ب. Shadowsocks-2022</a></li>
-                <li><a href="#fa" onclick="scrollToSection('cdn-fa')">۴. CDN VLESS+WS <span class="toc-badge badge-secondary">IP مسدود؟</span></a></li>
-                <li><a href="#fa" onclick="scrollToSection('xhttp-fa')">۴ب. XHTTP <span class="toc-badge badge-secondary">Xray-core</span></a></li>
-                <li><a href="#fa" onclick="scrollToSection('amneziawg-fa')">۵. AmneziaWG <span class="toc-badge badge-secondary">ضد فیلتر</span></a></li>
-                <li><a href="#fa" onclick="scrollToSection('wireguard-fa')">۶. WireGuard <span class="toc-badge badge-secondary">VPN کامل</span></a></li>
-                <li><a href="#fa" onclick="scrollToSection('trusttunnel-fa')">۷. TrustTunnel <span class="toc-badge badge-secondary">VPN مخفی</span></a></li>
-                <li><a href="#fa" onclick="scrollToSection('dns-tunnel-fa')">۸. تونل DNS <span class="toc-badge badge-fallback">آخرین راه‌حل</span></a></li>
+                <li style="{{REALITY_DISPLAY}}"><a href="#fa" onclick="scrollToSection('reality-fa')">۱. Reality (VLESS) <span class="toc-badge badge-primary">اصلی</span></a></li>
+                <li style="{{HYSTERIA2_DISPLAY}}"><a href="#fa" onclick="scrollToSection('hysteria2-fa')">۲. Hysteria2 <span class="toc-badge badge-secondary">سریع</span></a></li>
+                <li style="{{TROJAN_DISPLAY}}"><a href="#fa" onclick="scrollToSection('trojan-fa')">۳. Trojan <span class="toc-badge badge-secondary">پشتیبان</span></a></li>
+                <li style="{{ANYTLS_DISPLAY}}"><a href="#fa" onclick="scrollToSection('anytls-fa')">۳پ. AnyTLS <span class="toc-badge badge-secondary">ضد اثرانگشت</span></a></li>
+                <li style="{{SHADOWSOCKS_DISPLAY}}"><a href="#fa" onclick="scrollToSection('shadowsocks-fa')">۳ب. Shadowsocks-2022</a></li>
+                <li style="{{CDN_DISPLAY}}"><a href="#fa" onclick="scrollToSection('cdn-fa')">۴. CDN VLESS+WS <span class="toc-badge badge-secondary">IP مسدود؟</span></a></li>
+                <li style="{{XHTTP_DISPLAY}}"><a href="#fa" onclick="scrollToSection('xhttp-fa')">۴ب. XHTTP <span class="toc-badge badge-secondary">Xray-core</span></a></li>
+                <li style="{{AMNEZIAWG_DISPLAY}}"><a href="#fa" onclick="scrollToSection('amneziawg-fa')">۵. AmneziaWG <span class="toc-badge badge-secondary">ضد فیلتر</span></a></li>
+                <li style="{{WIREGUARD_DISPLAY}}"><a href="#fa" onclick="scrollToSection('wireguard-fa')">۶. WireGuard <span class="toc-badge badge-secondary">VPN کامل</span></a></li>
+                <li style="{{TRUSTTUNNEL_DISPLAY}}"><a href="#fa" onclick="scrollToSection('trusttunnel-fa')">۷. TrustTunnel <span class="toc-badge badge-secondary">VPN مخفی</span></a></li>
+                <li style="{{DNSTT_DISPLAY}}"><a href="#fa" onclick="scrollToSection('dns-tunnel-fa')">۸. تونل DNS <span class="toc-badge badge-fallback">آخرین راه‌حل</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('slipstream-fa')">۸ب. Slipstream <span class="toc-badge badge-fallback">DNS سریع</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('xdns-fa')">۸پ. XDNS <span class="toc-badge badge-fallback">DNS با mKCP</span></a></li>
                 <li style="{{MASTERDNS_DISPLAY}}"><a href="#fa" onclick="scrollToSection('masterdns-fa')">۸ت. MasterDNS <span class="toc-badge badge-fallback">DNS Tunnel</span></a></li>
                 <li style="{{GOOSERELAY_DISPLAY}}"><a href="#fa" onclick="scrollToSection('gooserelay-fa')">۸ث. GooseRelay <span class="toc-badge badge-standalone">از طریق گوگل</span></a></li>
-                <li><a href="#fa" onclick="scrollToSection('telemt-fa')">۹. Telegram MTProxy <span class="toc-badge badge-secondary">فقط تلگرام</span></a></li>
+                <li style="{{TELEMT_DISPLAY}}"><a href="#fa" onclick="scrollToSection('telemt-fa')">۹. Telegram MTProxy <span class="toc-badge badge-secondary">فقط تلگرام</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('tor-fa')">۱۰. Tor <span class="toc-badge badge-standalone">مستقل</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('psiphon-fa')">۱۱. Psiphon <span class="toc-badge badge-standalone">مستقل</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('apps-fa')">اپلیکیشن‌ها</a></li>
@@ -1616,7 +1616,7 @@
         </div>
 
         <!-- Reality (VLESS) -->
-        <details class="protocol-section" id="reality-fa">
+        <details class="protocol-section" id="reality-fa" style="{{REALITY_DISPLAY}}">
             <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>۱. Reality (VLESS)</h2>
@@ -1653,7 +1653,7 @@
         </details>
 
         <!-- Hysteria2 -->
-        <details class="protocol-section" id="hysteria2-fa">
+        <details class="protocol-section" id="hysteria2-fa" style="{{HYSTERIA2_DISPLAY}}">
             <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>۲. Hysteria2</h2>
@@ -1684,7 +1684,7 @@
         </details>
 
         <!-- Trojan -->
-        <details class="protocol-section" id="trojan-fa">
+        <details class="protocol-section" id="trojan-fa" style="{{TROJAN_DISPLAY}}">
             <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>۳. Trojan</h2>
@@ -1721,7 +1721,7 @@
         </details>
 
         <!-- AnyTLS -->
-        <details class="protocol-section" id="anytls-fa">
+        <details class="protocol-section" id="anytls-fa" style="{{ANYTLS_DISPLAY}}">
             <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>۳پ. AnyTLS</h2>
@@ -1756,7 +1756,7 @@
         </details>
 
         <!-- Shadowsocks-2022 -->
-        <details class="protocol-section" id="shadowsocks-fa">
+        <details class="protocol-section" id="shadowsocks-fa" style="{{SHADOWSOCKS_DISPLAY}}">
             <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>۳ب. Shadowsocks-2022</h2>
@@ -1786,7 +1786,7 @@
         </details>
 
         <!-- CDN VLESS+WS -->
-        <details class="protocol-section" id="cdn-fa">
+        <details class="protocol-section" id="cdn-fa" style="{{CDN_DISPLAY}}">
             <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>۴. CDN VLESS+WS</h2>
@@ -1829,7 +1829,7 @@
         </details>
 
         <!-- XHTTP (Xray-core) -->
-        <details class="protocol-section" id="xhttp-fa">
+        <details class="protocol-section" id="xhttp-fa" style="{{XHTTP_DISPLAY}}">
             <summary class="protocol-header">
                 <div class="protocol-title">
                     <h2>۴ب. XHTTP</h2>
@@ -1869,7 +1869,7 @@
         </details>
 
         <!-- AmneziaWG -->
-        <div class="protocol-section" id="amneziawg-fa">
+        <div class="protocol-section" id="amneziawg-fa" style="{{AMNEZIAWG_DISPLAY}}">
             <div class="protocol-header">
                 <div class="protocol-title">
                     <h2>۵. AmneziaWG</h2>
@@ -1906,7 +1906,7 @@
         </div>
 
         <!-- WireGuard -->
-        <div class="protocol-section" id="wireguard-fa">
+        <div class="protocol-section" id="wireguard-fa" style="{{WIREGUARD_DISPLAY}}">
             <div class="protocol-header">
                 <div class="protocol-title">
                     <h2>۶. WireGuard</h2>
@@ -1981,7 +1981,7 @@
         </div>
 
         <!-- TrustTunnel -->
-        <div class="protocol-section" id="trusttunnel-fa">
+        <div class="protocol-section" id="trusttunnel-fa" style="{{TRUSTTUNNEL_DISPLAY}}">
             <div class="protocol-header">
                 <div class="protocol-title">
                     <h2>۷. TrustTunnel</h2>
@@ -2031,7 +2031,7 @@
         </div>
 
         <!-- DNS Tunnel -->
-        <div class="protocol-section" id="dns-tunnel-fa">
+        <div class="protocol-section" id="dns-tunnel-fa" style="{{DNSTT_DISPLAY}}">
             <div class="protocol-header">
                 <div class="protocol-title">
                     <h2>۸. تونل DNS</h2>
@@ -2201,7 +2201,7 @@
         </div>
 
         <!-- Telegram MTProxy -->
-        <div class="protocol-section" id="telemt-fa">
+        <div class="protocol-section" id="telemt-fa" style="{{TELEMT_DISPLAY}}">
             <div class="protocol-header">
                 <div class="protocol-title">
                     <h2>۹. Telegram MTProxy</h2>

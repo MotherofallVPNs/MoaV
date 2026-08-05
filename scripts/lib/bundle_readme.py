@@ -45,6 +45,10 @@ def val_or(value, fallback):
     return value if value else fallback
 
 
+def _hide(name):       # "" (show) if the artifact exists in the bundle, else CSS hide
+    return "" if os.path.isfile(os.path.join(OUT, name)) else "display:none"
+
+
 # MasterDNS/GooseRelay can't be generated on the host path (server-shared key
 # lives in the state volume) — nudge to regenerate-users there; else "not enabled".
 def absent_extra(label):
@@ -141,6 +145,23 @@ repl = {
     "MASTERDNS_DISPLAY": "" if md else "display:none",
     "CONFIG_GOOSERELAY": val_or(gr, absent_extra("GooseRelay")),
     "GOOSERELAY_DISPLAY": "" if gr else "display:none",
+
+    # #73: hide a protocol's whole section + its TOC entry when the user's
+    # bundle has no artifact for it (a disabled/not-running protocol), instead
+    # of showing a "No X config available" null section. Keyed on the real
+    # per-user artifact file — the same signal the CONFIG_* values read above.
+    "REALITY_DISPLAY":     _hide("reality.txt"),
+    "HYSTERIA2_DISPLAY":   _hide("hysteria2.txt"),
+    "TROJAN_DISPLAY":      _hide("trojan.txt"),
+    "ANYTLS_DISPLAY":      _hide("anytls.txt"),
+    "SHADOWSOCKS_DISPLAY": _hide("shadowsocks.txt"),
+    "CDN_DISPLAY":         "" if cdn else "display:none",
+    "XHTTP_DISPLAY":       _hide("xhttp-vless.txt"),
+    "AMNEZIAWG_DISPLAY":   _hide("amneziawg.conf"),
+    "WIREGUARD_DISPLAY":   _hide("wireguard.conf"),
+    "TRUSTTUNNEL_DISPLAY": _hide("trusttunnel.txt"),
+    "DNSTT_DISPLAY":       _hide("dnstt-instructions.txt"),
+    "TELEMT_DISPLAY":      _hide("telegram-proxy-link.txt"),
 
     "TRUSTTUNNEL_PASSWORD": val_or(os.environ.get("RB_USER_PASSWORD", ""), "See trusttunnel.json"),
     "DEMO_NOTICE_EN": demo_en,
