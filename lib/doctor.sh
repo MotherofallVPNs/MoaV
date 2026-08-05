@@ -962,7 +962,7 @@ EOF
         state_sid=$(docker run --rm -v moav_moav_state:/state alpine sh -c \
             'grep "^REALITY_SHORT_ID=" /state/keys/reality.env 2>/dev/null | cut -d= -f2-' 2>/dev/null | tr -d '\r\n ')
         if [[ -n "$state_sid" && -f "$rcfg" ]]; then
-            if grep -qF "$state_sid" "$rcfg"; then
+            if grep -qF -- "$state_sid" "$rcfg"; then
                 echo -e "    ${GREEN}✓${NC} Reality short_id in config.json matches state"
             else
                 echo -e "    ${RED}✗${NC} Reality short_id from state is ABSENT in config.json"

@@ -62,6 +62,22 @@ else
     ok "desynced config (empty short_id) is caught and aborts"
 fi
 
+# Base64url secret starting with '-': grep must treat it as a pattern, not an
+# option (grep -qF --). This false-positived in e2e and aborted a healthy
+# bootstrap — the short_id is hex so it never tripped, but the private key can
+# start with '-'.
+cat > "$STATE_DIR/keys/reality.env" <<EOF
+REALITY_SHORT_ID=abcd1234
+REALITY_PRIVATE_KEY=-Xleadingdashkey123
+EOF
+dash="$WORK/dash.json"
+printf '{"inbounds":[{"tls":{"reality":{"short_id":["abcd1234"],"private_key":"-Xleadingdashkey123"}}}]}\n' > "$dash"
+if ( assert_reality_in_render "$dash" ) 2>/dev/null; then
+    ok "leading-dash private key present → passes (grep -qF -- honored)"
+else
+    bad "leading-dash private key wrongly rejected — grep parsed it as an option (missing --)"
+fi
+
 # When state short_id is empty (deliberate empty-short_id setup), no false abort.
 echo "REALITY_SHORT_ID=" > "$STATE_DIR/keys/reality.env"
 if ( assert_reality_in_render "$bad_cfg" ) 2>/dev/null; then

@@ -57,13 +57,13 @@ assert_reality_in_render() {
     local sid pk
     sid=$(source "$STATE_DIR/keys/reality.env"; printf '%s' "${REALITY_SHORT_ID:-}")
     pk=$(source "$STATE_DIR/keys/reality.env"; printf '%s' "${REALITY_PRIVATE_KEY:-}")
-    if [[ -n "$sid" ]] && ! grep -qF "$sid" "$cfg"; then
+    if [[ -n "$sid" ]] && ! grep -qF -- "$sid" "$cfg"; then
         log_error "FATAL: Reality short_id from state is absent in $cfg."
         log_error "  The render read an empty value instead of state — every Reality client"
         log_error "  would be rejected (PR #152 class). Not writing a silently-broken config."
         exit 1
     fi
-    if [[ -n "$pk" ]] && ! grep -qF "$pk" "$cfg"; then
+    if [[ -n "$pk" ]] && ! grep -qF -- "$pk" "$cfg"; then
         log_error "FATAL: Reality private key from state is absent in $cfg — Reality would not authenticate."
         exit 1
     fi
