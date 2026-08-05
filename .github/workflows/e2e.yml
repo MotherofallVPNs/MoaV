@@ -331,8 +331,8 @@ jobs:
           # HOLLOW-RUN GUARD. `skip` never counted as failure, so a broken
           # bootstrap that left every protocol unconfigured produced all-skip
           # and passed green — the run tested nothing. (This actually shipped:
-          # ENABLE_ANYTLS=true broke sing-box config generation, every protocol
-          # skipped, e2e stayed green.) Require the core sing-box protocols that
+          # skipped, e2e stayed green (this shipped once and drove this guard's
+          # creation). Require the core sing-box protocols that run in EVERY
           # run in EVERY domain pass to actually PASS. reality+ss also run in
           # the domainless pass, so gate the domain-only ones on DOMAIN.
           require_pass() {
