@@ -427,10 +427,11 @@ fi
 # inline copy of telemt_add_user_to_config; using the lib removes the duplication
 # and gains idempotency -- telemt_generate_secret reuses an existing secret rather
 # than minting a new one, so re-running no longer invalidates the user's bundle.
-if [[ "${ENABLE_TELEMT:-true}" == "true" ]] && [[ -f "configs/telemt/config.toml" ]]; then
+TELEMT_CONFIG="configs/telemt/config.toml"  # referenced again by the reload + share-link blocks below
+if [[ "${ENABLE_TELEMT:-true}" == "true" ]] && [[ -f "$TELEMT_CONFIG" ]]; then
     log_info "Adding $USERNAME to telemt..."
     telemt_generate_secret "$USERNAME"
-    telemt_add_user_to_config "$USERNAME" "$TELEMT_SECRET" "configs/telemt/config.toml"
+    telemt_add_user_to_config "$USERNAME" "$TELEMT_SECRET" "$TELEMT_CONFIG"
 fi
 
 # Try to reload sing-box (hot reload) unless --no-reload was passed
