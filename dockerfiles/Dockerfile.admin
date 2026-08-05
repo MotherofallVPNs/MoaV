@@ -12,7 +12,9 @@ RUN apk add --no-cache \
     libqrencode-tools \
     su-exec
 
-RUN addgroup -S moav && adduser -S moav -G moav
+# Fixed uid/gid: host-side scripts chown bundles/state to 2000:2000 so the
+# non-root app keeps rw without world-writable modes (see grant_admin_rw).
+RUN addgroup -S -g 2000 moav && adduser -S -u 2000 -G moav moav
 
 WORKDIR /app
 

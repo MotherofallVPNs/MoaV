@@ -115,6 +115,9 @@ rm -f "$OUTPUT_ZIP"
 # Clean up temp directory
 rm -rf "$TEMP_DIR"
 
+# The zip bundles every client key; admin-owned, no world bits
+grant_admin_rw "$OUTPUT_ZIP"
+
 log_info "  Zip created"
 
 # -----------------------------------------------------------------------------

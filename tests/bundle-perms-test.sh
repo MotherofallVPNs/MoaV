@@ -1,0 +1,88 @@
+#!/bin/bash
+# Regression test for world-writable user bundles.
+#
+# outputs/bundles (client private keys, share URIs) and state/users were held
+# together with chmod 777 / chmod -R a+rwX so the non-root admin app and the
+# root-run provisioning paths could both write. Any local account could read
+# AND MODIFY every user's keys. The fix pins the admin user to uid/gid 2000
+# (Dockerfile.admin), root-run paths chown to it via grant_admin_rw, and every
+# world bit is stripped.
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+pass=0; fail=0
+ok()  { printf '  ok    %s\n' "$1"; pass=$((pass+1)); }
+bad() { printf '  FAIL  %s\n' "$1"; fail=$((fail+1)); }
+mode() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" 2>/dev/null; }
+
+echo "bundle permission tests"
+
+log_info() { :; }   # stub before sourcing
+# shellcheck disable=SC1091
+source "$ROOT/scripts/lib/common.sh" 2>/dev/null || { echo "cannot source common.sh"; exit 1; }
+
+# --- grant_admin_rw: functional (chmod half; the chown half needs root and is
+# --- asserted statically below) -------------------------------------------
+T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+mkdir -p "$T/bundle/user1"
+echo key > "$T/bundle/user1/wg.conf"
+chmod 777 "$T/bundle" "$T/bundle/user1"
+chmod 666 "$T/bundle/user1/wg.conf"
+
+grant_admin_rw "$T/bundle"
+
+m=$(mode "$T/bundle/user1/wg.conf")
+[[ "${m: -1}" == "0" ]] && ok "world bits stripped from bundle file ($m)" \
+                        || bad "bundle file still world-accessible ($m)"
+m=$(mode "$T/bundle/user1")
+[[ "${m: -1}" == "0" ]] && ok "world bits stripped from bundle dir ($m)" \
+                        || bad "bundle dir still world-accessible ($m)"
+[[ -w "$T/bundle/user1/wg.conf" ]] && ok "owner keeps write" || bad "owner lost write"
+
+grant_admin_rw "$T/bundle"
+[[ $? -eq 0 ]] && ok "second pass is idempotent (exit 0)" || bad "second pass returned non-zero"
+
+grant_admin_rw "$T/nope"
+[[ $? -eq 0 ]] && ok "missing path is a clean no-op" || bad "missing path returned non-zero"
+
+# --- the uid contract both sides depend on --------------------------------
+grep -qE 'adduser .*-u 2000' "$ROOT/dockerfiles/Dockerfile.admin" \
+    && ok "Dockerfile.admin pins the moav user to uid 2000" \
+    || bad "admin uid is not pinned — grant_admin_rw chowns to 2000 for nobody"
+grep -q 'ADMIN_UID=2000' "$ROOT/scripts/lib/common.sh" \
+    && ok "grant_admin_rw targets uid 2000" \
+    || bad "ADMIN_UID drifted from the Dockerfile's uid 2000"
+
+# --- no world-writable modes may come back --------------------------------
+loose=$(grep -rnE 'chmod[^#]*(777|666|a\+rwX|a\+w|o\+w)' --include='*.sh' "$ROOT/scripts" "$ROOT/lib" 2>/dev/null \
+        | grep -vE '^\S+:[0-9]+:\s*#' || true)
+[[ -z "$loose" ]] && ok "no world-writable chmod in scripts/ or lib/" \
+                  || bad "world-writable chmod reintroduced: $loose"
+
+grep -E '^[^#]*chown[^#]*0:1000' "$ROOT/scripts/bootstrap.sh" >/dev/null \
+    && bad "bootstrap.sh still chowns to gid 1000 — the admin user never had it" \
+    || ok "bootstrap.sh no longer chowns to the phantom gid 1000"
+
+# --- the paths that used the crutches must now use the grant --------------
+grep -q 'grant_admin_rw' "$ROOT/scripts/user-add.sh" \
+    && ok "user-add.sh grants the bundle to the admin uid" \
+    || bad "user-add.sh no longer calls grant_admin_rw — root-created bundles lock the admin out"
+grep -q 'grant_admin_rw' "$ROOT/scripts/user-package.sh" \
+    && ok "user-package.sh grants the zip to the admin uid" \
+    || bad "user-package.sh zip stays root-owned world-readable"
+
+# --- monitoring configs must stay world-readable (grafana 472 / prom 65534)
+if grep -E 'chmod -R (ug\+rwX,)?o-rwx' "$ROOT/scripts/admin-entrypoint.sh" | grep -q 'monitoring'; then
+    bad "admin entrypoint strips world-read from configs/monitoring — grafana/prometheus cannot read their configs"
+else
+    ok "admin entrypoint leaves configs/monitoring world-readable"
+fi
+if grep -E 'o-rwx' "$ROOT/scripts/bootstrap.sh" | grep -q 'monitoring'; then
+    bad "bootstrap strips world-read from configs/monitoring — grafana/prometheus cannot read their configs"
+else
+    ok "bootstrap leaves configs/monitoring world-readable"
+fi
+
+echo ""
+echo "  $pass passed, $fail failed"
+[[ $fail -eq 0 ]]

@@ -203,14 +203,18 @@ FAILED_USERS=()
 
 # Ensure directories exist and are writable (Docker creates them as root)
 # Try: direct mkdir → sudo mkdir → su-exec root mkdir (admin container has su-exec)
+# Root-owned dirs are chowned to the admin uid (was chmod 777 — world-writable
+# bundles hold client private keys).
 _fix_perms() {
     local dir="$1"
     mkdir -p "$dir" 2>/dev/null || \
         sudo mkdir -p "$dir" 2>/dev/null || \
         su-exec root mkdir -p "$dir" 2>/dev/null || true
     if [[ -d "$dir" ]] && [[ ! -w "$dir" ]]; then
-        sudo chmod 777 "$dir" 2>/dev/null || \
-            su-exec root chmod 777 "$dir" 2>/dev/null || true
+        sudo chown "$ADMIN_UID:$ADMIN_GID" "$dir" 2>/dev/null || \
+            su-exec root chown "$ADMIN_UID:$ADMIN_GID" "$dir" 2>/dev/null || true
+        sudo chmod 770 "$dir" 2>/dev/null || \
+            su-exec root chmod 770 "$dir" 2>/dev/null || true
     fi
 }
 
@@ -220,16 +224,19 @@ done
 # Also fix state/ parent and config files that may be root-owned
 for _dir in "state" "configs/amneziawg" "configs/wireguard"; do
     _fix_perms "$_dir"
-    # Fix root-owned config files so we can append peers
+    # Fix root-owned config files so we can append peers (owner change, not a
+    # world-writable 666 — wg0.conf/awg0.conf hold the server private key)
     for _f in "$_dir"/*.conf; do
         if [[ -f "$_f" ]] && [[ ! -w "$_f" ]]; then
-            sudo chmod 666 "$_f" 2>/dev/null || \
-                su-exec root chmod 666 "$_f" 2>/dev/null || true
+            sudo chown "$ADMIN_UID:$ADMIN_GID" "$_f" 2>/dev/null || \
+                su-exec root chown "$ADMIN_UID:$ADMIN_GID" "$_f" 2>/dev/null || true
+            sudo chmod 660 "$_f" 2>/dev/null || \
+                su-exec root chmod 660 "$_f" 2>/dev/null || true
         fi
     done
 done
 if [[ ! -w "outputs/bundles" ]]; then
-    log_error "Cannot write to outputs/bundles/ — try: sudo chmod 777 outputs/bundles"
+    log_error "Cannot write to outputs/bundles/ — try: sudo chown -R $ADMIN_UID:$ADMIN_GID outputs/bundles && sudo chmod -R ug+rwX outputs/bundles"
     exit 1
 fi
 
@@ -431,6 +438,10 @@ fi
     # -------------------------------------------------------------------------
     # Summary for this user
     # -------------------------------------------------------------------------
+    # Root-run paths (bootstrap container, host) leave root-owned files the
+    # admin app could not touch; hand the bundle + state to the admin uid with
+    # no world bits.
+    grant_admin_rw "$OUTPUT_DIR" "$STATE_DIR/users/$USERNAME"
     echo ""
     if [[ ${#ERRORS[@]} -gt 0 ]]; then
         log_error "User '$USERNAME' failed: ${ERRORS[*]}"

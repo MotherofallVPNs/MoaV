@@ -68,9 +68,10 @@ fi
 # Create directories (may need sudo if Docker created parent as root)
 mkdir -p "$OUTPUT_DIR" 2>/dev/null || sudo mkdir -p "$OUTPUT_DIR" 2>/dev/null || true
 mkdir -p "$STATE_DIR/users/$USERNAME" 2>/dev/null || sudo mkdir -p "$STATE_DIR/users/$USERNAME" 2>/dev/null || true
-# Ensure writable
+# Ensure writable by the admin uid — no world bits (was chmod 777)
 if [[ ! -w "$STATE_DIR/users/$USERNAME" ]]; then
-    sudo chmod 777 "$STATE_DIR/users/$USERNAME" 2>/dev/null || true
+    sudo chown "$ADMIN_UID:$ADMIN_GID" "$STATE_DIR/users/$USERNAME" 2>/dev/null || true
+    sudo chmod 770 "$STATE_DIR/users/$USERNAME" 2>/dev/null || true
 fi
 
 # Check if user already exists in config (jq, whitespace-insensitive — the

@@ -66,12 +66,15 @@ else
     echo "[admin] SSL: no certificate found - the dashboard will refuse to start"
 fi
 
-# Ensure required directories exist and are writable by moav user
-# Use chmod 777 instead of chown — more reliable across Docker volume mount scenarios
+# Ensure required directories exist and are writable by the moav user (fixed
+# uid 2000, matching grant_admin_rw on the host side). No world bits: bundles
+# hold client private keys, and a+rwX let any local account read and modify
+# them. configs/monitoring is deliberately not touched — grafana (uid 472) and
+# prometheus (65534) need world-read there.
 mkdir -p /project/outputs/bundles /project/state/users /project/configs/amneziawg /project/configs/wireguard 2>/dev/null || true
 chown -R moav:moav /project/outputs /project/configs /project/state 2>/dev/null || true
-chmod -R a+rwX /project/outputs /project/state 2>/dev/null || true
-chmod -R a+rwX /project/configs/sing-box /project/configs/xray /project/configs/amneziawg /project/configs/wireguard /project/configs/trusttunnel /project/configs/telemt 2>/dev/null || true
+chmod -R ug+rwX,o-rwx /project/outputs /project/state 2>/dev/null || true
+chmod -R ug+rwX,o-rwx /project/configs/sing-box /project/configs/xray /project/configs/amneziawg /project/configs/wireguard /project/configs/trusttunnel /project/configs/telemt 2>/dev/null || true
 
 # Read the Clash API secret as root and hand it to the app via env — the state
 # file is 0600 root-only and the app below runs as the non-root moav user.

@@ -1031,6 +1031,12 @@ services:
       - all
 
   cadvisor:
+    # ACCEPTED EXCEPTION: privileged + read-only host mounts (incl. the raw
+    # docker socket). cAdvisor cannot produce per-container cpu/memory/disk
+    # stats without cgroup, /sys and docker-state access; this is its upstream
+    # deployment mode. Scope limits: every mount is :ro, its API is read-only
+    # metrics on an internal port, and the whole service only exists under the
+    # opt-in `monitoring` profile — disable monitoring and it is gone.
     # Use IMAGE_CADVISOR env var, or build locally with: moav build --local
     image: ${IMAGE_CADVISOR:-gcr.io/cadvisor/cadvisor:latest}
     container_name: moav-cadvisor

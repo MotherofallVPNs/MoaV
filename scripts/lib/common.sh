@@ -82,6 +82,26 @@ net_next_free_octet() {
     printf '%s\n' "$next"
 }
 
+# The admin container's fixed uid/gid (Dockerfile.admin: adduser -u 2000).
+# Bundles and user state must be writable by the non-root admin app AND by the
+# root-run provisioning paths; the old answer was chmod 777 / a+rwX, which left
+# client private keys readable and writable by every local account.
+ADMIN_UID=2000
+ADMIN_GID=2000
+
+# Make paths admin-owned with no world bits. Root callers (bootstrap container,
+# host scripts under sudo) get the full chown; the admin app itself already
+# writes as uid 2000, so its chown failure is harmless and the chmod still
+# strips world access from what it owns.
+grant_admin_rw() {
+    local p
+    for p in "$@"; do
+        [[ -e "$p" ]] || continue
+        chown -R "$ADMIN_UID:$ADMIN_GID" "$p" 2>/dev/null || true
+        chmod -R ug+rwX,o-rwx "$p" 2>/dev/null || true
+    done
+}
+
 # Secret material under state/keys must not be world-readable.
 #
 # Files created with `(umask 077 && ...)` came out 0600 correctly, but everything

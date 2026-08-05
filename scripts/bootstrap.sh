@@ -976,12 +976,18 @@ fi
 provision_all_users "" "/configs/sing-box/config.json" "/configs/xray/config.json" "$STATE_DIR/users"
 
 # -----------------------------------------------------------------------------
-# Fix permissions on generated configs (admin container runs as non-root uid 1000)
+# Fix permissions on generated configs. The admin app runs as uid 2000 (the old
+# `0:1000` chown targeted a gid the admin user never had — world-read was doing
+# all the work). Strip world bits from the sensitive trees; configs/monitoring
+# keeps world-read because grafana (uid 472) and prometheus (65534) read it.
 # -----------------------------------------------------------------------------
-chown -R 0:1000 /configs/ 2>/dev/null || true
-chmod -R g+r /configs/ 2>/dev/null || true
-chown -R 0:1000 /outputs/ 2>/dev/null || true
-chmod -R g+r /outputs/ 2>/dev/null || true
+chown -R "$ADMIN_UID:$ADMIN_GID" /configs/ /outputs/ 2>/dev/null || true
+chmod -R ug+rwX /configs/ /outputs/ 2>/dev/null || true
+chmod -R o-rwx /outputs/ 2>/dev/null || true
+for _d in sing-box xray amneziawg wireguard trusttunnel telemt; do
+    # `|| true`: a missing dir fails the && list, fatal under set -e
+    [[ -d "/configs/$_d" ]] && chmod -R o-rwx "/configs/$_d" 2>/dev/null || true
+done
 
 # state/keys is deliberately NOT part of the g+r pass above: the admin container
 # must read /configs and /outputs, but nothing needs group or world read on the

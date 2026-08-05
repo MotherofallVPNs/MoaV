@@ -326,6 +326,13 @@ MoaV/
 - Minimal logging (no URLs, no content)
 - TLS 1.3 everywhere
 
+**Container privileges.** Docker API access is confined to a filtered socket
+proxy on a management-only network, and the monitoring exporters read published
+state files instead of the socket. The one accepted exception is **cAdvisor**
+(optional `monitoring` profile): per-container CPU/memory/disk stats require
+privileged mode with read-only host mounts, which is its upstream deployment
+mode. If that trade-off is not acceptable, run without the monitoring profile.
+
 See the [OPSEC guide](https://moav.sh/docs/OPSEC) for security guidelines.
 
 ## License
