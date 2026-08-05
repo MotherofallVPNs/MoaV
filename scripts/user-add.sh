@@ -142,7 +142,10 @@ for _f in configs/sing-box/config.json configs/xray/config.json \
     # owner root + group admin write, never world-write. wg0.conf/awg0.conf
     # (server private keys, container-root consumers) drop world-read too; the
     # other four are read by non-root daemons and keep it.
-    if [[ -f "$_f" ]]; then
+    # Only when WE cannot write it: chowning to root while running non-root
+    # (e2e runner, sudo-less operator) would revoke our own access mid-run —
+    # container-facing ownership is re-asserted by every `moav up` anyway.
+    if [[ -f "$_f" ]] && [[ ! -w "$_f" ]]; then
         case "$_f" in
             configs/wireguard/*|configs/amneziawg/*) _m=660 ;;
             *)                                       _m=664 ;;
