@@ -54,10 +54,27 @@ grep -q 'ADMIN_UID=2000' "$ROOT/scripts/lib/common.sh" \
     || bad "ADMIN_UID drifted from the Dockerfile's uid 2000"
 
 # --- no world-writable modes may come back --------------------------------
-loose=$(grep -rnE 'chmod[^#]*(777|666|a\+rwX|a\+w|o\+w)' --include='*.sh' "$ROOT/scripts" "$ROOT/lib" 2>/dev/null \
+# Any `a+` grant counts: the first version of this check matched a+w/a+rwX and
+# sailed straight past a `chmod a+rw` on the six protocol config files.
+loose=$(grep -rnE 'chmod[^#]*(777|666|a\+|o\+w)' --include='*.sh' "$ROOT/scripts" "$ROOT/lib" 2>/dev/null \
         | grep -vE '^\S+:[0-9]+:\s*#' || true)
 [[ -z "$loose" ]] && ok "no world-writable chmod in scripts/ or lib/" \
                   || bad "world-writable chmod reintroduced: $loose"
+
+# --- configs must be OWNED BY ROOT, not the admin uid ---------------------
+# wireguard/amneziawg/telemt/xray run cap_drop ALL without DAC_OVERRIDE, so
+# their in-container root cannot bypass file modes: with o-rwx configs it can
+# only read as OWNER. Chowning configs to uid 2000 crash-looped the WireGuard
+# container ("Config file not found") in e2e.
+if grep -qE 'chown -R root:moav /project/configs' "$ROOT/scripts/admin-entrypoint.sh" \
+   && ! grep -qE 'chown -R moav:moav[^#]*/project/configs' "$ROOT/scripts/admin-entrypoint.sh"; then
+    ok "admin entrypoint keeps configs owner root (cap-dropped containers read as owner)"
+else
+    bad "admin entrypoint chowns configs away from root — DAC-less container roots lose read"
+fi
+grep -qE 'chown -R "0:\$ADMIN_GID" /configs/' "$ROOT/scripts/bootstrap.sh" \
+    && ok "bootstrap keeps configs owner root" \
+    || bad "bootstrap no longer chowns configs to 0:\$ADMIN_GID — DAC-less container roots lose read"
 
 grep -E '^[^#]*chown[^#]*0:1000' "$ROOT/scripts/bootstrap.sh" >/dev/null \
     && bad "bootstrap.sh still chowns to gid 1000 — the admin user never had it" \

@@ -139,7 +139,11 @@ done
 for _f in configs/sing-box/config.json configs/xray/config.json \
           configs/wireguard/wg0.conf configs/amneziawg/awg0.conf \
           configs/trusttunnel/credentials.toml configs/telemt/config.toml; do
-    [[ -f "$_f" ]] && chmod a+rw "$_f" 2>/dev/null || true
+    # owner root (DAC-less container reads) + group admin write, no world bits
+    if [[ -f "$_f" ]]; then
+        chown "0:$ADMIN_GID" "$_f" 2>/dev/null || sudo chown "0:$ADMIN_GID" "$_f" 2>/dev/null || true
+        chmod 660 "$_f" 2>/dev/null || sudo chmod 660 "$_f" 2>/dev/null || true
+    fi
 done
 
 # Load environment
@@ -207,13 +211,17 @@ FAILED_USERS=()
 # world-writable bundles hold client private keys): the invoking user and the
 # uid-2000 admin app can both write, nobody else can even read.
 _fix_perms() {
-    local dir="$1"
+    local dir="$1" _owner
+    # configs are read by cap_drop-ALL containers whose root lacks DAC_OVERRIDE:
+    # owner must stay root (they read as owner); the admin app writes via group.
+    # Everything else goes to the caller so direct host runs keep working.
+    case "$dir" in configs/*) _owner=0 ;; *) _owner=$(id -u) ;; esac
     mkdir -p "$dir" 2>/dev/null || \
         sudo mkdir -p "$dir" 2>/dev/null || \
         su-exec root mkdir -p "$dir" 2>/dev/null || true
     if [[ -d "$dir" ]] && [[ ! -w "$dir" ]]; then
-        sudo chown "$(id -u):$ADMIN_GID" "$dir" 2>/dev/null || \
-            su-exec root chown "$(id -u):$ADMIN_GID" "$dir" 2>/dev/null || true
+        sudo chown "$_owner:$ADMIN_GID" "$dir" 2>/dev/null || \
+            su-exec root chown "$_owner:$ADMIN_GID" "$dir" 2>/dev/null || true
         sudo chmod 2770 "$dir" 2>/dev/null || \
             su-exec root chmod 2770 "$dir" 2>/dev/null || true
     fi
@@ -229,8 +237,8 @@ for _dir in "state" "configs/amneziawg" "configs/wireguard"; do
     # world-writable 666 — wg0.conf/awg0.conf hold the server private key)
     for _f in "$_dir"/*.conf; do
         if [[ -f "$_f" ]] && [[ ! -w "$_f" ]]; then
-            sudo chown "$(id -u):$ADMIN_GID" "$_f" 2>/dev/null || \
-                su-exec root chown "$(id -u):$ADMIN_GID" "$_f" 2>/dev/null || true
+            sudo chown "0:$ADMIN_GID" "$_f" 2>/dev/null || \
+                su-exec root chown "0:$ADMIN_GID" "$_f" 2>/dev/null || true
             sudo chmod 660 "$_f" 2>/dev/null || \
                 su-exec root chmod 660 "$_f" 2>/dev/null || true
         fi

@@ -743,6 +743,16 @@ repair_bundle_perms() {
         chown -R 2000:2000 "$p" 2>/dev/null || true
         chmod -R ug+rwX,o-rwx "$p" 2>/dev/null || true
     done
+    # configs: owner root — wireguard/amneziawg/telemt/xray run cap_drop ALL
+    # without DAC_OVERRIDE, so their in-container root reads only as owner; the
+    # admin app writes via group 2000. Running this before compose up closes
+    # the window where a container reads its config before the admin
+    # entrypoint's own repair lands.
+    for p in sing-box xray amneziawg wireguard trusttunnel telemt; do
+        [[ -d "$SCRIPT_DIR/configs/$p" ]] || continue
+        chown -R 0:2000 "$SCRIPT_DIR/configs/$p" 2>/dev/null || true
+        chmod -R ug+rwX,o-rwx "$SCRIPT_DIR/configs/$p" 2>/dev/null || true
+    done
 }
 
 # Tighten private key material in the state volume to 0600. The equivalent call

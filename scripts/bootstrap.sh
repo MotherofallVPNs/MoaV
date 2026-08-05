@@ -981,7 +981,10 @@ provision_all_users "" "/configs/sing-box/config.json" "/configs/xray/config.jso
 # all the work). Strip world bits from the sensitive trees; configs/monitoring
 # keeps world-read because grafana (uid 472) and prometheus (65534) read it.
 # -----------------------------------------------------------------------------
-chown -R "$ADMIN_UID:$ADMIN_GID" /configs/ /outputs/ 2>/dev/null || true
+chown -R "$ADMIN_UID:$ADMIN_GID" /outputs/ 2>/dev/null || true
+# configs owner stays root: cap_drop-ALL containers without DAC_OVERRIDE
+# (wireguard, amneziawg, telemt, xray) read their config as owner root.
+chown -R "0:$ADMIN_GID" /configs/ 2>/dev/null || true
 chmod -R ug+rwX /configs/ /outputs/ 2>/dev/null || true
 chmod -R o-rwx /outputs/ 2>/dev/null || true
 for _d in sing-box xray amneziawg wireguard trusttunnel telemt; do

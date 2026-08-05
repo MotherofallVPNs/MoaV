@@ -72,7 +72,11 @@ fi
 # them. configs/monitoring is deliberately not touched — grafana (uid 472) and
 # prometheus (65534) need world-read there.
 mkdir -p /project/outputs/bundles /project/state/users /project/configs/amneziawg /project/configs/wireguard 2>/dev/null || true
-chown -R moav:moav /project/outputs /project/configs /project/state 2>/dev/null || true
+chown -R moav:moav /project/outputs /project/state 2>/dev/null || true
+# configs keep OWNER root: wireguard/amneziawg/telemt/xray run cap_drop ALL
+# without DAC_OVERRIDE, so their in-container root cannot bypass file modes and
+# must read as owner. The admin app writes via group moav.
+chown -R root:moav /project/configs 2>/dev/null || true
 chmod -R ug+rwX,o-rwx /project/outputs /project/state 2>/dev/null || true
 chmod -R ug+rwX,o-rwx /project/configs/sing-box /project/configs/xray /project/configs/amneziawg /project/configs/wireguard /project/configs/trusttunnel /project/configs/telemt 2>/dev/null || true
 

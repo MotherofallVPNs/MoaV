@@ -42,7 +42,11 @@ fi
 for _f in configs/sing-box/config.json configs/xray/config.json \
           configs/wireguard/wg0.conf configs/amneziawg/awg0.conf \
           configs/trusttunnel/credentials.toml configs/telemt/config.toml; do
-    [[ -f "$_f" ]] && chmod a+rw "$_f" 2>/dev/null || true
+    # owner root (DAC-less container reads) + group admin write, no world bits
+    if [[ -f "$_f" ]]; then
+        chown "0:$ADMIN_GID" "$_f" 2>/dev/null || sudo chown "0:$ADMIN_GID" "$_f" 2>/dev/null || true
+        chmod 660 "$_f" 2>/dev/null || sudo chmod 660 "$_f" 2>/dev/null || true
+    fi
 done
 
 # Load environment
