@@ -163,6 +163,10 @@ if [ -n "$certs" ]; then
 else
     echo "[grafana] SSL: Disabled (no certificates found)"
     export GF_SERVER_PROTOCOL=http
+    # Define it empty: the readability check below reads $GF_SERVER_CERT_KEY,
+    # which is unset on this branch and aborts under `set -u`, making the whole
+    # HTTP-fallback block unreachable.
+    export GF_SERVER_CERT_KEY=""
 fi
 
 # Test certificate readability and fall back to HTTP if not readable

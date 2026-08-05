@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Three strict-mode crashes in cert-wait/fallback paths (grafana, grafana-proxy, trusttunnel).** D4c enabled `set -e`/`-u` on these but left code written for a tolerant shell in the branches that only run *before* Let's Encrypt has issued, invisible to the happy-path e2e. grafana-proxy had the unguarded `certs=$(find_certificates)` that was fixed in grafana but missed in its twin; grafana read `GF_SERVER_CERT_KEY` unbound on the no-cert path, making its HTTP fallback unreachable; and trusttunnel's `((CERT_WAIT_COUNT++))` returned non-zero from zero, killing its cert-wait one second in. Each crashed a fresh install until certbot succeeded.
+
 ### Added
 - **Community links in the CLI and README.** The `moav` banner and `moav help` footer now show the Telegram support channel (t.me/motherofallvpns) and Twitter/X; the README gained badges and a Community & support section.
 

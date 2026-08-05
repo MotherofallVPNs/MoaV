@@ -94,6 +94,29 @@ done
 # plain `var=$(cmd)` assignment propagates that (unlike `local x=$(cmd)`). Without
 # the guard, -e killed grafana on every install before certbot had issued, which
 # is exactly the state its wait loop exists to handle.
+# grafana-proxy has the SAME cert-wait pattern as grafana and had the SAME bug
+# (unguarded certs=$(find_certificates) under -eu). It was missed in D4c and only
+# fires before certbot issues, which the happy-path e2e never hits.
+if grep -qE 'certs=\$\(find_certificates\)$' "$ROOT/scripts/grafana-proxy-entrypoint.sh"; then
+    bad "grafana-proxy: unguarded certs=\$(find_certificates) -- dies before certbot issues"
+else
+    ok "grafana-proxy: cert lookup guarded (survives a pre-certbot install)"
+fi
+
+# grafana's HTTP-fallback branch reads GF_SERVER_CERT_KEY, which is only exported
+# on the cert-found branch; under -u the no-cert path aborted before reaching it.
+grep -q 'export GF_SERVER_CERT_KEY=""' "$ROOT/scripts/grafana-entrypoint.sh" \
+    && ok "grafana: GF_SERVER_CERT_KEY defined on the no-cert path (HTTP fallback reachable)" \
+    || bad "grafana: GF_SERVER_CERT_KEY unset on no-cert path -- aborts under -u before HTTP fallback"
+
+# trusttunnel: `((x++))` returns 1 when x is 0, fatal under -e, one second into its
+# own cert-wait loop.
+if grep -qE '\(\(CERT_WAIT_COUNT\+\+\)\)' "$ROOT/scripts/trusttunnel-entrypoint.sh"; then
+    bad "trusttunnel: ((CERT_WAIT_COUNT++)) returns 1 from 0 -- kills the cert wait under -e"
+else
+    ok "trusttunnel: counter increment is set -e safe"
+fi
+
 grep -q 'certs=$(find_certificates) || true' "$ROOT/scripts/grafana-entrypoint.sh" \
     && ok "grafana: cert lookup guarded (survives a pre-certbot install)" \
     || bad "grafana: unguarded certs=\$(find_certificates) — dies before certbot issues"

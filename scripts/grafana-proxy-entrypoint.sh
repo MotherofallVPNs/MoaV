@@ -45,7 +45,11 @@ find_certificates() {
 waited=0
 max_wait=30
 while [ $waited -lt $max_wait ]; do
-    certs=$(find_certificates)
+    # `|| true`: find_certificates returns 1 when no cert exists yet, and a plain
+    # var=$(cmd) propagates that (unlike `local x=$(cmd)`). Under -e this killed the
+    # proxy on every install before certbot issued -- the exact bug fixed in
+    # grafana-entrypoint.sh; it was missed here in D4c.
+    certs=$(find_certificates) || true
     if [ -n "$certs" ]; then
         break
     fi
@@ -54,7 +58,7 @@ while [ $waited -lt $max_wait ]; do
     waited=$((waited + 5))
 done
 
-certs=$(find_certificates)
+certs=$(find_certificates) || true
 if [ -z "$certs" ]; then
     echo "[grafana-proxy] ERROR: No certificates found, cannot start"
     exit 1
