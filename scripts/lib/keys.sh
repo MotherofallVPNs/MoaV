@@ -21,19 +21,27 @@ _keys_bin=""
 _keys_prefix=()   # command prefix as an array (empty for a local binary)
 _keys_resolve() {
     [[ -n "$_keys_resolved" ]] && return 0
+    # 60s, not 20: keygen is instant, but on a small box (1 vCPU / 1 GB) right
+    # after `moav start` the exec's cold-start under container-boot contention
+    # blew a 20s budget, so `moav user add` reported "no key generator" for
+    # wg/awg even though the container was healthy. Seen live on bitchat.
     local t=()
-    command -v timeout >/dev/null 2>&1 && t=(timeout -k 5 20)
+    command -v timeout >/dev/null 2>&1 && t=(timeout -k 5 60)
     if command -v wg >/dev/null 2>&1; then
         _keys_bin=wg; _keys_prefix=(); _keys_resolved=1; return 0
     fi
     if command -v awg >/dev/null 2>&1; then
         _keys_bin=awg; _keys_prefix=(); _keys_resolved=1; return 0
     fi
-    local pair svc bin
+    # Prefer `docker exec <container>` over `docker compose exec <service>`:
+    # compose re-parses the whole compose file on every call (~2x slower idle,
+    # far worse under load), and this runs three times per peer (ps + genkey +
+    # pubkey). Container names are deterministic (moav-<service>).
+    local pair svc bin cname
     for pair in "wireguard wg" "amneziawg awg"; do
-        svc=${pair% *}; bin=${pair#* }
-        if "${t[@]}" docker compose ps "$svc" --status running 2>/dev/null | tail -n +2 | grep -q .; then
-            _keys_bin="$bin"; _keys_prefix=("${t[@]}" docker compose exec -T "$svc"); _keys_resolved=1; return 0
+        svc=${pair% *}; bin=${pair#* }; cname="moav-$svc"
+        if "${t[@]}" docker ps --filter "name=^/${cname}$" --filter status=running -q 2>/dev/null | grep -q .; then
+            _keys_bin="$bin"; _keys_prefix=("${t[@]}" docker exec -i "$cname"); _keys_resolved=1; return 0
         fi
     done
     _keys_bin=wg; _keys_prefix=("${t[@]}" docker run --rm -i lscr.io/linuxserver/wireguard); _keys_resolved=1; return 0

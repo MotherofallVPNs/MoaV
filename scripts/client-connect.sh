@@ -982,7 +982,8 @@ connect_tor() {
     log_info "Note: Tor connects to its own network, not your MoaV server"
 
     if ! command -v snowflake-client >/dev/null 2>&1; then
-        log_error "snowflake-client not available"
+        log_error "snowflake-client is no longer bundled in the server's built-in client."
+        log_error "Use the standalone client for Tor/Snowflake: https://github.com/MotherofallVPNs/moav-client"
         return 1
     fi
 

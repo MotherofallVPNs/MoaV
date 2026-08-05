@@ -1362,8 +1362,7 @@ cmd_start() {
     fi
     # Show Conduit sharing hint if conduit was started
     if echo "$profiles" | grep -qE "conduit|all"; then
-        echo -e "  ${CYAN}Psiphon Conduit:${NC} serving Psiphon users (incl. Iran) via the public pool"
-        echo -e "  ${DIM}                  Claim link, QR & sharing guide: moav conduit link${NC}"
+        echo -e "  ${CYAN}Psiphon Conduit:${NC} claim link, QR & sharing guide: moav conduit link"
     fi
 
     if echo "$profiles" | grep -qE "admin|monitoring|proxy|all"; then

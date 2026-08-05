@@ -72,7 +72,8 @@ LATEST_VERSION=""
 goodbye() {
     echo ""
     echo -e "${CYAN}Goodbye! Stay safe out there.${NC}"
-    echo -e "${DIM}Questions or issues? https://t.me/motherofallvpns${NC}"
+    echo -e "${DIM}Questions: https://t.me/motherofallvpns${NC}"
+    echo -e "${DIM}Issues/bugs: https://github.com/MotherofallVPNs/MoaV/issues${NC}"
     echo ""
     exit 0
 }

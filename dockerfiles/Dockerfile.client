@@ -36,29 +36,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 go build -o /dnstt-client . || touch /dnstt-client
 
 # =============================================================================
-# Builder stage - build snowflake-client via Go module proxy
-# =============================================================================
-# Uses proxy.golang.org to bypass gitlab.torproject.org blocks (Russia, etc.)
-FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS snowflake-builder
-
-ARG TARGETARCH
-ARG TARGETOS=linux
-ARG SNOWFLAKE_VERSION=2.11.0
-
-# Go module fetch resilience (pipe = fall through on ANY error incl. 403).
-# See Dockerfile.xray for the full rationale. Override via .env.
-ARG GOPROXY="https://proxy.golang.org|https://goproxy.cn|direct"
-ARG GOSUMDB=off
-ENV GOPROXY=${GOPROXY} GOSUMDB=${GOSUMDB}
-
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 \
-    go install -ldflags="-s -w" \
-    gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/snowflake/v2/client@v${SNOWFLAKE_VERSION} && \
-    cp /go/bin/${TARGETOS}_${TARGETARCH}/client /go/bin/client 2>/dev/null || true
-
-# =============================================================================
 # Builder stage - download slipstream-client (Rust, glibc-linked)
 # Must run on Debian since the binary requires full glibc (__res_init, _Unwind_*)
 # =============================================================================
@@ -201,11 +178,11 @@ RUN ARCH=$(cat /tmp/arch) && \
     echo "wstunnel ${WSTUNNEL_VERSION} installed (${ARCH})" || \
     echo "wstunnel: download failed (optional, needed for WireGuard-wstunnel)"
 
-# snowflake-client: build via Go module proxy (bypasses gitlab.torproject.org blocks)
-COPY --from=snowflake-builder /go/bin/client /usr/local/bin/snowflake-client
-RUN chmod +x /usr/local/bin/snowflake-client && \
-    echo "snowflake-client installed" || \
-    echo "snowflake-client: not available (optional, needed for Tor)"
+# snowflake-client is intentionally NOT bundled here. This image's job is to
+# validate a user's server-side bundle + net perms (moav test) and connect
+# (moav client); Snowflake is a Tor pluggable transport that belongs to the
+# standalone MotherofallVPNs/moav-client, not the server's built-in tester.
+# Dropping it also removes a heavy Go build stage from every `moav test`.
 
 # dnstt-client: copy cross-compiled binary from builder
 COPY --from=dnstt-builder /dnstt-client /usr/local/bin/dnstt-client

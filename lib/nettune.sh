@@ -36,6 +36,17 @@ nt_buffer_max() {
     fi
 }
 
+# Human byte formatter: KiB under 1 MiB, else integer MiB. Keeps a 208 KiB
+# kernel default from printing as a confusing "0 MiB".
+nt_fmt_bytes() {
+    local b="${1:-0}"
+    if [[ "$b" -lt 1048576 ]]; then
+        echo "$((b / 1024)) KiB"
+    else
+        echo "$((b / 1048576)) MiB"
+    fi
+}
+
 # Render the sysctl bundle to stdout. Caller writes it to NT_CONF_PATH.
 # bmax = max for {r,w}mem_max + tcp_{r,w}mem high bound.
 nt_render_config() {
@@ -179,10 +190,13 @@ nt_status() {
     wmax=$(cat /proc/sys/net/core/wmem_max 2>/dev/null || echo 0)
     local expected
     expected=$(nt_buffer_max)
+    # Format sub-MiB values as KiB: the kernel default (~208 KiB) rendered as
+    # integer MiB printed "0 MiB", which reads like a broken probe rather than
+    # "buffer is small".
     if [[ "$rmax" -ge "$expected" && "$wmax" -ge "$expected" ]]; then
-        echo -e "    ${GREEN}✓${NC} rmem_max=$((rmax / 1048576)) MiB  wmem_max=$((wmax / 1048576)) MiB (expected ≥ $((expected / 1048576)) MiB)"
+        echo -e "    ${GREEN}✓${NC} rmem_max=$(nt_fmt_bytes "$rmax")  wmem_max=$(nt_fmt_bytes "$wmax") (expected ≥ $(nt_fmt_bytes "$expected"))"
     else
-        echo -e "    ${YELLOW}!${NC} buffers below recommended: rmem_max=$((rmax / 1048576)) MiB wmem_max=$((wmax / 1048576)) MiB (expected ≥ $((expected / 1048576)) MiB)"
+        echo -e "    ${YELLOW}!${NC} buffers below recommended: rmem_max=$(nt_fmt_bytes "$rmax") wmem_max=$(nt_fmt_bytes "$wmax") (expected ≥ $(nt_fmt_bytes "$expected"))"
         [[ "$applied" == "true" ]] && pass=false
     fi
 

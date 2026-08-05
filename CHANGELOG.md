@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **`moav user add` from the CLI could fail WireGuard/AmneziaWG right after `moav start`.** The key generator fell back to `docker compose exec` (which re-parses the whole compose file every call, three times per peer) under a 20s timeout; on a 1-vCPU/1-GB box still settling from a full start, that blew the budget and reported "no wg/awg key generator available" for a perfectly healthy container. It now uses `docker exec` by container name (no compose parse, ~2x faster idle and far more under load) with a 60s ceiling. The web admin was unaffected because it never hit the slow path. Found on the first live 1.9.1 upgrade.
+- **`moav doctor` printed network buffers as "0 MiB".** The kernel default (~208 KiB) integer-divided to 0 MiB, reading like a broken probe instead of "buffer is small". Sub-MiB values now print in KiB. (The BBR/qdisc/buffer lines remain advisory until `moav net apply` is run.)
+- **`moav test` reported WireGuard/AmneziaWG as a cryptic kernel error.** When the test host lacks the wg/awg kernel module the config is still validated, but the clear "no kernel module in this environment" note was overwritten by the raw `Unknown device type` text. The clear message is now primary and the raw error is demoted to context.
+
+### Changed
+- **`moav test` and the built-in client no longer bundle `snowflake-client`.** Snowflake is a Tor pluggable transport that belongs to the standalone `MotherofallVPNs/moav-client`; the server's built-in client exists to validate a user's bundle and the server's net perms. Dropping it removes a heavy Go build stage from every `moav test`.
+- **`moav build` now prunes the BuildKit cache when it finishes.** The cache had grown to ~4 GB on a live server (most of a "disk 81% full" scare) while images and logs were fine; nothing evicted it. Cache only — never images, which back the running stack and any rollback.
+- **Community links in `moav start` / `moav status` / goodbye now include GitHub issues.** The start success block and the status footer show Telegram, X and the GitHub issues URL; the exit banner points to Telegram for questions and GitHub for bugs. The marketing-flavored "serving Psiphon users (incl. Iran) via the public pool" line after start is gone; the useful `moav conduit link` hint stays.
+
+
+### Fixed
 - **Four upgrade regressions found on the first live 1.9.1 → v2 upgrade.** The key-permissions repair normalized modes but not OWNERSHIP: live installs carry state keys owned by old per-container uids (uid 999 from the v1 dnstt image), and a `cap_drop: ALL` container without `DAC_OVERRIDE` cannot read a 0600 file it does not own even as in-container root. The repair now chowns to root. Second, dnstt, masterdns and slipstream run their daemons as `USER moav` and read their own key directly, so those three keys stay 644 inside the state volume (the mount boundary is the control) — 0600 silently killed all three tunnels. Third, the singbox-exporter crash-looped on the now-0600 Clash secret file: it reads the env var first now (compose already passed it) and any file-read failure is non-fatal. Fourth, the xray access-log tailer could never read the log (xray-core creates it 0600 under xray's non-root uid; the exporter has no DAC_OVERRIDE) — the xray entrypoint now keeps it 644 — and a leftover `result.stderr` reference raised NameError on every stats poll.
 
 ### Added

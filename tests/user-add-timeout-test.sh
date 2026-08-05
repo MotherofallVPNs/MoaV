@@ -75,6 +75,22 @@ else
     ok "wg-user-add.sh does not mint its own keypair"
 fi
 
+# --- keygen resolver: docker exec by container name, not compose exec -------
+# `docker compose exec` re-parses the whole compose file per call; three calls
+# per peer under post-`moav start` load on a 1-vCPU box blew the timeout and
+# reported "no key generator" for a healthy container (#live-upgrade). Must use
+# `docker exec moav-<svc>` (deterministic name, no compose parse).
+if grep -qE 'docker exec -i "\$cname"|docker exec -i "moav-' "$ROOT/scripts/lib/keys.sh"; then
+    ok "keys.sh resolves via docker exec by container name"
+else
+    bad "keys.sh no longer uses docker exec by name — compose exec is slow enough to time out under load"
+fi
+if grep -E 'docker compose exec' "$ROOT/scripts/lib/keys.sh" | grep -qvE '^\s*#'; then
+    bad "keys.sh still has a docker compose exec keygen path — the slow call that timed out live"
+else
+    ok "keys.sh has no docker compose exec keygen path (comments aside)"
+fi
+
 echo ""
 echo "  $pass passed, $fail failed"
 [[ $fail -eq 0 ]]

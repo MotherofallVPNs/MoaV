@@ -61,9 +61,10 @@ version_gt() {
 }
 
 # Footer-style community links, shown after `moav start` success and at the
-# end of `moav status`.
+# end of `moav status`. GitHub is included for bug/issue reporting.
 print_community_links() {
     echo -e "  ${DIM}Community: https://t.me/motherofallvpns  |  https://x.com/motherofallvpns${NC}"
+    echo -e "  ${DIM}Issues/bugs: https://github.com/MotherofallVPNs/MoaV/issues${NC}"
 }
 
 print_header() {

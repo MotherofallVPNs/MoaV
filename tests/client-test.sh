@@ -1073,9 +1073,9 @@ test_wireguard() {
             # fail later at the handshake (which we DO mark fail, below). On a
             # host with kernel WireGuard (a real server) this path is skipped and
             # the test is fully live.
-            detail="No WireGuard capability in this environment (no kernel module / userspace impl); bring-up skipped"
+            detail="config valid; WireGuard tunnel not brought up (no kernel module / userspace impl in this environment)"
             if [[ -s "$error_log" ]]; then
-                detail="wg-quick could not bring up interface: $(tail -3 "$error_log" 2>/dev/null | tr '\n' ' ')"
+                detail="$detail [wg-quick: $(tail -3 "$error_log" 2>/dev/null | tr '\n' ' ')]"
             fi
             log_warn "$detail"
             RESULTS[wireguard]="warn"
@@ -1260,10 +1260,10 @@ test_amneziawg() {
         # (no awg kernel module / userspace impl) = WARN, not a protocol fault.
         # A live server with the module gets a real pass/fail from the exit-IP
         # check below.
-        detail="No AmneziaWG capability in this environment (no kernel module / userspace impl); bring-up skipped"
+        detail="config valid; AmneziaWG tunnel not brought up (no kernel module / userspace impl in this environment)"
         if [[ -s "$error_log" ]]; then
             local error_msg=$(tail -5 "$error_log" 2>/dev/null | tr '\n' ' ' || true)
-            detail="awg-quick could not bring up interface: $error_msg"
+            detail="$detail [awg-quick: $error_msg]"
         fi
         log_warn "$detail"
         RESULTS[amneziawg]="warn"

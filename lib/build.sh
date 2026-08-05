@@ -229,6 +229,21 @@ cmd_build() {
             return 0
         fi
     fi
+
+    prune_build_cache
+}
+
+# Reclaim BuildKit cache after a build. On the bitchat upgrade the build cache
+# had grown to ~4 GB (the bulk of a "disk 81% full" scare) while images and
+# logs were fine — every `moav build` layers more cache and nothing evicted it.
+# Cache only, never images: pulling the next build's base layers from cache is
+# a speed nicety, but images back the running stack and a possible rollback.
+prune_build_cache() {
+    command -v docker >/dev/null 2>&1 || return 0
+    local before after
+    before=$(docker system df --format '{{.Type}} {{.Reclaimable}}' 2>/dev/null | awk '/Build Cache/{print $3$4}')
+    docker builder prune -f >/dev/null 2>&1 || true
+    info "Pruned build cache${before:+ (was reclaiming $before)}"
 }
 
 # Map of services that can be built locally
