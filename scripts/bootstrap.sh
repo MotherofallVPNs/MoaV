@@ -156,6 +156,9 @@ mkdir -p "$STATE_DIR"/{users,keys}
 
 # Check if already bootstrapped
 if [[ -f "$STATE_DIR/.bootstrapped" ]]; then
+    # Repair key perms even when skipping the re-bootstrap: the call at the end
+    # of this script is unreachable for existing installs.
+    secure_state_keys "$STATE_DIR/keys"
     log_info "Already bootstrapped. To re-bootstrap, run:"
     log_info "  docker run --rm -v moav_moav_state:/state alpine rm /state/.bootstrapped"
     log_info "  docker compose --profile setup run --rm bootstrap"
@@ -238,11 +241,12 @@ if [[ "${ENABLE_REALITY:-true}" == "true" ]] || [[ "${ENABLE_TROJAN:-true}" == "
         log_info "Hysteria2 obfuscation password already exists, skipping generation"
     fi
 
-    # Save to state
-    cat > "$STATE_DIR/keys/clash-api.env" <<EOF
+    # Save to state (0600: the root admin entrypoint reads it, not the app user)
+    (umask 077 && cat > "$STATE_DIR/keys/clash-api.env" <<EOF
 CLASH_API_SECRET=$CLASH_API_SECRET
 HYSTERIA2_OBFS_PASSWORD=$HYSTERIA2_OBFS_PASSWORD
 EOF
+    )
 
     # Parse Reality target
     REALITY_TARGET_HOST=$(echo "${REALITY_TARGET:-dl.google.com:443}" | cut -d: -f1)

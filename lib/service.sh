@@ -730,6 +730,21 @@ ensure_conduit_lifetime_rules() {
     fi
 }
 
+# Tighten private key material in the state volume to 0600. The equivalent call
+# in bootstrap.sh is unreachable for already-bootstrapped installs (the
+# .bootstrapped guard exits first), so upgrades never got the rc.2 perms repair.
+# Runs on every start: idempotent, one alpine one-shot, mirrors
+# secure_state_keys' public-file skips.
+repair_state_key_perms() {
+    docker run --rm -v moav_moav_state:/state alpine sh -c '
+        cd /state/keys 2>/dev/null || exit 0
+        for f in *; do
+            [ -f "$f" ] || continue
+            case "$f" in *.pub|*.pub.hex|*-cert.pem|*.crt|*.csr) continue ;; esac
+            chmod 600 "$f"
+        done' 2>/dev/null || true
+}
+
 ensure_clash_api_secret() {
     local profiles="$1"
     local env_file="$SCRIPT_DIR/.env"
@@ -856,6 +871,8 @@ start_services() {
             return 1
         fi
     fi
+
+    repair_state_key_perms
 
     # Ensure CLASH_API_SECRET is configured for monitoring
     # Returns 1 if user declined monitoring when using 'all' profile
@@ -1234,6 +1251,8 @@ cmd_start() {
             exit 1
         fi
     fi
+
+    repair_state_key_perms
 
     # Ensure CLASH_API_SECRET is configured for monitoring
     # Returns 1 if user declined monitoring when using 'all' profile

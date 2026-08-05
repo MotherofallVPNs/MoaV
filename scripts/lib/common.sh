@@ -104,25 +104,10 @@ secure_state_keys() {
         base="$(basename "$f")"
         case "$base" in
             *.pub|*.pub.hex|*-cert.pem|*.crt|*.csr) continue ;;   # public by design
-            # EXCEPTION -- clash-api.env must stay group/world readable.
-            # admin/main.py reads it directly, and the admin container drops to a
-            # NON-root user (`exec su-exec moav …`, uid 100 / gid 101 on
-            # python:3.12-alpine), so 0600 root-owned locks it out and the
-            # container crash-loops with PermissionError. bootstrap's
-            # `chown -R 0:1000` never applied to it either -- /configs and
-            # /outputs only work for admin because they are world-readable.
-            # Tracked: admin should get this secret without a world-readable file.
-            #
-            # Actively RESTORE readability rather than merely skipping: an
-            # earlier build of this function already tightened the file, and the
-            # state volume persists across upgrades, so a plain `continue` would
-            # leave those installs permanently broken. Repair must be
-            # bidirectional to be a repair at all.
-            clash-api.env)
-                chmod 644 "$f" 2>/dev/null || true
-                continue
-                ;;
         esac
+        # clash-api.env is no longer an exception: the root admin entrypoint now
+        # reads it and hands the secret to the non-root app via env, so 0600 is
+        # safe. Requires an admin image built from this revision or later.
         # Only touch what is actually loose, so the log stays meaningful.
         #
         # `find -perm /077` is GNU-only: BSD/macOS find rejects it, the test

@@ -73,6 +73,11 @@ chown -R moav:moav /project/outputs /project/configs /project/state 2>/dev/null 
 chmod -R a+rwX /project/outputs /project/state 2>/dev/null || true
 chmod -R a+rwX /project/configs/sing-box /project/configs/xray /project/configs/amneziawg /project/configs/wireguard /project/configs/trusttunnel /project/configs/telemt 2>/dev/null || true
 
+# Read the Clash API secret as root and hand it to the app via env — the state
+# file is 0600 root-only and the app below runs as the non-root moav user.
+CLASH_API_SECRET=$(grep '^CLASH_API_SECRET=' /state/keys/clash-api.env 2>/dev/null | tail -1 | cut -d= -f2- || true)
+export CLASH_API_SECRET
+
 # Run the dashboard as non-root
 echo "[admin] Starting uvicorn server..."
 exec su-exec moav python main.py

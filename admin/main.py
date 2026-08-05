@@ -72,14 +72,17 @@ def get_system_uptime() -> int:
 SINGBOX_API = "http://moav-sing-box:9090"
 CLASH_SECRET = ""
 
-# Try to load Clash API secret
-try:
-    with open("/state/keys/clash-api.env") as f:
-        for line in f:
-            if line.startswith("CLASH_API_SECRET="):
-                CLASH_SECRET = line.split("=", 1)[1].strip()
-except FileNotFoundError:
-    pass
+# Prefer the env var handed over by the root entrypoint (the state file is 0600
+# root-only); the file read remains as a fallback and must never be fatal.
+CLASH_SECRET = os.environ.get("CLASH_API_SECRET", "").strip()
+if not CLASH_SECRET:
+    try:
+        with open("/state/keys/clash-api.env") as f:
+            for line in f:
+                if line.startswith("CLASH_API_SECRET="):
+                    CLASH_SECRET = line.split("=", 1)[1].strip()
+    except OSError:
+        pass
 
 # Current version
 CURRENT_VERSION = "unknown"

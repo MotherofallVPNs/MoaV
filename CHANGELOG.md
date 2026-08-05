@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **The Clash API secret file is now 0600 like every other key.** `clash-api.env` was the one deliberate world-readable exception under `state/keys` because the non-root admin app read it directly. The root admin entrypoint now reads it and hands the secret over via environment, so the exception (and the code that actively restored 0644 on every pass) is gone. Requires the admin image to be rebuilt, which `moav update` does.
+- **The key-permissions repair now actually reaches existing installs.** The rc.2 fix that tightened `state/keys` to 0600 only ran at the end of a fresh bootstrap; already-bootstrapped installs exit earlier and upgrades never run the bootstrap container at all, so the installs the repair was written for never got it. The repair now also runs inside the early-exit guard and, host-side, on every `moav up`/`moav start`.
+
 ### Changed
 - **Deduplicated the TrustTunnel... telemt user-add path.** `singbox-user-add.sh` had an inline copy of the telemt config mutation that duplicated `scripts/lib/telemt.sh` and drifted from it; the host caller now uses the shared `telemt_generate_secret` + `telemt_add_user_to_config` (the latter gained a config-path argument so host and container callers share it). Also fixes a latent bug: the inline version minted a fresh MTProxy secret on every re-run, invalidating the user's existing bundle; the lib path reuses the stored secret.
 
