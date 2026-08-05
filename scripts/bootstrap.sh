@@ -987,9 +987,14 @@ chown -R "$ADMIN_UID:$ADMIN_GID" /outputs/ 2>/dev/null || true
 chown -R "0:$ADMIN_GID" /configs/ 2>/dev/null || true
 chmod -R ug+rwX /configs/ /outputs/ 2>/dev/null || true
 chmod -R o-rwx /outputs/ 2>/dev/null || true
-for _d in sing-box xray amneziawg wireguard trusttunnel telemt; do
-    # `|| true`: a missing dir fails the && list, fatal under set -e
+# wireguard/amneziawg: container-root consumers, fully locked. The other four
+# run non-root daemons that must keep world-read; only world-write is stripped.
+# `|| true`: a missing dir fails the && list, fatal under set -e
+for _d in wireguard amneziawg; do
     [[ -d "/configs/$_d" ]] && chmod -R o-rwx "/configs/$_d" 2>/dev/null || true
+done
+for _d in sing-box xray trusttunnel telemt; do
+    [[ -d "/configs/$_d" ]] && chmod -R o+rX,o-w "/configs/$_d" 2>/dev/null || true
 done
 
 # state/keys is deliberately NOT part of the g+r pass above: the admin container

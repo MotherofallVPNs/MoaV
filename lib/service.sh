@@ -748,10 +748,17 @@ repair_bundle_perms() {
     # admin app writes via group 2000. Running this before compose up closes
     # the window where a container reads its config before the admin
     # entrypoint's own repair lands.
-    for p in sing-box xray amneziawg wireguard trusttunnel telemt; do
+    # wireguard/amneziawg: container-root consumers, fully locked. sing-box,
+    # xray, telemt, trusttunnel run non-root daemons that must keep world-read.
+    for p in wireguard amneziawg; do
         [[ -d "$SCRIPT_DIR/configs/$p" ]] || continue
         chown -R 0:2000 "$SCRIPT_DIR/configs/$p" 2>/dev/null || true
         chmod -R ug+rwX,o-rwx "$SCRIPT_DIR/configs/$p" 2>/dev/null || true
+    done
+    for p in sing-box xray trusttunnel telemt; do
+        [[ -d "$SCRIPT_DIR/configs/$p" ]] || continue
+        chown -R 0:2000 "$SCRIPT_DIR/configs/$p" 2>/dev/null || true
+        chmod -R ug+rwX,o+rX,o-w "$SCRIPT_DIR/configs/$p" 2>/dev/null || true
     done
 }
 

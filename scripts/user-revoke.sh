@@ -42,10 +42,16 @@ fi
 for _f in configs/sing-box/config.json configs/xray/config.json \
           configs/wireguard/wg0.conf configs/amneziawg/awg0.conf \
           configs/trusttunnel/credentials.toml configs/telemt/config.toml; do
-    # owner root (DAC-less container reads) + group admin write, no world bits
+    # owner root + group admin write, never world-write. wg0.conf/awg0.conf
+    # (server private keys, container-root consumers) drop world-read too; the
+    # other four are read by non-root daemons and keep it.
     if [[ -f "$_f" ]]; then
+        case "$_f" in
+            configs/wireguard/*|configs/amneziawg/*) _m=660 ;;
+            *)                                       _m=664 ;;
+        esac
         chown "0:$ADMIN_GID" "$_f" 2>/dev/null || sudo chown "0:$ADMIN_GID" "$_f" 2>/dev/null || true
-        chmod 660 "$_f" 2>/dev/null || sudo chmod 660 "$_f" 2>/dev/null || true
+        chmod "$_m" "$_f" 2>/dev/null || sudo chmod "$_m" "$_f" 2>/dev/null || true
     fi
 done
 

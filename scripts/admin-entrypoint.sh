@@ -78,7 +78,11 @@ chown -R moav:moav /project/outputs /project/state 2>/dev/null || true
 # must read as owner. The admin app writes via group moav.
 chown -R root:moav /project/configs 2>/dev/null || true
 chmod -R ug+rwX,o-rwx /project/outputs /project/state 2>/dev/null || true
-chmod -R ug+rwX,o-rwx /project/configs/sing-box /project/configs/xray /project/configs/amneziawg /project/configs/wireguard /project/configs/trusttunnel /project/configs/telemt 2>/dev/null || true
+# wireguard/amneziawg are consumed by container-root: fully locked. sing-box,
+# xray, telemt and trusttunnel run their daemons as non-root uids and must
+# keep world-READ; only world-write (the actual bug) is stripped.
+chmod -R ug+rwX,o-rwx /project/configs/wireguard /project/configs/amneziawg 2>/dev/null || true
+chmod -R ug+rwX,o+rX,o-w /project/configs/sing-box /project/configs/xray /project/configs/trusttunnel /project/configs/telemt 2>/dev/null || true
 
 # Read the Clash API secret as root and hand it to the app via env — the state
 # file is 0600 root-only and the app below runs as the non-root moav user.

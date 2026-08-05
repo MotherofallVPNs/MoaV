@@ -76,6 +76,26 @@ grep -qE 'chown -R "0:\$ADMIN_GID" /configs/' "$ROOT/scripts/bootstrap.sh" \
     && ok "bootstrap keeps configs owner root" \
     || bad "bootstrap no longer chowns configs to 0:\$ADMIN_GID — DAC-less container roots lose read"
 
+# --- the world-read split -------------------------------------------------
+# wireguard/amneziawg configs (server private keys) are consumed by
+# container-root: fully locked. sing-box/xray/telemt/trusttunnel run their
+# daemons as NON-root uids and crash-looped in e2e when world-read was
+# stripped ("Permission denied" reading their config) — they keep o+rX and
+# lose only o-w.
+for f in "$ROOT/scripts/admin-entrypoint.sh" "$ROOT/lib/service.sh" "$ROOT/scripts/bootstrap.sh"; do
+    b=$(basename "$f")
+    if grep -E 'o-rwx' "$f" | grep -vE '^\s*#' | grep -qE 'sing-box|xray|trusttunnel|telemt'; then
+        bad "$b strips world-read from a non-root-daemon config dir — sing-box/xray/telemt/trusttunnel crash-loop"
+    else
+        ok "$b keeps world-read on the non-root-daemon config dirs"
+    fi
+    if grep -E 'o\+rX' "$f" | grep -vE '^\s*#' | grep -qE 'wireguard|amneziawg'; then
+        bad "$b grants world-read on configs/wireguard or amneziawg — server private keys exposed"
+    else
+        ok "$b keeps configs/wireguard + amneziawg fully locked"
+    fi
+done
+
 grep -E '^[^#]*chown[^#]*0:1000' "$ROOT/scripts/bootstrap.sh" >/dev/null \
     && bad "bootstrap.sh still chowns to gid 1000 — the admin user never had it" \
     || ok "bootstrap.sh no longer chowns to the phantom gid 1000"
