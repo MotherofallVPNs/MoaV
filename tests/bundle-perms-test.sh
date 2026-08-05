@@ -71,6 +71,15 @@ grep -q 'grant_admin_rw' "$ROOT/scripts/user-package.sh" \
     && ok "user-package.sh grants the zip to the admin uid" \
     || bad "user-package.sh zip stays root-owned world-readable"
 
+# Existing installs keep 777 bundles unless something repairs them: the admin
+# entrypoint covers admin-enabled installs, the host start path covers the rest.
+if grep -q 'repair_bundle_perms()' "$ROOT/lib/service.sh" \
+   && [[ $(grep -cE '^\s*repair_bundle_perms$' "$ROOT/lib/service.sh") -ge 2 ]]; then
+    ok "moav start paths repair bundle perms (covers upgrades)"
+else
+    bad "lib/service.sh start paths do not call repair_bundle_perms — upgraded installs keep 777 bundles"
+fi
+
 # --- monitoring configs must stay world-readable (grafana 472 / prom 65534)
 if grep -E 'chmod -R (ug\+rwX,)?o-rwx' "$ROOT/scripts/admin-entrypoint.sh" | grep -q 'monitoring'; then
     bad "admin entrypoint strips world-read from configs/monitoring — grafana/prometheus cannot read their configs"

@@ -730,6 +730,21 @@ ensure_conduit_lifetime_rules() {
     fi
 }
 
+# Same reachability story for the bind-mounted bundle tree: the admin
+# entrypoint repairs it on every admin restart, but installs without a running
+# admin keep 777 bundles from the old chmod. Host-side, effective as root; a
+# non-root operator's silent failure is fine (the admin entrypoint covers it).
+# Inlined rather than shared with scripts/lib/common.sh grant_admin_rw -- the
+# host CLI and the container provisioning tree are deliberately separate.
+repair_bundle_perms() {
+    local p
+    for p in "$SCRIPT_DIR/outputs/bundles" "$SCRIPT_DIR/state/users"; do
+        [[ -d "$p" ]] || continue
+        chown -R 2000:2000 "$p" 2>/dev/null || true
+        chmod -R ug+rwX,o-rwx "$p" 2>/dev/null || true
+    done
+}
+
 # Tighten private key material in the state volume to 0600. The equivalent call
 # in bootstrap.sh is unreachable for already-bootstrapped installs (the
 # .bootstrapped guard exits first), so upgrades never got the rc.2 perms repair.
@@ -873,6 +888,7 @@ start_services() {
     fi
 
     repair_state_key_perms
+    repair_bundle_perms
 
     # Ensure CLASH_API_SECRET is configured for monitoring
     # Returns 1 if user declined monitoring when using 'all' profile
@@ -1253,6 +1269,7 @@ cmd_start() {
     fi
 
     repair_state_key_perms
+    repair_bundle_perms
 
     # Ensure CLASH_API_SECRET is configured for monitoring
     # Returns 1 if user declined monitoring when using 'all' profile
