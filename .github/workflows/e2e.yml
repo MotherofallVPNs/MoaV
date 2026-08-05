@@ -328,13 +328,12 @@ jobs:
             echo "::error::e2e connectivity test failed for $fails protocol(s)"
             exit 1
           fi
-          # HOLLOW-RUN GUARD. `skip` never counted as failure, so a broken
-          # bootstrap that left every protocol unconfigured produced all-skip
-          # and passed green — the run tested nothing. (This actually shipped:
-          # skipped, e2e stayed green (this shipped once and drove this guard's
-          # creation). Require the core sing-box protocols that run in EVERY
-          # run in EVERY domain pass to actually PASS. reality+ss also run in
-          # the domainless pass, so gate the domain-only ones on DOMAIN.
+          # HOLLOW-RUN GUARD. `skip` never counted as failure, so a broken bootstrap
+          # that left every protocol unconfigured produced all-skip and passed green,
+          # testing nothing. That shipped once and is why this guard exists. Require the
+          # core sing-box protocols that run in EVERY domain pass to actually PASS;
+          # reality+ss also run in the domainless pass, so gate the domain-only ones on
+          # DOMAIN.
           require_pass() {
             local p="$1"
             local st=$(jq -r --arg p "$p" '.tests[$p].status // "absent"' e2e-results.json)
