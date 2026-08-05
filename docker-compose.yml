@@ -1061,6 +1061,13 @@ services:
       - '--docker_only=true'
       - '--housekeeping_interval=30s'
       - '--store_container_labels=true'
+      # Quiet the logs: cAdvisor logs a multi-line "Filesystem partitions" map
+      # (every overlayfs/tmpfs mount) at glog level 0 on each housekeeping pass,
+      # which floods `docker logs`. -v=0 + only-warnings-and-up to stderr keeps
+      # the metrics unchanged while cutting the info-spam.
+      - '--logtostderr=true'
+      - '--stderrthreshold=1'
+      - '-v=0'
     environment:
       - TZ=${TZ:-UTC}
     mem_limit: 256m

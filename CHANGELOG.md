@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Grafana no longer crash-loops over cosmetic branding.** The entrypoint patches a logo into the grafana image's `public/img` dir; on images/hosts where that dir is not writable even as root (seen live on a DigitalOcean droplet with `grafana/grafana:latest`), the one unguarded `cat >` write failed with "Permission denied" and, under `set -e`, killed the entrypoint and restart-looped the container. The write is now best-effort (`if cat … else skip`), so branding degrades gracefully and grafana stays up. A restart-storming grafana was also starving the box's docker daemon, which is the likely trigger for the intermittent "no wg/awg key generator" on `moav user add` right after start.
+- **`moav test` no longer warns "couldn't parse the wstunnel server".** It read the endpoint from a `wireguard-instructions.txt` that bundles do not contain; it now reads the `wstunnel client -L … wss://host:port` command from `README.html` (matching the command line, not the surrounding prose) and validates that endpoint.
+
+### Changed
+- **cAdvisor logs are quiet.** It logged a multi-line "Filesystem partitions" map (every overlayfs/tmpfs mount) on each housekeeping pass, flooding `docker logs`; added `--stderrthreshold=1 -v=0` so only warnings and up are emitted. Metrics unchanged.
+- **The installer's completion banner shows the community links** (Telegram, Twitter/X, GitHub issues) alongside Documentation and Website.
+
+
 ### Changed
 - **User bundles show only the protocols the user actually has (#73).** The README guide used to render every protocol section, with "No X config available" filler for anything disabled — a 12-protocol wall where half the entries were dead. Each section and its table-of-contents entry (English and Farsi) is now hidden when the user's bundle has no artifact for that protocol, keyed on the same per-user files the config values already read. `subscription.txt` is untouched (same unconditional format, so `moav-client` and V2Ray apps see no change). Migration for existing users: `moav regenerate-users` — and `moav update` now detects bundle-guide/renderer changes and lists that step in its post-update instructions.
 

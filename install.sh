@@ -763,5 +763,8 @@ fi
 
 echo ""
 echo -e "${CYAN}Documentation:${NC} https://github.com/MotherofallVPNs/moav"
-echo -e "${CYAN}Website:${NC} https://moav.sh"
+echo -e "${CYAN}Website:${NC}       https://moav.sh"
+echo -e "${CYAN}Telegram:${NC}      https://t.me/motherofallvpns"
+echo -e "${CYAN}Twitter/X:${NC}     https://x.com/motherofallvpns"
+echo -e "${CYAN}Issues/bugs:${NC}   https://github.com/MotherofallVPNs/MoaV/issues"
 echo ""

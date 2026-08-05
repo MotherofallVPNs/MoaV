@@ -65,12 +65,22 @@ if [ -d "/branding" ]; then
     if [ -f "/branding/logo.png" ]; then
         # Get image dimensions (default to 100x100 if not determinable)
         LOGO_B64=$(base64 -w0 /branding/logo.png 2>/dev/null || base64 /branding/logo.png)
-        cat > "$GRAFANA_IMG/grafana_icon.svg" << SVGEOF
+        # `if cat` (not a bare `cat >`): the grafana image dir is read-only for
+        # the non-root grafana user (uid 472) in current images, so this write
+        # is Permission denied — and as the one UNGUARDED write in this block it
+        # crash-looped the whole container under `set -e` (the favicon cp's are
+        # in `&& echo` lists and the js seds are `|| true`, so only this one was
+        # fatal). Branding is cosmetic; skip it rather than take grafana down.
+        if cat > "$GRAFANA_IMG/grafana_icon.svg" 2>/dev/null << SVGEOF
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 100 100">
   <image width="100" height="100" xlink:href="data:image/png;base64,$LOGO_B64"/>
 </svg>
 SVGEOF
-        echo "[grafana] Created grafana_icon.svg from logo.png"
+        then
+            echo "[grafana] Created grafana_icon.svg from logo.png"
+        else
+            echo "[grafana] logo branding skipped (image dir read-only) — dashboards unaffected"
+        fi
     fi
 
     # Replace app title in JavaScript bundles (affects browser tab and PWA name)

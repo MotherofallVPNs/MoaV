@@ -2164,10 +2164,22 @@ test_wstunnel() {
     fi
 
     # The .conf points WireGuard at the local wstunnel endpoint (127.0.0.1); the
-    # real server + port live in the instructions' wstunnel client command.
-    local instr="$CONFIG_DIR/wireguard-instructions.txt"
-    local cmd=""; [[ -f "$instr" ]] && cmd=$(grep -m1 'wstunnel client' "$instr" 2>/dev/null || true)
-    local url; url=$(echo "$cmd" | grep -oE '(wss?)://[^ ]+' | head -1 || true)
+    # real server + port live in the "wstunnel client ... wss://host:port" line.
+    # That command is rendered into README.html (there is no separate
+    # wireguard-instructions.txt in the bundle), so read it from there — with a
+    # fallback to a .txt if a future bundle ships one. Extraction stops at the
+    # first space, quote or `<` so the surrounding HTML tag is trimmed.
+    # Match the command line specifically ('wstunnel client -L …'), not the
+    # surrounding prose ("run the wstunnel client to create a tunnel:"), then
+    # take the ws(s):// endpoint. Extraction stops at space/quote/`<` to trim
+    # the HTML tag around it in README.html.
+    local url=""
+    for instr in "$CONFIG_DIR/wireguard-instructions.txt" "$CONFIG_DIR/README.html"; do
+        [[ -f "$instr" ]] || continue
+        url=$(grep -oE 'wstunnel client -L[^<"]*' "$instr" 2>/dev/null \
+              | grep -oE '(wss?)://[^ <"]+' | head -1 || true)
+        [[ -n "$url" ]] && break
+    done
     local scheme="${url%%://*}"
     local hostport="${url#*://}"; hostport="${hostport%%/*}"
     local server="${hostport%:*}" port="${hostport##*:}"
