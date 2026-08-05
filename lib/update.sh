@@ -229,10 +229,14 @@ cmd_update() {
     fi
 }
 
-# Check if component versions in .env are outdated compared to .env.example
+# Check if component versions in .env are outdated compared to the reference.
+# Reads .env.example.full: the curated .env.example no longer carries pinned
+# *_VERSION lines (they live in the full reference and default in compose), so
+# the slim file would make this a silent no-op.
 check_component_versions() {
     local env_file="$SCRIPT_DIR/.env"
-    local example_file="$SCRIPT_DIR/.env.example"
+    local example_file="$SCRIPT_DIR/.env.example.full"
+    [[ -f "$example_file" ]] || example_file="$SCRIPT_DIR/.env.example"
 
     # Skip if .env doesn't exist
     [[ ! -f "$env_file" ]] && return 0
@@ -537,6 +541,10 @@ migrate_dns_tunnel_state() {
 
 check_env_additions() {
     local env_file="$SCRIPT_DIR/.env"
+    # Deliberately the SLIM .env.example, not .env.example.full: on update we
+    # only auto-add newly-introduced ESSENTIAL vars. Advanced tunables have
+    # code defaults and stay opt-in via the full reference, so we never
+    # re-bloat a user's .env with the whole advanced set.
     local example_file="$SCRIPT_DIR/.env.example"
 
     [[ ! -f "$env_file" ]] && return 0

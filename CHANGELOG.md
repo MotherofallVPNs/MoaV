@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`.env.example` slimmed from 118 vars / 475 lines to a curated 28-var first-run surface.** A new operator now sees only what they actually set (domain, ACME email, admin password, server IP, protocol toggles, and a few common options). Every advanced tunable (component versions, ports, Reality/XHTTP targets, DNS-tunnel subdomains, Telegram/telemt tuning, CDN, bandwidth donation, monitoring, client mode, registry overrides) has a working code/compose default and moved to a new complete reference, **`.env.example.full`** — copy any line into your `.env` to override it. Existing installs are unaffected (their `.env` is untouched; removed keys fall back to the same defaults). `moav update`'s version-outdated check now reads the full reference; its new-variable auto-add still reads the slim file, so an update never re-bloats your `.env` with the advanced set. A drift test keeps the slim file a strict subset of the reference and under a 40-var ceiling.
+
+
 ### Fixed
 - **`moav user add` from the CLI could fail WireGuard/AmneziaWG right after `moav start`.** The key generator fell back to `docker compose exec` (which re-parses the whole compose file every call, three times per peer) under a 20s timeout; on a 1-vCPU/1-GB box still settling from a full start, that blew the budget and reported "no wg/awg key generator available" for a perfectly healthy container. It now uses `docker exec` by container name (no compose parse, ~2x faster idle and far more under load) with a 60s ceiling. The web admin was unaffected because it never hit the slow path. Found on the first live 1.9.1 upgrade.
 - **`moav doctor` printed network buffers as "0 MiB".** The kernel default (~208 KiB) integer-divided to 0 MiB, reading like a broken probe instead of "buffer is small". Sub-MiB values now print in KiB. (The BBR/qdisc/buffer lines remain advisory until `moav net apply` is run.)

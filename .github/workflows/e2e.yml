@@ -102,7 +102,6 @@ jobs:
             # Disable protocols that need a domain cert or DNS delegation so
             # their services don't crash-loop without one.
             sed -i "s|^DOMAIN=.*|DOMAIN=|" .env
-            sed -i "s|^CDN_SUBDOMAIN=.*|CDN_SUBDOMAIN=|" .env
             for p in TROJAN ANYTLS HYSTERIA2 DNSTT SLIPSTREAM MASTERDNS TRUSTTUNNEL XDNS; do
               sed -i "s|^ENABLE_${p}=.*|ENABLE_${p}=false|" .env
             done
@@ -394,7 +393,6 @@ jobs:
           sed -i "s|^DOMAIN=.*|DOMAIN=|" .env
           sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${MOAV_ADMIN_PASSWORD}|" .env
           [ -n "${MOAV_SERVER_IP:-}" ] && sed -i "s|^SERVER_IP=.*|SERVER_IP=${MOAV_SERVER_IP}|" .env
-          sed -i "s|^CDN_SUBDOMAIN=.*|CDN_SUBDOMAIN=|" .env
           for p in TROJAN ANYTLS HYSTERIA2 DNSTT SLIPSTREAM MASTERDNS TRUSTTUNNEL XDNS; do
             sed -i "s|^ENABLE_${p}=.*|ENABLE_${p}=false|" .env
           done
