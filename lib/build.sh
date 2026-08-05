@@ -321,7 +321,7 @@ build_local_images() {
         local version_value=""
         local build_args=""
         if [[ -n "$version_env_var" ]] && [[ -f "$env_file" ]]; then
-            version_value=$(grep "^${version_env_var}=" "$env_file" 2>/dev/null | cut -d'=' -f2 | tr -d '"' || true)
+            version_value=$(get_env_val "$version_env_var" "$env_file")
             if [[ -n "$version_value" ]] && [[ -n "$version_arg" ]]; then
                 build_args="--build-arg ${version_arg}=${version_value}"
             fi

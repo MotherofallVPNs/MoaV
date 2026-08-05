@@ -259,8 +259,8 @@ check_component_versions() {
 
     for var in "${version_vars[@]}"; do
         local current_val example_val
-        current_val=$(grep "^${var}=" "$env_file" 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'" || true)
-        example_val=$(grep "^${var}=" "$example_file" 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'" || true)
+        current_val=$(get_env_val "$var" "$env_file")
+        example_val=$(get_env_val "$var" "$example_file")
 
         # Skip if either is empty
         [[ -z "$current_val" || -z "$example_val" ]] && continue

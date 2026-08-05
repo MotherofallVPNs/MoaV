@@ -95,7 +95,16 @@ done
 # C1a: the lib/ tree must no longer carry ad-hoc .env scrapers. The one
 # permitted survivor reads state/keys/cdn.env out of the docker volume, which is
 # not a .env read at all.
-stragglers=$(grep -rn "cut -d= -f2 " --include='*.sh' "$ROOT/lib/" "$ROOT/moav.sh" 2>/dev/null | grep -v 'moav_moav_state' || true)
+# Match BOTH `cut -d= -f2` and the quoted `cut -d'=' -f2` form. The original
+# pattern only matched the unquoted one, so five quoted scrapers passed this gate
+# vacuously (found by the epic audit). Excludes: the get_env_val definitions
+# themselves (they contain `cut -d'=' -f2-`), docker-volume reads (moav_moav_state),
+# and shell-variable parses (`echo "$x" | cut`, i.e. cut immediately after a pipe
+# from echo, not from a file grep).
+stragglers=$(grep -rnE "cut -d'?=('?) -f2 " --include='*.sh' "$ROOT/lib/" "$ROOT/moav.sh" 2>/dev/null \
+             | grep -v 'moav_moav_state' \
+             | grep -vE 'cut -d.=. -f2-' \
+             | grep -vE 'echo "\$[A-Za-z_]' || true)
 if [[ -z "$stragglers" ]]; then
     ok "lib/ tree has no ad-hoc .env scrapers left (all on get_env_val)"
 else
@@ -121,8 +130,10 @@ fi
 # scripts/ must have no ad-hoc .env scrapers left. Permitted survivors read a
 # shell VARIABLE (`echo "$REALITY_ENV_CONTENT" | grep …`) or the docker volume —
 # neither is a .env read.
-leftover=$(grep -rn "cut -d= -f2" --include='*.sh' "$ROOT/scripts/" 2>/dev/null \
-           | grep -v 'moav_moav_state' | grep -v 'echo "\$' || true)
+leftover=$(grep -rnE "cut -d'?=('?) -f2 " --include='*.sh' "$ROOT/scripts/" 2>/dev/null \
+           | grep -v 'moav_moav_state' | grep -v 'echo "\$' \
+           | grep -vE 'cut -d.=. -f2-' \
+           | grep -viE 'CONFIG_FILE|wg0.conf|awg0.conf|REALITY_ENV_CONTENT' || true)
 if [[ -z "$leftover" ]]; then
     ok "scripts/ tree has no ad-hoc .env scrapers left"
 else

@@ -574,10 +574,7 @@ save_default_profiles() {
 
 # Get default profiles from .env
 get_default_profiles() {
-    local env_file="$SCRIPT_DIR/.env"
-    if [[ -f "$env_file" ]]; then
-        grep "^DEFAULT_PROFILES=" "$env_file" 2>/dev/null | cut -d'=' -f2 | sed 's/#.*//' | tr -d '"' | tr -d "'" | xargs
-    fi
+    get_env_val "DEFAULT_PROFILES" "$SCRIPT_DIR/.env"
 }
 
 # Profile ↔ ENABLE_* mapping (issue #106) — Compose profiles don't know
@@ -762,9 +759,9 @@ ensure_clash_api_secret() {
     fi
 
     # Check if CLASH_API_SECRET is already set in .env (non-empty)
-    # Note: || true needed because set -o pipefail causes exit if grep finds nothing
+    # get_env_val keeps a secret containing '=' intact (cut -f2- vs -f2).
     local current_secret
-    current_secret=$(grep "^CLASH_API_SECRET=" "$env_file" 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'" || true)
+    current_secret=$(get_env_val "CLASH_API_SECRET" "$env_file")
 
     # Get the authoritative secret from state volume (source of truth from bootstrap)
     local state_secret

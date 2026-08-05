@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Five `.env` reads bypassed the config accessor, and the test that was supposed to catch them was quote-blind.** Workstream C's "no ad-hoc scrapers" gate grepped only the unquoted `cut -d= -f2`, so five sites written as `cut -d'=' -f2` passed it vacuously — including a `CLASH_API_SECRET` read that truncated any secret containing `=` (a routine base64 character), causing a perpetual "stale secret" resync. All five now use `get_env_val`; the gate matches both quoted and unquoted forms.
+
+### Fixed
 - **Three strict-mode crashes in cert-wait/fallback paths (grafana, grafana-proxy, trusttunnel).** D4c enabled `set -e`/`-u` on these but left code written for a tolerant shell in the branches that only run *before* Let's Encrypt has issued, invisible to the happy-path e2e. grafana-proxy had the unguarded `certs=$(find_certificates)` that was fixed in grafana but missed in its twin; grafana read `GF_SERVER_CERT_KEY` unbound on the no-cert path, making its HTTP fallback unreachable; and trusttunnel's `((CERT_WAIT_COUNT++))` returned non-zero from zero, killing its cert-wait one second in. Each crashed a fresh install until certbot succeeded.
 
 ### Added

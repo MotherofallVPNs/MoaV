@@ -58,13 +58,9 @@ VERSION=$(cat "$SCRIPT_DIR/VERSION" 2>/dev/null || echo "dev")
 get_component_version() {
     local var_name="$1"
     local default="$2"
-    local env_file="$SCRIPT_DIR/.env"
-    if [[ -f "$env_file" ]]; then
-        local val
-        val=$(grep "^${var_name}=" "$env_file" 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
-        [[ -n "$val" ]] && echo "$val" && return
-    fi
-    echo "$default"
+    # get_env_val handles the read (last-wins, comment-strip, `=`-safe). Defined
+    # below in this same file; only reached at call time, never at source time.
+    get_env_val "$var_name" "$SCRIPT_DIR/.env" "$default"
 }
 
 # State file for persistent checks
