@@ -13,6 +13,7 @@ source scripts/lib/common.sh
 source scripts/lib/sing-box.sh
 source scripts/lib/trusttunnel.sh
 source scripts/lib/xray.sh
+source scripts/lib/telemt.sh
 
 # Parse arguments
 USERNAME=""
@@ -422,34 +423,14 @@ if [[ "${ENABLE_XDNS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
     log_info "Generated XDNS client config"
 fi
 
-# Add user to telemt (Telegram MTProxy) if config exists
-TELEMT_CONFIG="configs/telemt/config.toml"
-if [[ "${ENABLE_TELEMT:-true}" == "true" ]] && [[ -f "$TELEMT_CONFIG" ]]; then
+# Add user to telemt (Telegram MTProxy) via the shared lib functions. This was an
+# inline copy of telemt_add_user_to_config; using the lib removes the duplication
+# and gains idempotency -- telemt_generate_secret reuses an existing secret rather
+# than minting a new one, so re-running no longer invalidates the user's bundle.
+if [[ "${ENABLE_TELEMT:-true}" == "true" ]] && [[ -f "configs/telemt/config.toml" ]]; then
     log_info "Adding $USERNAME to telemt..."
-
-    # Check if user already exists
-    if grep -q "^${USERNAME} = " "$TELEMT_CONFIG" 2>/dev/null; then
-        log_info "User '$USERNAME' already exists in telemt, skipping..."
-    else
-        # Generate 32-hex MTProxy secret
-        TELEMT_SECRET=$(openssl rand -hex 16)
-
-        # Save secret to state
-        cat > "$STATE_DIR/users/$USERNAME/telemt.env" <<EOF
-TELEMT_SECRET=$TELEMT_SECRET
-EOF
-
-        # Add user to [access.users] section (before [access.user_max_tcp_conns])
-        sed -i "/^\[access\.user_max_tcp_conns\]/i ${USERNAME} = \"${TELEMT_SECRET}\"" "$TELEMT_CONFIG"
-
-        # Add connection limit (before [access.user_max_unique_ips])
-        sed -i "/^\[access\.user_max_unique_ips\]/i ${USERNAME} = ${TELEMT_MAX_TCP_CONNS:-100}" "$TELEMT_CONFIG"
-
-        # Add IP limit (append at end)
-        echo "${USERNAME} = ${TELEMT_MAX_UNIQUE_IPS:-10}" >> "$TELEMT_CONFIG"
-
-        log_info "Added $USERNAME to telemt config"
-    fi
+    telemt_generate_secret "$USERNAME"
+    telemt_add_user_to_config "$USERNAME" "$TELEMT_SECRET" "configs/telemt/config.toml"
 fi
 
 # Try to reload sing-box (hot reload) unless --no-reload was passed

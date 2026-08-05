@@ -232,11 +232,14 @@ telemt_generate_client_instructions() {
 }
 
 # Add a user to an existing telemt config.toml
-# Usage: telemt_add_user_to_config <user_id> <secret>
+# Usage: telemt_add_user_to_config <user_id> <secret> [config_file]
 telemt_add_user_to_config() {
     local user_id="$1"
     local secret="$2"
-    local config_file="$TELEMT_CONFIG_DIR/config.toml"
+    # Config path is an argument (like singbox_add_user) so the host caller can
+    # pass a relative path and the container caller the absolute one. Defaults to
+    # the container path for back-compat.
+    local config_file="${3:-$TELEMT_CONFIG_DIR/config.toml}"
 
     if [[ ! -f "$config_file" ]]; then
         log_error "telemt config not found: $config_file"

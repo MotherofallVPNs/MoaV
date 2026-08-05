@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Deduplicated the TrustTunnel... telemt user-add path.** `singbox-user-add.sh` had an inline copy of the telemt config mutation that duplicated `scripts/lib/telemt.sh` and drifted from it; the host caller now uses the shared `telemt_generate_secret` + `telemt_add_user_to_config` (the latter gained a config-path argument so host and container callers share it). Also fixes a latent bug: the inline version minted a fresh MTProxy secret on every re-run, invalidating the user's existing bundle; the lib path reuses the stored secret.
+
 ### Internal
 - **Regression tests for two security fixes that had none.** The admin CIDR-whitelist matcher is now unit-tested (13 cases incl. IPv6, family mismatch, and malformed-fails-closed) after being lifted to a module-level `ip_matches` function; and `.env` being created `0600` is now asserted at both creation sites. The whitelist bug (every CIDR entry denied everyone) had shipped untested because the repo had no Python tests.
 
