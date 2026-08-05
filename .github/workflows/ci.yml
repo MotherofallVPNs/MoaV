@@ -39,6 +39,8 @@ jobs:
         run: bash tests/strict-mode-test.sh
       - name: state key permission test
         run: bash tests/state-perms-test.sh
+      - name: user-add timeout + wg dedup test
+        run: bash tests/user-add-timeout-test.sh
       - name: bundle permission test
         run: bash tests/bundle-perms-test.sh
       - name: entrypoint strict-mode test

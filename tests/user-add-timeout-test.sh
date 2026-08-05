@@ -27,6 +27,11 @@ else
 fi
 
 # Functional: the deadline must actually fire. Stub `docker` with a hang.
+# Needs the `timeout` binary -- without it compose_timeout deliberately falls
+# through to a bare call, so this check would BE the hang (macOS dev boxes).
+if ! command -v timeout >/dev/null 2>&1; then
+    ok "skip: no timeout binary on this host (CI covers the functional check)"
+else
 _tmp=$(mktemp -d); trap 'rm -rf "$_tmp"' EXIT
 cat > "$_tmp/docker" <<'EOF'
 #!/bin/sh
@@ -44,10 +49,13 @@ if [[ $elapsed -le 10 ]]; then
 else
     bad "compose_timeout did not enforce its deadline (took ${elapsed}s)"
 fi
+fi
 
 # --- no bare docker compose calls in the provisioning scripts -------------
 for f in user-add.sh wg-user-add.sh singbox-user-add.sh; do
-    bare=$(grep -nE '^[^#]*docker compose' "$ROOT/scripts/$f" | grep -v 'compose_timeout' || true)
+    # log_info/log_error/echo lines are user-facing instruction text, not calls
+    bare=$(grep -nE '^[^#]*docker compose' "$ROOT/scripts/$f" \
+           | grep -vE 'compose_timeout|log_info|log_error|echo ' || true)
     [[ -z "$bare" ]] && ok "$f: every docker compose call has a deadline" \
                      || bad "$f: bare docker compose call can hang user add (#220): $bare"
 done

@@ -225,6 +225,17 @@ jobs:
                 ! -name 'README.html' ! -name 'subscription.txt' 2>/dev/null | wc -l)
           echo "bundle has $n protocol config file(s):"; ls -1 outputs/bundles/e2e-test || true
           [ "$n" -ge 1 ] || { echo "::error::user add produced no protocol configs (only README.html/subscription.txt) — provisioning skipped every protocol"; exit 1; }
+          # #220 regression: the AmneziaWG/WireGuard adds must COMPLETE (every
+          # container call now has a deadline — a wedged exec used to freeze
+          # `user add` forever) AND produce their client configs when enabled.
+          if grep -qE '^ENABLE_AMNEZIAWG=true' .env; then
+            test -f outputs/bundles/e2e-test/amneziawg.conf \
+              || { echo "::error::AmneziaWG enabled but user add produced no amneziawg.conf (#220 regression)"; exit 1; }
+          fi
+          if grep -qE '^ENABLE_WIREGUARD=true' .env; then
+            test -f outputs/bundles/e2e-test/wireguard.conf \
+              || { echo "::error::WireGuard enabled but user add produced no wireguard.conf"; exit 1; }
+          fi
 
       - name: Regression — added user survives a re-bootstrap (orphan guard)
         run: |
