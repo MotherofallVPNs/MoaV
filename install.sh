@@ -19,6 +19,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 WHITE='\033[1;37m'
+DIM='\033[2m'
 NC='\033[0m'
 
 # Configuration
@@ -762,9 +763,11 @@ else
 fi
 
 echo ""
-echo -e "${CYAN}Documentation:${NC} https://github.com/MotherofallVPNs/moav"
-echo -e "${CYAN}Website:${NC}       https://moav.sh"
-echo -e "${CYAN}Telegram:${NC}      https://t.me/motherofallvpns"
-echo -e "${CYAN}Twitter/X:${NC}     https://x.com/motherofallvpns"
-echo -e "${CYAN}Issues/bugs:${NC}   https://github.com/MotherofallVPNs/MoaV/issues"
+echo -e "${CYAN}Docs:${NC}    https://moav.sh/docs"
+echo -e "${CYAN}Website:${NC} https://moav.sh"
+echo ""
+echo -e "${DIM}Come build MoaV with us:${NC}"
+echo -e "${DIM}  Questions or ideas:  https://t.me/motherofallvpns${NC}"
+echo -e "${DIM}  Bugs, features, PRs: https://github.com/MotherofallVPNs/MoaV${NC}"
+echo -e "${DIM}  Run it with your AI: add moav.sh/llms.txt to your agent${NC}"
 echo ""
