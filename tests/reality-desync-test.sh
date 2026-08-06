@@ -78,6 +78,21 @@ else
     bad "leading-dash private key wrongly rejected — grep parsed it as an option (missing --)"
 fi
 
+# The short_id check is anchored to the short_id/shortIds JSON field, not a bare
+# substring: a config whose real short_id field is blank but where the 8-hex
+# value coincidentally appears elsewhere (e.g. inside a UUID) must still ABORT.
+cat > "$STATE_DIR/keys/reality.env" <<EOF
+REALITY_SHORT_ID=deadbeef
+REALITY_PRIVATE_KEY=PRIVKEYVALUE123
+EOF
+fp="$WORK/falsepos.json"
+printf '{"inbounds":[{"users":[{"uuid":"deadbeef-1111-2222"}],"tls":{"reality":{"short_id":[""],"private_key":"PRIVKEYVALUE123"}}}]}\n' > "$fp"
+if ( assert_reality_in_render "$fp" ) 2>/dev/null; then
+    bad "short_id in a UUID gave a false PASS — the check is an unanchored substring"
+else
+    ok "short_id present only outside its field is caught (anchored check)"
+fi
+
 # When state short_id is empty (deliberate empty-short_id setup), no false abort.
 echo "REALITY_SHORT_ID=" > "$STATE_DIR/keys/reality.env"
 if ( assert_reality_in_render "$bad_cfg" ) 2>/dev/null; then

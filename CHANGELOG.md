@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **Hardening from the pre-v2.0.0 security review** (independent adversarial pass over the perms/secret rework since rc.2): the Reality short_id render-guard now anchors to the `short_id`/`shortIds` JSON field instead of a bare substring (an 8-hex id coincidentally appearing inside a UUID could have given a false PASS); the CDN WebSocket path is generated with a 48-bit `openssl` token instead of predictable bash `$RANDOM` (it is an active-probing barrier for a censorship tool); and its value is no longer echoed to the bootstrap log (which lands in transcripts). The review found no critical/high issues — the rc.2→now perms/secret changes are net security-positive.
+
+
 ### Removed
 - **The obsolete `scripts/wg-sync-keys.sh` workaround (E4-3).** It manually re-synced WireGuard server keys between the running container and the config files "if you have key mismatch issues after container restarts". It had zero callers, and the mismatch it patched no longer occurs: `wg-user-add.sh` reads the running container's public key and syncs `server.pub` inline on every peer add. The other half of the E4-3 card — retiring the fragile `_fix_perms` chmod dance — was already done in the world-writable-bundles fix, which replaced `chmod 777` with deterministic uid-2000 ownership; `_fix_perms` now sets owner=caller / group=admin / 2770 and is the correct handling, not a workaround, so it stays.
 
