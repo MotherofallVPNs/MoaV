@@ -72,8 +72,11 @@ LATEST_VERSION=""
 goodbye() {
     echo ""
     echo -e "${CYAN}Goodbye! Stay safe out there.${NC}"
-    echo -e "${DIM}Questions: https://t.me/motherofallvpns${NC}"
-    echo -e "${DIM}Issues/bugs: https://github.com/MotherofallVPNs/MoaV/issues${NC}"
+    echo ""
+    echo -e "${DIM}Come build MoaV with us:${NC}"
+    echo -e "${DIM}  Questions or ideas:  https://t.me/motherofallvpns${NC}"
+    echo -e "${DIM}  Bugs, features, PRs: https://github.com/MotherofallVPNs/MoaV${NC}"
+    echo -e "${DIM}  Run it with your AI: add moav.sh/llms.txt to your agent${NC}"
     echo ""
     exit 0
 }
