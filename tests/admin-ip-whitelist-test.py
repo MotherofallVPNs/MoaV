@@ -41,7 +41,12 @@ CASES = [
     ("2001:dead::5","2001:db8::/32",  False),
     ("10.1.2.3",    "",               False),  # empty entry -> deny
     ("10.1.2.3",    "not-an-ip/8",    False),  # malformed -> deny (fail closed)
-    ("10.1.2.3",    "::1/128",        False),  # family mismatch -> deny
+    ("10.1.2.3",    "::1/128",        False),  # v4 client vs v6 CIDR -> deny
+    # reverse-direction family mismatch (the gap): a v6 client must not match a
+    # v4 rule and must not raise.
+    ("2001:db8::5", "10.0.0.0/8",     False),  # v6 client vs v4 CIDR -> deny
+    ("2001:db8::5", "1.2.3.4",        False),  # v6 client vs v4 exact -> deny
+    ("10.1.2.3",    "2001:db8::/32",  False),  # v4 client vs v6 CIDR (/32) -> deny
     ("10.1.2.3",    "  10.0.0.0/8  ", True),   # surrounding whitespace tolerated
 ]
 

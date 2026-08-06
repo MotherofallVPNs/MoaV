@@ -163,6 +163,24 @@ for e in wireguard amneziawg; do
     fi
 done
 
+# --- admin entrypoint: clash-secret read must not crash a secret-less install -
+# The read runs under `set -eu`; grep exits 1 when /state/keys/clash-api.env is
+# absent (a valid state: no sing-box protocols), so the `|| true` is load-bearing
+# — without it the admin container crash-loops on every such install.
+_ae="$ROOT/scripts/admin-entrypoint.sh"
+if grep -qE "CLASH_API_SECRET=\\\$\(grep .*clash-api\.env.* \|\| true\)" "$_ae"; then
+    ok "admin: clash-secret read is guarded with || true (secret-less install safe)"
+else
+    bad "admin: clash-secret read lost its || true — crash-loops when clash-api.env is absent"
+fi
+
+# --- admin must DROP privileges: the app runs as non-root `moav`, not root ----
+if grep -qE '^exec su-exec moav ' "$_ae"; then
+    ok "admin drops to non-root (exec su-exec moav …)"
+else
+    bad "admin no longer drops privileges — the dashboard would run as root"
+fi
+
 echo
 echo "  $pass passed, $fail failed"
 [[ $fail -eq 0 ]]

@@ -107,6 +107,13 @@ moav build && moav start
 - **Grafana browser-tab title** stays "Grafana" on the default (prebuilt) image;
   the favicon and logo are branded. The tab text only changes on a locally-built
   image (`moav build --local`).
+- **Multi-user hosts (edge case).** v2 owns user bundles and state as uid/gid
+  `2000` with no world access (they hold client private keys). On a dedicated,
+  single-tenant VPS — where only root logs in, the normal MoaV deployment — this
+  is strictly safer than before. If, unusually, you run MoaV on a box that has
+  *other human login accounts*, be aware that an account with uid 2000 or in
+  group 2000 would gain access to those bundles. Don't share a MoaV host with
+  untrusted local users, or ensure uid/gid 2000 is unused by real accounts.
 
 ## Questions
 
