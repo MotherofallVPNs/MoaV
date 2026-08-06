@@ -924,6 +924,15 @@ services:
       - ./configs/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./configs/monitoring/grafana/provisioning/dashboards:/var/lib/grafana/dashboards:ro
       - ./branding:/branding:ro
+      # MoaV-branded (grafana-palette) favicon + login/nav logo, bind-mounted
+      # directly over grafana's assets. The entrypoint used to WRITE these, but
+      # /usr/share/grafana/public is read-only even for root in the current
+      # image; a read-only bind-mount overrides the file at the kernel level and
+      # works regardless. The tab-title patch still needs a writable image
+      # (moav build --local); on the prebuilt image the tab text stays "Grafana".
+      - ./branding/grafana/fav32.png:/usr/share/grafana/public/img/fav32.png:ro
+      - ./branding/grafana/apple-touch-icon.png:/usr/share/grafana/public/img/apple-touch-icon.png:ro
+      - ./branding/grafana/grafana_icon.svg:/usr/share/grafana/public/img/grafana_icon.svg:ro
       - ./scripts/grafana-entrypoint.sh:/scripts/grafana-entrypoint.sh:ro
       - moav_grafana:/var/lib/grafana
       - moav_certs:/certs:ro
