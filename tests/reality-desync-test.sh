@@ -48,7 +48,10 @@ eval "$(awk '/^assert_reality_in_render\(\) \{/,/^\}/' "$ROOT/scripts/bootstrap.
 
 WORK=$(mktemp -d)
 good="$WORK/good.json"; bad_cfg="$WORK/bad.json"
-printf '{"inbounds":[{"tls":{"reality":{"short_id":["deadbeef"],"private_key":"PRIVKEYVALUE123"}}}]}\n' > "$good"
+# Pretty-printed (multi-line) like the REAL rendered config — the array spans
+# lines ("short_id": [\n "deadbeef"\n]). A single-line fixture hid a bug where
+# a line-based grep false-aborted bootstrap on the real (jq-formatted) config.
+printf '{"inbounds":[{"tls":{"reality":{"short_id":["deadbeef"],"private_key":"PRIVKEYVALUE123"}}}]}\n' | jq . > "$good"
 printf '{"inbounds":[{"tls":{"reality":{"short_id":[""],"private_key":""}}}]}\n' > "$bad_cfg"
 
 ( assert_reality_in_render "$good" ) && ok "good config passes the assert" \
