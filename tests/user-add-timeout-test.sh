@@ -75,6 +75,17 @@ else
     ok "wg-user-add.sh does not mint its own keypair"
 fi
 
+# --- the server-pubkey sync must stay inline in provisioning -----------------
+# It replaced the standalone scripts/wg-sync-keys.sh (removed in E4-3): wg-user-add
+# reads the running container's pubkey and syncs server.pub. If this goes away
+# there's no key-mismatch recovery left, so pin it.
+grep -q 'wg show wg0 public-key' "$ROOT/scripts/wg-user-add.sh" \
+    && ok "wg-user-add.sh syncs the server pubkey from the running container" \
+    || bad "wg-user-add.sh no longer syncs the server pubkey — the wg-sync-keys.sh replacement is gone"
+[[ ! -f "$ROOT/scripts/wg-sync-keys.sh" ]] \
+    && ok "the obsolete wg-sync-keys.sh workaround is removed" \
+    || bad "scripts/wg-sync-keys.sh is back — its function is inline in wg-user-add now"
+
 # --- keygen resolver: docker exec by container name, not compose exec -------
 # `docker compose exec` re-parses the whole compose file per call; three calls
 # per peer under post-`moav start` load on a 1-vCPU box blew the timeout and

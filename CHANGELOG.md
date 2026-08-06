@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **The obsolete `scripts/wg-sync-keys.sh` workaround (E4-3).** It manually re-synced WireGuard server keys between the running container and the config files "if you have key mismatch issues after container restarts". It had zero callers, and the mismatch it patched no longer occurs: `wg-user-add.sh` reads the running container's public key and syncs `server.pub` inline on every peer add. The other half of the E4-3 card — retiring the fragile `_fix_perms` chmod dance — was already done in the world-writable-bundles fix, which replaced `chmod 777` with deterministic uid-2000 ownership; `_fix_perms` now sets owner=caller / group=admin / 2770 and is the correct handling, not a workaround, so it stays.
+
+
 ### Added
 - **Agent entry points: root `llms.txt` and `AGENTS.md`.** `llms.txt` (llmstxt.org format, mirroring the moav-site one) is a concise project summary + curated index for AI agents landing on the repo; `AGENTS.md` is the deep agent guide (repo layout, build/run, testing, and the conventions that bite — strict mode, `get_env_val`, bash 3.2, host-vs-container paths, uid 2000, secrets-in-state). The `.claude/skills/` stay as operational tools.
 - **CI test for nested env-var fallbacks.** `tests/env-fallback-test.sh` verifies every `${PRIMARY:-${SECONDARY:-DEFAULT}}` chain resolves correctly for primary-set / primary-empty+secondary-set / both-unset (XHTTP_REALITY_TARGET→REALITY_TARGET, CDN_ADDRESS→CDN_DOMAIN, CDN_SNI→DOMAIN, CONDUIT_MAX_COMMON_CLIENTS→CONDUIT_MAX_CLIENTS), pins the XHTTP→REALITY chain at all three call sites, and a coverage guard fails CI if a new nested fallback ships untested. Runs under bash 3.2.
