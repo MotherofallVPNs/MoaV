@@ -29,18 +29,29 @@ are bash.
 | `docs/devdocs/` | Contributor docs: E2E-TESTING, PROTOCOL-INTEGRATION-CHECKLIST, VERSION-BUMP-CHECKLIST |
 | `.claude/skills/` | Operational Claude Code skills (e.g. running e2e) — tools, not this guide |
 
-## Build & run (local, no full install)
+## Install & run
+
+**Normal deployment** — how an operator (or an agent setting up a server) does it.
+Installs the global `moav` command, then an interactive setup + bootstrap:
 
 ```bash
-cp .env.example .env      # set DOMAIN, ACME_EMAIL, ADMIN_PASSWORD (top block)
-./moav.sh build           # build images (caps BuildKit cache when done)
-./moav.sh bootstrap       # generate keys/certs/configs + first user (idempotent)
-./moav.sh start all       # bring up the selected profiles
-./moav.sh doctor          # diagnostics
-./moav.sh user add alice  # provision a user bundle -> outputs/bundles/alice/
+curl -fsSL https://moav.sh/install.sh | bash    # or: git clone … && ./moav.sh install
+moav                                             # guided config + bootstrap + start
 ```
 
-`moav update -b dev && moav build && moav start` is the in-place upgrade path.
+Everyday operation is then `moav <cmd>`: `moav status`, `moav user add alice`,
+`moav doctor`, `moav update`. Full command reference: [moav.sh/docs/CLI](https://moav.sh/docs/CLI/).
+
+**Working on the code** (no global install) — run the dispatcher directly:
+
+```bash
+cp .env.example .env      # DOMAIN, ACME_EMAIL, ADMIN_PASSWORD (top block)
+./moav.sh build && ./moav.sh bootstrap && ./moav.sh start all
+./moav.sh doctor
+```
+
+**Upgrade in place:** `moav update -b main && moav build && moav start`
+(see [docs/V2-MIGRATION.md](docs/V2-MIGRATION.md) for the 1.9.x → v2 path).
 
 ## Testing
 
