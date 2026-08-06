@@ -49,6 +49,8 @@ jobs:
         run: bash tests/grafana-branding-test.sh
       - name: env resolution golden-diff
         run: bash tests/env-resolution-test.sh
+      - name: env nested-fallback resolution
+        run: bash tests/env-fallback-test.sh
       - name: .env.example slim/full split
         run: bash tests/env-example-test.sh
       - name: reality short_id desync guard

@@ -1,0 +1,31 @@
+# MoaV
+
+> Multi-protocol Internet censorship circumvention stack optimized for hostile network environments. Bundles 16+ transports — Reality (VLESS), Trojan, AnyTLS (defeats TLS-in-TLS fingerprinting), Hysteria2, XHTTP, Shadowsocks-2022, CDN VLESS+WS, WireGuard (direct + over wss:// WebSocket via wstunnel), AmneziaWG, TrustTunnel (HTTP/2+QUIC), Telegram MTProxy, plus four DNS tunnels (dnstt, Slipstream, MasterDNS, XDNS) sharing port 53 through a subdomain-routing daemon. Optional bandwidth donation paths via Psiphon Conduit, Tor Snowflake, and GooseRelay. Single-host Docker Compose deployment with per-user bundle generation (configs, QR codes, V2Ray subscription), automatic Let's Encrypt certificate renewal, and an optional Prometheus + Grafana monitoring stack.
+
+This is the **source repository**. `moav.sh` is a bash dispatcher over `lib/*.sh` modules; protocol servers run as containers.
+
+## For agents working in this repo
+
+- [AGENTS.md](AGENTS.md): the deep guide — repo layout, build/run, testing, the conventions that bite (strict mode, get_env_val, bash 3.2, host-vs-container paths, uid 2000, secrets in state)
+- [CONTRIBUTING.md](CONTRIBUTING.md): contributor workflow
+- [CHANGELOG.md](CHANGELOG.md): behavior changes per version
+- [docs/devdocs/E2E-TESTING.md](docs/devdocs/E2E-TESTING.md): the end-to-end harness and what a passing run must prove
+- [docs/devdocs/PROTOCOL-INTEGRATION-CHECKLIST.md](docs/devdocs/PROTOCOL-INTEGRATION-CHECKLIST.md): adding a new protocol
+- [docs/devdocs/VERSION-BUMP-CHECKLIST.md](docs/devdocs/VERSION-BUMP-CHECKLIST.md): bumping a component version
+
+## Documentation (moav.sh)
+
+- [Quick Start](https://moav.sh/docs/quick-start/): one-command install and minimal first run
+- [Setup Guide](https://moav.sh/docs/SETUP/): full deployment — domain, DNS, certbot, ports, firewall, bootstrap
+- [DNS Configuration](https://moav.sh/docs/DNS/): NS delegations for the DNS tunnels, dns-router fan-out, freeing port 53
+- [Supported Protocols](https://moav.sh/docs/protocols/): per-protocol cipher, port, transport, client compatibility
+- [CLI Reference](https://moav.sh/docs/CLI/): every `moav` command, profile filtering, environment variables
+- [Architecture](https://moav.sh/docs/architecture/): container topology, bundle generation flow, monitoring stack
+- [Monitoring](https://moav.sh/docs/MONITORING/): Grafana dashboards, Conduit lifetime bandwidth, GeoIP
+- [Troubleshooting](https://moav.sh/docs/TROUBLESHOOTING/): common failure modes with diagnostic recipes
+- [OPSEC Guide](https://moav.sh/docs/OPSEC/): operator-side hardening and threat-model notes
+
+## Optional
+
+- [Full documentation in one file](https://moav.sh/llms-full.txt): every docs page concatenated
+- [Website / project home](https://moav.sh): landing page and hosted docs
