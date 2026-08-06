@@ -42,7 +42,7 @@ xray_add_user() {
 # xray_xhttp_link <label> — VLESS+XHTTP+Reality share link.
 xray_xhttp_link() {
     local label="$1"
-    local target="${XHTTP_REALITY_TARGET:-dl.google.com:443}"
+    local target="${XHTTP_REALITY_TARGET:-${REALITY_TARGET:-dl.google.com:443}}"
     local host="${target%%:*}"
     local port="${PORT_XHTTP:-2096}"
     echo "vless://${USER_UUID}@${SERVER_IP}:${port}?type=xhttp&security=reality&sni=${host}&fp=chrome&headers=chrome&pbk=${REALITY_PUBLIC_KEY}&sid=${REALITY_SHORT_ID}&encryption=none#MoaV-XHTTP-${label}"

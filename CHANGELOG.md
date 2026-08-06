@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`XHTTP_REALITY_TARGET` now actually defaults to `REALITY_TARGET`.** The comment claimed "default: same as REALITY_TARGET" but the value was hardcoded to `dl.google.com:443` in `.env.example` and every code path, so changing REALITY_TARGET silently did not change XHTTP's camouflage target. It is now empty in `.env.example` and falls back `XHTTP_REALITY_TARGET -> REALITY_TARGET -> dl.google.com:443` at all sites (bootstrap, xray config-gen, compose).
+
+### Changed
+- **The admin dashboard browser title is `MoaV - <domain> - Dashboard`** (falls back to the server IP, or just "MoaV - Dashboard" with no domain), instead of the static "MoaV Dashboard".
+
+
 ### Changed
 - **`.env.example` is one reorganized file again, not a slim/full split.** The E4-1 split into `.env.example` + `.env.example.full` is replaced by a single file: the ~29 commonly-configured vars (domain, ACME email, admin password, server identity, protocol toggles, Reality target, common options) sit in a labeled block on top, then a hard `ADVANCED - only change things below if you know what you're doing` separator, then every other tunable with its original comments. Nothing is removed, so a fresh `cp .env.example .env` carries every variable at its intended value (this also un-does the four fresh-install default drifts the split had introduced: CDN on, conduit/snowflake bandwidth, client ports). `moav update`'s version-outdated check and new-variable auto-add read the single file again.
 

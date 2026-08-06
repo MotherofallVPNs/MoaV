@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MoaV Dashboard</title>
+    <title>MoaV{% if domain %} - {{ domain }}{% elif server_ip %} - {{ server_ip }}{% endif %} - Dashboard</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <style>
         :root {
