@@ -167,7 +167,22 @@ nt_status() {
     fi
 
     if [[ "$applied" == "true" ]]; then
-        echo -e "    ${GREEN}✓${NC} Tuning file present: $NT_CONF_PATH"
+        # Presence is not enough. `net apply` skips a host that already has the
+        # file, so a server tuned by an older MoaV keeps that version's key set
+        # forever -- and then a key added since reads as operator drift. A 2.1.0
+        # server was still running the v1.8.4 bundle, missing tcp_max_syn_backlog.
+        local stale
+        stale=$(comm -23 \
+            <(nt_render_config 0 | grep -oE '^net\.[a-z0-9_.]+' | sort -u) \
+            <(grep -oE '^net\.[a-z0-9_.]+' "$NT_CONF_PATH" 2>/dev/null | sort -u) \
+            | tr '\n' ' ')
+        if [[ -n "${stale// /}" ]]; then
+            echo -e "    ${YELLOW}!${NC} Tuning file is from an older MoaV — missing: ${stale% }"
+            echo -e "      ${DIM}Re-run 'moav net apply' to refresh it (it rewrites the file).${NC}"
+            pass=false
+        else
+            echo -e "    ${GREEN}✓${NC} Tuning file present: $NT_CONF_PATH"
+        fi
     else
         echo -e "    ${YELLOW}○${NC} Tuning file not present (run: moav net apply)"
     fi
@@ -299,9 +314,12 @@ nt_check_drops() {
     else
         local line
         for line in "${report[@]}"; do
-            echo -e "    ${YELLOW}!${NC} $line"
+            echo -e "    ${YELLOW}!${NC} $line since boot"
             pass=false
         done
+        # A since-boot total says nothing about now: a bad hour last week and an
+        # ongoing overflow print the same number.
+        echo -e "      ${DIM}Still happening? 'nstat -az | grep -E \"SndbufErrors|RcvbufErrors|ListenDrops\"' twice, 10s apart.${NC}"
     fi
     $pass && return 0 || return 1
 }

@@ -612,6 +612,17 @@ check_env_additions() {
             done
         fi
 
+        # A new opt-in flag must not switch off a feature the server is already
+        # running. ENABLE_CDN's absence means "on if CDN_SUBDOMAIN is set" (see
+        # cdn_enabled), so appending the example's `false` would leave a working
+        # CDN alive until the next bootstrap and then silently drop the inbound.
+        if [[ "$var" == "ENABLE_CDN" ]]; then
+            if [[ -n "$(get_env_val "CDN_SUBDOMAIN" "$env_file" "")" \
+               || -n "$(get_env_val "CDN_DOMAIN"    "$env_file" "")" ]]; then
+                value_line="ENABLE_CDN=true"
+            fi
+        fi
+
         # Display: variable name with its default value
         local default_val
         default_val=$(echo "$value_line" | cut -d'=' -f2-)

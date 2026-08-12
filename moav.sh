@@ -96,6 +96,7 @@ trap goodbye SIGINT
 source "$SCRIPT_DIR/lib/common.sh"
 source "$SCRIPT_DIR/lib/nettune.sh"   # before doctor: doctor_check_net calls nt_*
 source "$SCRIPT_DIR/lib/peers.sh"     # doctor_check_peers + the --fix repair
+source "$SCRIPT_DIR/lib/hostload.sh"  # doctor_check_host (load/swap/zombies)
 source "$SCRIPT_DIR/lib/donate.sh"
 source "$SCRIPT_DIR/lib/cert.sh"
 source "$SCRIPT_DIR/lib/migrate.sh"

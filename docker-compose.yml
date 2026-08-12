@@ -821,6 +821,10 @@ services:
       dockerfile: dockerfiles/Dockerfile.admin
     container_name: moav-admin
     restart: unless-stopped
+    # PID 1 here is python (the entrypoint execs it), which never reaps orphans.
+    # When a user-add script is killed on timeout its children reparent to PID 1
+    # and stay zombies -- 28 of them on a live server. tini reaps them.
+    init: true
     logging: *default-logging
     networks:
       - moav_net
@@ -918,6 +922,9 @@ services:
     image: ${IMAGE_GRAFANA:-grafana/grafana:latest}
     container_name: moav-grafana
     restart: unless-stopped
+    # Same reason as admin: the entrypoint execs grafana, so PID 1 does not reap.
+    # 11 zombies on both live servers.
+    init: true
     logging: *default-logging
     user: "0"
     entrypoint: ["/bin/sh", "/scripts/grafana-entrypoint.sh"]

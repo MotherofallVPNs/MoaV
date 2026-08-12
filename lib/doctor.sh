@@ -1128,6 +1128,7 @@ DOCTOR_CHECKS=(
     "conflicts:Check for conflicting services (e.g. DNS tunnels on port 53)"
     "reality:Check Reality fallback targets resolve and are reachable"
     "net:Check BBR/sysctl tuning + packet drops + PMTU + CGNAT + MTU"
+    "host:Check CPU load, swap pressure and zombie processes"
     "peers:Check for duplicate WireGuard/AmneziaWG peer addresses (--fix repairs)"
     "env:Compare .env with .env.example for missing vars"
     "updates:Check for MoaV updates"

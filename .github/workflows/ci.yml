@@ -85,6 +85,8 @@ jobs:
         run: bash tests/donate-regenerate-test.sh
       - name: ENABLE_CDN opt-in flag
         run: bash tests/cdn-flag-test.sh
+      - name: CDN survives an upgrade (flag inference + path rotation)
+        run: bash tests/cdn-upgrade-test.sh
       - name: llms.txt link hygiene (structure)
         run: bash tests/llms-links-test.sh
       - name: moav update rebuild prompts (baked-in changes)
@@ -105,6 +107,14 @@ jobs:
         run: bash scripts/render-funding.sh --check
       - name: FUNDING.yml address values stay quoted
         run: bash tests/funding-yaml-test.sh
+      - name: doctor peers --fix (SIGPIPE + volume state)
+        run: bash tests/peers-repair-test.sh
+      - name: net tuning stale-file + template drift
+        run: bash tests/nettune-template-test.sh
+      - name: PID-1 reaper on orphan-inheriting containers
+        run: bash tests/zombie-reaper-test.sh
+      - name: doctor host (load/swap/zombies) + check wiring
+        run: bash tests/hostload-test.sh
       - name: release footer generator
         run: bash tests/release-footer-test.sh
       - name: release footer links resolve (network)

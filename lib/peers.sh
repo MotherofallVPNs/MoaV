@@ -49,10 +49,18 @@ peers_users_for_octet() {
 # peers_live_owner <container> <bin> <iface> <prefix> <octet>
 # Which public key currently OWNS the address in the running interface (that is
 # the peer whose tunnel actually works). Empty if the service is not running.
+#
+# The docker output is captured before awk sees it, NOT piped into it. Piping and
+# then `exit`ing on the first match closes the pipe while `wg show` is still
+# writing its other peers, so docker dies of SIGPIPE; under `set -o pipefail`
+# that makes this assignment fail and `set -e` kills the caller mid-repair with
+# no message at all. It is a race, so it only shows up on servers with enough
+# peers for the match to land before the writer finishes -- which is exactly the
+# servers that need the repair.
 peers_live_owner() {
-    local cont="$1" bin="$2" iface="$3" prefix="$4" octet="$5"
-    docker exec "$cont" "$bin" show "$iface" allowed-ips 2>/dev/null \
-        | awk -v pat="${prefix//./[.]}[.]${octet}(/|,|$)" '$0 ~ pat {print $1; exit}'
+    local cont="$1" bin="$2" iface="$3" prefix="$4" octet="$5" out
+    out=$(docker exec "$cont" "$bin" show "$iface" allowed-ips 2>/dev/null) || return 0
+    awk -v pat="${prefix//./[.]}[.]${octet}(/|,|$)" '$0 ~ pat {print $1; exit}' <<<"$out"
 }
 
 # peers_pubkey_for_user <conf> <user>
@@ -140,6 +148,28 @@ peers_drop_block() {
     rm -f "$tmp"
 }
 
+# peers_clear_state_env <svc> <user> — drop the stored keypair+IP so the next
+# provisioning run reallocates. Returns 0 if a copy was actually removed.
+#
+# There are TWO state trees and the generators read different ones: the host CLI
+# path uses ./state, while the container path (scripts/generate-user.sh, and so
+# `moav regenerate-users`) reads /state from the moav_state docker volume, which
+# is NOT the host directory. Clearing only the host copy leaves the volume copy
+# authoritative, the stored address comes straight back, and the duplicate the
+# repair just reported reappears on the next regenerate.
+peers_clear_state_env() {
+    local svc="$1" user="$2" gone=1
+    local envf="${STATE_DIR:-state}/users/$user/${svc}.env"
+    [[ -f "$envf" ]] && { rm -f "$envf" 2>/dev/null && gone=0; }
+    # Same volume name and image as scripts/user-revoke.sh uses for its cleanup.
+    if docker run --rm -v moav_moav_state:/state alpine \
+        sh -c "[ -f /state/users/$user/${svc}.env ] && rm -f /state/users/$user/${svc}.env" 2>/dev/null
+    then
+        gone=0
+    fi
+    return $gone
+}
+
 # peers_repair [--yes] — for every duplicated address, keep the peer that owns it
 # on the live interface (or the last one in the config, which is who WireGuard
 # would pick on load) and reset the rest: drop their [Peer] block and their
@@ -147,7 +177,6 @@ peers_drop_block() {
 # `moav regenerate-users`.
 peers_repair() {
     local assume_yes="${1:-}" spec name conf prefix svc bin iface
-    local state_dir="${STATE_DIR:-state}"
     local -a resets=()
 
     for spec in "${PEERS_SPECS[@]}"; do
@@ -202,20 +231,30 @@ peers_repair() {
         [[ "$reply" =~ ^[Yy]$ ]] || { info "Cancelled."; return 1; }
     fi
 
-    local done_n=0
+    local done_n=0 stuck=0
     for entry in "${resets[@]}"; do
         IFS='|' read -r svc2 conf2 user2 <<<"$entry"
-        local envf="$state_dir/users/$user2/${svc2}.env"
-        if peers_drop_block "$conf2" "$user2"; then
-            rm -f "$envf" 2>/dev/null || true
+        if ! peers_drop_block "$conf2" "$user2"; then
+            echo -e "    ${RED}✗${NC} could not edit $conf2 for $user2"
+            continue
+        fi
+        # Dropping the block alone is not a reset: with the stored address still
+        # readable the next regenerate re-adds the very same duplicate.
+        if peers_clear_state_env "$svc2" "$user2"; then
             echo -e "    ${GREEN}✓${NC} reset $svc2 peer for $user2"
             done_n=$((done_n + 1))
         else
-            echo -e "    ${RED}✗${NC} could not edit $conf2 for $user2"
+            echo -e "    ${YELLOW}!${NC} dropped $svc2 peer for $user2 but found no stored state to clear"
+            stuck=$((stuck + 1))
         fi
     done
 
     echo ""
+    if [[ "$stuck" -gt 0 ]]; then
+        warn "$stuck peer(s) had no state file in ./state or the moav_state volume."
+        echo -e "  ${DIM}Their address came from somewhere else, so a regenerate may re-add the${NC}"
+        echo -e "  ${DIM}duplicate. Check 'docker volume ls' for moav_moav_state, then report this.${NC}"
+    fi
     success "Reset $done_n peer(s)."
     echo -e "  ${CYAN}Next:${NC} moav regenerate-users   ${DIM}# reassigns addresses + rebuilds bundles${NC}"
     echo -e "  Then distribute the new bundles to the users listed above."

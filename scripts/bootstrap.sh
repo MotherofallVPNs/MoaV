@@ -393,6 +393,7 @@ fi
 if [[ -f "$STATE_DIR/keys/cdn.env" ]]; then
     source "$STATE_DIR/keys/cdn.env"
 fi
+_cdn_path_before="${CDN_WS_PATH:-}"
 if [[ -z "${CDN_WS_PATH:-}" || "${CDN_WS_PATH}" == "/ws" ]]; then
     # Generate a random realistic-looking path that blends with normal web traffic
     _cdn_prefixes=("api/v3/storage" "api/v2/assets" "api/v4/cdn" "api/v1/files" "cdn/v2/objects" "static/v3/resources" "dl/v2/packages")
@@ -411,7 +412,16 @@ if [[ -z "${CDN_WS_PATH:-}" || "${CDN_WS_PATH}" == "/ws" ]]; then
     CDN_WS_PATH="/${_rand_prefix}/${_rand_mid}/${_rand_file}-${_rand_num}.${_rand_ext}"
     # Do not log the value — it ships in bundles but bootstrap output lands in
     # docker logs / install transcripts that get pasted around.
-    log_info "Generated CDN WS path"
+    if [[ -n "$_cdn_path_before" ]]; then
+        # Rotating off the old /ws default breaks every CDN config already handed
+        # out, and only CDN: it is the one protocol whose link carries a path, so
+        # everything else keeps working and the report is "just this one broke".
+        log_warn "CDN WS path rotated away from the old /ws default"
+        log_warn "  Existing CDN configs will get 404 until their bundles are reissued:"
+        log_warn "    moav regenerate-users   # then redistribute the bundles"
+    else
+        log_info "Generated CDN WS path"
+    fi
 
     # Persist for subsequent bootstraps
     mkdir -p "$STATE_DIR/keys"
