@@ -595,7 +595,13 @@ fi
 # Generate telemt (Telegram MTProxy) instructions (if enabled)
 # -----------------------------------------------------------------------------
 if [[ "${ENABLE_TELEMT:-true}" == "true" ]]; then
-    if [[ -f "$OUTPUT_DIR/telegram-proxy-link.txt" ]] && [[ "$FORCE_REGENERATE" != "force" ]]; then
+    if [[ ! -f "$STATE_DIR/users/$USER_ID/telemt.env" ]]; then
+        # Donate-mode users are provisioned for a subset of protocols, so no
+        # secret means "not this user" -- not a failure. Without this the
+        # generator returns 1 and set -e loses the whole bundle over a protocol
+        # the user was never meant to have.
+        log_info "  - telemt: not provisioned for this user, skipping"
+    elif [[ -f "$OUTPUT_DIR/telegram-proxy-link.txt" ]] && [[ "$FORCE_REGENERATE" != "force" ]]; then
         log_info "  - telemt config exists, skipping"
     else
         BUNDLE_CHANGED=true

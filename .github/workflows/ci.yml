@@ -81,6 +81,8 @@ jobs:
         run: bash tests/bundle-guide-sections-test.sh
       - name: ENABLE_* gating in the user-add paths
         run: bash tests/enable-flag-gating-test.sh
+      - name: donate-mode regenerate (missing per-user protocol)
+        run: bash tests/donate-regenerate-test.sh
       - name: ENABLE_CDN opt-in flag
         run: bash tests/cdn-flag-test.sh
       - name: llms.txt link hygiene (structure)
