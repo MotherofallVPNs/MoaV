@@ -99,6 +99,8 @@ jobs:
         run: python3 scripts/gen-protocol-docs.py --check
       - name: star-history chart present (offline check)
         run: python3 scripts/gen-star-history.py --check
+      - name: star-history API version + timestamp guard
+        run: bash tests/star-history-test.sh
       - name: funding block drift gate (README from FUNDING.yml)
         run: bash scripts/render-funding.sh --check
       - name: FUNDING.yml address values stay quoted

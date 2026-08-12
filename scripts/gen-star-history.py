@@ -32,6 +32,10 @@ from datetime import datetime, timezone
 # failing the run -- see fetch_stars().
 REPOS = [r.strip() for r in os.environ.get(
     "STAR_REPOS", "MotherofallVPNs/MoaV,MotherofallVPNs/moav-client").split(",") if r.strip()]
+# Pinned explicitly: without this header the stargazers call 403s for a token
+# that can read the repo perfectly well, which cost an afternoon of adding
+# permissions to a token that was never the problem. Bump it deliberately.
+API_VERSION = os.environ.get("STAR_API_VERSION", "2026-03-10")
 FAILED_REPOS = []   # unreadable repos, reported once at the end
 OUT = os.environ.get("STAR_OUT", "assets/star-history.svg")
 LOGO = os.environ.get("STAR_LOGO", "branding/favicon-56.png")
@@ -66,6 +70,7 @@ def fetch_stars(repo):
     while True:
         out = subprocess.run(
             ["gh", "api", "-H", "Accept: application/vnd.github.star+json",
+             "-H", f"X-GitHub-Api-Version: {API_VERSION}",
              f"repos/{repo}/stargazers?per_page=100&page={page}"],
             capture_output=True, text=True,
         )
@@ -77,7 +82,18 @@ def fetch_stars(repo):
         batch = json.loads(out.stdout or "[]")
         if not batch:
             break
-        stamps += [x["starred_at"] for x in batch if "starred_at" in x]
+        dated = [x["starred_at"] for x in batch if "starred_at" in x]
+        if not dated:
+            # The plain listing returns users with no timestamps, and a history
+            # chart is nothing without them. Silently dropping them would render
+            # a flat line and look like the repo stopped being starred.
+            sys.stderr.write(
+                f"skipping {repo}: got {len(batch)} stargazers but no starred_at field.\n"
+                "  The 'application/vnd.github.star+json' media type was ignored, so this\n"
+                f"  API version ({API_VERSION}) cannot return timestamps for this token.\n")
+            FAILED_REPOS.append(repo)
+            return None
+        stamps += dated
         if len(batch) < 100:
             break
         page += 1
@@ -93,14 +109,17 @@ def token_hint(repos):
     """
     sys.stderr.write(
         "\ncould not read stargazers for: " + ", ".join(repos) + "\n"
-        "STAR_TOKEN must, for each of those repos:\n"
-        "  1. list the repo under 'Repository access' (all of STAR_REPOS, not just one)\n"
-        "  2. be approved by the org owner -- fine-grained tokens on org repos\n"
-        "     start as pending under Settings -> Personal access tokens\n"
-        "  3. carry enough to read stargazers; Metadata alone may not be, try\n"
-        "     adding Administration: Read-only\n"
-        "verify before re-running the workflow:\n"
-        "  GH_TOKEN=<token> gh api 'repos/%s/stargazers?per_page=1'\n" % repos[0])
+        "Check, in this order:\n"
+        "  1. the API version. This call sends X-GitHub-Api-Version: " + API_VERSION + ";\n"
+        "     without it the endpoint 403s even for a token with full access.\n"
+        "  2. the token's 'Repository access' list -- it needs every repo in\n"
+        "     STAR_REPOS, not just one.\n"
+        "  3. org approval: fine-grained tokens on org repos start as pending\n"
+        "     under Settings -> Personal access tokens.\n"
+        "verify before re-running the workflow (must print a starred_at field):\n"
+        "  GH_TOKEN=<token> gh api -H 'Accept: application/vnd.github.star+json' \\\n"
+        "    -H 'X-GitHub-Api-Version: " + API_VERSION + "' \\\n"
+        "    'repos/%s/stargazers?per_page=1'\n" % repos[0])
 
 
 def logo_data_uri():
