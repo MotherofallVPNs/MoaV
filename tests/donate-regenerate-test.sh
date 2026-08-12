@@ -72,6 +72,53 @@ took_branch() {   # <user> -> skip | generate
     && ok "a fully provisioned user still gets their telemt link" \
     || bad "the guard skips a user who HAS a secret — telemt would vanish from every bundle"
 
+# --- every OTHER generator must already tolerate absent state ----------------
+# The question this answers: does regenerate survive ANY combination of disabled
+# protocols, or is telemt just the one we happened to hit? Each generator is run
+# against a completely empty state dir under the same `set -euo pipefail` that
+# generate-user.sh uses. A new protocol whose generator hard-fails on missing
+# state would break donated bundles exactly the way telemt did.
+GEN_DIR="$ROOT/scripts/lib"
+run_generator() {   # <lib> -> exit code, with an empty STATE_DIR
+    local lib="$1" work; work=$(mktemp -d)
+    mkdir -p "$work/state/users/u1" "$work/out"
+    (
+        cd "$work" || exit 99
+        set -euo pipefail
+        RED=''; GREEN=''; YELLOW=''; BLUE=''; CYAN=''; WHITE=''; DIM=''; NC=''
+        # shellcheck disable=SC1091
+        source "$ROOT/scripts/lib/common.sh"
+        # shellcheck disable=SC1091
+        source "$GEN_DIR/$lib.sh"
+        STATE_DIR="$work/state"; DOMAIN=example.com; SERVER_IP=1.2.3.4
+        case "$lib" in
+            trusttunnel) trusttunnel_write_client_bundle "$work/out" u1 pw ;;
+            dnstt)       dnstt_write_client_pubkey       "$work/out" fakekey ;;
+            *)           "${lib}_generate_client_instructions" u1 "$work/out" ;;
+        esac
+    ) >/dev/null 2>&1
+    local rc=$?
+    rm -rf "$work"
+    return $rc
+}
+
+for lib in slipstream masterdns gooserelay trusttunnel dnstt; do
+    if run_generator "$lib"; then
+        ok "$lib survives an empty state dir"
+    else
+        bad "$lib hard-fails with no state — a donated bundle would be lost like telemt's"
+    fi
+done
+
+# telemt is the known exception, and that is why its call site is guarded. If it
+# ever starts tolerating absent state on its own, this test should be revisited
+# rather than silently passing for a different reason than it was written for.
+if run_generator telemt; then
+    bad "telemt now tolerates absent state — the call-site guard above may be redundant, re-check"
+else
+    ok "telemt is still the one strict generator (hence the call-site guard)"
+fi
+
 echo ""
 echo "  passed: $pass   failed: $fail"
 [ "$fail" -eq 0 ] || exit 1
