@@ -518,10 +518,8 @@ print_post_update_apply_steps() {
     fi
 
     if [[ -n "$recreate" ]]; then
-        echo -e "  ${WHITE}docker compose up -d --force-recreate ${recreate}${NC}"
-        echo -e "     ${DIM}# a bind-mounted config file changed. A single-FILE mount follows the${NC}"
-        echo -e "     ${DIM}# inode, and git replaces the file, so the container keeps reading the${NC}"
-        echo -e "     ${DIM}# old copy until it is recreated -- a restart is not enough.${NC}"
+        echo -e "  ${WHITE}cd ${SCRIPT_DIR} && docker compose up -d --force-recreate ${recreate}${NC}"
+        echo -e "     ${DIM}# a mounted config file changed; only a recreate picks it up${NC}"
         echo ""
     fi
 
