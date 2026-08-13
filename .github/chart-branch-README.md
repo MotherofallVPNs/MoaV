@@ -3,7 +3,7 @@
 Generated only. `star-history.svg` is the chart embedded in the main README;
 `star-history.json` is the accumulated star history it renders from.
 
-Both are written by `.github/workflows/star-history.yml` on `main`, which
+Both are written by `.github/workflows/charts.yml` on `main`, which
 force-pushes a single commit here whenever the numbers move. **Do not edit this
 branch or open PRs against it** — the next run overwrites it.
 
