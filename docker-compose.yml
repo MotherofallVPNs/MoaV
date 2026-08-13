@@ -38,6 +38,7 @@ volumes:
   # root-owned and unwritable by xray.
   moav_xray_metrics:
   moav_certs:
+  moav_tor_geoip:
   moav_state:
   moav_logs:
   moav_conduit:
@@ -531,7 +532,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.snowflake
       args:
-        SNOWFLAKE_VERSION: ${SNOWFLAKE_VERSION:-2.11.0}
+        SNOWFLAKE_VERSION: ${SNOWFLAKE_VERSION:-2.14.1}
         # prebuilt (default) = pull the official thetorproject/snowflake-proxy
         # binary; source = compile from source (set SNOWFLAKE_BINARY=source if
         # Docker Hub is unreachable for the prebuilt image).
@@ -542,8 +543,13 @@ services:
     restart: unless-stopped
     logging: *default-logging
     network_mode: host
+    expose:
+      - "9998"   # /internal/metrics, scraped by prometheus
     volumes:
       - moav_snowflake_logs:/var/log/snowflake
+      # Tor-format geoip: the proxy reports client countries to the broker
+      # for Tor's aggregate metrics. Not readable locally -- see the entrypoint.
+      - moav_tor_geoip:/usr/share/tor:ro
     environment:
       - TZ=${TZ:-UTC}
       - SNOWFLAKE_BANDWIDTH=${SNOWFLAKE_BANDWIDTH:-50}
@@ -1301,6 +1307,27 @@ services:
         curl -fSL "$$URL" | gunzip > /geoip/dbip-country-lite.mmdb &&
         echo "GeoIP database updated successfully ($${MONTH})"
       '
+
+  # Tor's own geoip files, in the plain-text format snowflake-proxy expects.
+  # NOT the same as the db-ip mmdb above: that one is binary MaxMind format for
+  # our Python exporters, and the two are not interchangeable.
+  tor-geoip-updater:
+    image: curlimages/curl:latest
+    container_name: moav-tor-geoip-updater
+    user: "0:0"  # same reason as geoip-updater: curlimages/curl is UID 100 and cannot write the volume
+    entrypoint: ["/bin/sh"]
+    command:
+      - -c
+      - |
+        set -e
+        B="https://gitlab.torproject.org/tpo/core/tor/-/raw/main/src/config"
+        echo "Downloading Tor geoip files..."
+        curl -fSL "$$B/geoip"  -o /geoip/geoip.tmp  && mv /geoip/geoip.tmp  /geoip/geoip
+        curl -fSL "$$B/geoip6" -o /geoip/geoip6.tmp && mv /geoip/geoip6.tmp /geoip/geoip6
+        [ -s /geoip/geoip ] && [ -s /geoip/geoip6 ] || { echo "Tor geoip download failed"; exit 1; }
+        echo "Tor geoip ready: $$(wc -l < /geoip/geoip) v4 + $$(wc -l < /geoip/geoip6) v6 ranges"
+    volumes:
+      - moav_tor_geoip:/geoip
     cap_drop:
       - ALL
     security_opt:

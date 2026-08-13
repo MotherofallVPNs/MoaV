@@ -74,6 +74,18 @@ scrape_configs:
       - targets: ['snowflake-exporter:8080']
     scrape_timeout: 10s
 
+  # The proxy's own Prometheus endpoint: relayed bytes as real counters and a
+  # connection-timeout counter. Complements the log exporter above, which is the
+  # only source for the completed-connection count.
+  - job_name: 'snowflake-proxy'
+    metrics_path: /internal/metrics
+    # snowflake runs with network_mode: host (it needs the host's NAT behaviour),
+    # so it is not on moav_net and has no service DNS name. prometheus already
+    # declares host.docker.internal:host-gateway for exactly this case.
+    static_configs:
+      - targets: ['host.docker.internal:9998']
+    scrape_timeout: 10s
+
   # telemt - Telegram MTProxy native Prometheus metrics
   # NOTE: Only available when running with --profile telegram
   - job_name: 'telemt'

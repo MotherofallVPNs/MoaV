@@ -14,7 +14,7 @@
 #   moav build:   SNOWFLAKE_BINARY=source moav build snowflake
 #   docker build: --build-arg SNOWFLAKE_BINARY=source
 
-ARG SNOWFLAKE_VERSION=2.11.0
+ARG SNOWFLAKE_VERSION=2.14.1
 # Selects which stage provides the binary: prebuilt (default) or source. Must be
 # a *global* ARG (declared before the first FROM) so it can be used in the FROM
 # selector below — a mid-file ARG is out of scope for FROM and resolves blank.
