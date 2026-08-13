@@ -9,9 +9,18 @@ reading "GitHub restricted access to star data", not a chart. Their token
 workaround does work, but it means handing a third party a credential that reads
 this repo, embedded in a public README, and they describe it as temporary.
 
-This repo's own GITHUB_TOKEN *is* admin here, so the durable place to build the
-chart is here. Output is a single committed SVG: no credential, no vendor, no
-request leaving GitHub, and immune to the next policy change.
+Building it here is the durable answer, but NOT from /stargazers: that endpoint
+now wants an admin or collaborator, and a fine-grained PAT does not satisfy it at
+any permission level. So the history lives in a committed JSON that grows from the
+repo object's `stargazers_count` -- public, unauthenticated, and unaffected by the
+restriction. /stargazers is used opportunistically, only to backfill history from
+before that file existed, and its absence is not an error.
+
+    python3 scripts/gen-star-history.py             # append today, render
+    python3 scripts/gen-star-history.py --seed      # backfill true history once,
+                                                    # needs a login that can read
+                                                    # /stargazers (yours, not a PAT)
+    python3 scripts/gen-star-history.py --check     # CI: fail if stale/missing
 
 The layout deliberately mirrors star-history.com's -- 800x533 white card, "Star
 History" title, "Date" axis, abbreviated star counts, repo legend -- because that
@@ -19,8 +28,6 @@ chart is what readers recognise. The one thing not copied is their xkcd webfont,
 which is 58 KB of base64 and would be most of the file; FONT below is a
 hand-drawn stack that falls back cleanly.
 
-    GITHUB_TOKEN=... python3 scripts/gen-star-history.py
-    python3 scripts/gen-star-history.py --check    # CI: fail if stale/missing
 """
 import json
 import os
@@ -39,6 +46,9 @@ API_VERSION = os.environ.get("STAR_API_VERSION", "2026-03-10")
 FAILED_REPOS = []   # unreadable repos, reported once at the end
 OUT = os.environ.get("STAR_OUT", "assets/star-history.svg")
 LOGO = os.environ.get("STAR_LOGO", "branding/favicon-56.png")
+# Committed history. The chart no longer depends on being able to read
+# /stargazers at run time: see fetch_count() and main().
+DATA = os.environ.get("STAR_DATA", "assets/star-history.json")
 
 W, H = 800, 533
 PAD_L, PAD_R, PAD_T, PAD_B = 84, 30, 62, 76
@@ -68,12 +78,19 @@ def fetch_stars(repo):
     """
     stamps, page = [], 1
     while True:
-        out = subprocess.run(
-            ["gh", "api", "-H", "Accept: application/vnd.github.star+json",
-             "-H", f"X-GitHub-Api-Version: {API_VERSION}",
-             f"repos/{repo}/stargazers?per_page=100&page={page}"],
-            capture_output=True, text=True,
-        )
+        try:
+            out = subprocess.run(
+                ["gh", "api", "-H", "Accept: application/vnd.github.star+json",
+                 "-H", f"X-GitHub-Api-Version: {API_VERSION}",
+                 f"repos/{repo}/stargazers?per_page=100&page={page}"],
+                capture_output=True, text=True,
+            )
+        except FileNotFoundError:
+            # No gh at all (a bare container, a stripped PATH). Timestamps are
+            # optional -- the count path below carries the run.
+            sys.stderr.write("skipping timestamps: gh is not installed\n")
+            FAILED_REPOS.append(repo)
+            return None
         if out.returncode != 0:
             err = out.stderr.strip()[:300]
             sys.stderr.write(f"skipping {repo}: {err}\n")
@@ -101,25 +118,25 @@ def fetch_stars(repo):
 
 
 def token_hint(repos):
-    """One actionable block, not the same two lines under every repo.
+    """Say what happened, once, and make clear the run did NOT fail.
 
-    Since 2026-06-30 the stargazers endpoint is limited to a repo's admins and
-    collaborators, so this needs a token that is one of those for EVERY repo in
-    STAR_REPOS -- granting it on one repo leaves the others 403ing.
+    The 2026-06-30 restriction limits /stargazers to a repo's admins and
+    collaborators, and a fine-grained PAT does not appear to satisfy that for any
+    combination of permissions -- ticking more boxes is not the fix. A classic PAT
+    or a user login works because it acts as the person. Since the only thing the
+    endpoint adds is BACKFILL, this is not worth a broad credential in CI: the
+    chart accumulates daily counts instead, and the past can be seeded once from
+    a laptop that is already logged in.
     """
     sys.stderr.write(
-        "\ncould not read stargazers for: " + ", ".join(repos) + "\n"
-        "Check, in this order:\n"
-        "  1. the API version. This call sends X-GitHub-Api-Version: " + API_VERSION + ";\n"
-        "     without it the endpoint 403s even for a token with full access.\n"
-        "  2. the token's 'Repository access' list -- it needs every repo in\n"
-        "     STAR_REPOS, not just one.\n"
-        "  3. org approval: fine-grained tokens on org repos start as pending\n"
-        "     under Settings -> Personal access tokens.\n"
-        "verify before re-running the workflow (must print a starred_at field):\n"
-        "  GH_TOKEN=<token> gh api -H 'Accept: application/vnd.github.star+json' \\\n"
-        "    -H 'X-GitHub-Api-Version: " + API_VERSION + "' \\\n"
-        "    'repos/%s/stargazers?per_page=1'\n" % repos[0])
+        "\nnote: no star timestamps for " + ", ".join(repos) + " (see above).\n"
+        "This is expected for a fine-grained token and is NOT a failure -- today's\n"
+        "count was appended to " + DATA + " and the chart still renders.\n"
+        "Only the history BEFORE this file existed needs /stargazers. To backfill\n"
+        "it once, from a machine whose `gh auth status` shows you logged in as an\n"
+        "admin of these repos:\n"
+        "    python3 scripts/gen-star-history.py --seed\n"
+        "then commit " + DATA + ". After that no credential is needed again.\n")
 
 
 def logo_data_uri():
@@ -130,6 +147,58 @@ def logo_data_uri():
             return "data:image/png;base64," + base64.b64encode(f.read()).decode("ascii")
     except OSError:
         return ""
+
+
+def fetch_count(repo):
+    """Today's star total, or None.
+
+    This is the endpoint that cannot break: stargazers_count on the repo object
+    is public, needs no credential at all, and is unaffected by the 2026-06-30
+    restriction on /stargazers. `gh` first so an authenticated run keeps its
+    higher rate limit; plain HTTPS when gh is absent or unauthenticated.
+    """
+    try:
+        out = subprocess.run(["gh", "api", f"repos/{repo}", "--jq", ".stargazers_count"],
+                             capture_output=True, text=True)
+        if out.returncode == 0 and out.stdout.strip().isdigit():
+            return int(out.stdout.strip())
+    except FileNotFoundError:
+        pass
+    try:
+        import urllib.request
+        with urllib.request.urlopen(f"https://api.github.com/repos/{repo}", timeout=15) as r:
+            return int(json.load(r)["stargazers_count"])
+    except Exception as e:                                   # noqa: BLE001
+        sys.stderr.write(f"could not read the star count for {repo}: {e}\n")
+        return None
+
+
+def load_history():
+    try:
+        with open(DATA, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def save_history(hist):
+    os.makedirs(os.path.dirname(DATA) or ".", exist_ok=True)
+    with open(DATA, "w", encoding="utf-8") as f:
+        json.dump(hist, f, indent=1, sort_keys=True)
+        f.write("\n")
+
+
+def merge_point(points, day, count):
+    """Insert or replace one (YYYY-MM-DD, count) point, keeping the list sorted."""
+    kept = [p for p in points if p[0] != day]
+    kept.append([day, int(count)])
+    kept.sort(key=lambda p: p[0])
+    return kept
+
+
+def points_to_series(points):
+    return [(datetime.strptime(d, "%Y-%m-%d").replace(tzinfo=timezone.utc), int(c))
+            for d, c in points]
 
 
 def build_series(stamps, max_points=110):
@@ -292,18 +361,69 @@ def main():
         for needed in ("<svg", "Star History", "GitHub Stars", "</svg>"):
             if needed not in body:
                 raise SystemExit(f"{OUT} does not look like a rendered chart (missing {needed!r})")
+        if os.path.isfile(DATA):
+            try:
+                store = json.load(open(DATA, encoding="utf-8"))
+            except ValueError as e:
+                raise SystemExit(f"{DATA} is not valid JSON: {e}")
+            thin = [r for r, e in store.items() if len(e.get("points", [])) < 2]
+            if thin:
+                print(f"gen-star-history: note — fewer than 2 points for {', '.join(thin)}")
         print(f"gen-star-history: {OUT} present and well-formed")
         return
 
-    datasets = []
+    seeding = "--seed" in sys.argv
+    # UTC day, passed in rather than computed twice, so a run that straddles
+    # midnight cannot write two points for "today".
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    hist = load_history()
     for repo in REPOS:
+        entry = hist.get(repo) or {"source": "counts", "points": []}
         stamps = fetch_stars(repo)
         if stamps:
-            datasets.append((repo, build_series(stamps)))
+            # Timestamps are the truth: rebuild the whole series from them, which
+            # also self-heals a history that had been accumulating daily counts.
+            entry = {"source": "timestamps", "updated": today,
+                     "points": [[d.strftime("%Y-%m-%d"), c]
+                                for d, c in build_series(stamps)]}
+        else:
+            count = fetch_count(repo)
+            if count is None:
+                hist[repo] = entry
+                continue
+            pts = entry.get("points", [])
+            if pts and int(pts[-1][1]) == int(count):
+                # Flat day. A cumulative line needs no point to stay flat, and
+                # writing one anyway would open a PR every night for nothing.
+                pass
+            else:
+                entry["points"] = merge_point(pts, today, count)
+                entry["updated"] = today
+        hist[repo] = entry
+
+    if seeding and any(e.get("source") != "timestamps" for e in hist.values()):
+        # A seed run exists to capture real history. Letting it write a
+        # counts-only file would look like success and quietly discard the past.
+        raise SystemExit(
+            "--seed needs full timestamp history for every repo and did not get it.\n"
+            "Run it with a credential that can read /stargazers -- your own gh login\n"
+            "works if you are an admin on these repos:  gh auth status")
+
+    save_history(hist)
+
+    datasets = [(repo, points_to_series(e["points"]))
+                for repo, e in hist.items()
+                if repo in REPOS and len(e.get("points", [])) >= 2]
+
     if FAILED_REPOS:
         token_hint(FAILED_REPOS)
     if not datasets:
-        raise SystemExit("no readable repo in STAR_REPOS")
+        # Not a failure worth alarming on: with counts-only history a brand new
+        # store has one point per repo and simply cannot be plotted yet.
+        print(f"gen-star-history: {DATA} has fewer than 2 points per repo — "
+              "nothing to plot yet, run again tomorrow (or seed it: --seed)")
+        return
     # Largest total first: its fade is drawn under the smaller one's line.
     datasets.sort(key=lambda d: d[1][-1][1], reverse=True)
     svg = render(datasets)

@@ -9,10 +9,15 @@ name: star history
 # service is neither, so third-party embeds now render a "GitHub restricted
 # access to star data" notice instead of a chart.
 #
-# STAR_TOKEN (optional): GITHUB_TOKEN is admin only on THIS repo, so charting
-# moav-client as well needs a token that can read both. A fine-grained PAT with
-# Metadata → Read-only on each repo is enough. Without it the run still succeeds
-# and charts MoaV alone — see fetch_stars() in the generator.
+# STAR_TOKEN is NOT required. The chart is built from assets/star-history.json,
+# which the run appends to using the repo object's stargazers_count -- public,
+# unauthenticated, unaffected by the 2026-06-30 /stargazers restriction.
+#
+# A token only buys BACKFILL of history from before that file existed, and a
+# fine-grained PAT cannot do it at any permission level: the endpoint wants an
+# admin or collaborator, which means a classic PAT or a user login. Not worth a
+# broad credential in CI for a cosmetic chart -- backfill once from a laptop
+# instead:  python3 scripts/gen-star-history.py --seed
 on:
   schedule:
     - cron: '20 4 * * *'      # daily, 04:20 UTC
@@ -41,10 +46,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # The generator is a no-op when the SVG is byte-identical, so on a quiet
-          # day this exits here and no PR is touched.
-          if git diff --quiet -- assets/star-history.svg; then
-            echo "chart unchanged — nothing to open"
+          # The generator writes nothing on a flat day, so on a quiet day this
+          # exits here and no PR is touched. Both files matter: the JSON is the
+          # accumulated history and the SVG is rendered from it.
+          if git diff --quiet -- assets/star-history.json assets/star-history.svg; then
+            echo "no change — nothing to open"
             exit 0
           fi
 
@@ -55,7 +61,10 @@ jobs:
           # One long-lived branch, reset each run: the chart is generated, so its
           # history is noise and a stack of daily branches would be worse.
           git checkout -B "$BRANCH"
-          git add assets/star-history.svg
+          # The JSON MUST be committed: it is the history. Committing only the
+          # SVG would discard every accumulated count and the chart could never
+          # grow past a single day.
+          git add assets/star-history.json assets/star-history.svg
           git commit -m "chore(assets): refresh star history chart"
           git push --force origin "$BRANCH"
 

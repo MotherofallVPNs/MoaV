@@ -2,18 +2,22 @@
 # Regression test: the stargazers call must send an explicit API version, and it
 # must refuse to chart a response that has no timestamps.
 #
-# The workflow failed with HTTP 403 on both repos. It was read as a permissions
-# problem and more permissions were added to the token for an afternoon; the
-# actual fix was the header GitHub's own docs use:
+# The nightly workflow 403'd on /stargazers. Two wrong diagnoses came first:
+# "the token needs more permissions" (it does not -- a fine-grained PAT cannot
+# read this endpoint at any permission level), and "it needs the API version
+# header" (the command that appeared to prove that was run with a personal login,
+# not the token, so the credential was the difference, not the header).
 #
-#   -H "X-GitHub-Api-Version: 2026-03-10"
+# The fix is to stop needing that endpoint. The chart is built from
+# assets/star-history.json, appended to from the repo object's stargazers_count:
+# public, unauthenticated, unaffected by the restriction. /stargazers is now only
+# an optional backfill of history from before that file existed.
 #
-# The trap in "just copy the working curl": the docs example also uses
-# `Accept: application/vnd.github+json`, which returns stargazers WITHOUT
-# starred_at. This script needs the timestamps -- without them every point
-# collapses and the chart renders a flat line that looks like the repo stopped
-# being starred. So the star media type stays, and a response with no starred_at
-# is an error rather than an empty series.
+# What must not regress:
+#   - a 403, or no gh at all, still produces a chart and exits 0
+#   - the history file is the input, so it must be written
+#   - a flat day writes nothing, or the workflow opens a PR every night
+#   - if timestamps ARE readable they win, and they must carry starred_at
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -31,6 +35,11 @@ mkdir -p "$TMP/bin" "$TMP/assets"
 cat > "$TMP/bin/gh" <<'STUB'
 #!/bin/bash
 printf '%s\n' "$*" >> "$ARGV_LOG"
+# fetch_count: the public repo object. Answers regardless of MODE, because a 403
+# on /stargazers must not stop the count path.
+if [[ "$*" == *".stargazers_count"* ]]; then
+    echo "${STUB_COUNT:-11}"; exit 0
+fi
 case "${MODE:-dated}" in
     dated)                 # what the star media type returns
         if [[ "$*" == *"page=1"* ]]; then
@@ -56,6 +65,7 @@ run_gen() {   # <mode> -> combined output; exit code in RC file
     ARGV_LOG="$TMP/argv.log" MODE="$1" \
     PATH="$TMP/bin:$PATH" \
     STAR_REPOS="acme/one" STAR_OUT="$TMP/assets/out.svg" STAR_LOGO="$TMP/none.png" \
+    STAR_DATA="$TMP/assets/store.json" \
         python3 "$SCRIPT" 2>&1
     echo "RC=$?"
 }
@@ -77,26 +87,54 @@ printf '%s' "$out" | grep -q 'RC=0' \
     && ok "a normal dated response renders" \
     || bad "failed on a valid response: $(printf '%s' "$out" | tr '\n' '|')"
 
-# --- 2. a response without timestamps must be refused, not charted -----------
-# This is the failure mode of copying the docs' plain-Accept example.
+# --- 2. a response without timestamps must not be charted as history ---------
+# The trap in copying the docs' plain-Accept example: it returns stargazers with
+# no starred_at, and charting those collapses every point onto one date.
 out_undated=$(run_gen undated)
-if printf '%s' "$out_undated" | grep -q 'no starred_at'; then
-    ok "a response with no starred_at is called out by name"
-else
-    bad "silently accepted a response with no timestamps — the chart would be a flat line"
-fi
-printf '%s' "$out_undated" | grep -q 'RC=0' \
-    && bad "exited 0 on a timestampless response — a broken chart would be committed" \
-    || ok "exits non-zero rather than committing a chart with no history"
+printf '%s' "$out_undated" | grep -q 'no starred_at' \
+    && ok "a response with no starred_at is called out by name" \
+    || bad "silently accepted a response with no timestamps — the chart would be a flat line"
 
-# --- 3. a 403 still names the version header first ---------------------------
+# --- 3. a 403 must NOT fail the run any more ---------------------------------
+# This is the nightly failure. The count path has to carry it.
+printf '{"acme/one":{"source":"counts","updated":"2026-08-01","points":[["2026-08-01",10],["2026-08-02",11]]}}\n' \
+    > "$TMP/assets/store.json"
 out_403=$(run_gen forbidden)
-printf '%s' "$out_403" | grep -qi 'API version' \
-    && ok "the 403 hint leads with the API version, which is what it was" \
-    || bad "the 403 hint still sends the operator to token permissions first"
-printf '%s' "$out_403" | grep -q 'starred_at field' \
-    && ok "the verify command tells you what a good response looks like" \
-    || bad "the verify command does not say what to look for in the output"
+printf '%s' "$out_403" | grep -q 'RC=0' \
+    && ok "a 403 on /stargazers no longer fails the run" \
+    || bad "still exits non-zero on 403 — the workflow keeps failing nightly: $(printf '%s' "$out_403" | tr '\n' '|' | tail -c 200)"
+printf '%s' "$out_403" | grep -qi 'NOT a failure' \
+    && ok "the note says plainly that this is not a failure" \
+    || bad "the 403 note still reads like an error"
+printf '%s' "$out_403" | grep -qi 'permission' \
+    && bad "the note still sends the operator to token permissions — that was the wrong turn twice" \
+    || ok "the note does not blame permissions"
+[ -s "$TMP/assets/out.svg" ] \
+    && ok "a chart is still rendered from the stored history" \
+    || bad "no chart written despite having stored history"
+
+# --- 3b. the count path: flat day writes nothing, a move appends -------------
+store_points() { python3 -c "
+import json;print(len(json.load(open('$TMP/assets/store.json'))['acme/one']['points']))"; }
+write_store() { printf '{"acme/one":{"source":"counts","updated":"2026-08-01","points":[["2026-08-01",10],["2026-08-02",11]]}}\n' > "$TMP/assets/store.json"; }
+
+write_store
+STUB_COUNT=11 run_gen forbidden >/dev/null 2>&1
+[ "$(store_points)" = "2" ] \
+    && ok "an unchanged count adds no point (no nightly PR churn)" \
+    || bad "a flat day grew the store to $(store_points) points — the workflow would open a PR every night"
+
+write_store
+STUB_COUNT=25 run_gen forbidden >/dev/null 2>&1
+if [ "$(store_points)" = "3" ]; then
+    got=$(python3 -c "
+import json;print(json.load(open('$TMP/assets/store.json'))['acme/one']['points'][-1][1])")
+    [ "$got" = "25" ] \
+        && ok "a changed count is appended (the chart grows without any credential)" \
+        || bad "appended the wrong value ($got, expected 25)"
+else
+    bad "a moved count did not append a point — history would never accumulate"
+fi
 
 # --- 4. and the stub is actually exercising the real call --------------------
 # Without this, a stub that never ran would make every check above vacuous.
