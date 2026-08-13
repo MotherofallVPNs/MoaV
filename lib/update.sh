@@ -439,6 +439,15 @@ check_source_rebuilds() {
     # the inode, so a running container keeps reading the old file until it is
     # recreated. Measured on a live server -- host inode 508739 vs container
     # 523302 -- which left prometheus on a stale scrape config after an update.
+    local compose_changed=""
+    while IFS= read -r f; do
+        case "$f" in
+            docker-compose.yml|docker-compose.*.yml|compose.yml|compose.*.yml)
+                compose_changed=1 ;;
+        esac
+    done <<< "$changed"
+    [[ -n "$compose_changed" ]] && POST_UPDATE_COMPOSE_CHANGED=1
+
     local recreate=""
     while IFS= read -r f; do
         case "$f" in
@@ -474,8 +483,10 @@ print_post_update_apply_steps() {
     local regen_bundles="${POST_UPDATE_REGEN_BUNDLES:-}"
     local recreate="${POST_UPDATE_CONFIG_RECREATE:-}"
     local setup_jobs="${POST_UPDATE_SETUP_JOBS:-}"
+    local compose_changed="${POST_UPDATE_COMPOSE_CHANGED:-}"
 
-    [[ -z "$rebuild" && -z "$templates" && -z "$regen_bundles" && -z "$recreate" && -z "$setup_jobs" ]] && return 0
+    [[ -z "$rebuild" && -z "$templates" && -z "$regen_bundles" && -z "$recreate" \
+       && -z "$setup_jobs" && -z "$compose_changed" ]] && return 0
 
     echo ""
     if [[ -n "$templates" ]]; then
@@ -516,7 +527,11 @@ print_post_update_apply_steps() {
         echo -e "     ${DIM}# fills a volume this release added; it has never run here${NC}"
         n=$((n+1))
     fi
-    echo -e "  ${WHITE}${n}.${NC} moav start                      ${DIM}# recreate containers on the new images${NC}"
+    if [[ -z "$rebuild" && -n "$compose_changed" ]]; then
+        echo -e "  ${WHITE}${n}.${NC} moav start                      ${DIM}# docker-compose.yml changed; recreates the services it touched${NC}"
+    else
+        echo -e "  ${WHITE}${n}.${NC} moav start                      ${DIM}# recreate containers on the new images${NC}"
+    fi
     n=$((n+1))
     if [[ -n "$recreate" ]]; then
         echo -e "  ${WHITE}${n}.${NC} cd ${SCRIPT_DIR} && docker compose up -d --force-recreate ${recreate}"

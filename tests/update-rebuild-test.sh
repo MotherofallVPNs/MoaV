@@ -114,6 +114,33 @@ case " $got " in
     *" prometheus "*) ok "a prometheus.yml change asks for a recreate" ;;
     *) bad "prometheus.yml changed but no recreate was suggested (got '${got:-none}') — the container keeps the old config silently" ;;
 esac
+# --- a compose change alone must still tell the operator to apply it ---------
+# It maps to no service, so the whole summary used to be skipped and the pull
+# looked like a no-op -- even though `up -d` is exactly what applies it.
+compose_flag_for() {  # <changed-paths...> -> 1 when the summary should fire
+    local tmp; tmp=$(mktemp); printf '%s\n' "$@" > "$tmp"
+    (
+        SCRIPT_DIR="$ROOT"
+        # shellcheck disable=SC1091
+        source "$ROOT/scripts/lib/common.sh" >/dev/null 2>&1
+        # shellcheck disable=SC1091
+        source "$ROOT/lib/common.sh"        >/dev/null 2>&1
+        # shellcheck disable=SC1091
+        source "$ROOT/lib/update.sh"        >/dev/null 2>&1
+        git() { case " $* " in *" diff --name-only "*) cat "$tmp" ;; *) command git "$@" ;; esac; }
+        POST_UPDATE_COMPOSE_CHANGED=""
+        check_source_rebuilds "SOMECOMMIT" >/dev/null 2>&1
+        printf '%s' "${POST_UPDATE_COMPOSE_CHANGED:-}"
+    )
+    rm -f "$tmp"
+}
+[ -n "$(compose_flag_for "docker-compose.yml")" ] \
+    && ok "a docker-compose.yml change asks the operator to run moav start" \
+    || bad "a compose change printed nothing — the pull looks like a no-op"
+[ -z "$(compose_flag_for "README.md")" ] \
+    && ok "a docs change does not ask for a start" \
+    || bad "a docs change asked for a start"
+
 got=$(recreate_for "README.md")
 [ -z "$got" ] && ok "a docs change asks for no recreate" \
               || bad "a docs change suggested recreating '$got'"
