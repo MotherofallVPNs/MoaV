@@ -68,7 +68,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "snowflake_connections_total",
+          "expr": "sum(tor_snowflake_proxy_connections_total)",
           "refId": "A"
         }
       ],
@@ -127,7 +127,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "snowflake_relayed_bytes_total{direction=\"down\"}",
+          "expr": "tor_snowflake_proxy_traffic_inbound_bytes_total * 1024",
           "refId": "A"
         }
       ],
@@ -187,7 +187,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "snowflake_relayed_bytes_total{direction=\"up\"}",
+          "expr": "tor_snowflake_proxy_traffic_outbound_bytes_total * 1024",
           "refId": "A"
         }
       ],
@@ -247,7 +247,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(snowflake_relayed_bytes_total)",
+          "expr": "sum(tor_snowflake_proxy_traffic_inbound_bytes_total + tor_snowflake_proxy_traffic_outbound_bytes_total) * 1024",
           "refId": "A"
         }
       ],
@@ -340,7 +340,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "increase(snowflake_connections_total[1h])",
+          "expr": "sum(increase(tor_snowflake_proxy_connections_total[1h]))",
           "legendFormat": "connections/hour",
           "refId": "A"
         }
@@ -465,7 +465,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(snowflake_relayed_bytes_total{direction=\"down\"}[$__rate_interval])",
+          "expr": "rate(tor_snowflake_proxy_traffic_inbound_bytes_total[$__rate_interval]) * 1024",
           "legendFormat": "to client",
           "refId": "A"
         },
@@ -474,7 +474,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(snowflake_relayed_bytes_total{direction=\"up\"}[$__rate_interval])",
+          "expr": "rate(tor_snowflake_proxy_traffic_outbound_bytes_total[$__rate_interval]) * 1024",
           "legendFormat": "from client",
           "refId": "B"
         }
@@ -565,13 +565,82 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(snowflake_relayed_bytes_total)",
+          "expr": "sum(tor_snowflake_proxy_traffic_inbound_bytes_total + tor_snowflake_proxy_traffic_outbound_bytes_total) * 1024",
           "legendFormat": "donated",
           "refId": "A"
         }
       ],
       "title": "Total Bandwidth Donated",
       "type": "timeseries"
+    },
+    {
+      "id": 8,
+      "type": "barchart",
+      "title": "Users Served by Country",
+      "description": "From the proxy's own geoip lookup at connection close. '??' means the client IP was not in the database.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(sum by (country) (tor_snowflake_proxy_connections_total))",
+          "legendFormat": "{{country}}",
+          "refId": "A",
+          "instant": true,
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Failed Connections (per hour)",
+      "description": "Rendezvous succeeded but the data channel never opened. Often the client's NAT or censorship, not this proxy.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "increase(tor_snowflake_proxy_connection_timeouts_total[1h])",
+          "legendFormat": "failed/hour",
+          "refId": "A"
+        }
+      ]
     }
   ],
   "refresh": "30s",

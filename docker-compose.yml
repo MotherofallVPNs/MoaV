@@ -614,39 +614,6 @@ services:
   # Snowflake Prometheus Exporter - parses snowflake logs for metrics
   # Only runs with monitoring profile (requires Prometheus to scrape)
   # Snowflake Exporter (custom optimized) - parses snowflake proxy logs
-  snowflake-exporter:
-    build:
-      context: ./exporters/snowflake
-      dockerfile: Dockerfile
-    container_name: moav-snowflake-exporter
-    restart: unless-stopped
-    logging: *default-logging
-    networks:
-      - moav_net
-    volumes:
-      - moav_snowflake_logs:/var/log/snowflake:ro
-    environment:
-      - TZ=${TZ:-UTC}
-    expose:
-      - "8080"
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    read_only: true
-    tmpfs:
-      - /tmp:rw,noexec,size=10m
-    mem_limit: 64m
-    cpus: 0.25
-    # No depends_on; exporter handles retry. Follows the relay (issue #106).
-    profiles:
-      - snowflake
-      - all
-
-  # ===========================================================================
-  # AMNEZIAWG: DPI-resistant WireGuard fork
-  # Obfuscated WireGuard that defeats deep packet inspection
-  # ===========================================================================
   amneziawg:
     build:
       context: .

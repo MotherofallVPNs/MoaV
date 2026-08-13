@@ -69,14 +69,9 @@ scrape_configs:
 
   # Snowflake Exporter - parses snowflake proxy logs for metrics
   # NOTE: Only available when running with --profile snowflake
-  - job_name: 'snowflake'
-    static_configs:
-      - targets: ['snowflake-exporter:8080']
-    scrape_timeout: 10s
-
-  # The proxy's own Prometheus endpoint: relayed bytes as real counters and a
-  # connection-timeout counter. Complements the log exporter above, which is the
-  # only source for the completed-connection count.
+  # The proxy's own Prometheus endpoint. This replaced a 213-line log-parsing
+  # exporter of ours: it carries the same connection and traffic counters, plus a
+  # per-country breakdown and a failure counter we never had.
   - job_name: 'snowflake-proxy'
     metrics_path: /internal/metrics
     # snowflake runs with network_mode: host (it needs the host's NAT behaviour),
