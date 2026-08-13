@@ -41,7 +41,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 6,
         "x": 0,
         "y": 0
@@ -73,7 +73,8 @@
         }
       ],
       "title": "People Served",
-      "type": "stat"
+      "type": "stat",
+      "description": "Cumulative since the proxy last started \u2014 this stat does not follow the time picker. Counters reset when the container restarts."
     },
     {
       "datasource": {
@@ -100,7 +101,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 6,
         "x": 6,
         "y": 0
@@ -131,8 +132,8 @@
           "refId": "A"
         }
       ],
-      "title": "Users Download",
-      "description": "Total data downloaded BY users through this proxy. Note: This is only the relayed payload - container metrics show higher values due to WebSocket/TLS overhead and broker connections.",
+      "title": "Total Downloaded",
+      "description": "Cumulative since the proxy last started \u2014 this stat does not follow the time picker. Counters reset when the container restarts.",
       "type": "stat"
     },
     {
@@ -160,7 +161,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 6,
         "x": 12,
         "y": 0
@@ -191,8 +192,8 @@
           "refId": "A"
         }
       ],
-      "title": "Users Upload",
-      "description": "Total data uploaded BY users through this proxy. Note: This is only the relayed payload - container metrics show higher values due to WebSocket/TLS overhead and broker connections.",
+      "title": "Total Uploaded",
+      "description": "Cumulative since the proxy last started \u2014 this stat does not follow the time picker. Counters reset when the container restarts.",
       "type": "stat"
     },
     {
@@ -220,7 +221,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 6,
         "x": 18,
         "y": 0
@@ -252,102 +253,98 @@
         }
       ],
       "title": "Total Bandwidth",
-      "description": "Total user payload relayed. Container network metrics (in cAdvisor) will show ~15-20x higher values due to WebSocket framing, TLS encryption overhead, and broker signaling traffic.",
+      "description": "Cumulative since the proxy last started \u2014 this stat does not follow the time picker. Counters reset when the container restarts.",
       "type": "stat"
     },
     {
+      "id": 12,
+      "type": "stat",
+      "title": "Downloaded (selected range)",
+      "description": "Relayed to clients within the selected time range. increase() spans counter resets, so a proxy restart inside the window does not lose the traffic.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
+          "unit": "bytes",
           "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 20,
-            "gradientMode": "opacity",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": true,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short",
-          "min": 0
+            "mode": "fixed",
+            "fixedColor": "super-light-blue"
+          }
         },
         "overrides": []
       },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 5
-      },
-      "id": 5,
       "options": {
-        "legend": {
+        "reduceOptions": {
           "calcs": [
-            "mean",
-            "max",
             "lastNotNull"
           ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
+          "fields": "",
+          "values": false
         },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto"
       },
-      "pluginVersion": "10.4.1",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(tor_snowflake_proxy_connections_total[1h]))",
-          "legendFormat": "connections/hour",
-          "refId": "A"
+          "expr": "increase(tor_snowflake_proxy_traffic_inbound_bytes_total[$__range]) * 1024",
+          "refId": "A",
+          "instant": true
         }
       ],
-      "title": "Connections Served (per hour)",
-      "type": "timeseries",
-      "description": "Completed connections per hour. The proxy reports every 90s but completes only a handful an hour, so shorter windows read as zero."
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Uploaded (selected range)",
+      "description": "Relayed from clients within the selected time range.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "super-light-green"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "increase(tor_snowflake_proxy_traffic_outbound_bytes_total[$__range]) * 1024",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      }
     },
     {
       "datasource": {
@@ -438,8 +435,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 5
+        "x": 0,
+        "y": 8
       },
       "id": 6,
       "options": {
@@ -499,7 +496,7 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 30,
+            "fillOpacity": 20,
             "gradientMode": "opacity",
             "hideFrom": {
               "legend": false,
@@ -516,7 +513,7 @@
             "spanNulls": true,
             "stacking": {
               "group": "A",
-              "mode": "normal"
+              "mode": "none"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -532,21 +529,23 @@
               }
             ]
           },
-          "unit": "bytes",
+          "unit": "short",
           "min": 0
         },
         "overrides": []
       },
       "gridPos": {
         "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 13
+        "w": 12,
+        "x": 12,
+        "y": 8
       },
-      "id": 7,
+      "id": 5,
       "options": {
         "legend": {
           "calcs": [
+            "mean",
+            "max",
             "lastNotNull"
           ],
           "displayMode": "table",
@@ -565,43 +564,14 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(tor_snowflake_proxy_traffic_inbound_bytes_total + tor_snowflake_proxy_traffic_outbound_bytes_total) * 1024",
-          "legendFormat": "donated",
+          "expr": "sum(increase(tor_snowflake_proxy_connections_total[1h]))",
+          "legendFormat": "connections/hour",
           "refId": "A"
         }
       ],
-      "title": "Total Bandwidth Donated",
-      "type": "timeseries"
-    },
-    {
-      "id": 9,
+      "title": "Connections Served (per hour)",
       "type": "timeseries",
-      "title": "Failed Connections (per hour)",
-      "description": "Rendezvous succeeded but the data channel never opened. Often the client's NAT or censorship, not this proxy.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 12,
-        "y": 21
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "min": 0
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "increase(tor_snowflake_proxy_connection_timeouts_total[1h])",
-          "legendFormat": "failed/hour",
-          "refId": "A"
-        }
-      ]
+      "description": "Completed connections per hour. The proxy reports every 90s but completes only a handful an hour, so shorter windows read as zero."
     },
     {
       "id": 10,
@@ -616,7 +586,7 @@
         "h": 9,
         "w": 8,
         "x": 0,
-        "y": 30
+        "y": 16
       },
       "fieldConfig": {
         "defaults": {
@@ -679,7 +649,7 @@
         "h": 9,
         "w": 16,
         "x": 8,
-        "y": 30
+        "y": 16
       },
       "fieldConfig": {
         "defaults": {
@@ -715,6 +685,131 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Failed Connections (per hour)",
+      "description": "Rendezvous succeeded but the data channel never opened. Often the client's NAT or censorship, not this proxy.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 25
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "increase(tor_snowflake_proxy_connection_timeouts_total[1h])",
+          "legendFormat": "failed/hour",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 25
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(tor_snowflake_proxy_traffic_inbound_bytes_total + tor_snowflake_proxy_traffic_outbound_bytes_total) * 1024",
+          "legendFormat": "donated",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Bandwidth Donated",
+      "type": "timeseries"
     }
   ],
   "refresh": "30s",
