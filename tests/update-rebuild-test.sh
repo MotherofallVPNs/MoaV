@@ -81,6 +81,43 @@ must_not_queue "bind-mounted lib/ change"    "lib/update.sh"
 must_not_queue "bind-mounted grafana entry"  "scripts/grafana-entrypoint.sh"
 must_not_queue "a docs change"               "README.md" "CHANGELOG.md"
 
+# A deleted service must not be suggested. Removing exporters/snowflake left its
+# files in the diff, so the prompt said `moav build snowflake-exporter` for a
+# service that no longer exists in compose.
+must_not_queue "a deleted exporter"          "exporters/snowflake/main.py"
+# ...but the mapping itself must still work for the exporters that remain.
+must_queue "a live exporter change"  singbox-exporter  "exporters/singbox/main.py"
+
+# --- bind-mounted single files need a RECREATE, not a restart ----------------
+# A single-file mount follows the inode; git replaces the file, so the container
+# reads the old copy until recreated. Measured on a live server: host inode
+# 508739 vs container 523302, leaving prometheus on a stale scrape config.
+recreate_for() {  # <changed-paths...> -> the services to recreate
+    local tmp; tmp=$(mktemp); printf '%s\n' "$@" > "$tmp"
+    (
+        SCRIPT_DIR="$ROOT"
+        # shellcheck disable=SC1091
+        source "$ROOT/scripts/lib/common.sh" >/dev/null 2>&1
+        # shellcheck disable=SC1091
+        source "$ROOT/lib/common.sh"        >/dev/null 2>&1
+        # shellcheck disable=SC1091
+        source "$ROOT/lib/update.sh"        >/dev/null 2>&1
+        git() { case " $* " in *" diff --name-only "*) cat "$tmp" ;; *) command git "$@" ;; esac; }
+        POST_UPDATE_CONFIG_RECREATE=""
+        check_source_rebuilds "SOMECOMMIT" >/dev/null 2>&1
+        printf '%s' "${POST_UPDATE_CONFIG_RECREATE:-}"
+    )
+    rm -f "$tmp"
+}
+got=$(recreate_for "configs/monitoring/prometheus.yml")
+case " $got " in
+    *" prometheus "*) ok "a prometheus.yml change asks for a recreate" ;;
+    *) bad "prometheus.yml changed but no recreate was suggested (got '${got:-none}') — the container keeps the old config silently" ;;
+esac
+got=$(recreate_for "README.md")
+[ -z "$got" ] && ok "a docs change asks for no recreate" \
+              || bad "a docs change suggested recreating '$got'"
+
 # --- the real 2.1.0 range, if the tag is present -----------------------------
 # The guarantee that matters is not synthetic: upgrading from 2.0.1 must prompt
 # the admin rebuild, or the dashboard locks out.

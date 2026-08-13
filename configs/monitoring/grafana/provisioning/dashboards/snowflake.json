@@ -574,45 +574,6 @@
       "type": "timeseries"
     },
     {
-      "id": 8,
-      "type": "barchart",
-      "title": "Users Served by Country",
-      "description": "From the proxy's own geoip lookup at connection close. '??' means the client IP was not in the database.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 0,
-        "y": 21
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "min": 0
-        },
-        "overrides": []
-      },
-      "options": {
-        "orientation": "horizontal",
-        "xTickLabelRotation": 0,
-        "legend": {
-          "showLegend": false
-        }
-      },
-      "targets": [
-        {
-          "expr": "sort_desc(sum by (country) (tor_snowflake_proxy_connections_total))",
-          "legendFormat": "{{country}}",
-          "refId": "A",
-          "instant": true,
-          "format": "time_series"
-        }
-      ]
-    },
-    {
       "id": 9,
       "type": "timeseries",
       "title": "Failed Connections (per hour)",
@@ -638,6 +599,119 @@
         {
           "expr": "increase(tor_snowflake_proxy_connection_timeouts_total[1h])",
           "legendFormat": "failed/hour",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "piechart",
+      "title": "Share of Users by Country",
+      "description": "Completed connections since the proxy last started, by the country of the client IP. '??' means the address was not in the geoip database.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 0,
+        "y": 30
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "pieType": "donut",
+        "displayLabels": [
+          "percent"
+        ],
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (country) (tor_snowflake_proxy_connections_total)",
+          "legendFormat": "{{country}}",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Users Served by Country over Time",
+      "description": "Completed connections per hour, stacked by country.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 16,
+        "x": 8,
+        "y": 30
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 25,
+            "showPoints": "never",
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (country) (increase(tor_snowflake_proxy_connections_total[1h]))",
+          "legendFormat": "{{country}}",
           "refId": "A"
         }
       ]

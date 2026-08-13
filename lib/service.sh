@@ -107,6 +107,14 @@ show_status() {
     # Track which services we've displayed
     declare -A displayed_services
 
+    # One-shot jobs that populate a volume and exit. They are plumbing, not
+    # services: showing them as "exited" in a health table reads as a fault.
+    local status_hide=" geoip-updater tor-geoip-updater bootstrap "
+    # Shown, but last: certbot legitimately exits after issuing, so it sorts
+    # below the things that are supposed to be running.
+    local status_defer=" certbot "
+    local -a deferred_rows=()
+
     # Handle both JSON array format and NDJSON (one object per line)
     if [[ -n "$raw_status" ]] && [[ "$raw_status" != "[]" ]]; then
         if [[ "$raw_status" == "["* ]]; then
@@ -207,10 +215,21 @@ show_status() {
                 name_color="${DIM}"
             fi
 
+            [[ "$status_hide" == *" $short_name "* ]] && continue
+
             # Note: %-14s for status to account for 3-byte Unicode symbols (●○◐) displaying as 1 char
-            printf "  ${CYAN}│${NC} ${name_color}%-20s${NC} ${CYAN}│${NC} ${status_color}%-14s${NC} ${CYAN}│${NC} %-19s ${CYAN}│${NC} %-12s ${CYAN}│${NC} %-15s ${CYAN}│${NC}\n" \
+            local row
+            printf -v row "  ${CYAN}│${NC} ${name_color}%-20s${NC} ${CYAN}│${NC} ${status_color}%-14s${NC} ${CYAN}│${NC} %-19s ${CYAN}│${NC} %-12s ${CYAN}│${NC} %-15s ${CYAN}│${NC}" \
                 "$display_name" "$status_display" "$last_run" "$uptime" "$ports"
+            if [[ "$status_defer" == *" $short_name "* ]]; then
+                deferred_rows+=("$row")
+            else
+                printf '%s\n' "$row"
+            fi
         done <<< "$json_lines"
+
+        local drow
+        for drow in ${deferred_rows+"${deferred_rows[@]}"}; do printf '%s\n' "$drow"; done
     fi
 
     # Show services that have never been started (not in docker ps -a)

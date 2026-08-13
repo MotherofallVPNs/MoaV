@@ -414,10 +414,41 @@ check_source_rebuilds() {
         esac
         [[ -z "$svc" ]] && continue
         # Drop anything not in the allowlist: bind-mounted entrypoints (grafana),
-        # monitoring exporters, infra images, unknown name mappings.
+        # infra images, unknown name mappings.
         [[ "$valid" == *" $svc "* ]] || continue
+        # And drop anything no longer in compose. Deleting a service leaves its
+        # files in the diff, so the prompt would tell the operator to build a
+        # service that does not exist -- which is exactly what `moav build
+        # snowflake-exporter` did after that exporter was removed.
+        grep -qE "^  ${svc}:" "$SCRIPT_DIR/docker-compose.yml" 2>/dev/null || continue
         [[ " $queued " == *" $svc "* ]] || queued="${queued:+$queued }$svc"
     done <<< "$changed"
+
+    # Setup-profile one-shots never run on upgrade, so a volume introduced by a
+    # release stays empty. The snowflake proxy then starts with no geoip and
+    # every connection is labelled "" instead of a country.
+    if grep -q '^  tor-geoip-updater:' "$SCRIPT_DIR/docker-compose.yml" 2>/dev/null \
+       && docker volume ls --format '{{.Name}}' 2>/dev/null | grep -q 'moav_tor_geoip'; then
+        if ! docker run --rm -v moav_moav_tor_geoip:/geoip alpine \
+                 test -s /geoip/geoip 2>/dev/null; then
+            POST_UPDATE_SETUP_JOBS="tor-geoip-updater"
+        fi
+    fi
+
+    # Single-file bind mounts do not survive a git replacement: the mount follows
+    # the inode, so a running container keeps reading the old file until it is
+    # recreated. Measured on a live server -- host inode 508739 vs container
+    # 523302 -- which left prometheus on a stale scrape config after an update.
+    local recreate=""
+    while IFS= read -r f; do
+        case "$f" in
+            configs/monitoring/prometheus.yml)
+                [[ " $recreate " == *" prometheus "* ]] || recreate="${recreate:+$recreate }prometheus" ;;
+            configs/monitoring/grafana/*)
+                [[ " $recreate " == *" grafana "* ]] || recreate="${recreate:+$recreate }grafana" ;;
+        esac
+    done <<< "$changed"
+    [[ -n "$recreate" ]] && POST_UPDATE_CONFIG_RECREATE="$recreate"
 
     [[ -z "$queued" ]] && return 0
 
@@ -441,8 +472,10 @@ print_post_update_apply_steps() {
     local rebuild="${POST_UPDATE_REBUILD_SERVICES:-}"
     local templates="${POST_UPDATE_BOOTSTRAP_TEMPLATES:-}"
     local regen_bundles="${POST_UPDATE_REGEN_BUNDLES:-}"
+    local recreate="${POST_UPDATE_CONFIG_RECREATE:-}"
+    local setup_jobs="${POST_UPDATE_SETUP_JOBS:-}"
 
-    [[ -z "$rebuild" && -z "$templates" && -z "$regen_bundles" ]] && return 0
+    [[ -z "$rebuild" && -z "$templates" && -z "$regen_bundles" && -z "$recreate" && -z "$setup_jobs" ]] && return 0
 
     echo ""
     if [[ -n "$templates" ]]; then
@@ -477,6 +510,21 @@ print_post_update_apply_steps() {
     fi
     echo -e "  ${WHITE}${n}.${NC} moav start                      ${DIM}# recreate containers on the new images${NC}"
     echo ""
+    if [[ -n "$setup_jobs" ]]; then
+        echo -e "  ${WHITE}docker compose --profile setup run --rm ${setup_jobs}${NC}"
+        echo -e "     ${DIM}# a one-shot setup job added by this release has never run here,${NC}"
+        echo -e "     ${DIM}# so the volume it fills is still empty${NC}"
+        echo ""
+    fi
+
+    if [[ -n "$recreate" ]]; then
+        echo -e "  ${WHITE}docker compose up -d --force-recreate ${recreate}${NC}"
+        echo -e "     ${DIM}# a bind-mounted config file changed. A single-FILE mount follows the${NC}"
+        echo -e "     ${DIM}# inode, and git replaces the file, so the container keeps reading the${NC}"
+        echo -e "     ${DIM}# old copy until it is recreated -- a restart is not enough.${NC}"
+        echo ""
+    fi
+
     echo -e "${DIM}Note: 'moav restart' reuses the old image — use 'moav start' (docker compose up -d) to pick up rebuilt images.${NC}"
 }
 
