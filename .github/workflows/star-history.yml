@@ -37,6 +37,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The chart branch is reset from main every run, so the store this run reads
+      # is main's. If a previous run's PR is still open, its accumulated points
+      # live only on that branch and would be silently dropped. Fold them in.
+      - name: Carry over history from an unmerged chart PR
+        run: |
+          if git fetch -q origin chore/star-history 2>/dev/null; then
+            if git show origin/chore/star-history:assets/star-history.json \
+                 > /tmp/prev-star-history.json 2>/dev/null \
+               && [ -s /tmp/prev-star-history.json ]; then
+              echo "STAR_DATA_MERGE=/tmp/prev-star-history.json" >> "$GITHUB_ENV"
+              echo "will fold in the open PR's history"
+            fi
+          else
+            echo "no chart branch yet — nothing to carry over"
+          fi
+
       - name: Render the chart
         env:
           GH_TOKEN: ${{ secrets.STAR_TOKEN || secrets.GITHUB_TOKEN }}

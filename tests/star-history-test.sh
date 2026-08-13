@@ -136,6 +136,30 @@ else
     bad "a moved count did not append a point — history would never accumulate"
 fi
 
+# --- 3c. history from an unmerged chart PR must not be dropped ---------------
+# The workflow resets chore/star-history from main every run, so points that
+# accumulated while its PR sat unmerged live only on that branch. Without the
+# fold-in, each day's PR carries main+1 point and the days between are lost.
+printf '{"acme/one":{"source":"counts","updated":"2026-08-11","points":[["2026-08-10",10],["2026-08-11",11]]}}\n' \
+    > "$TMP/assets/store.json"
+printf '{"acme/one":{"source":"counts","updated":"2026-08-12","points":[["2026-08-10",10],["2026-08-11",11],["2026-08-12",20]]}}\n' \
+    > "$TMP/assets/unmerged.json"
+STUB_COUNT=30 STAR_DATA_MERGE="$TMP/assets/unmerged.json" run_gen forbidden >/dev/null 2>&1
+carried=$(python3 -c "
+import json;pts=json.load(open('$TMP/assets/store.json'))['acme/one']['points']
+print('yes' if ['2026-08-12',20] in pts else 'no', len(pts))")
+case "$carried" in
+    "yes 4") ok "points from an unmerged chart PR are carried into the new run" ;;
+    *)       bad "unmerged history was dropped ($carried) — an open PR loses a point a day" ;;
+esac
+
+# And the workflow must actually wire that up, or the generator support is dead code.
+if grep -q 'STAR_DATA_MERGE' "$ROOT/.github/workflows/star-history.yml"; then
+    ok "the workflow points STAR_DATA_MERGE at the chart branch"
+else
+    bad "the workflow never sets STAR_DATA_MERGE — the fold-in never runs in CI"
+fi
+
 # --- 4. and the stub is actually exercising the real call --------------------
 # Without this, a stub that never ran would make every check above vacuous.
 grep -q 'repos/acme/one/stargazers' "$TMP/argv.log" \

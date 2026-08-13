@@ -49,6 +49,10 @@ LOGO = os.environ.get("STAR_LOGO", "branding/favicon-56.png")
 # Committed history. The chart no longer depends on being able to read
 # /stargazers at run time: see fetch_count() and main().
 DATA = os.environ.get("STAR_DATA", "assets/star-history.json")
+# An additional store to fold in before appending. The chart branch is reset from
+# the default branch on every run, so points accumulated while its PR sat unmerged
+# would be dropped; the workflow points this at the branch's copy.
+MERGE = os.environ.get("STAR_DATA_MERGE", "")
 
 W, H = 800, 533
 PAD_L, PAD_R, PAD_T, PAD_B = 84, 30, 62, 76
@@ -186,6 +190,20 @@ def save_history(hist):
     with open(DATA, "w", encoding="utf-8") as f:
         json.dump(hist, f, indent=1, sort_keys=True)
         f.write("\n")
+
+
+def merge_store(hist, other):
+    """Union two stores by date. Cumulative counts only ever rise, so the higher
+    value for a given day is the later reading and the right one to keep."""
+    for repo, incoming in other.items():
+        cur = hist.setdefault(repo, {"source": incoming.get("source", "counts"), "points": []})
+        pts = {d: int(c) for d, c in cur.get("points", [])}
+        for d, c in incoming.get("points", []):
+            pts[d] = max(int(c), pts.get(d, 0))
+        cur["points"] = [[d, pts[d]] for d in sorted(pts)]
+        if incoming.get("source") == "timestamps":
+            cur["source"] = "timestamps"
+    return hist
 
 
 def merge_point(points, day, count):
@@ -378,6 +396,12 @@ def main():
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     hist = load_history()
+    if MERGE and os.path.isfile(MERGE) and os.path.abspath(MERGE) != os.path.abspath(DATA):
+        try:
+            hist = merge_store(hist, json.load(open(MERGE, encoding="utf-8")))
+            print(f"gen-star-history: folded in {MERGE}")
+        except ValueError as e:
+            sys.stderr.write(f"ignoring unreadable {MERGE}: {e}\n")
     for repo in REPOS:
         entry = hist.get(repo) or {"source": "counts", "points": []}
         stamps = fetch_stars(repo)
