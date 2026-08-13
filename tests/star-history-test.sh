@@ -153,12 +153,45 @@ case "$carried" in
     *)       bad "unmerged history was dropped ($carried) — an open PR loses a point a day" ;;
 esac
 
-# And the workflow must actually wire that up, or the generator support is dead code.
-if grep -q 'STAR_DATA_MERGE' "$ROOT/.github/workflows/star-history.yml"; then
-    ok "the workflow points STAR_DATA_MERGE at the chart branch"
+# --- 3d. the publish path: a branch, no PR, and the history read back --------
+WF="$ROOT/.github/workflows/star-history.yml"
+grep -q 'git push -q --force' "$WF" && grep -q ' chart$' "$WF" \
+    && ok "the workflow force-pushes the chart branch" \
+    || bad "the workflow no longer publishes to the chart branch"
+grep -q 'gh pr create' "$WF" \
+    && bad "still opens a PR — the chart is meant to update itself daily" \
+    || ok "no PR is opened"
+grep -q 'origin/chart:star-history.json' "$WF" \
+    && ok "the run reads the accumulated history back before appending" \
+    || bad "the history is never read back — every run would start from one point"
+grep -q 'cmp -s' "$WF" \
+    && ok "an unchanged chart is not republished" \
+    || bad "no no-op guard — the branch would get a commit every night regardless"
+
+# --- 3e. the README link is gated ------------------------------------------
+# A renamed branch or file leaves a broken image in the README, which nobody
+# notices because the old URL keeps serving a cached copy for a while.
+#
+# --check reads README.md from the working directory, so this runs in a copy. The
+# earlier version of this test edited the repo's own README and restored it after,
+# which would have left it broken if the test were interrupted.
+linkdir=$(mktemp -d)
+cp "$ROOT/README.md" "$linkdir/README.md"
+if (cd "$linkdir" && python3 "$SCRIPT" --check >/dev/null 2>&1); then
+    ok "--check passes with the README pointing at the publish location"
 else
-    bad "the workflow never sets STAR_DATA_MERGE — the fold-in never runs in CI"
+    bad "--check fails against the committed README"
 fi
+sed 's|refs/heads/chart/star-history.svg|assets/star-history.svg|' \
+    "$ROOT/README.md" > "$linkdir/README.md"
+if cmp -s "$ROOT/README.md" "$linkdir/README.md"; then
+    bad "could not build the broken-README fixture — has the link format changed?"
+elif (cd "$linkdir" && python3 "$SCRIPT" --check >/dev/null 2>&1); then
+    bad "--check accepted a README pointing at a path the workflow never writes"
+else
+    ok "--check catches a README that no longer matches the publish location"
+fi
+rm -rf "$linkdir"
 
 # --- 4. and the stub is actually exercising the real call --------------------
 # Without this, a stub that never ran would make every check above vacuous.

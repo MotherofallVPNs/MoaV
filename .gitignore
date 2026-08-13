@@ -120,3 +120,8 @@ spec.yaml
 .claude/settings.local.json
 *.mp4
 .claude/worktrees/
+
+# Generated locally by scripts/gen-star-history.py; the published copies live on
+# the chart branch (see .github/workflows/star-history.yml).
+assets/star-history.*
+.chart/

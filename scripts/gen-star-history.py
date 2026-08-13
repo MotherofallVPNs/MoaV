@@ -53,6 +53,11 @@ DATA = os.environ.get("STAR_DATA", "assets/star-history.json")
 # the default branch on every run, so points accumulated while its PR sat unmerged
 # would be dropped; the workflow points this at the branch's copy.
 MERGE = os.environ.get("STAR_DATA_MERGE", "")
+# The rendered chart is published to its own branch rather than committed to the
+# default one: a generated file that changes daily is noise in main's history, and
+# a branch needs no PR. The README embeds it by raw URL.
+CHART_BRANCH = os.environ.get("STAR_BRANCH", "chart")
+REPO_SLUG = os.environ.get("STAR_REPO_SLUG", "MotherofallVPNs/MoaV")
 
 W, H = 800, 533
 PAD_L, PAD_R, PAD_T, PAD_B = 84, 30, 62, 76
@@ -372,22 +377,29 @@ def render(datasets):
 
 def main():
     if "--check" in sys.argv:
-        # Structural only: no network, so CI can gate the committed file.
-        if not os.path.isfile(OUT):
-            raise SystemExit(f"{OUT} is missing — run scripts/gen-star-history.py")
-        body = open(OUT, encoding="utf-8").read()
+        # Nothing is committed to this branch any more, so there is no artifact to
+        # validate. What can still rot is the link (a renamed branch or file leaves
+        # a broken image in the README) and the renderer itself.
+        expected = f"refs/heads/{CHART_BRANCH}/{os.path.basename(OUT)}"
+        readme = "README.md"
+        try:
+            body = open(readme, encoding="utf-8").read()
+        except OSError as e:
+            raise SystemExit(f"cannot read {readme}: {e}")
+        if expected not in body:
+            raise SystemExit(
+                f"{readme} does not embed the chart from the publish location.\n"
+                f"  expected a URL containing: {expected}\n"
+                f"  the workflow publishes {os.path.basename(OUT)} to the "
+                f"'{CHART_BRANCH}' branch, so the README image would 404.")
+        # Render a two-point series offline: proves the drawing path works without
+        # a network, a token, or a stored history.
+        demo = [("acme/one", points_to_series([["2026-01-01", 1], ["2026-06-01", 50]]))]
+        svg = render(demo)
         for needed in ("<svg", "Star History", "GitHub Stars", "</svg>"):
-            if needed not in body:
-                raise SystemExit(f"{OUT} does not look like a rendered chart (missing {needed!r})")
-        if os.path.isfile(DATA):
-            try:
-                store = json.load(open(DATA, encoding="utf-8"))
-            except ValueError as e:
-                raise SystemExit(f"{DATA} is not valid JSON: {e}")
-            thin = [r for r, e in store.items() if len(e.get("points", [])) < 2]
-            if thin:
-                print(f"gen-star-history: note — fewer than 2 points for {', '.join(thin)}")
-        print(f"gen-star-history: {OUT} present and well-formed")
+            if needed not in svg:
+                raise SystemExit(f"the renderer produced no {needed!r}")
+        print(f"gen-star-history: README embeds {expected}; renderer OK")
         return
 
     seeding = "--seed" in sys.argv

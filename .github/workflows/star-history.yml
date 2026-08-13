@@ -1,22 +1,19 @@
 name: star history
 
-# Regenerate assets/star-history.svg from our own stargazer timestamps and open a
-# PR with it. Never pushes to main directly — the chart is cosmetic, so it can
-# wait for a human to merge.
+# Refresh the star-history chart and publish it to the `chart` branch, which the
+# README embeds by raw URL. Nothing is committed to main and no PR is opened: the
+# chart is generated, changes daily, and would otherwise be permanent noise in
+# main's history.
 #
-# It runs HERE, with a repo token, because since 2026-06-30 the stargazers
-# endpoint is limited to a repo's admins and collaborators: a hosted chart
-# service is neither, so third-party embeds now render a "GitHub restricted
-# access to star data" notice instead of a chart.
-#
-# STAR_TOKEN is NOT required. The chart is built from assets/star-history.json,
-# which the run appends to using the repo object's stargazers_count -- public,
-# unauthenticated, unaffected by the 2026-06-30 /stargazers restriction.
+# STAR_TOKEN is NOT required. The chart is built from star-history.json on the
+# chart branch, appended to using the repo object's stargazers_count -- public,
+# unauthenticated, unaffected by the 2026-06-30 restriction that limits
+# /stargazers to a repo's admins and collaborators.
 #
 # A token only buys BACKFILL of history from before that file existed, and a
-# fine-grained PAT cannot do it at any permission level: the endpoint wants an
+# fine-grained PAT cannot do it at any permission level -- the endpoint wants an
 # admin or collaborator, which means a classic PAT or a user login. Not worth a
-# broad credential in CI for a cosmetic chart -- backfill once from a laptop
+# broad credential in CI for a cosmetic chart; backfill once from a laptop
 # instead:  python3 scripts/gen-star-history.py --seed
 on:
   schedule:
@@ -29,7 +26,6 @@ concurrency:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   render:
@@ -37,69 +33,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The chart branch is reset from main every run, so the store this run reads
-      # is main's. If a previous run's PR is still open, its accumulated points
-      # live only on that branch and would be silently dropped. Fold them in.
-      - name: Carry over history from an unmerged chart PR
+      - name: Carry the accumulated history forward
         run: |
-          if git fetch -q origin chore/star-history 2>/dev/null; then
-            if git show origin/chore/star-history:assets/star-history.json \
-                 > /tmp/prev-star-history.json 2>/dev/null \
-               && [ -s /tmp/prev-star-history.json ]; then
-              echo "STAR_DATA_MERGE=/tmp/prev-star-history.json" >> "$GITHUB_ENV"
-              echo "will fold in the open PR's history"
-            fi
+          mkdir -p .chart
+          if git fetch -q origin chart 2>/dev/null; then
+            git show origin/chart:star-history.json > .chart/star-history.json 2>/dev/null || true
+            git show origin/chart:star-history.svg  > .chart/previous.svg      2>/dev/null || true
+          fi
+          # The JSON is the state: it is what makes this a history rather than a
+          # single data point, and /stargazers cannot rebuild it from CI.
+          if [ -s .chart/star-history.json ]; then
+            python3 -c "import json; d=json.load(open('.chart/star-history.json')); print('carried forward', sum(len(e['points']) for e in d.values()), 'points')"
           else
-            echo "no chart branch yet — nothing to carry over"
+            echo "no history on the chart branch yet"
           fi
 
       - name: Render the chart
         env:
           GH_TOKEN: ${{ secrets.STAR_TOKEN || secrets.GITHUB_TOKEN }}
+          STAR_DATA: .chart/star-history.json
+          STAR_OUT: .chart/star-history.svg
         run: python3 scripts/gen-star-history.py
 
-      - name: Open or update the PR
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish to the chart branch
         run: |
-          # The generator writes nothing on a flat day, so on a quiet day this
-          # exits here and no PR is touched. Both files matter: the JSON is the
-          # accumulated history and the SVG is rendered from it.
-          if git diff --quiet -- assets/star-history.json assets/star-history.svg; then
-            echo "no change — nothing to open"
+          if [ -s .chart/previous.svg ] && cmp -s .chart/previous.svg .chart/star-history.svg; then
+            echo "chart unchanged — nothing to publish"
             exit 0
           fi
 
-          BRANCH=chore/star-history
+          # One commit, force-pushed. The JSON carries the state forward, so this
+          # branch's own git history is disposable and it stays small forever.
+          pub=$(mktemp -d)
+          cp .chart/star-history.svg .chart/star-history.json "$pub/"
+          cp .github/chart-branch-README.md "$pub/README.md"
+
+          cd "$pub"
+          git init -q -b chart
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # One long-lived branch, reset each run: the chart is generated, so its
-          # history is noise and a stack of daily branches would be worse.
-          git checkout -B "$BRANCH"
-          # The JSON MUST be committed: it is the history. Committing only the
-          # SVG would discard every accumulated count and the chart could never
-          # grow past a single day.
-          git add assets/star-history.json assets/star-history.svg
-          git commit -m "chore(assets): refresh star history chart"
-          git push --force origin "$BRANCH"
-
-          TOTALS=$(python3 - <<'PY'
-          import re
-          s = open("assets/star-history.svg", encoding="utf-8").read()
-          print(", ".join(f"{r} {n}" for r, n in re.findall(r'>([\w.-]+/[\w.-]+) <tspan[^>]*>\((\d+)\)', s)) or "updated")
-          PY
-          )
-
-          if gh pr view "$BRANCH" --json state -q .state 2>/dev/null | grep -q OPEN; then
-            echo "PR already open — the force-push above updated it"
-          else
-            gh pr create --base main --head "$BRANCH" \
-              --title "chore(assets): refresh star history chart" \
-              --body "Regenerated by \`.github/workflows/star-history.yml\`.
-
-          Current totals: **${TOTALS}**
-
-          Only \`assets/star-history.svg\` changes. Safe to merge or close — the next
-          run reopens it if the numbers move again."
-          fi
+          git add -A
+          git commit -qm "chore(chart): star history $(date -u '+%Y-%m-%d')"
+          git push -q --force \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" \
+            chart
+          echo "published to the chart branch"

@@ -99,7 +99,7 @@ jobs:
         run: bash tests/refactor-verify.sh
       - name: protocol-roster drift gate
         run: python3 scripts/gen-protocol-docs.py --check
-      - name: star-history chart present (offline check)
+      - name: star-history README link + renderer (offline)
         run: python3 scripts/gen-star-history.py --check
       - name: star-history API version + timestamp guard
         run: bash tests/star-history-test.sh
