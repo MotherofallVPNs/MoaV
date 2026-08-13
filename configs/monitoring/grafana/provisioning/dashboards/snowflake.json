@@ -284,8 +284,8 @@
     {
       "id": 12,
       "type": "stat",
-      "title": "Downloaded (selected range)",
-      "description": "Relayed to clients within the selected time range. increase() spans counter resets, so a proxy restart inside the window does not lose the traffic.",
+      "title": "Downloaded",
+      "description": "Follows the dashboard's time picker, unlike the Total beside it. increase() spans counter resets, so a proxy restart inside the window does not lose the traffic.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -389,8 +389,8 @@
     {
       "id": 13,
       "type": "stat",
-      "title": "Uploaded (selected range)",
-      "description": "Relayed from clients within the selected time range.",
+      "title": "Uploaded",
+      "description": "Follows the dashboard's time picker, unlike the Total beside it. Relayed from clients within the selected time range.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
