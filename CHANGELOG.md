@@ -37,6 +37,40 @@ moav net apply          # if doctor says the tuning file is from an older MoaV
 
 ### Fixed
 
+- **`moav update` said nothing after changing `docker-compose.yml`.** A compose
+  change maps to no service, so the apply summary was skipped entirely and the
+  pull read as a no-op — even though `moav start` is exactly what applies it.
+  Every step in that summary is numbered now, too: the recreate line was an
+  unnumbered footnote and was being skipped.
+- **`moav update` suggested building a service that no longer exists.** Deleting
+  `exporters/snowflake` left its files in the diff, so the summary printed
+  `moav build snowflake snowflake-exporter` and the second half failed with
+  "no such service".
+- **A bind-mounted config file kept its old contents after an update.** This is
+  why the Snowflake dashboard showed *No Data* after a correct upgrade:
+  `prometheus.yml` is mounted as a single **file**, a file mount follows the
+  **inode**, and git replaces the file — so the container read the old copy
+  forever (measured: host inode 508739, container 523302). `moav restart` cannot
+  fix that; only a recreate can, and nothing said so.
+- **The GeoIP database was re-downloaded on every `moav start`.** `geoip-updater`
+  has no `profiles` key, so compose starts it on every `up` — 3.9 MB each time,
+  seven times in one evening on a test box. It now stamps the month (the db-ip
+  URL is monthly) and skips, writing through a temp file so an interrupted
+  download cannot leave a truncated database. The Tor geoip fetch uses a
+  conditional request instead, so an unchanged upstream transfers nothing.
+- **The build cache cap ignored the disk.** A fixed 4 GB on a 24 GB box left
+  4.9 GB of cache with 3.8 GB free — the largest single thing on a disk at 84%.
+  It now scales to a quarter of what the cache could grow into, floored at
+  512 MB and still capped at 4 GB.
+- **Log colours reshuffled between runs.** They were assigned in first-seen
+  order, which is distinct within a run but changes whenever containers attach in
+  a different order. They are now keyed to the service's position in the sorted
+  compose service list: stable across runs, and collision-free.
+- **`moav status` listed one-shot plumbing as failures.** `geoip-updater`,
+  `tor-geoip-updater` and `bootstrap` fill a volume and exit, so "exited" read as
+  a fault in a health table; they are hidden. `certbot` legitimately exits after
+  issuing, so it sorts last instead of sitting between running services.
+
 - **`moav doctor peers --fix` died silently on any busy server.** It printed the
   duplicate list and returned to the prompt: no confirmation, no repair, no
   error. The live-owner lookup piped `docker exec … wg show` into an `awk` that
@@ -84,6 +118,13 @@ moav net apply          # if doctor says the tuning file is from an older MoaV
   number, producing the reported `150.07845 → 150.07848 GB`.
 
 ### Added
+
+- **Snowflake dashboard, rebuilt on the proxy's own metrics.** Beyond the
+  per-country panels: rendezvous success rate, countries reached, proxy uptime,
+  failed connections per hour, and traffic stats that follow the time picker
+  alongside the cumulative totals. Laid out on an explicit grid — every row fills
+  the full width and starts where the previous one ended, asserted when the
+  dashboard is generated rather than eyeballed.
 
 - **`moav doctor host`** — CPU load against the core count, swap in use, zombie
   processes and the busiest container. Working out why one server felt slow took
