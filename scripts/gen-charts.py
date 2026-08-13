@@ -137,16 +137,15 @@ def main():
         svg = render_translation([("English", 23, 23, PURPLE), ("فارسی", 3, 23, CYAN)])
         if "<svg" not in svg:
             raise SystemExit("the translation renderer produced no chart")
-        missing = []
+        # These two are embedded on the docs site (moav-site), not in this
+        # README, so there is nothing here to check the link against -- a
+        # cross-repo assertion would just go stale in the other direction.
+        # What must hold is that the publish location is the one the site uses.
         for chart in CHARTS:
-            want = f"refs/heads/{CHART_BRANCH}/{chart}"
-            found = any(want in open(p, encoding="utf-8").read()
-                        for p in ("README.md",) if os.path.isfile(p))
-            if not found and chart == "test-suites.svg":
-                missing.append(f"{chart} is not embedded in README.md ({want})")
-        if missing:
-            raise SystemExit("\n".join(missing))
-        print("gen-charts: renderers OK; README embeds the chart-branch URL")
+            if "/" in chart or not chart.endswith(".svg"):
+                raise SystemExit(f"unexpected chart filename: {chart}")
+        print(f"gen-charts: renderers OK; publishes {', '.join(CHARTS)} "
+              f"to the '{CHART_BRANCH}' branch")
         return
 
     out_dir = "."

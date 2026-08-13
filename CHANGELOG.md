@@ -7,6 +7,115 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Fixes for problems that only appear on a **running, upgraded** server, found by
+testing 2.1.0 on live servers rather than in CI. Two of them were silent: they
+reported success and did nothing. Plus Snowflake monitoring that finally shows
+who is being served.
+
+Keys, users and certificates are untouched.
+
+### Upgrade Notes
+
+```bash
+moav update
+moav build snowflake    # 2.14.1, and the metrics endpoint is baked in
+moav start              # NOT `moav restart` -- see below
+moav doctor             # two new checks report on this box
+moav net apply          # if doctor says the tuning file is from an older MoaV
+```
+
+- **`moav start`, not `moav restart`.** This release changes
+  `docker-compose.yml`, and `moav restart` restarts containers with their
+  existing config. Only `moav start` (`docker compose up -d`) recreates them.
+- **`SNOWFLAKE_VERSION` in your `.env` wins over the new default.** The compose
+  default is `${SNOWFLAKE_VERSION:-2.14.1}`, so a server whose `.env` pins
+  `2.11.0` rebuilds 2.11.0 again. Update the pin, or let `moav update`'s version
+  check prompt you.
+- **The Snowflake dashboard's history does not carry over.** Its metrics are now
+  the proxy's own, under new names; existing panels keep their old series until
+  retention expires. Nothing to do, but the graphs will look empty at first.
+
+### Fixed
+
+- **`moav doctor peers --fix` died silently on any busy server.** It printed the
+  duplicate list and returned to the prompt: no confirmation, no repair, no
+  error. The live-owner lookup piped `docker exec … wg show` into an `awk` that
+  exits on the first match; the early exit closes the pipe while `wg` is still
+  writing, so docker takes `SIGPIPE`, and `pipefail` plus `set -e` killed the run
+  with no output. It is a race, which is why a 19-peer server repaired fine and a
+  171-peer one failed every time.
+- **…and when it did run, the reset did not stick.** All 18 peers reported
+  `✓ reset`, `moav regenerate-users` ran clean, and the identical duplicates came
+  back. The reset cleared `./state/users/<u>/<proto>.env`, but
+  `regenerate-users` provisions in a container reading `/state` from the
+  `moav_state` volume — a different tree. Both copies are now cleared.
+- **`moav doctor net` reported a tuning file it never checked.** `✓ Tuning file
+  present` sat one line above `! tcp_max_syn_backlog = 256`, which reads as
+  something on the box overriding us. Nothing was: `net apply` skips a host that
+  already has the file, so a server tuned by **v1.8.4** kept that version's 13
+  keys forever. The installed keys are now diffed against the current template
+  and the missing ones named.
+- **CDN could be switched off by upgrading.** `ENABLE_CDN` arrived in 2.1.0
+  defaulting to `false`, and an absent flag means "on if `CDN_SUBDOMAIN` is set".
+  But `moav update` offers to append every new variable with its default and the
+  prompt defaults to yes, so one Enter wrote `ENABLE_CDN=false` and the CDN
+  vanished at the next bootstrap. It now writes `true` when a CDN subdomain is
+  already configured; an explicit `false` is still obeyed.
+- **A donated user could lose their whole bundle.** `regenerate-users` failed
+  with `No telemt secret found`, discarding every protocol that user *did* have.
+  Donate mode provisions a subset, but the check used the server-wide flag. Every
+  other generator was audited against the same case; telemt was the only one.
+- **The CDN WebSocket path rotated in silence.** Bootstrap replaces the old
+  `/ws` default with a random path, which is right — `/ws` is a guessable
+  active-probing target — but CDN is the only protocol whose link carries a path,
+  so every other protocol kept working while already-distributed CDN configs
+  started returning 404. It now warns and names the recovery.
+- **Zombie processes in the admin and grafana containers** (39 and 11 on two live
+  servers). Both entrypoints `exec` their app, so PID 1 is python / grafana and
+  neither reaps a process it did not spawn. Both now run with an init process.
+- **Exporter changes never reached a running container.** `exporters/*/Dockerfile`
+  COPYs the code into the image, but `moav update`'s rebuild check excluded
+  exporters, with a comment claiming their entrypoints are bind-mounted — true of
+  grafana, false of everything in `exporters/`.
+- **Snowflake panels plotted lifetime totals as trends** (#183). Prometheus had
+  2880 samples over 24h; the data was never missing. Every "over time" panel ran
+  `max(<cumulative gauge>)`, so the lines were flat by construction and
+  `Total Bandwidth Donated` auto-scaled its axis to the noise band above a large
+  number, producing the reported `150.07845 → 150.07848 GB`.
+
+### Added
+
+- **`moav doctor host`** — CPU load against the core count, swap in use, zombie
+  processes and the busiest container. Working out why one server felt slow took
+  four rounds of `uptime`, `top`, `docker stats` and a `ps` pipeline; this is
+  that, in one command. It also names a bandwidth-donation container when it is
+  the one saturating a small host.
+- **Snowflake: per-country users served** (#183). The proxy has exposed
+  `tor_snowflake_proxy_connections_total{country}` since 2.11 and we were not
+  reading it. New panels for users by country and failed connections per hour.
+- **Snowflake proxy 2.14.1**, with Tor-format geoip fetched into its own volume
+  (385,622 IPv4 + 276,646 IPv6 ranges). Without it the proxy logs
+  `Error loading geoip db for country based metrics` on every start and every
+  connection is labelled `""`.
+- **Generated project charts** on a dedicated `chart` branch, embedded by raw URL
+  so nothing generated is committed to `main`: star history, test suites per
+  release, and documentation translation coverage. Refreshed daily, and the run
+  publishes only when a chart actually changed.
+
+### Changed
+
+- **The Snowflake log-parsing exporter is deleted.** 213 lines of regex over log
+  lines, replaced by the proxy's own Prometheus endpoint, which carries the same
+  connection and traffic counters plus the per-country breakdown and a failure
+  counter we never had. One scrape job replaces an exporter, a Dockerfile, a
+  compose service and a scrape job.
+- **Packet-drop counters are labelled `since boot`**, with a pointer to `nstat`
+  for a rate. `SndbufErrors=633297` reads as an emergency; on both live servers
+  it turned out to be months of history with nothing happening now.
+- **`FUNDING.yml` addresses are quoted.** Unquoted, the ETH `0x…` value loads as
+  an integer under any YAML parser. Both generators regex-parse it and were
+  unaffected; the next tool to reach for `safe_load` would not have been.
+
 ## [2.1.0] - 2026-08-11
 
 Bug fixes across user-bundle generation, one security fix, and two changed
