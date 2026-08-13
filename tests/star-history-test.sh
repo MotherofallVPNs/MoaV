@@ -154,7 +154,7 @@ case "$carried" in
 esac
 
 # --- 3d. the publish path: a branch, no PR, and the history read back --------
-WF="$ROOT/.github/workflows/star-history.yml"
+WF="$ROOT/.github/workflows/charts.yml"
 grep -q 'git push -q --force' "$WF" && grep -q ' chart$' "$WF" \
     && ok "the workflow force-pushes the chart branch" \
     || bad "the workflow no longer publishes to the chart branch"

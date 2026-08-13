@@ -103,6 +103,8 @@ jobs:
         run: python3 scripts/gen-protocol-docs.py --check
       - name: star-history README link + renderer (offline)
         run: python3 scripts/gen-star-history.py --check
+      - name: repo charts renderer + README link (offline)
+        run: python3 scripts/gen-charts.py --check
       - name: star-history API version + timestamp guard
         run: bash tests/star-history-test.sh
       - name: funding block drift gate (README from FUNDING.yml)

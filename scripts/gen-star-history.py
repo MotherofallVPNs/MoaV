@@ -61,20 +61,12 @@ REPO_SLUG = os.environ.get("STAR_REPO_SLUG", "MotherofallVPNs/MoaV")
 
 W, H = 800, 533
 PAD_L, PAD_R, PAD_T, PAD_B = 84, 30, 62, 76
-# Dark card in the site's register rather than star-history's white one: the
-# layout is what readers recognise, and the palette is what makes it ours.
-BG_TOP, BG_BOTTOM = "#1f1b33", "#14111f"
-INK = "#e6e1f5"      # titles + axis names
-MUTED = "#9a92b8"    # tick labels
-GRID = "#ffffff"     # drawn at low opacity
-AXIS = "#4a4266"
-# MoaV's own accent purple leads; the logo cyan follows, so the two series read
-# as the brand rather than as arbitrary chart colours.
-SERIES = ["#a371f7", "#00d4ff"]
-# Hand-drawn feel without embedding a webfont. Resolves per viewer, so the last
-# entry matters: layout stays right even where none of the others exist.
-FONT = ("'Comic Sans MS','Chalkboard SE','Marker Felt','Segoe Print',"
-        "'Bradley Hand',cursive,sans-serif")
+# Palette and SVG helpers live in chartkit so this and gen-charts.py cannot
+# drift: they publish to the same branch and sit in the same READMEs.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from chartkit import (  # noqa: E402
+    BG_TOP, BG_BOTTOM, INK, MUTED, GRID, AXIS, SERIES, FONT_HAND as FONT, esc,
+)
 
 
 def fetch_stars(repo):
@@ -253,10 +245,6 @@ def kfmt(v):
         return str(v)
     s = f"{v / 1000:.1f}".rstrip("0").rstrip(".")
     return f"{s}K"
-
-
-def esc(s):
-    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def render(datasets):

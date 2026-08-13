@@ -15,36 +15,18 @@ import os
 import subprocess
 import sys
 
-# Same register as the star chart, so the two read as one family.
-BG = "#191527"
-INK = "#e6e1f5"
-MUTED = "#9a92b8"
-GRID = "#ffffff"
-PURPLE = "#a371f7"
-CYAN = "#00d4ff"
-GREEN = "#4ec9a5"
-FONT = "system-ui,-apple-system,'Segoe UI',sans-serif"
+# Palette and SVG primitives are shared with gen-star-history.py: the two render
+# into the same branch and sit in the same READMEs, so they must not drift.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from chartkit import (  # noqa: E402
+    BG_FLAT, INK, MUTED, GRID, PURPLE, CYAN, GREEN, FONT_UI, esc, text, frame, hgrid,
+)
 
 CHART_BRANCH = os.environ.get("STAR_BRANCH", "chart")
 REPO_SLUG = os.environ.get("STAR_REPO_SLUG", "MotherofallVPNs/MoaV")
 # Where the docs live for the translation chart. A checkout path, not an API:
 # counting files needs no token and cannot rate-limit.
 SITE_DIR = os.environ.get("MOAV_SITE_DIR", "../moav-site")
-
-
-def esc(s):
-    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-
-def text(x, y, s, size=10, fill=MUTED, anchor="start", weight=400):
-    return (f'<text x="{x:.1f}" y="{y:.1f}" font-family="{FONT}" font-size="{size}" '
-            f'fill="{fill}" text-anchor="{anchor}" font-weight="{weight}">{esc(s)}</text>')
-
-
-def frame(inner, w=660, h=250):
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" '
-            f'width="100%" role="img" aria-label="MoaV project chart">'
-            f'<rect width="{w}" height="{h}" rx="10" fill="{BG}"/>{inner}</svg>')
 
 
 def git(*args):
@@ -83,12 +65,8 @@ def render_test_suites(pts):
     xs = [L + (W - L - R) * (i / (len(pts) - 1)) for i in range(len(pts))]
     ys = [H - B - (H - T - B) * (n / ymax) for _, n in pts]
 
-    out = [text(L, 24, "Test suites in CI", 12, INK, "start", 600)]
-    for i in range(5):
-        gy = H - B - (H - T - B) * i / 4
-        out.append(f'<line x1="{L}" y1="{gy:.1f}" x2="{W-R}" y2="{gy:.1f}" '
-                   f'stroke="{GRID}" stroke-opacity="0.06"/>')
-        out.append(text(L - 8, gy + 4, int(ymax * i / 4), 10, MUTED, "end"))
+    out = [text(L, 24, "Test suites in CI", 12, INK, "start", 600),
+           hgrid(W, H, ymax, L, R, T, B)]
 
     line = " ".join(f"{'M' if i == 0 else 'L'}{xs[i]:.1f},{ys[i]:.1f}"
                     for i in range(len(pts)))

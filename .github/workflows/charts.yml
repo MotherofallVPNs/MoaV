@@ -1,7 +1,10 @@
-name: star history
+name: charts
 
-# Refresh the star-history chart and publish it to the `chart` branch, which the
-# README embeds by raw URL. Nothing is committed to main and no PR is opened: the
+# Refresh every generated chart and publish them to the `chart` branch, which the
+# README and the docs embed by raw URL.
+#
+# ONE job on purpose: two workflows force-pushing the same branch would clobber
+# each other's charts. Nothing is committed to main and no PR is opened: the
 # chart is generated, changes daily, and would otherwise be permanent noise in
 # main's history.
 #
@@ -17,11 +20,14 @@ name: star history
 # instead:  python3 scripts/gen-star-history.py --seed
 on:
   schedule:
-    - cron: '20 4 * * *'      # daily, 04:20 UTC
+    # Daily. The job exits before publishing when no chart changed, so a quiet
+    # day costs one short run -- cheaper than reasoning about a skip schedule,
+    # and cron's day-of-month */2 is uneven across month boundaries anyway.
+    - cron: '20 4 * * *'      # 04:20 UTC
   workflow_dispatch:
 
 concurrency:
-  group: star-history
+  group: charts
   cancel-in-progress: false
 
 permissions:
@@ -32,6 +38,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Public repo, read-only, no credential: the translation chart counts files.
+      - uses: actions/checkout@v4
+        with:
+          repository: MotherofallVPNs/moav-site
+          path: .moav-site
 
       - name: Carry the accumulated history forward
         run: |
@@ -48,24 +60,41 @@ jobs:
             echo "no history on the chart branch yet"
           fi
 
-      - name: Render the chart
+      - name: Render the star chart
         env:
           GH_TOKEN: ${{ secrets.STAR_TOKEN || secrets.GITHUB_TOKEN }}
           STAR_DATA: .chart/star-history.json
           STAR_OUT: .chart/star-history.svg
         run: python3 scripts/gen-star-history.py
 
+      # No state and no credential: git tags and a file count. Regenerated from
+      # scratch every run, so these two can never go stale.
+      - name: Render the repo charts
+        env:
+          MOAV_SITE_DIR: .moav-site
+        run: python3 scripts/gen-charts.py --out .chart
+
       - name: Publish to the chart branch
         run: |
-          if [ -s .chart/previous.svg ] && cmp -s .chart/previous.svg .chart/star-history.svg; then
-            echo "chart unchanged — nothing to publish"
+          # Compare every chart, not just the star one: a new test suite moves
+          # test-suites.svg while the star count sits still.
+          changed=0
+          for f in .chart/*.svg; do
+            name=$(basename "$f")
+            if ! git show "origin/chart:$name" > /tmp/prev-"$name" 2>/dev/null \
+               || ! cmp -s /tmp/prev-"$name" "$f"; then
+              echo "changed: $name"; changed=1
+            fi
+          done
+          if [ "$changed" = "0" ]; then
+            echo "no chart changed — nothing to publish"
             exit 0
           fi
 
           # One commit, force-pushed. The JSON carries the state forward, so this
           # branch's own git history is disposable and it stays small forever.
           pub=$(mktemp -d)
-          cp .chart/star-history.svg .chart/star-history.json "$pub/"
+          cp .chart/*.svg .chart/star-history.json "$pub/"
           cp .github/chart-branch-README.md "$pub/README.md"
 
           cd "$pub"
@@ -73,7 +102,7 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -qm "chore(chart): star history $(date -u '+%Y-%m-%d')"
+          git commit -qm "chore(chart): refresh charts $(date -u '+%Y-%m-%d')"
           git push -q --force \
             "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" \
             chart

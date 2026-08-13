@@ -473,6 +473,10 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes and version history.
 
 Every star helps someone else find a way through. Thank you.
 
+<a href="https://github.com/MotherofallVPNs/MoaV/tree/main/tests">
+  <img src="https://raw.githubusercontent.com/MotherofallVPNs/MoaV/refs/heads/chart/test-suites.svg" alt="MoaV test suites in CI" width="800">
+</a>
+
 ---
 ## Disclaimer
 
