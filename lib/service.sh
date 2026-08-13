@@ -1080,11 +1080,24 @@ restart_services() {
 # is exactly when you need to tell them apart. compose now emits plain text and
 # we colour the prefix from a 256-colour palette.
 #
-# Assigned in first-seen order rather than by hashing the name: hashing keeps a
-# colour stable between runs but collides (conduit and xray landed on the same
-# one), and distinctness is the whole point.
+# Colours are assigned by the service's position in the SORTED compose service
+# list, which is both stable between runs and collision-free -- unlike hashing
+# (conduit and xray landed on the same colour) and unlike first-seen order, which
+# is distinct within a run but reshuffles every time containers attach in a
+# different order. First-seen remains the fallback for a name compose did not
+# list (a stray container, a renamed service).
 format_log_timestamps() {
-    awk '
+    # name=index pairs from the sorted service list; awk turns the index into a
+    # palette slot. Computed once per invocation, not per line.
+    local svc_index=""
+    local _i=0 _svc
+    while IFS= read -r _svc; do
+        [[ -z "$_svc" ]] && continue
+        svc_index+="${_svc}=${_i} "
+        _i=$((_i + 1))
+    done < <(docker compose --profile all config --services 2>/dev/null | sort)
+
+    awk -v svc_index="$svc_index" '
     BEGIN {
         # 36 entries, all readable on a dark terminal. `moav start all` runs 30
         # containers, so a smaller palette wraps and collides -- a 24-entry one
@@ -1093,9 +1106,21 @@ format_log_timestamps() {
                   "82,165,178,123,197,120,171,228,209,80,105,191,168,75,186,135," \
                   "115,216,99,156", pal, ",")
         next_c = 0
+        # "name=index name=index ..." -> fixed[name] = index
+        split(svc_index, pairs, " ")
+        for (p in pairs) {
+            if (pairs[p] == "") continue
+            eq = index(pairs[p], "=")
+            if (eq > 0) fixed[substr(pairs[p], 1, eq - 1)] = substr(pairs[p], eq + 1)
+        }
     }
-    function svc_color(name) {
-        if (!(name in col)) { col[name] = pal[(next_c % n) + 1]; next_c++ }
+    function svc_color(name,   base) {
+        if (name in col) return col[name]
+        # compose appends -1/-2 for replicas; the service name is what we mapped.
+        base = name; sub(/-[0-9]+$/, "", base)
+        if (base in fixed)      col[name] = pal[(fixed[base] % n) + 1]
+        else if (name in fixed) col[name] = pal[(fixed[name] % n) + 1]
+        else { col[name] = pal[(next_c % n) + 1]; next_c++ }   # unlisted: fall back
         return col[name]
     }
     {

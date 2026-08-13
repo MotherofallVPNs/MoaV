@@ -242,14 +242,34 @@ cmd_build() {
 # keep the most-recently-used ~4 GB and evict the older overflow. So a normal
 # rebuild keeps its warm cache; only unbounded accumulation is trimmed.
 # Cache only, never images (they back the running stack and any rollback).
-MOAV_BUILD_CACHE_KEEP="${MOAV_BUILD_CACHE_KEEP:-4GB}"
+MOAV_BUILD_CACHE_KEEP="${MOAV_BUILD_CACHE_KEEP:-}"
+
+# A fixed cap is wrong on a small VPS. Measured on a 24 GB box: 4.9 GB of build
+# cache with 3.8 GB free, i.e. the cache was the single largest thing on a disk
+# at 84%. Keep at most a quarter of what the cache could grow into, floored so a
+# rebuild still has something to reuse, and capped at the old 4 GB.
+default_cache_keep() {
+    local free_kb cache_kb budget_mb
+    free_kb=$(df -Pk / 2>/dev/null | awk 'NR==2 {print $4}')
+    [[ "$free_kb" =~ ^[0-9]+$ ]] || { echo "4GB"; return; }
+    cache_kb=$(docker system df --format '{{.Type}}\t{{.Size}}' 2>/dev/null \
+        | awk -F'\t' '/Build Cache/ {print $2}' \
+        | awk '/GB/{printf "%d", $1*1048576} /MB/{printf "%d", $1*1024}')
+    [[ "$cache_kb" =~ ^[0-9]+$ ]] || cache_kb=0
+    budget_mb=$(( (free_kb + cache_kb) / 1024 / 4 ))
+    (( budget_mb < 512 ))  && budget_mb=512
+    (( budget_mb > 4096 )) && budget_mb=4096
+    echo "${budget_mb}MB"
+}
+
 prune_build_cache() {
     command -v docker >/dev/null 2>&1 || return 0
+    [[ -n "$MOAV_BUILD_CACHE_KEEP" ]] || MOAV_BUILD_CACHE_KEEP="$(default_cache_keep)"
     # --keep-storage caps retained cache (Docker 18.09+; a deprecation alias for
     # --reserved-space on 27+, still honored). Fall back to an age filter on the
     # rare daemon that rejects it, still preserving recent layers.
     if docker builder prune -f --keep-storage "$MOAV_BUILD_CACHE_KEEP" >/dev/null 2>&1; then
-        info "Capped build cache at ~${MOAV_BUILD_CACHE_KEEP} (recent layers kept for fast rebuilds)"
+        info "Capped build cache at ~${MOAV_BUILD_CACHE_KEEP} (least-recently-used layers evicted first)"
     elif docker builder prune -f --filter until=336h >/dev/null 2>&1; then
         info "Pruned build cache older than 14 days (recent layers kept)"
     fi

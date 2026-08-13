@@ -508,20 +508,21 @@ print_post_update_apply_steps() {
         echo -e "  ${WHITE}${n}.${NC} moav regenerate-users           ${DIM}# refresh user bundles (guide layout changed)${NC}"
         n=$((n+1))
     fi
-    echo -e "  ${WHITE}${n}.${NC} moav start                      ${DIM}# recreate containers on the new images${NC}"
-    echo ""
+    # Everything below is a NUMBERED step. An unnumbered command after a numbered
+    # list reads as a footnote and gets skipped -- which is exactly what happened
+    # with the recreate line.
     if [[ -n "$setup_jobs" ]]; then
-        echo -e "  ${WHITE}docker compose --profile setup run --rm ${setup_jobs}${NC}"
-        echo -e "     ${DIM}# a one-shot setup job added by this release has never run here,${NC}"
-        echo -e "     ${DIM}# so the volume it fills is still empty${NC}"
-        echo ""
+        echo -e "  ${WHITE}${n}.${NC} cd ${SCRIPT_DIR} && docker compose --profile setup run --rm ${setup_jobs}"
+        echo -e "     ${DIM}# fills a volume this release added; it has never run here${NC}"
+        n=$((n+1))
     fi
-
+    echo -e "  ${WHITE}${n}.${NC} moav start                      ${DIM}# recreate containers on the new images${NC}"
+    n=$((n+1))
     if [[ -n "$recreate" ]]; then
-        echo -e "  ${WHITE}cd ${SCRIPT_DIR} && docker compose up -d --force-recreate ${recreate}${NC}"
+        echo -e "  ${WHITE}${n}.${NC} cd ${SCRIPT_DIR} && docker compose up -d --force-recreate ${recreate}"
         echo -e "     ${DIM}# a mounted config file changed; only a recreate picks it up${NC}"
-        echo ""
     fi
+    echo ""
 
     echo -e "${DIM}Note: 'moav restart' reuses the old image — use 'moav start' (docker compose up -d) to pick up rebuilt images.${NC}"
 }

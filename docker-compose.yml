@@ -1269,9 +1269,17 @@ services:
     command: >
       -c '
         MONTH=$$(date +%Y-%m) &&
+        DB=/geoip/dbip-country-lite.mmdb &&
+        STAMP=/geoip/.dbip-month &&
+        if [ -s "$$DB" ] && [ "$$(cat $$STAMP 2>/dev/null)" = "$$MONTH" ]; then
+          echo "GeoIP database already current ($${MONTH}), skipping download"
+          exit 0
+        fi &&
         URL="https://download.db-ip.com/free/dbip-country-lite-$${MONTH}.mmdb.gz" &&
         echo "Downloading GeoIP database for $${MONTH}..." &&
-        curl -fSL "$$URL" | gunzip > /geoip/dbip-country-lite.mmdb &&
+        curl -fSL "$$URL" | gunzip > "$$DB.tmp" &&
+        mv "$$DB.tmp" "$$DB" &&
+        echo "$$MONTH" > "$$STAMP" &&
         echo "GeoIP database updated successfully ($${MONTH})"
       '
 
@@ -1288,9 +1296,13 @@ services:
       - |
         set -e
         B="https://gitlab.torproject.org/tpo/core/tor/-/raw/main/src/config"
-        echo "Downloading Tor geoip files..."
-        curl -fSL "$$B/geoip"  -o /geoip/geoip.tmp  && mv /geoip/geoip.tmp  /geoip/geoip
-        curl -fSL "$$B/geoip6" -o /geoip/geoip6.tmp && mv /geoip/geoip6.tmp /geoip/geoip6
+        echo "Checking Tor geoip files..."
+        # -z: conditional GET. Unchanged upstream means a 304 and no transfer,
+        # and curl leaves the existing file alone. These are 25 MB together.
+        curl -fsSL -z /geoip/geoip  -o /geoip/geoip.new  "$$B/geoip"  || true
+        curl -fsSL -z /geoip/geoip6 -o /geoip/geoip6.new "$$B/geoip6" || true
+        [ -s /geoip/geoip.new  ] && mv /geoip/geoip.new  /geoip/geoip  || rm -f /geoip/geoip.new
+        [ -s /geoip/geoip6.new ] && mv /geoip/geoip6.new /geoip/geoip6 || rm -f /geoip/geoip6.new
         [ -s /geoip/geoip ] && [ -s /geoip/geoip6 ] || { echo "Tor geoip download failed"; exit 1; }
         echo "Tor geoip ready: $$(wc -l < /geoip/geoip) v4 + $$(wc -l < /geoip/geoip6) v6 ranges"
     volumes:
