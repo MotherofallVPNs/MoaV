@@ -91,6 +91,8 @@ jobs:
         run: bash tests/llms-links-test.sh
       - name: moav update rebuild prompts (baked-in changes)
         run: bash tests/update-rebuild-test.sh
+      - name: build cache cap (sizing reaches docker builder)
+        run: bash tests/build-cache-test.sh
       - name: snowflake native metrics + dashboard (#183)
         run: bash tests/snowflake-metrics-test.sh
       - name: admin TLS enforcement

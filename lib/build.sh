@@ -244,27 +244,32 @@ cmd_build() {
 # Cache only, never images (they back the running stack and any rollback).
 MOAV_BUILD_CACHE_KEEP="${MOAV_BUILD_CACHE_KEEP:-}"
 
-# A fixed cap is wrong on a small VPS. Measured on a 24 GB box: 4.9 GB of build
-# cache with 3.8 GB free, i.e. the cache was the single largest thing on a disk
-# at 84%. Keep at most a quarter of what the cache could grow into, floored so a
-# rebuild still has something to reuse, and capped at the old 4 GB.
+# Sized to hold the whole stack's layers: MoaV's in-use images total ~1.9 GB on a
+# full install and their cache is the same order, so 4 GB keeps every rebuild
+# warm. It only shrinks when the disk is genuinely tight -- never more than half
+# of the space the cache could occupy -- so a small VPS gives ground instead of
+# filling up. Measured case: 24 GB box at 82%, 4.3 GB free plus 4.0 GB cache, so
+# the cap stays 4 GB; the same box with 1 GB free would drop to 2.5 GB.
 default_cache_keep() {
-    local free_kb cache_kb budget_mb
-    free_kb=$(df -Pk / 2>/dev/null | awk 'NR==2 {print $4}')
-    [[ "$free_kb" =~ ^[0-9]+$ ]] || { echo "4GB"; return; }
-    cache_kb=$(docker system df --format '{{.Type}}\t{{.Size}}' 2>/dev/null \
-        | awk -F'\t' '/Build Cache/ {print $2}' \
-        | awk '/GB/{printf "%d", $1*1048576} /MB/{printf "%d", $1*1024}')
-    [[ "$cache_kb" =~ ^[0-9]+$ ]] || cache_kb=0
-    budget_mb=$(( (free_kb + cache_kb) / 1024 / 4 ))
-    (( budget_mb < 512 ))  && budget_mb=512
-    (( budget_mb > 4096 )) && budget_mb=4096
-    echo "${budget_mb}MB"
+    local free_mb cache_mb keep
+    free_mb=$(df -Pm / 2>/dev/null | awk 'NR==2 {print $4}')
+    [[ "$free_mb" =~ ^[0-9]+$ ]] || { echo 4096; return; }
+    # Count the existing cache as available: it is what we are about to reclaim,
+    # so without it the cap would ratchet down every run.
+    cache_mb=$(docker system df 2>/dev/null | awk '/^Build Cache/ {
+        v = $(NF-1); u = $(NF-1);
+        sub(/[A-Za-z]+$/, "", v);
+        if (u ~ /GB/) printf "%d", v * 1024; else if (u ~ /MB/) printf "%d", v; else print 0 }')
+    [[ "$cache_mb" =~ ^[0-9]+$ ]] || cache_mb=0
+    keep=$(( (free_mb + cache_mb) / 2 ))
+    (( keep > 4096 )) && keep=4096
+    (( keep < 1024 )) && keep=1024
+    echo "$keep"
 }
 
 prune_build_cache() {
     command -v docker >/dev/null 2>&1 || return 0
-    [[ -n "$MOAV_BUILD_CACHE_KEEP" ]] || MOAV_BUILD_CACHE_KEEP="$(default_cache_keep)"
+    [[ -n "$MOAV_BUILD_CACHE_KEEP" ]] || MOAV_BUILD_CACHE_KEEP="$(default_cache_keep)MB"
     # --keep-storage caps retained cache (Docker 18.09+; a deprecation alias for
     # --reserved-space on 27+, still honored). Fall back to an age filter on the
     # rare daemon that rejects it, still preserving recent layers.
