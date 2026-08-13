@@ -91,6 +91,8 @@ jobs:
         run: bash tests/llms-links-test.sh
       - name: moav update rebuild prompts (baked-in changes)
         run: bash tests/update-rebuild-test.sh
+      - name: snowflake exporter counters + dashboard (#183)
+        run: bash tests/snowflake-exporter-test.sh
       - name: admin TLS enforcement
         run: bash tests/admin-tls-test.sh
       - name: admin IP whitelist (CIDR) unit test

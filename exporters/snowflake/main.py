@@ -19,8 +19,8 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 # Metrics storage (cumulative - we add to these, never replace)
 metrics = {
     'served_people': 0,      # Total connections served (cumulative)
-    'download_gb': 0.0,      # Total GB downloaded (cumulative)
-    'upload_gb': 0.0,        # Total GB uploaded (cumulative)
+    'down_bytes': 0,         # Total bytes relayed toward the client (cumulative)
+    'up_bytes': 0,           # Total bytes relayed from the client (cumulative)
     'last_update_timestamp': 0,
 }
 
@@ -37,17 +37,17 @@ BYTES_PATTERN = re.compile(r'Traffic Relayed\s*↓\s*(\d+\.?\d*)\s*(B|KB|MB|GB|T
 ALT_BYTES_PATTERN = re.compile(r'(\d+\.?\d*)\s*(B|KB|MB|GB|TB)\s*down.*?(\d+\.?\d*)\s*(B|KB|MB|GB|TB)\s*up', re.IGNORECASE)
 
 
-def convert_to_gb(value: float, unit: str) -> float:
-    """Convert value with unit to GB."""
+def convert_to_bytes(value: float, unit: str) -> int:
+    """Convert a logged value with its unit to bytes."""
     unit = unit.upper()
     multipliers = {
-        'B': 1 / (1024 ** 3),
-        'KB': 1 / (1024 ** 2),
-        'MB': 1 / 1024,
-        'GB': 1,
-        'TB': 1024,
+        'B': 1,
+        'KB': 1024,
+        'MB': 1024 ** 2,
+        'GB': 1024 ** 3,
+        'TB': 1024 ** 4,
     }
-    return value * multipliers.get(unit, 0)
+    return int(value * multipliers.get(unit, 0))
 
 
 def parse_log_line(line: str) -> bool:
@@ -76,8 +76,8 @@ def parse_log_line(line: str) -> bool:
 
         with metrics_lock:
             # ACCUMULATE - add to running totals
-            metrics['download_gb'] += convert_to_gb(down_value, down_unit)
-            metrics['upload_gb'] += convert_to_gb(up_value, up_unit)
+            metrics['down_bytes'] += convert_to_bytes(down_value, down_unit)
+            metrics['up_bytes'] += convert_to_bytes(up_value, up_unit)
             metrics['last_update_timestamp'] = time.time()
         updated = True
 
@@ -123,7 +123,8 @@ def tail_log_file(log_path: str):
                     new_lines = True
                     if parse_log_line(line):
                         print(f"Total: served={metrics['served_people']}, "
-                              f"down={metrics['download_gb']:.2f}GB, up={metrics['upload_gb']:.2f}GB")
+                              f"down={metrics['down_bytes'] / 1024**3:.2f}GiB, "
+                              f"up={metrics['up_bytes'] / 1024**3:.2f}GiB")
 
                 last_position = f.tell()
 
@@ -150,25 +151,46 @@ class MetricsHandler(BaseHTTPRequestHandler):
             output = []
 
             with metrics_lock:
-                output.append('# HELP served_people Total number of connections served by snowflake proxy')
-                output.append('# TYPE served_people gauge')
-                output.append(f'served_people {metrics["served_people"]}')
+                served = metrics["served_people"]
+                down = metrics["down_bytes"]
+                up = metrics["up_bytes"]
+                stamp = metrics["last_update_timestamp"]
 
-                # Note: download_gb = bytes the proxy received (from perspective of proxy)
-                # For users behind censorship, this is what they uploaded
-                output.append('# HELP download_gb Total GB received by the proxy')
-                output.append('# TYPE download_gb gauge')
-                output.append(f'download_gb {metrics["download_gb"]:.6f}')
+            # COUNTERS. These are monotonically increasing totals, and typing them
+            # as gauges is what made every "over time" panel useless: Grafana was
+            # plotting the lifetime total, so the line looked flat and the axis
+            # auto-scaled to the noise band (150.07845..150.07848 GB). As counters,
+            # rate()/increase() work and a restart -- which replays the log from
+            # zero -- reads as a counter reset instead of a cliff.
+            output.append('# HELP snowflake_connections_total Connections served by this proxy')
+            output.append('# TYPE snowflake_connections_total counter')
+            output.append(f'snowflake_connections_total {served}')
 
-                # Note: upload_gb = bytes the proxy sent (from perspective of proxy)
-                # For users behind censorship, this is what they downloaded
-                output.append('# HELP upload_gb Total GB sent by the proxy')
-                output.append('# TYPE upload_gb gauge')
-                output.append(f'upload_gb {metrics["upload_gb"]:.6f}')
+            # Bytes, not GB floats: the unit belongs in the dashboard, and GB
+            # floats drift as they accumulate.
+            output.append('# HELP snowflake_relayed_bytes_total Bytes relayed, by direction')
+            output.append('# TYPE snowflake_relayed_bytes_total counter')
+            output.append(f'snowflake_relayed_bytes_total{{direction="down"}} {down}')
+            output.append(f'snowflake_relayed_bytes_total{{direction="up"}} {up}')
 
-                output.append('# HELP snowflake_last_update Unix timestamp of last metrics update')
-                output.append('# TYPE snowflake_last_update gauge')
-                output.append(f'snowflake_last_update {metrics["last_update_timestamp"]}')
+            output.append('# HELP snowflake_last_update_timestamp_seconds When a log line last moved a counter')
+            output.append('# TYPE snowflake_last_update_timestamp_seconds gauge')
+            output.append(f'snowflake_last_update_timestamp_seconds {stamp}')
+
+            # DEPRECATED, kept so an operator's own panels do not break on upgrade.
+            # Same numbers, old names and units. Remove once 2.1.x is well past.
+            output.append('# HELP served_people DEPRECATED, use snowflake_connections_total')
+            output.append('# TYPE served_people gauge')
+            output.append(f'served_people {served}')
+            output.append('# HELP download_gb DEPRECATED, use snowflake_relayed_bytes_total{direction="down"}')
+            output.append('# TYPE download_gb gauge')
+            output.append(f'download_gb {down / 1024 ** 3:.6f}')
+            output.append('# HELP upload_gb DEPRECATED, use snowflake_relayed_bytes_total{direction="up"}')
+            output.append('# TYPE upload_gb gauge')
+            output.append(f'upload_gb {up / 1024 ** 3:.6f}')
+            output.append('# HELP snowflake_last_update DEPRECATED, use snowflake_last_update_timestamp_seconds')
+            output.append('# TYPE snowflake_last_update gauge')
+            output.append(f'snowflake_last_update {stamp}')
 
             self.wfile.write('\n'.join(output).encode())
 
@@ -191,7 +213,9 @@ def main():
 
     # Get log path from argument or use default
     log_path = sys.argv[1] if len(sys.argv) > 1 else '/var/log/snowflake/snowflake.log'
-    port = 8080
+    # Overridable so the exporter can be run and scraped outside the container,
+    # which is the only way to test the metric output.
+    port = int(os.environ.get('SNOWFLAKE_EXPORTER_PORT', '8080'))
 
     # Start log tailer in background thread
     tailer_thread = threading.Thread(target=tail_log_file, args=(log_path,), daemon=True)

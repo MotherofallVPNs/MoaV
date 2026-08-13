@@ -390,10 +390,13 @@ check_source_rebuilds() {
     changed=$(git -C "$SCRIPT_DIR" diff --name-only "$old_commit" HEAD 2>/dev/null) || return 0
     [[ -z "$changed" ]] && return 0
 
-    # Operator-facing services built from source. Monitoring/infra images
-    # (exporters, grafana, prometheus, the bootstrap image) are intentionally
-    # excluded — low impact, and their entrypoints are bind-mounted anyway.
-    local valid=" dns-router dnstt slipstream gooserelay masterdns sing-box xray telemt trusttunnel wireguard amneziawg wstunnel snowflake psiphon-conduit client admin "
+    # Services built from source. Exporters are included: their code is COPYed
+    # into the image (exporters/*/Dockerfile), so a fix to one never reaches a
+    # running container without a rebuild -- the comment here used to claim they
+    # were bind-mounted, which is true of the grafana entrypoint and of nothing
+    # in exporters/. Grafana, prometheus and the bootstrap image stay out: those
+    # are upstream images or bind-mounted config.
+    local valid=" dns-router dnstt slipstream gooserelay masterdns sing-box xray telemt trusttunnel wireguard amneziawg wstunnel snowflake psiphon-conduit client admin snowflake-exporter singbox-exporter telemt-exporter xray-exporter wireguard-exporter amneziawg-exporter "
 
     local queued="" f svc
     while IFS= read -r f; do
@@ -402,6 +405,7 @@ check_source_rebuilds() {
         case "$f" in
             dns-router/*)                   svc="dns-router" ;;
             admin/*)                        svc="admin" ;;
+            exporters/*/*)                  svc="${f#exporters/}"; svc="${svc%%/*}-exporter" ;;
             scripts/conduit-entrypoint.sh)  svc="psiphon-conduit" ;;   # name mismatch
             dockerfiles/Dockerfile.psiphon) svc="psiphon-conduit" ;;   # name mismatch
             scripts/client-*.sh)            svc="client" ;;
