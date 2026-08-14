@@ -94,6 +94,14 @@ grep -q 'storage.tsdb.retention.size' "$COMPOSE" \
     && ok "Prometheus retention has a size ceiling as well as an age" \
     || bad "retention.time alone cannot stop cardinality filling the disk"
 
+# A longer window is only safe because the size cap bounds the disk. Making the
+# time configurable without the cap would let one cardinality mistake fill it.
+if grep -q 'PROMETHEUS_RETENTION_TIME' "$COMPOSE" && ! grep -q 'PROMETHEUS_RETENTION_SIZE' "$COMPOSE"; then
+    bad "retention time is configurable but the size cap is not"
+else
+    ok "retention time and size cap are configurable together"
+fi
+
 # --- the policy has to be written down somewhere operators look --------------
 doc_found=0
 for d in "$ROOT/../moav-site/docs/OPSEC.md" "$ROOT/docs/OPSEC.md"; do

@@ -8,8 +8,8 @@
 x-logging: &default-logging
   driver: json-file
   options:
-    max-size: "10m"
-    max-file: "3"
+    max-size: "${LOG_MAX_SIZE:-10m}"
+    max-file: "${LOG_MAX_FILES:-3}"
 
 networks:
   moav_net:
@@ -872,9 +872,10 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=15d'
-      # retention.time alone does not bound size when cardinality grows
-      - '--storage.tsdb.retention.size=2GB'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-90d}'
+      # The real guard. retention.time alone cannot bound disk when cardinality
+      # grows, and whichever limit is reached first wins.
+      - '--storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-2GB}'
       - '--web.listen-address=:9091'
       - '--web.enable-lifecycle'
     environment:

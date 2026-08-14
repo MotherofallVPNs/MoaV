@@ -676,7 +676,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(max_over_time(tor_snowflake_proxy_connections_total[$__interval]))",
+          "expr": "sum(max_over_time(tor_snowflake_proxy_connections_total[$__rate_interval]))",
           "legendFormat": "connections/hour",
           "refId": "A"
         }
@@ -759,7 +759,7 @@
       "id": 11,
       "type": "timeseries",
       "title": "Users Served by Country over Time",
-      "description": "Running total per country across the selected range, so the right-hand edge matches the pie beside it. Steps down if the container restarts. Counted with max_over_time, not increase: these tick once per completed connection and then sit flat, and increase() can only see growth from a previous sample, so every country's FIRST connection was invisible. Measured on a live proxy, increase saw 2 countries where max_over_time saw 7. Trade-off: if the container restarts mid-window this shows the larger run rather than the sum.",
+      "description": "Running total per country across the selected range, so the right-hand edge matches the pie beside it. Sampled over $__rate_interval, which Grafana keeps at or above the scrape interval \u2014 a shorter window would fall between scrapes and draw gaps.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -802,7 +802,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (country) (max_over_time(tor_snowflake_proxy_connections_total[$__interval]))",
+          "expr": "sum by (country) (max_over_time(tor_snowflake_proxy_connections_total[$__rate_interval]))",
           "legendFormat": "{{country}}",
           "refId": "A",
           "datasource": {
