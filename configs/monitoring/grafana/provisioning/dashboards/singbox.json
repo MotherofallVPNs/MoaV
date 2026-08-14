@@ -1691,7 +1691,7 @@
           "id": 127,
           "type": "stat",
           "title": "Threshold Cost",
-          "description": "How much the k-anonymity threshold folded into 'other' in the last full hour. Folded sites is how many missed it; closest miss is the largest client count among them -- if that sits just under SITE_ANALYTICS_MIN_CLIENTS, lowering it by one would name that site. Neither names anything.",
+          "description": "How much the k-anonymity threshold folded into 'other' in the last full hour. Closest miss is the largest client count among the folded sites. If it sits just under SITE_ANALYTICS_MIN_CLIENTS, the fix is to widen SITE_ANALYTICS_BUCKET_SECONDS, not to lower the threshold: a longer bucket gathers more distinct clients per site, so more sites clear the same bar and every named site is still backed by at least that many people. Neither number names a site.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
