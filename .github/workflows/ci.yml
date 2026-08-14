@@ -99,6 +99,8 @@ jobs:
         run: bash tests/sitestats-test.sh
       - name: sing-box country metrics
         run: bash tests/singbox-country-test.sh
+      - name: sing-box log scrubbing (#297)
+        run: bash tests/singbox-log-scrub-test.sh
       - name: snowflake native metrics + dashboard (#183)
         run: bash tests/snowflake-metrics-test.sh
       - name: admin TLS enforcement
