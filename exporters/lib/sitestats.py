@@ -224,6 +224,8 @@ class SiteStats:
         self.conns = d.get("conns") or {}
         self.clients = d.get("clients") or {}
         self._site_country = d.get("site_country") or {}
+        self.folded = d.get("folded") or 0
+        self.folded_max = d.get("folded_max") or 0
         self._rolled = True
         self.ports = {tuple(k.split("\x1f")): v for k, v in (d.get("ports") or {}).items()}
 
@@ -233,6 +235,7 @@ class SiteStats:
             return
         d = {"sites": self.sites, "countries": self.countries, "conns": self.conns,
              "clients": self.clients, "site_country": self._site_country,
+             "folded": self.folded, "folded_max": self.folded_max,
              "ports": {"\x1f".join(k): v for k, v in self.ports.items()}}
         try:
             os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)

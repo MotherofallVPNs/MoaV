@@ -286,11 +286,15 @@ s2 = sitestats.SiteStats(now=99999)          # a fresh process, same state file
 body = "\n".join(s2.render())
 print("AFTER_BYTES=%s" % ('site="popular.net",direction="up"} 400' in body))
 print("AFTER_CONNS=%s" % ('moav_site_connections_total{site="popular.net"} 4' in body))
+print("AFTER_FOLDED=%s" % ("moav_site_folded_sites" in body))
 PY
 )
 grep -q 'AFTER_BYTES=True' <<<"$out" && grep -q 'AFTER_CONNS=True' <<<"$out" \
     && ok "totals survive a restart instead of resetting to nothing" \
     || bad "a restart lost every aggregate: $out"
+grep -q 'AFTER_FOLDED=True' <<<"$out" \
+    && ok "the threshold-cost figures survive too, rather than reading zero" \
+    || bad "folded counts reset on restart, so the panel would claim nothing was folded: $out"
 
 # The salted client digests must never be among what is written.
 if grep -qE '"_clients"|"clients": *\[' "$STATE_DIR/state.json" 2>/dev/null; then
