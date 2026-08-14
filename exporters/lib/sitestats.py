@@ -168,14 +168,18 @@ class SiteStats:
         self._pending = {}        # site -> {"up": n, "down": n}
         self._countries = {}      # destination country -> pending bytes
         self._unlocated = {}      # site -> pending bytes with no country yet
+        self._conns = {}          # site -> connections opened this bucket
         self._ports = {}          # (site, port, network) -> pending bytes, research only
         self._resolver = resolver  # site -> country code; see resolve_country()
         self._site_country = {}   # resolved, cached for the life of the process
         self.sites = {}           # exposed cumulative counters
         self.countries = {}
         self.ports = {}
+        self.conns = {}
+        self.clients = {}         # distinct clients in the last closed bucket
 
-    def record(self, client, host, up, down, dest_country="", port="", network=""):
+    def record(self, client, host, up, down, dest_country="", port="", network="",
+               new_conn=False):
         """One connection's delta. `client` never leaves this object."""
         if not ENABLED or (up <= 0 and down <= 0):
             return
@@ -184,6 +188,8 @@ class SiteStats:
         site = registrable(host) or OTHER
         with self.lock:
             self._clients.setdefault(site, set()).add(_client_key(client))
+            if new_conn:
+                self._conns[site] = self._conns.get(site, 0) + 1
             p = self._pending.setdefault(site, {"up": 0, "down": 0})
             p["up"] += max(0, up)
             p["down"] += max(0, down)
@@ -230,10 +236,13 @@ class SiteStats:
             qualifying.sort(reverse=True)
             named = {s for _, s in qualifying[:TOP_N]}
             pending, countries = self._pending, self._countries
-            unlocated, ports = self._unlocated, self._ports
+            unlocated, ports, conns = self._unlocated, self._ports, self._conns
+            # Only named sites get a client count, and they cleared the
+            # threshold, so the number describes a crowd rather than a person.
+            clients = {s: len(self._clients.get(s, ())) for s in named}
             self._clients = {}
             self._pending, self._countries = {}, {}
-            self._unlocated, self._ports = {}, {}
+            self._unlocated, self._ports, self._conns = {}, {}, {}
             self._bucket = bucket
 
         # Outside the lock: a cold DNS answer must not stall recording.
@@ -253,6 +262,10 @@ class SiteStats:
             for k, n in ports.items():
                 if k[0] in named:
                     self.ports[k] = self.ports.get(k, 0) + n
+            for site, n in conns.items():
+                key = site if site in named else OTHER
+                self.conns[key] = self.conns.get(key, 0) + n
+            self.clients = clients
         return True
 
     def render(self):
@@ -261,6 +274,7 @@ class SiteStats:
         out = []
         with self.lock:
             sites, countries, ports = dict(self.sites), dict(self.countries), dict(self.ports)
+            conns, clients = dict(self.conns), dict(self.clients)
         if sites:
             out.append("# HELP moav_site_traffic_bytes_total Bytes relayed per destination site")
             out.append("# TYPE moav_site_traffic_bytes_total counter")
@@ -268,6 +282,16 @@ class SiteStats:
                 for direction in ("up", "down"):
                     out.append('moav_site_traffic_bytes_total{site="%s",direction="%s"} %d'
                                % (site, direction, v[direction]))
+        if conns:
+            out.append("# HELP moav_site_connections_total Connections opened per destination site")
+            out.append("# TYPE moav_site_connections_total counter")
+            for site, n in sorted(conns.items()):
+                out.append('moav_site_connections_total{site="%s"} %d' % (site, n))
+        if clients:
+            out.append("# HELP moav_site_clients Distinct clients that reached the site in the last hour")
+            out.append("# TYPE moav_site_clients gauge")
+            for site, n in sorted(clients.items()):
+                out.append('moav_site_clients{site="%s"} %d' % (site, n))
         if countries:
             out.append("# HELP moav_site_destination_country_bytes_total Bytes relayed per destination country")
             out.append("# TYPE moav_site_destination_country_bytes_total counter")

@@ -1164,13 +1164,13 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "singbox_connections_by_country",
+          "expr": "sum by (country) (increase(singbox_connections_by_country[$__range]))",
           "legendFormat": "{{country}}",
           "refId": "A",
           "instant": true
         }
       ],
-      "description": "Connections since this exporter started, by the country of the client IP. Resets when the exporter restarts."
+      "description": "Connections opened in the selected time range, by the country of the client IP. Counts connections, not people: a chatty client outweighs a quiet one."
     },
     {
       "datasource": {
@@ -1256,7 +1256,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "singbox_active_users_by_country",
+          "expr": "max_over_time(singbox_active_users_by_country[$__range])",
           "format": "table",
           "instant": true,
           "legendFormat": "{{country}}",
@@ -1290,7 +1290,8 @@
             ]
           }
         }
-      ]
+      ],
+      "description": "Peak simultaneous users in the selected time range, by the country of the client IP. Counts people, not connections, so it will not track the pie beside it."
     },
     {
       "id": 122,
@@ -1453,6 +1454,204 @@
               "instant": true
             }
           ]
+        },
+        {
+          "id": 126,
+          "type": "table",
+          "title": "Site Usage",
+          "description": "One row per named site for the selected time range. Clients is the number of distinct people who reached it in the last full hour, which is also the gate: a site is named only once at least SITE_ANALYTICS_MIN_CLIENTS reached it. 'other' holds everything below that, so it has bytes and connections but no client count.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 58
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "moav_site_clients",
+              "instant": true,
+              "format": "table",
+              "legendFormat": "{{site}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            },
+            {
+              "refId": "B",
+              "expr": "sum by (site) (increase(moav_site_connections_total[$__range]))",
+              "instant": true,
+              "format": "table",
+              "legendFormat": "{{site}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            },
+            {
+              "refId": "C",
+              "expr": "sum by (site) (increase(moav_site_traffic_bytes_total{direction=\"down\"}[$__range]))",
+              "instant": true,
+              "format": "table",
+              "legendFormat": "{{site}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            },
+            {
+              "refId": "D",
+              "expr": "sum by (site) (increase(moav_site_traffic_bytes_total{direction=\"up\"}[$__range]))",
+              "instant": true,
+              "format": "table",
+              "legendFormat": "{{site}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ],
+          "transformations": [
+            {
+              "id": "joinByField",
+              "options": {
+                "byField": "site",
+                "mode": "outer"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "Time 1": true,
+                  "Time 2": true,
+                  "Time 3": true,
+                  "Time 4": true
+                },
+                "renameByName": {
+                  "site": "Site",
+                  "Value #A": "Clients",
+                  "Value #B": "Connections",
+                  "Value #C": "Downloaded",
+                  "Value #D": "Uploaded"
+                },
+                "indexByName": {}
+              }
+            },
+            {
+              "id": "sortBy",
+              "options": {
+                "sort": [
+                  {
+                    "field": "Downloaded",
+                    "desc": true
+                  }
+                ]
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                }
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Downloaded"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "gauge",
+                      "mode": "gradient"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Uploaded"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "gauge",
+                      "mode": "gradient"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Clients"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 130
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Connections"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 130
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "footer": {
+              "show": true,
+              "reducer": [
+                "sum"
+              ],
+              "fields": [
+                "Connections",
+                "Downloaded",
+                "Uploaded"
+              ]
+            }
+          }
         }
       ]
     }

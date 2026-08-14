@@ -304,6 +304,7 @@ def poll_clash_connections():
                             dest_country=geoip.lookup(dest_ip) if dest_ip else "",
                             port=meta.get("destinationPort", ""),
                             network=meta.get("network", ""),
+                            new_conn=conn_id not in counted_connection_ids,
                         )
 
                 # Count each connection ONCE, the first time we see it. The old

@@ -154,10 +154,11 @@ s.maybe_roll(now=99999)
 print("\n".join(s.render()))
 PY
 )
-if grep -qE '203\.0\.113\.|source|client' <<<"$out"; then
-    bad "a client identifier reached the output: $(grep -m1 -E '203\.0\.113\.|source|client' <<<"$out")"
+samples=$(grep -v '^#' <<<"$out")
+if grep -qE '203\.0\.113\.|(^|[{,])(source|client|client_ip|src|ip|user)=' <<<"$samples"; then
+    bad "a client identifier reached the output: $(grep -m1 -E '203\.0\.113\.|(^|[{,])(source|client|client_ip|src|ip|user)=' <<<"$samples")"
 else
-    ok "no client IP or client-shaped label in the output"
+    ok "no client IP, and no client-shaped label key, on any sample"
 fi
 grep -q 'moav_site_destination_country_bytes_total{country="US"}' <<<"$out" \
     && ok "destination country is reported" \
@@ -238,6 +239,34 @@ PY
 grep -q 'CHAT=True VIDEO=False' <<<"$out" \
     && ok "top-N keeps the most-used site, not the heaviest" \
     || bad "ranked by bytes: a CDN crowded out the site more people used ($out)"
+
+# --- connection and client counts ---------------------------------------------
+# record() is called once per byte-delta poll, so counting calls would report
+# connections that never happened.
+out=$(run_py ENABLE_SITE_ANALYTICS=true SITE_ANALYTICS_MIN_CLIENTS=3 <<'PY'
+import sitestats
+s = sitestats.SiteStats(now=0)
+for i in range(5):
+    s.record("10.0.0.%d" % i, "a.popular.net", 100, 200, new_conn=True)
+    s.record("10.0.0.%d" % i, "a.popular.net", 50, 50)      # same connection again
+s.record("10.0.9.1", "lonely.example.org", 10, 10, new_conn=True)
+s.maybe_roll(now=99999)
+body = "\n".join(s.render())
+print(body)
+PY
+)
+grep -q 'moav_site_connections_total{site="popular.net"} 5' <<<"$out" \
+    && ok "a connection counts once, not once per poll" \
+    || bad "connection count follows poll frequency: $(grep -m1 connections_total <<<"$out")"
+grep -q 'moav_site_clients{site="popular.net"} 5' <<<"$out" \
+    && ok "distinct clients per site are exposed" \
+    || bad "no client count for a named site: $out"
+grep -q 'moav_site_clients{site="other"}' <<<"$out" \
+    && bad "'other' got a client count; only threshold-clearing sites may have one" \
+    || ok "'other' has bytes and connections but no client count"
+grep -q 'moav_site_connections_total{site="other"} 1' <<<"$out" \
+    && ok "sub-threshold connections are still counted, under 'other'" \
+    || bad "connections below the threshold were dropped: $out"
 
 # --- the exporter must actually drive the object ------------------------------
 # record() without maybe_roll() collects and never exposes: the failure is

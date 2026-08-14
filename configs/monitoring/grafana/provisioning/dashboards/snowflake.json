@@ -125,7 +125,7 @@
       "id": 15,
       "type": "gauge",
       "title": "Rendezvous Success Rate",
-      "description": "Completed connections as a share of all rendezvous attempts. A large failure share is normal and mostly outside this proxy's control \u2014 the client's NAT and censorship decide it, per the upstream metric's own help text. Watch the trend, not the absolute number.",
+      "description": "Share of rendezvous attempts in the selected time range that produced a connection. Empty when nothing was attempted in the range.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -164,7 +164,7 @@
       },
       "targets": [
         {
-          "expr": "100 * sum(tor_snowflake_proxy_connections_total) / (sum(tor_snowflake_proxy_connections_total) + sum(tor_snowflake_proxy_connection_timeouts_total))",
+          "expr": "100 * sum(increase(tor_snowflake_proxy_connections_total[$__range])) / (sum(increase(tor_snowflake_proxy_connections_total[$__range])) + sum(increase(tor_snowflake_proxy_connection_timeouts_total[$__range])))",
           "refId": "A",
           "instant": true
         }
@@ -662,7 +662,7 @@
       "id": 10,
       "type": "piechart",
       "title": "Share of Users by Country",
-      "description": "Completed connections since the proxy last started, by the country of the client IP. '??' means the address was not in the geoip database.",
+      "description": "Connections completed in the selected time range, by the country of the client IP. '??' means the address was not in the geoip database.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -714,7 +714,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (country) (tor_snowflake_proxy_connections_total)",
+          "expr": "sum by (country) (increase(tor_snowflake_proxy_connections_total[$__range]))",
           "legendFormat": "{{country}}",
           "refId": "A",
           "instant": true
