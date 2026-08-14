@@ -95,6 +95,8 @@ jobs:
         run: bash tests/build-cache-test.sh
       - name: monitoring privacy (no user x destination) (#297)
         run: bash tests/monitoring-privacy-test.sh
+      - name: site analytics aggregation (#297)
+        run: bash tests/sitestats-test.sh
       - name: snowflake native metrics + dashboard (#183)
         run: bash tests/snowflake-metrics-test.sh
       - name: admin TLS enforcement

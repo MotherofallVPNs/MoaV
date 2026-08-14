@@ -1126,6 +1126,12 @@ services:
     environment:
       - CLASH_TOKEN=${CLASH_API_SECRET:-}
       - TZ=${TZ:-UTC}
+      # #297: destination stats, aggregated and k-anonymous. Off by default.
+      - ENABLE_SITE_ANALYTICS=${ENABLE_SITE_ANALYTICS:-false}
+      - ENABLE_SITE_ANALYTICS_RESEARCH=${ENABLE_SITE_ANALYTICS_RESEARCH:-false}
+      - SITE_ANALYTICS_MIN_CLIENTS=${SITE_ANALYTICS_MIN_CLIENTS:-5}
+      - SITE_ANALYTICS_TOP_N=${SITE_ANALYTICS_TOP_N:-50}
+      - SITE_ANALYTICS_BUCKET_SECONDS=${SITE_ANALYTICS_BUCKET_SECONDS:-3600}
     expose:
       - "9102"
     cap_drop:

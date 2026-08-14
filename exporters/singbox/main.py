@@ -15,6 +15,11 @@ import threading
 import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from collections import defaultdict
+
+try:
+    import sitestats
+except ImportError:
+    sitestats = None
 from geoip import GeoIPLookup
 
 try:
@@ -40,6 +45,7 @@ conn_bytes_seen = {}  # connection id -> (upload, download) already accounted fo
 
 # Lock for thread safety
 metrics_lock = threading.Lock()
+site_stats = sitestats.SiteStats() if sitestats else None
 
 # GeoIP lookup
 geoip = GeoIPLookup()
@@ -246,6 +252,19 @@ def poll_clash_connections():
                         new_bytes_down[proto_label] += d_down
                     conn_bytes_seen[conn_id] = (up, down)
 
+                    # Aggregate destination stats. site_stats never returns a
+                    # client identifier; see exporters/lib/sitestats.py. #297
+                    if site_stats is not None and source_ip and (d_up or d_down):
+                        dest_ip = meta.get("destinationIP", "")
+                        site_stats.record(
+                            source_ip,
+                            meta.get("host", "") or dest_ip,
+                            d_up, d_down,
+                            dest_country=geoip.lookup(dest_ip) if dest_ip else "",
+                            port=meta.get("destinationPort", ""),
+                            network=meta.get("network", ""),
+                        )
+
                 # Count each connection ONCE, the first time we see it. The old
                 # log tailer counted "inbound connection" events; a polled
                 # snapshot would otherwise re-count every still-open connection
@@ -287,6 +306,9 @@ def poll_clash_connections():
         except Exception as e:
             if poll_count <= 5 or poll_count % 100 == 0:
                 print(f"GeoIP poll #{poll_count} error: {e}")
+
+        if site_stats is not None:
+            site_stats.maybe_roll()
 
         time.sleep(GEOIP_POLL_INTERVAL)
 
@@ -377,6 +399,9 @@ class MetricsHandler(BaseHTTPRequestHandler):
                     active_country_counts[c] += 1
                 for country, count in sorted(active_country_counts.items()):
                     output.append(f'singbox_active_users_by_country{{country="{country}"}} {count}')
+
+            if site_stats is not None:
+                output.extend(site_stats.render())
 
             self.wfile.write('\n'.join(output).encode())
 

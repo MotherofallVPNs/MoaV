@@ -8,6 +8,7 @@ RUN pip install --no-cache-dir maxminddb
 
 WORKDIR /app
 COPY lib/geoip.py .
+COPY lib/sitestats.py .
 COPY singbox/main.py .
 
 EXPOSE 9102
