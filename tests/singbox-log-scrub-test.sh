@@ -101,6 +101,9 @@ grep -q 'RAW_LOG="/tmp/' "$ENTRY" \
 grep -q 'sleep 3600; done ) <> "$RAW_LOG"' "$ENTRY" \
     && ok "the FIFO is held open, so sing-box never blocks on open()" \
     || bad "nothing pins the FIFO open; sing-box could block or see EOF"
+grep -q 'Cleared the pre-scrub log' "$ENTRY" \
+    && ok "an upgrade clears the log written before scrubbing existed" \
+    || bad "the pre-scrub log survives the upgrade that fixed it"
 grep -A2 'awk .{$' "$ENTRY" >/dev/null; grep -q 'sleep 1' "$ENTRY" \
     && ok "the scrubber is restarted if it dies (a full pipe blocks sing-box)" \
     || bad "no restart loop around the scrubber"

@@ -111,6 +111,14 @@ if [ -d /var/log/sing-box ] && mkfifo -m 600 "$RAW_LOG" 2>/dev/null; then
           sleep 1
       done ) &
 
+    # Everything already in the file predates scrubbing, so it still pairs
+    # usernames with destinations. Upgrades would otherwise keep it until the
+    # 32 MiB truncation happens to come round.
+    if [ -s "$ACCESS_LOG" ]; then
+        : > "$ACCESS_LOG" 2>/dev/null \
+            && echo "[sing-box] Cleared the pre-scrub log (it still held destinations)"
+    fi
+
     LOG_SINK="$RAW_LOG"
     echo "[sing-box] Destinations are scrubbed from the log before it is written"
 fi
