@@ -107,11 +107,9 @@ show_status() {
     # Track which services we've displayed
     declare -A displayed_services
 
-    # One-shot jobs that populate a volume and exit. They are plumbing, not
-    # services: showing them as "exited" in a health table reads as a fault.
+    # One-shot jobs that fill a volume and exit; "exited" reads as a fault here.
     local status_hide=" geoip-updater tor-geoip-updater bootstrap "
-    # Shown, but last: certbot legitimately exits after issuing, so it sorts
-    # below the things that are supposed to be running.
+    # Shown last: certbot exits after issuing, which is not a fault.
     local status_defer=" certbot "
     local -a deferred_rows=()
 
@@ -1080,12 +1078,8 @@ restart_services() {
 # is exactly when you need to tell them apart. compose now emits plain text and
 # we colour the prefix from a 256-colour palette.
 #
-# Colours are assigned by the service's position in the SORTED compose service
-# list, which is both stable between runs and collision-free -- unlike hashing
-# (conduit and xray landed on the same colour) and unlike first-seen order, which
-# is distinct within a run but reshuffles every time containers attach in a
-# different order. First-seen remains the fallback for a name compose did not
-# list (a stray container, a renamed service).
+# Colour = position in the sorted compose service list: stable across runs and
+# collision-free. First-seen order is the fallback for an unlisted container.
 format_log_timestamps() {
     # name=index pairs from the sorted service list; awk turns the index into a
     # palette slot. Computed once per invocation, not per line.

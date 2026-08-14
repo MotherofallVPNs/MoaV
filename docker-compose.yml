@@ -872,9 +872,7 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=15d'
-      # Size ceiling as well as age (#297): retention.time alone cannot stop a
-      # cardinality surprise filling the disk, and this stack runs on VPSes where
-      # the TSDB was already the largest volume.
+      # retention.time alone does not bound size when cardinality grows
       - '--storage.tsdb.retention.size=2GB'
       - '--web.listen-address=:9091'
       - '--web.enable-lifecycle'

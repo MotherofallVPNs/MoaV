@@ -66,18 +66,13 @@ setup_bandwidth_limit || echo "[snowflake] Continuing without bandwidth limit"
 
 # Run the proxy with output tee'd to both stdout and log file (for metrics exporter)
 # Note: -verbose removed to reduce log noise (SDP offers/answers)
-# The proxy's own Prometheus endpoint (path /internal/metrics) carries relayed
-# bytes as real counters and a connection-timeout counter we had no way to see.
-# It does NOT carry the completed-connection count -- that exists only in the
-# summary log line -- so it complements our log exporter rather than replacing it.
+# /internal/metrics: relayed bytes and connection timeouts as counters.
 METRICS_ARGS=""
 if [ "${SNOWFLAKE_METRICS:-true}" = "true" ]; then
     METRICS_ARGS="-metrics -metrics-address 0.0.0.0 -metrics-port ${SNOWFLAKE_METRICS_PORT:-9998}"
 fi
 
-# Country data from the geoip db is reported to the BROKER for Tor's aggregate
-# metrics; it is not exposed on the local endpoint. Loading it is still correct
-# -- without it the proxy logs an error on every start -- and it costs one file.
+# Tor-format geoip; without it the proxy errors on start and labels country "".
 GEOIP_ARGS=""
 if [ -s /usr/share/tor/geoip ]; then
     GEOIP_ARGS="-geoipdb /usr/share/tor/geoip"

@@ -416,17 +416,12 @@ check_source_rebuilds() {
         # Drop anything not in the allowlist: bind-mounted entrypoints (grafana),
         # infra images, unknown name mappings.
         [[ "$valid" == *" $svc "* ]] || continue
-        # And drop anything no longer in compose. Deleting a service leaves its
-        # files in the diff, so the prompt would tell the operator to build a
-        # service that does not exist -- which is exactly what `moav build
-        # snowflake-exporter` did after that exporter was removed.
+        # Drop services no longer in compose: a deleted one still shows in the diff.
         grep -qE "^  ${svc}:" "$SCRIPT_DIR/docker-compose.yml" 2>/dev/null || continue
         [[ " $queued " == *" $svc "* ]] || queued="${queued:+$queued }$svc"
     done <<< "$changed"
 
-    # Setup-profile one-shots never run on upgrade, so a volume introduced by a
-    # release stays empty. The snowflake proxy then starts with no geoip and
-    # every connection is labelled "" instead of a country.
+    # Setup-profile one-shots never run on upgrade, so a new volume stays empty.
     if grep -q '^  tor-geoip-updater:' "$SCRIPT_DIR/docker-compose.yml" 2>/dev/null \
        && docker volume ls --format '{{.Name}}' 2>/dev/null | grep -q 'moav_tor_geoip'; then
         if ! docker run --rm -v moav_moav_tor_geoip:/geoip alpine \
@@ -435,10 +430,8 @@ check_source_rebuilds() {
         fi
     fi
 
-    # Single-file bind mounts do not survive a git replacement: the mount follows
-    # the inode, so a running container keeps reading the old file until it is
-    # recreated. Measured on a live server -- host inode 508739 vs container
-    # 523302 -- which left prometheus on a stale scrape config after an update.
+    # A single-file bind mount follows the inode; git replaces the file, so the
+    # container reads the old copy until recreated.
     local compose_changed=""
     while IFS= read -r f; do
         case "$f" in
@@ -519,9 +512,7 @@ print_post_update_apply_steps() {
         echo -e "  ${WHITE}${n}.${NC} moav regenerate-users           ${DIM}# refresh user bundles (guide layout changed)${NC}"
         n=$((n+1))
     fi
-    # Everything below is a NUMBERED step. An unnumbered command after a numbered
-    # list reads as a footnote and gets skipped -- which is exactly what happened
-    # with the recreate line.
+    # Every step is numbered: an unnumbered command reads as a footnote.
     if [[ -n "$setup_jobs" ]]; then
         echo -e "  ${WHITE}${n}.${NC} cd ${SCRIPT_DIR} && docker compose --profile setup run --rm ${setup_jobs}"
         echo -e "     ${DIM}# fills a volume this release added; it has never run here${NC}"

@@ -244,18 +244,12 @@ cmd_build() {
 # Cache only, never images (they back the running stack and any rollback).
 MOAV_BUILD_CACHE_KEEP="${MOAV_BUILD_CACHE_KEEP:-}"
 
-# Sized to hold the whole stack's layers: MoaV's in-use images total ~1.9 GB on a
-# full install and their cache is the same order, so 4 GB keeps every rebuild
-# warm. It only shrinks when the disk is genuinely tight -- never more than half
-# of the space the cache could occupy -- so a small VPS gives ground instead of
-# filling up. Measured case: 24 GB box at 82%, 4.3 GB free plus 4.0 GB cache, so
-# the cap stays 4 GB; the same box with 1 GB free would drop to 2.5 GB.
+# 4 GB holds a full stack's layers; halves down on a tight disk, floor 1 GB.
 default_cache_keep() {
     local free_mb cache_mb keep
     free_mb=$(df -Pm / 2>/dev/null | awk 'NR==2 {print $4}')
     [[ "$free_mb" =~ ^[0-9]+$ ]] || { echo 4096; return; }
-    # Count the existing cache as available: it is what we are about to reclaim,
-    # so without it the cap would ratchet down every run.
+    # Existing cache counts as available, or the cap ratchets down each run.
     cache_mb=$(docker system df 2>/dev/null | awk '/^Build Cache/ {
         v = $(NF-1); u = $(NF-1);
         sub(/[A-Za-z]+$/, "", v);

@@ -32,17 +32,8 @@ scrape_configs:
   - job_name: 'clash'
     static_configs:
       - targets: ['clash-exporter:2112']
-    # SECURITY (#297): clash-exporter emits one series per (client IP,
-    # destination hostname) pair -- a browsing log keyed by user, kept for the
-    # full retention. Measured on a live server: 4,849 client IPs against 7,592
-    # hostnames, 83% of the whole TSDB, and no dashboard reads it.
-    #
-    # Dropped at scrape time, so Prometheus never stores a sample. The exporter
-    # still serves the four aggregate metrics the dashboards do use.
-    #
-    # This is the containment fix. The replacement -- a MoaV exporter that
-    # aggregates before the scrape and can offer opt-in, k-anonymous site
-    # analytics -- lands separately.
+    # clash_network_traffic_bytes_total is one series per (client IP, destination
+    # hostname). Dropped at scrape time so it is never stored. #297
     metric_relabel_configs:
       - source_labels: [__name__]
         regex: 'clash_network_traffic_bytes_total'
