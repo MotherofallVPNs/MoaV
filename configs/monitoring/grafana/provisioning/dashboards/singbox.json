@@ -1166,9 +1166,11 @@
           },
           "expr": "singbox_connections_by_country",
           "legendFormat": "{{country}}",
-          "refId": "A"
+          "refId": "A",
+          "instant": true
         }
-      ]
+      ],
+      "description": "Connections since this exporter started, by the country of the client IP. Resets when the exporter restarts."
     },
     {
       "datasource": {
@@ -1254,10 +1256,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "singbox_connections_by_country",
+          "expr": "singbox_active_users_by_country",
           "format": "table",
           "instant": true,
-          "legendFormat": "",
+          "legendFormat": "{{country}}",
           "refId": "A"
         }
       ],

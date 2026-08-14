@@ -14,7 +14,7 @@ import time
 import threading
 import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 try:
     import sitestats
@@ -36,6 +36,9 @@ active_users = set()  # users seen in last 5 minutes
 protocol_connections = defaultdict(int)  # protocol -> total connections
 country_connections = defaultdict(int)  # country -> total connections
 user_country = {}  # user -> last seen country code
+# connection id -> client IP, from the log line that carries no username.
+conn_source_ip = OrderedDict()
+CONN_IP_CACHE_MAX = 4096
 
 # Clash reports byte counters per OPEN connection, so accumulate deltas per
 # connection id -- summing raw values would re-count everything still open.
@@ -62,6 +65,11 @@ site_stats = sitestats.SiteStats(
 # Regex to parse connection lines with usernames
 # Example: [newaidin] inbound connection to vas.samsungapps.com:443
 USER_PATTERN = re.compile(r'\[([^\]]+)\]\s*inbound connection')
+
+# "[3883633974 0ms] inbound/vless[in]: inbound connection from 89.196.4.82:20159"
+CONN_FROM_PATTERN = re.compile(r'\[(\d{4,})\s[^\]]*\].*inbound connection from ([0-9a-fA-F.:]+):\d+')
+# The same id reappears on the line that names the user.
+CONN_ID_PATTERN = re.compile(r'\[(\d{4,})\s[^\]]*\]')
 
 # Regex to extract protocol from inbound name
 # Example: inbound/hysteria2[hysteria2-in]: [user]
@@ -117,6 +125,14 @@ def parse_log_line(line: str) -> bool:
     Does not touch protocol_connections: the Clash poller owns that series with a
     richer label, and counting both would double-count the same events.
     """
+    from_match = CONN_FROM_PATTERN.search(line)
+    if from_match:
+        conn_id, ip = from_match.group(1), from_match.group(2)
+        conn_source_ip[conn_id] = ip
+        while len(conn_source_ip) > CONN_IP_CACHE_MAX:
+            conn_source_ip.popitem(last=False)
+        return False
+
     user_match = USER_PATTERN.search(line)
     if not user_match:
         return False
@@ -124,9 +140,15 @@ def parse_log_line(line: str) -> bool:
     username = user_match.group(1)
     now = time.time()
 
+    id_match = CONN_ID_PATTERN.search(line)
+    ip = conn_source_ip.get(id_match.group(1), "") if id_match else ""
+    country = geoip.lookup(ip) if ip else ""
+
     with metrics_lock:
         user_connections[username] += 1
         user_last_seen[username] = now
+        if country:
+            user_country[username] = country
 
     return True
 
@@ -252,11 +274,9 @@ def poll_clash_connections():
                 user = meta.get("inboundUser", "")
                 conn_id = conn.get("id", "")
 
-                if source_ip:
-                    country = geoip.lookup(source_ip)
-                    seen_countries[country] += 1
-                    if user:
-                        seen_user_country[user] = country
+                conn_country = geoip.lookup(source_ip) if source_ip else ""
+                if conn_country and user:
+                    seen_user_country[user] = conn_country
 
                 proto_label = (meta.get("inboundName") or meta.get("type")
                                or meta.get("network") or "unknown")
@@ -294,6 +314,8 @@ def poll_clash_connections():
                     current_ids.add(conn_id)
                     if conn_id not in counted_connection_ids:
                         counted_connection_ids.add(conn_id)
+                        if conn_country:
+                            seen_countries[conn_country] += 1
                         if user:
                             new_user_hits[user] += 1
                         new_proto_hits[proto_label] += 1
