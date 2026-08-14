@@ -234,6 +234,27 @@ grep -q 'SUBHOUR=none' <<<"$out" \
     && ok "no site panel samples the hourly counters at sub-hour resolution" \
     || bad "a sub-hour rate on an hourly counter reads 0 or spikes: $(grep '^SUBHOUR=' <<<"$out" | head -c 140)"
 
+# The counters step exactly on the hour. Sampling at exactly 1h aligns every
+# window between two steps, so the chart reads 0 while the data is fine.
+out=$(python3 - "$DASH/singbox.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+bad = []
+def walk(p):
+    if p.get("interval") == "1h" and any("moav_site_" in t.get("expr", "")
+                                         for t in p.get("targets", [])):
+        bad.append(p.get("title"))
+    for n in p.get("panels", []):
+        walk(n)
+for p in d["panels"]:
+    walk(p)
+print("ALIGNED=%s" % (bad or "none"))
+PY
+)
+grep -q 'ALIGNED=none' <<<"$out" \
+    && ok "no site panel is pinned to the bucket length (it would sample between steps)" \
+    || bad "interval pinned to 1h on an hourly counter reads all zeros: $(grep '^ALIGNED=' <<<"$out")"
+
 # The table's columns must agree with each other: one cumulative column beside
 # three range-scoped ones showed clients next to a row of zeros.
 out=$(python3 - "$DASH/singbox.json" <<'PY'

@@ -1578,7 +1578,7 @@
           "id": 124,
           "type": "timeseries",
           "title": "Site Traffic (per hour)",
-          "description": "Bytes per site per hour. The exporter advances these counters once an hour, so this is a step per bucket rather than a smooth rate \u2014 a window shorter than an hour can legitimately show nothing.",
+          "description": "Bytes per site over the preceding hour, sampled continuously. The counters step exactly on the hour, so this is a staircase that changes once per bucket -- not a smooth rate. Sampling it at exactly 1h would land every window between two steps and read zero.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -1628,8 +1628,7 @@
                 "uid": "prometheus"
               }
             }
-          ],
-          "interval": "1h"
+          ]
         },
         {
           "id": 125,
