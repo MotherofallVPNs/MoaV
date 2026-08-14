@@ -95,9 +95,9 @@ grep -q 'UNKNOWN=True' <<<"$out" && grep -q 'CN=True' <<<"$out" \
 out=$(run_py ENABLE_SITE_ANALYTICS=true SITE_ANALYTICS_MIN_CLIENTS=5 <<'PY'
 import sitestats
 asked = []
-def fake_resolver(site):
-    asked.append(site)
-    return {"popular-site.net": "NL"}.get(site, "")
+def fake_resolver(name):
+    asked.append(name)
+    return {"cdn.popular-site.net": "NL"}.get(name, "")
 s = sitestats.SiteStats(now=0, resolver=fake_resolver)
 for i in range(9):
     s.record("10.0.0.%d" % i, "cdn.popular-site.net", 500, 500)   # named
@@ -114,16 +114,16 @@ s.maybe_roll(now=199999)
 print("ASKED_AGAIN=%s" % sorted(asked))
 PY
 )
-grep -q "ASKED=\['popular-site.net'\]" <<<"$out" \
-    && ok "only sites past the k threshold are ever resolved" \
-    || bad "a sub-threshold domain was sent to the resolver: $out"
+grep -q "ASKED=\['cdn.popular-site.net'\]" <<<"$out" \
+    && ok "a real hostname is resolved, not the folded name" \
+    || bad "resolved something other than a hostname seen in traffic: $out"
 grep -q 'NL=True' <<<"$out" \
     && ok "a named site's bytes are attributed to its resolved country" \
     || bad "resolution did not reach the country counter: $out"
 grep -q 'UNKNOWN=True' <<<"$out" \
     && ok "unresolved and sub-threshold bytes stay 'unknown'" \
     || bad "unattributable bytes went missing or were mislabelled: $out"
-grep -q "ASKED_AGAIN=\['popular-site.net'\]" <<<"$out" \
+grep -q "ASKED_AGAIN=\['cdn.popular-site.net'\]" <<<"$out" \
     && ok "answers are cached; the second bucket resolves nothing new" \
     || bad "the resolver is called again every bucket: $out"
 
@@ -335,6 +335,36 @@ grep -q 'moav_site_folded_clients_max 4' <<<"$out" \
 grep -qE 'nearmiss|faroff' <<<"$out" \
     && bad "a folded site was named; that is the whole point of folding it" \
     || ok "folded sites are counted, never named"
+
+# --- a failed lookup must stay retryable --------------------------------------
+# Caching the miss meant one bad answer marked a site unknown for ever. On a
+# live server that left cdninstagram.com -- the single biggest destination --
+# permanently uncounted, and 65% of bytes in "unknown".
+out=$(run_py ENABLE_SITE_ANALYTICS=true SITE_ANALYTICS_MIN_CLIENTS=2 \
+             SITE_ANALYTICS_STATE=/nonexistent/state.json <<'PY'
+import sitestats
+calls = {"n": 0}
+def flaky(name):
+    calls["n"] += 1
+    return "" if calls["n"] == 1 else "DE"     # first attempt fails
+s = sitestats.SiteStats(now=0, resolver=flaky)
+for i in range(3):
+    s.record("10.0.0.%d" % i, "edge.flaky-site.net", 10, 10)
+s.maybe_roll(now=7200)
+print("AFTER_FAIL=%s" % ('country="DE"' in "\n".join(s.render())))
+for i in range(3):
+    s.record("10.0.0.%d" % i, "edge.flaky-site.net", 10, 10)
+s.maybe_roll(now=14400)
+print("RETRIED=%s" % ('country="DE"' in "\n".join(s.render())))
+print("CALLS=%d" % calls["n"])
+PY
+)
+grep -q 'AFTER_FAIL=False' <<<"$out" \
+    && ok "a failed lookup leaves the traffic in 'unknown' for that bucket" \
+    || bad "a failed lookup invented a country: $out"
+grep -q 'RETRIED=True' <<<"$out" \
+    && ok "and is retried on the next bucket rather than cached as unknown" \
+    || bad "one bad answer marks the site unknown for ever: $out"
 
 # --- the exporter must actually drive the object ------------------------------
 # record() without maybe_roll() collects and never exposes: the failure is

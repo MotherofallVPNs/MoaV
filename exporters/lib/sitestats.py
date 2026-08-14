@@ -30,6 +30,7 @@ OTHER = "other"
 # New DNS answers fetched per bucket roll. Answers are cached for the life of
 # the process, so this only bites on the first bucket.
 RESOLVE_BUDGET = 25
+RESOLVE_ATTEMPTS = 3
 RESOLVE_TIMEOUT = 2.0
 
 
@@ -174,6 +175,10 @@ class SiteStats:
         self._conns = {}          # site -> connections opened this bucket
         self._ports = {}          # (site, port, network) -> pending bytes, research only
         self._resolver = resolver  # site -> country code; see resolve_country()
+        # A folded name is often not a host: cdninstagram.com and gvt1.com have
+        # no A record, only their subdomains do. Resolve something real instead.
+        self._host_sample = {}    # site -> one hostname seen this bucket
+        self._resolve_fail = {}   # site -> attempts, so a miss is retried
         self._site_country = {}   # resolved, cached for the life of the process
         self.sites = {}           # exposed cumulative counters
         self.countries = {}
@@ -195,6 +200,8 @@ class SiteStats:
         site = registrable(host) or OTHER
         with self.lock:
             self._clients.setdefault(site, set()).add(_client_key(client))
+            if site != OTHER and host and host != site:
+                self._host_sample.setdefault(site, host)
             if new_conn:
                 self._conns[site] = self._conns.get(site, 0) + 1
             p = self._pending.setdefault(site, {"up": 0, "down": 0})
@@ -223,7 +230,7 @@ class SiteStats:
         self.countries = d.get("countries") or {}
         self.conns = d.get("conns") or {}
         self.clients = d.get("clients") or {}
-        self._site_country = d.get("site_country") or {}
+        self._site_country = {k: v for k, v in (d.get("site_country") or {}).items() if v}
         self.folded = d.get("folded") or 0
         self.folded_max = d.get("folded_max") or 0
         self._rolled = True
@@ -246,7 +253,7 @@ class SiteStats:
         except Exception:
             pass                   # metrics are not worth crashing the exporter
 
-    def _locate(self, named):
+    def _locate(self, named, samples):
         """Country for each named site, resolving at most RESOLVE_BUDGET new ones.
 
         Only sites that cleared the k threshold are looked up, so the set of
@@ -258,13 +265,23 @@ class SiteStats:
         for site in named:
             if site in self._site_country or site == OTHER:
                 continue
+            if self._resolve_fail.get(site, 0) >= RESOLVE_ATTEMPTS:
+                continue
             if budget <= 0:
                 break
             budget -= 1
+            country = ""
             try:
-                self._site_country[site] = self._resolver(site) or ""
+                country = self._resolver(samples.get(site, site)) or ""
             except Exception:
-                self._site_country[site] = ""
+                country = ""
+            # Only positives are cached. A miss stays retryable, because caching
+            # it meant one bad answer marked a site unknown for ever.
+            if country:
+                self._site_country[site] = country
+                self._resolve_fail.pop(site, None)
+            else:
+                self._resolve_fail[site] = self._resolve_fail.get(site, 0) + 1
 
     def maybe_roll(self, now=None):
         """Fold the finished bucket into the exposed counters. Idempotent."""
@@ -279,6 +296,7 @@ class SiteStats:
             named = {s for _, s in qualifying[:TOP_N]}
             pending, countries = self._pending, self._countries
             unlocated, ports, conns = self._unlocated, self._ports, self._conns
+            samples = dict(self._host_sample)
             # Only named sites get a client count, and they cleared the
             # threshold, so the number describes a crowd rather than a person.
             clients = {s: len(self._clients.get(s, ())) for s in named}
@@ -290,10 +308,11 @@ class SiteStats:
             self._clients = {}
             self._pending, self._countries = {}, {}
             self._unlocated, self._ports, self._conns = {}, {}, {}
+            self._host_sample = {}
             self._bucket = bucket
 
         # Outside the lock: a cold DNS answer must not stall recording.
-        self._locate(named)
+        self._locate(named, samples)
 
         with self.lock:
             for site, p in pending.items():
