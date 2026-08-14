@@ -85,23 +85,41 @@ PY
     && ok "the two country panels say why their numbers differ" \
     || bad "nothing explains why connections and users disagree; it reads as a bug"
 
-# Snowflake's counters tick once per completed connection and then sit flat, so
-# increase() over a window that misses that moment is legitimately zero -- which
-# reads as a broken panel. Those stay lifetime, and must say so.
+# Snowflake's counters restart with the container, so a panel reading one raw
+# shows a number that falls to zero on every restart. Measured on a live server:
+# "Total Downloaded" read 779 KiB while "Downloaded" over the same data read
+# 31.5 MiB, because only the second summed across the reset.
 out=$(python3 - "$DASH/snowflake.json" <<'PY'
-import json, sys
+import json, re, sys
 d = json.load(open(sys.argv[1]))
-bad = [p["title"] for p in d["panels"]
-       if p.get("targets") and "tor_snowflake_proxy_connections_total" in str(p["targets"])
-       and "increase(" not in str(p["targets"])
-       and p.get("type") != "timeseries"
-       and "since start" not in p.get("title", "")]
-print("UNLABELLED=%s" % (bad or "none"))
+COUNTERS = ("tor_snowflake_proxy_connections_total",
+            "tor_snowflake_proxy_connection_timeouts_total",
+            "tor_snowflake_proxy_traffic_inbound_bytes_total",
+            "tor_snowflake_proxy_traffic_outbound_bytes_total")
+WRAPPED = re.compile(r'\b(increase|rate|irate|delta)\s*\(')
+raw = []
+for p in d["panels"]:
+    for t in p.get("targets", []):
+        e = t.get("expr", "")
+        if any(c in e for c in COUNTERS) and not WRAPPED.search(e):
+            raw.append("%s: %s" % (p.get("title"), e[:60]))
+print("RAW=%s" % (raw or "none"))
+
+# The pie and the timeline beside it must be computed the same way, or they
+# disagree about which countries exist and it reads as a bug.
+def expr(title):
+    return next((t.get("expr", "") for p in d["panels"] if p.get("title") == title
+                 for t in p.get("targets", [])), "")
+pie, ts = expr("Share of Users by Country"), expr("Users Served by Country over Time")
+print("SAME_BASIS=%s" % (("increase(" in pie) and ("increase(" in ts)))
 PY
 )
-grep -q 'UNLABELLED=none' <<<"$out" \
-    && ok "every lifetime snowflake panel says so in its title" \
-    || bad "a lifetime panel looks range-scoped: $out"
+grep -q 'RAW=none' <<<"$out" \
+    && ok "no snowflake panel reads a counter that resets with the container" \
+    || bad "reads a raw counter, so it drops to zero on restart: $(grep '^RAW=' <<<"$out")"
+grep -q 'SAME_BASIS=True' <<<"$out" \
+    && ok "the country pie and the country timeline are computed the same way" \
+    || bad "pie and timeline use different bases, so they list different countries"
 
 echo ""
 echo "  passed: $pass   failed: $fail"

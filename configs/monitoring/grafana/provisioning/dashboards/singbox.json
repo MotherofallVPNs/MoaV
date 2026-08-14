@@ -1315,7 +1315,7 @@
             "uid": "prometheus"
           },
           "gridPos": {
-            "h": 9,
+            "h": 11,
             "w": 8,
             "x": 0,
             "y": 41
@@ -1358,104 +1358,6 @@
           ]
         },
         {
-          "id": 124,
-          "type": "timeseries",
-          "title": "Site Usage over Time",
-          "description": "Counters advance once per bucket, so this is deliberately coarse.",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 9,
-            "w": 16,
-            "x": 8,
-            "y": 41
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "Bps",
-              "min": 0,
-              "custom": {
-                "fillOpacity": 25,
-                "showPoints": "never",
-                "stacking": {
-                  "mode": "normal",
-                  "group": "A"
-                }
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "legend": {
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          },
-          "targets": [
-            {
-              "expr": "sum by (site) (rate(moav_site_traffic_bytes_total[$__rate_interval]))",
-              "legendFormat": "{{site}}",
-              "refId": "A"
-            }
-          ]
-        },
-        {
-          "id": 125,
-          "type": "piechart",
-          "title": "Traffic by Destination Country",
-          "description": "Where the traffic goes, from the local GeoIP database. Only sites past the k-anonymity threshold are located, so everything under 'other' shows as 'unknown' -- that slice is the honest coverage gap, not missing data. CDN traffic resolves to the nearest edge, not the service's home country.",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 24,
-            "x": 0,
-            "y": 50
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "bytes"
-            },
-            "overrides": []
-          },
-          "options": {
-            "pieType": "pie",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "legend": {
-              "displayMode": "table",
-              "placement": "right",
-              "showLegend": true,
-              "values": [
-                "value",
-                "percent"
-              ]
-            }
-          },
-          "targets": [
-            {
-              "expr": "sum by (country) (moav_site_destination_country_bytes_total)",
-              "legendFormat": "{{country}}",
-              "refId": "A",
-              "instant": true
-            }
-          ]
-        },
-        {
           "id": 126,
           "type": "table",
           "title": "Site Usage",
@@ -1465,15 +1367,15 @@
             "uid": "prometheus"
           },
           "gridPos": {
-            "h": 10,
-            "w": 24,
-            "x": 0,
-            "y": 58
+            "h": 11,
+            "w": 16,
+            "x": 8,
+            "y": 41
           },
           "targets": [
             {
               "refId": "A",
-              "expr": "moav_site_clients",
+              "expr": "sum by (site) (moav_site_clients)",
               "instant": true,
               "format": "table",
               "legendFormat": "{{site}}",
@@ -1532,7 +1434,13 @@
                   "Time 1": true,
                   "Time 2": true,
                   "Time 3": true,
-                  "Time 4": true
+                  "Time 4": true,
+                  "__name__": true,
+                  "instance": true,
+                  "job": true,
+                  "__name__ 1": true,
+                  "instance 1": true,
+                  "job 1": true
                 },
                 "renameByName": {
                   "site": "Site",
@@ -1654,6 +1562,104 @@
           }
         },
         {
+          "id": 124,
+          "type": "timeseries",
+          "title": "Site Usage over Time",
+          "description": "Counters advance once per bucket, so this is deliberately coarse.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 52
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "Bps",
+              "min": 0,
+              "custom": {
+                "fillOpacity": 25,
+                "showPoints": "never",
+                "stacking": {
+                  "mode": "normal",
+                  "group": "A"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (site) (rate(moav_site_traffic_bytes_total[$__rate_interval]))",
+              "legendFormat": "{{site}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 125,
+          "type": "piechart",
+          "title": "Traffic by Destination Country",
+          "description": "Where the traffic goes, from the local GeoIP database. Only sites past the k-anonymity threshold are located, so everything under 'other' shows as 'unknown' -- that slice is the honest coverage gap, not missing data. CDN traffic resolves to the nearest edge, not the service's home country.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 60
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "options": {
+            "pieType": "pie",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "values": [
+                "value",
+                "percent"
+              ]
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (country) (moav_site_destination_country_bytes_total)",
+              "legendFormat": "{{country}}",
+              "refId": "A",
+              "instant": true
+            }
+          ]
+        },
+        {
           "id": 127,
           "type": "stat",
           "title": "Threshold Cost",
@@ -1663,7 +1669,7 @@
             "uid": "prometheus"
           },
           "gridPos": {
-            "h": 5,
+            "h": 4,
             "w": 24,
             "x": 0,
             "y": 68
