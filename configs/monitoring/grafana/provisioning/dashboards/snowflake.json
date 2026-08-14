@@ -916,6 +916,8 @@
       "options": {
         "legend": {
           "calcs": [
+            "mean",
+            "max",
             "lastNotNull"
           ],
           "displayMode": "table",

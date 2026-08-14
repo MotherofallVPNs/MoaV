@@ -1371,7 +1371,7 @@
           "id": 126,
           "type": "table",
           "title": "Site Usage",
-          "description": "One row per named site for the selected time range. Clients is the number of distinct people who reached it in the last full hour, which is also the gate: a site is named only once at least SITE_ANALYTICS_MIN_CLIENTS reached it. 'other' holds everything below that, so it has bytes and connections but no client count.",
+          "description": "Totals per site since collection began; they survive an exporter restart. Clients is distinct people in the last full hour, and is also the gate \u2014 a site is named only once at least SITE_ANALYTICS_MIN_CLIENTS reached it, so 'other' has bytes and connections but no client count. Use the chart above for a window.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -1396,7 +1396,7 @@
             },
             {
               "refId": "B",
-              "expr": "round(sum by (site) (increase(moav_site_connections_total[$__range])))",
+              "expr": "last_over_time((sum by (site) (moav_site_connections_total))[5m:])",
               "instant": true,
               "format": "table",
               "legendFormat": "{{site}}",
@@ -1407,7 +1407,7 @@
             },
             {
               "refId": "C",
-              "expr": "sum by (site) (increase(moav_site_traffic_bytes_total{direction=\"down\"}[$__range]))",
+              "expr": "last_over_time((sum by (site) (moav_site_traffic_bytes_total{direction=\"down\"}))[5m:])",
               "instant": true,
               "format": "table",
               "legendFormat": "{{site}}",
@@ -1418,7 +1418,7 @@
             },
             {
               "refId": "D",
-              "expr": "sum by (site) (increase(moav_site_traffic_bytes_total{direction=\"up\"}[$__range]))",
+              "expr": "last_over_time((sum by (site) (moav_site_traffic_bytes_total{direction=\"up\"}))[5m:])",
               "instant": true,
               "format": "table",
               "legendFormat": "{{site}}",
@@ -1577,8 +1577,8 @@
         {
           "id": 124,
           "type": "timeseries",
-          "title": "Site Usage over Time",
-          "description": "Counters advance once per bucket, so this is deliberately coarse.",
+          "title": "Site Traffic (per hour)",
+          "description": "Bytes per site per hour. The exporter advances these counters once an hour, so this is a step per bucket rather than a smooth rate \u2014 a window shorter than an hour can legitimately show nothing.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -1591,7 +1591,7 @@
           },
           "fieldConfig": {
             "defaults": {
-              "unit": "Bps",
+              "unit": "bytes",
               "min": 0,
               "custom": {
                 "fillOpacity": 25,
@@ -1620,7 +1620,7 @@
           },
           "targets": [
             {
-              "expr": "sum by (site) (rate(moav_site_traffic_bytes_total[$__rate_interval]))",
+              "expr": "sum by (site) (increase(moav_site_traffic_bytes_total[1h]))",
               "legendFormat": "{{site}}",
               "refId": "A",
               "datasource": {
@@ -1628,7 +1628,8 @@
                 "uid": "prometheus"
               }
             }
-          ]
+          ],
+          "interval": "1h"
         },
         {
           "id": 125,

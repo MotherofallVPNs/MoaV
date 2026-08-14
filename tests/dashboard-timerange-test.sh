@@ -210,6 +210,51 @@ grep -q 'NODS=none' <<<"$out" \
     && ok "every target names its datasource" \
     || bad "target has no datasource: $(grep '^NODS=' <<<"$out" | head -c 160)"
 
+# --- site counters step hourly, so a sub-hour rate is meaningless ---------------
+# sitestats advances its counters once per bucket. rate() over $__rate_interval
+# reads zero between rolls and one huge spike at the roll -- it showed 20 MB/s
+# for a site averaging a few KB/s, and nothing at all on a one-hour window.
+out=$(python3 - "$DASH/singbox.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+bad = []
+def walk(p):
+    for t in p.get("targets", []):
+        e = t.get("expr", "")
+        if "moav_site_" in e and ("$__rate_interval" in e or "$__interval" in e):
+            bad.append("%s: %s" % (p.get("title"), e[:50]))
+    for n in p.get("panels", []):
+        walk(n)
+for p in d["panels"]:
+    walk(p)
+print("SUBHOUR=%s" % (bad or "none"))
+PY
+)
+grep -q 'SUBHOUR=none' <<<"$out" \
+    && ok "no site panel samples the hourly counters at sub-hour resolution" \
+    || bad "a sub-hour rate on an hourly counter reads 0 or spikes: $(grep '^SUBHOUR=' <<<"$out" | head -c 140)"
+
+# The table's columns must agree with each other: one cumulative column beside
+# three range-scoped ones showed clients next to a row of zeros.
+out=$(python3 - "$DASH/singbox.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+def find(t):
+    for p in d["panels"]:
+        for n in p.get("panels", []) or [p]:
+            if n.get("title") == t:
+                return n
+    return None
+t = find("Site Usage")
+kinds = {("range" if "$__range" in x.get("expr", "") else "cumulative")
+         for x in (t or {}).get("targets", [])}
+print("MIXED=%s" % (len(kinds) > 1))
+PY
+)
+grep -q 'MIXED=False' <<<"$out" \
+    && ok "the Site Usage columns are all the same kind" \
+    || bad "the table mixes cumulative and range columns, so some read 0 while others do not"
+
 echo ""
 echo "  passed: $pass   failed: $fail"
 [ "$fail" -eq 0 ] || exit 1
