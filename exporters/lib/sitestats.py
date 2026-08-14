@@ -68,16 +68,19 @@ class SiteStats:
         """One connection's delta. `client` never leaves this object."""
         if not ENABLED or (up <= 0 and down <= 0):
             return
-        site = registrable(host)
-        if not site:
-            return
+        # A bare IP has no site to name, but its bytes still belong in the
+        # total, so it lands in "other" rather than being dropped.
+        site = registrable(host) or OTHER
         with self.lock:
             self._clients.setdefault(site, set()).add(_client_key(client))
             p = self._pending.setdefault(site, {"up": 0, "down": 0})
             p["up"] += max(0, up)
             p["down"] += max(0, down)
-            if dest_country:
-                self._countries[dest_country] = self._countries.get(dest_country, 0) + up + down
+            # sing-box records destinationIP or host, not both, so a country is
+            # only known for IP-dialed connections. The rest is counted as
+            # "unknown" so the chart sums to the real total.
+            c = dest_country or "unknown"
+            self._countries[c] = self._countries.get(c, 0) + up + down
             if RESEARCH and port:
                 k = (site, str(port), network or "tcp")
                 self._ports[k] = self._ports.get(k, 0) + up + down
@@ -88,7 +91,8 @@ class SiteStats:
         with self.lock:
             if bucket == self._bucket:
                 return False
-            qualifying = [(len(self._clients.get(s, ())), s) for s in self._pending]
+            qualifying = [(len(self._clients.get(s, ())), s) for s in self._pending
+                          if s != OTHER]
             qualifying = [(n, s) for n, s in qualifying if n >= MIN_CLIENTS]
             qualifying.sort(reverse=True)
             named = {s for _, s in qualifying[:TOP_N]}

@@ -60,6 +60,35 @@ grep -q 'POPULAR_NAMED=True'  <<<"$out" && ok "a 9-client domain is named" \
 grep -q 'OTHER_UP=400'        <<<"$out" && ok "sub-threshold bytes are kept under 'other' (4x100)" \
                                         || bad "traffic below the threshold was lost, not bucketed: $out"
 
+# --- totals must stay complete ------------------------------------------------
+# Measured on a live server: sing-box's Clash API sets destinationIP OR host,
+# never both. Roughly a fifth of connections are dialed by IP literal, and those
+# have no site name. Dropping them would silently under-count every total.
+out=$(run_py ENABLE_SITE_ANALYTICS=true <<'PY'
+import sitestats
+s = sitestats.SiteStats(now=0)
+s.record("10.0.0.1", "8.222.185.93", 700, 300, dest_country="CN")   # IP literal
+s.record("10.0.0.2", "", 100, 100)                                   # neither
+s.maybe_roll(now=99999)
+body = "\n".join(s.render())
+import re
+up = re.search(r'site="other",direction="up"\} (\d+)', body)
+print("OTHER_UP=%s" % (up.group(1) if up else "missing"))
+print("HAS_IP_LABEL=%s" % ("8.222" in body))
+print("UNKNOWN=%s" % ('country="unknown"' in body))
+print("CN=%s" % ('country="CN"' in body))
+PY
+)
+grep -q 'OTHER_UP=800' <<<"$out" \
+    && ok "IP-literal and hostless traffic still counts, under 'other' (700+100)" \
+    || bad "bytes with no site name were dropped, so totals under-count: $out"
+grep -q 'HAS_IP_LABEL=False' <<<"$out" \
+    && ok "a destination IP is never used as a site label" \
+    || bad "a raw destination IP reached a label"
+grep -q 'UNKNOWN=True' <<<"$out" && grep -q 'CN=True' <<<"$out" \
+    && ok "traffic with no known country is counted as 'unknown', not omitted" \
+    || bad "the country chart silently covers only part of the traffic: $out"
+
 # --- no client identifier may appear anywhere ---------------------------------
 out=$(run_py ENABLE_SITE_ANALYTICS=true ENABLE_SITE_ANALYTICS_RESEARCH=true <<'PY'
 import sitestats

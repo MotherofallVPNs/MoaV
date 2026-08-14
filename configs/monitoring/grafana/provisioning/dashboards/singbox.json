@@ -1407,7 +1407,7 @@
           "id": 125,
           "type": "piechart",
           "title": "Traffic by Destination Country",
-          "description": "Where the traffic goes, from the local GeoIP database. CDN traffic resolves to the nearest edge, not the service's home country.",
+          "description": "Where the traffic goes, from the local GeoIP database. sing-box reports a destination IP only when the client dialed one, so domain-addressed traffic counts as 'unknown' -- usually most of it. CDN traffic resolves to the nearest edge, not the service's home country.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
