@@ -45,7 +45,6 @@ conn_bytes_seen = {}  # connection id -> (upload, download) already accounted fo
 
 # Lock for thread safety
 metrics_lock = threading.Lock()
-site_stats = sitestats.SiteStats() if sitestats else None
 active_connections = 0      # current, from the last poll
 singbox_version = ""        # from the Clash API /version
 
@@ -55,6 +54,10 @@ geoip = GeoIPLookup()
 # Clash API config
 CLASH_API = os.environ.get("CLASH_API", "http://moav-sing-box:9090")
 CLASH_SECRET = ""
+
+site_stats = sitestats.SiteStats(
+    resolver=sitestats.make_resolver(CLASH_API, lambda: CLASH_SECRET, geoip.lookup)
+) if sitestats else None
 
 # Regex to parse connection lines with usernames
 # Example: [newaidin] inbound connection to vas.samsungapps.com:443

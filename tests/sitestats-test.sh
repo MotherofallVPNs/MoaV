@@ -89,6 +89,60 @@ grep -q 'UNKNOWN=True' <<<"$out" && grep -q 'CN=True' <<<"$out" \
     && ok "traffic with no known country is counted as 'unknown', not omitted" \
     || bad "the country chart silently covers only part of the traffic: $out"
 
+# --- country resolution -------------------------------------------------------
+# Only named sites are resolved, so the set of names looked up has already
+# cleared the k threshold and points at no one.
+out=$(run_py ENABLE_SITE_ANALYTICS=true SITE_ANALYTICS_MIN_CLIENTS=5 <<'PY'
+import sitestats
+asked = []
+def fake_resolver(site):
+    asked.append(site)
+    return {"popular-site.net": "NL"}.get(site, "")
+s = sitestats.SiteStats(now=0, resolver=fake_resolver)
+for i in range(9):
+    s.record("10.0.0.%d" % i, "cdn.popular-site.net", 500, 500)   # named
+for i in range(2):
+    s.record("10.0.9.%d" % i, "rare-site.org", 50, 50)            # below k
+s.maybe_roll(now=99999)
+body = "\n".join(s.render())
+print("ASKED=%s" % sorted(asked))
+print("NL=%s" % ('country="NL"} 9000' in body))
+print("UNKNOWN=%s" % ('country="unknown"} 200' in body))
+for i in range(9):
+    s.record("10.0.0.%d" % i, "cdn.popular-site.net", 1, 1)
+s.maybe_roll(now=199999)
+print("ASKED_AGAIN=%s" % sorted(asked))
+PY
+)
+grep -q "ASKED=\['popular-site.net'\]" <<<"$out" \
+    && ok "only sites past the k threshold are ever resolved" \
+    || bad "a sub-threshold domain was sent to the resolver: $out"
+grep -q 'NL=True' <<<"$out" \
+    && ok "a named site's bytes are attributed to its resolved country" \
+    || bad "resolution did not reach the country counter: $out"
+grep -q 'UNKNOWN=True' <<<"$out" \
+    && ok "unresolved and sub-threshold bytes stay 'unknown'" \
+    || bad "unattributable bytes went missing or were mislabelled: $out"
+grep -q "ASKED_AGAIN=\['popular-site.net'\]" <<<"$out" \
+    && ok "answers are cached; the second bucket resolves nothing new" \
+    || bad "the resolver is called again every bucket: $out"
+
+# A resolver that hangs or errors must not take the exporter down with it.
+out=$(run_py ENABLE_SITE_ANALYTICS=true <<'PY'
+import sitestats
+def broken(site):
+    raise RuntimeError("DNS is down")
+s = sitestats.SiteStats(now=0, resolver=broken)
+for i in range(9):
+    s.record("10.0.0.%d" % i, "a.example.net", 10, 10)
+s.maybe_roll(now=99999)
+print("SURVIVED=%s" % ('example.net' in "\n".join(s.render())))
+PY
+)
+grep -q 'SURVIVED=True' <<<"$out" \
+    && ok "a failing resolver degrades to 'unknown' instead of losing the bucket" \
+    || bad "a resolver error killed the roll: $out"
+
 # --- no client identifier may appear anywhere ---------------------------------
 out=$(run_py ENABLE_SITE_ANALYTICS=true ENABLE_SITE_ANALYTICS_RESEARCH=true <<'PY'
 import sitestats
@@ -149,6 +203,16 @@ import sitestats as s
 for host, want in (("edge-42.a.example-cdn.net", "example-cdn.net"),
                    ("example.co.uk", "example.co.uk"),
                    ("x.y.example.co.uk", "example.co.uk"),
+                   ("mail.example.co.ir", "example.co.ir"),
+                   ("a.b.example.com.ru", "example.com.ru"),
+                   ("cdn.example.com.cn", "example.com.cn"),
+                   ("x.example.co.il", "example.co.il"),
+                   ("www.example.ca.us", "example.ca.us"),
+                   ("school.example.k12.il", "example.k12.il"),
+                   # Hosting suffixes stay folded: naming the tenant is the
+                   # thing this whole module exists to avoid.
+                   ("someone.github.io", "github.io"),
+                   ("d111.cloudfront.net", "cloudfront.net"),
                    ("192.0.2.7", ""),
                    ("localhost", "")):
     got = s.registrable(host)

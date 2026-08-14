@@ -9,9 +9,12 @@ Guarantees, all enforced here rather than downstream:
   * exposed counters advance on a bucket boundary, not per poll
 """
 import hashlib
+import json
 import os
 import threading
 import time
+import urllib.parse
+import urllib.request
 
 ENABLED = os.environ.get("ENABLE_SITE_ANALYTICS", "false").lower() == "true"
 RESEARCH = os.environ.get("ENABLE_SITE_ANALYTICS_RESEARCH", "false").lower() == "true"
@@ -21,13 +24,118 @@ BUCKET_SECONDS = int(os.environ.get("SITE_ANALYTICS_BUCKET_SECONDS", "3600"))
 
 OTHER = "other"
 
+# New DNS answers fetched per bucket roll. Answers are cached for the life of
+# the process, so this only bites on the first bucket.
+RESOLVE_BUDGET = 25
+RESOLVE_TIMEOUT = 2.0
+
+
+def make_resolver(clash_api, secret_fn, geoip_lookup):
+    """site -> country, via sing-box's own resolver.
+
+    sing-box already resolved these names to carry the traffic, so /dns/query
+    is answered from its cache. Nothing is sent anywhere the proxied traffic
+    did not already go, and the lookup is per site, never per client.
+    """
+    def resolve(site):
+        url = "%s/dns/query?name=%s&type=A" % (clash_api.rstrip("/"),
+                                               urllib.parse.quote(site))
+        req = urllib.request.Request(url,
+                                     headers={"Authorization": "Bearer " + secret_fn()})
+        with urllib.request.urlopen(req, timeout=RESOLVE_TIMEOUT) as r:
+            answers = json.load(r).get("Answer") or []
+        for a in answers:
+            if a.get("type") == 1 and a.get("data"):     # 1 = A record
+                return geoip_lookup(a["data"])
+        return ""
+    return resolve
+
 # Suffixes needing three labels to reach the registrable name. Not the full
 # public suffix list: this only has to be right for common hosts, and a wrong
 # guess folds too much together rather than too little.
+#
+# Hosting suffixes (github.io, cloudfront.net, workers.dev) are deliberately
+# absent. The public suffix list has them because each subdomain is separately
+# owned -- which is exactly why adding them here would name individual tenants.
+# Folding them to the platform is both safer and the more useful answer.
 _TWO_PART = {
-    "co.uk", "org.uk", "ac.uk", "gov.uk", "co.jp", "ne.jp", "or.jp",
-    "com.br", "com.au", "net.au", "org.au", "com.cn", "com.tr", "com.mx",
-    "co.in", "co.kr", "co.za", "com.ar", "com.sg", "com.hk", "com.tw",
+    # Iran
+    "co.ir", "ac.ir", "org.ir", "net.ir", "gov.ir", "id.ir", "sch.ir",
+    # Russia, ex-USSR
+    "com.ru", "net.ru", "org.ru", "pp.ru", "int.ru", "ac.ru", "edu.ru",
+    "gov.ru", "msk.ru", "spb.ru", "com.su", "net.su", "org.su",
+    "com.ua", "net.ua", "org.ua", "in.ua", "kiev.ua", "com.by", "gov.by",
+    "com.kz", "org.kz", "net.kz", "edu.kz", "gov.kz", "com.uz", "co.uz",
+    "com.kg", "com.tj", "com.tm", "com.am", "com.ge", "com.az",
+    # China, Hong Kong, Taiwan
+    "com.cn", "net.cn", "org.cn", "gov.cn", "edu.cn", "ac.cn", "mil.cn",
+    "com.hk", "net.hk", "org.hk", "edu.hk", "gov.hk", "idv.hk",
+    "com.tw", "net.tw", "org.tw", "edu.tw", "gov.tw", "idv.tw",
+    # Israel
+    "co.il", "net.il", "org.il", "ac.il", "gov.il", "k12.il", "muni.il",
+    # United States. State codes matter because .us delegates by locality;
+    # k12/cc/lib sit a level deeper and fold up to the state, which is fine.
+    "ak.us", "al.us", "ar.us", "az.us", "ca.us", "co.us", "ct.us", "dc.us",
+    "de.us", "fl.us", "ga.us", "hi.us", "ia.us", "id.us", "il.us", "in.us",
+    "ks.us", "ky.us", "la.us", "ma.us", "md.us", "me.us", "mi.us", "mn.us",
+    "mo.us", "ms.us", "mt.us", "nc.us", "nd.us", "ne.us", "nh.us", "nj.us",
+    "nm.us", "nv.us", "ny.us", "oh.us", "ok.us", "or.us", "pa.us", "ri.us",
+    "sc.us", "sd.us", "tn.us", "tx.us", "ut.us", "va.us", "vt.us", "wa.us",
+    "wi.us", "wv.us", "wy.us", "fed.us", "isa.us", "nsn.us",
+    # United Kingdom
+    "co.uk", "org.uk", "ac.uk", "gov.uk", "net.uk", "sch.uk", "ltd.uk",
+    "plc.uk", "me.uk", "nhs.uk", "police.uk", "mod.uk",
+    # Europe
+    "com.tr", "net.tr", "org.tr", "gov.tr", "edu.tr", "k12.tr", "bel.tr",
+    "web.tr", "gen.tr", "av.tr", "com.pl", "net.pl", "org.pl", "edu.pl",
+    "gov.pl", "waw.pl", "com.es", "org.es", "nom.es", "gob.es", "edu.es",
+    "com.pt", "net.pt", "org.pt", "edu.pt", "gov.pt", "com.gr", "net.gr",
+    "org.gr", "edu.gr", "gov.gr", "gov.it", "edu.it", "com.ro", "com.hr",
+    "com.rs", "co.rs", "org.rs", "edu.rs", "ac.rs", "gov.rs", "com.cy",
+    "ac.cy", "gov.cy", "net.cy", "org.cy", "com.mt", "org.mt", "net.mt",
+    "com.ee", "com.lv", "com.mk", "com.ba", "co.no", "priv.no",
+    # Middle East, North Africa
+    "com.sa", "net.sa", "org.sa", "gov.sa", "edu.sa", "com.ae", "net.ae",
+    "org.ae", "gov.ae", "ac.ae", "com.qa", "net.qa", "org.qa", "gov.qa",
+    "edu.qa", "com.kw", "com.bh", "com.om", "com.jo", "com.lb", "com.ye",
+    "com.iq", "net.iq", "org.iq", "gov.iq", "edu.iq", "com.sy", "gov.sy",
+    "com.eg", "net.eg", "org.eg", "gov.eg", "edu.eg", "com.ly", "com.tn",
+    "com.dz", "co.ma", "net.ma", "org.ma", "gov.ma", "com.af", "com.pk",
+    "net.pk", "org.pk", "edu.pk", "gov.pk",
+    # South and Southeast Asia
+    "co.in", "net.in", "org.in", "gen.in", "firm.in", "ind.in", "ac.in",
+    "edu.in", "gov.in", "nic.in", "res.in", "com.bd", "net.bd", "org.bd",
+    "edu.bd", "gov.bd", "ac.bd", "com.lk", "net.lk", "org.lk", "edu.lk",
+    "gov.lk", "ac.lk", "com.np", "com.mm", "com.kh", "com.sg", "net.sg",
+    "org.sg", "edu.sg", "gov.sg", "per.sg", "com.my", "net.my", "org.my",
+    "edu.my", "gov.my", "com.vn", "net.vn", "org.vn", "edu.vn", "gov.vn",
+    "co.th", "in.th", "ac.th", "go.th", "or.th", "net.th", "co.id", "or.id",
+    "ac.id", "web.id", "my.id", "sch.id", "go.id", "com.ph", "net.ph",
+    "org.ph", "edu.ph", "gov.ph",
+    # East Asia
+    "co.jp", "ne.jp", "or.jp", "ac.jp", "ad.jp", "go.jp", "ed.jp", "gr.jp",
+    "lg.jp", "co.kr", "ne.kr", "or.kr", "re.kr", "pe.kr", "go.kr", "ac.kr",
+    "hs.kr", "ms.kr", "es.kr", "sc.kr", "kg.kr", "mil.kr",
+    # Oceania
+    "com.au", "net.au", "org.au", "edu.au", "gov.au", "asn.au", "id.au",
+    "co.nz", "net.nz", "org.nz", "govt.nz", "ac.nz", "geek.nz", "school.nz",
+    # Africa
+    "co.za", "org.za", "net.za", "gov.za", "ac.za", "web.za", "com.ng",
+    "net.ng", "org.ng", "edu.ng", "gov.ng", "com.gh", "co.ke", "or.ke",
+    "ac.ke", "go.ke", "co.tz", "ac.tz", "go.tz", "co.ug", "ac.ug",
+    "com.et", "com.zm", "co.mz", "com.ci", "com.sn", "com.cm",
+    # Latin America
+    "com.br", "net.br", "org.br", "gov.br", "edu.br", "art.br", "blog.br",
+    "com.mx", "org.mx", "net.mx", "edu.mx", "gob.mx", "com.ar", "net.ar",
+    "org.ar", "gob.ar", "edu.ar", "int.ar", "mil.ar", "tur.ar", "com.co",
+    "net.co", "org.co", "edu.co", "gov.co", "com.pe", "net.pe", "org.pe",
+    "edu.pe", "gob.pe", "com.ve", "net.ve", "org.ve", "edu.ve", "gob.ve",
+    "com.ec", "net.ec", "org.ec", "edu.ec", "gob.ec", "com.uy", "net.uy",
+    "org.uy", "edu.uy", "gub.uy", "com.bo", "com.py", "com.do", "com.gt",
+    "com.pa", "com.sv", "com.ni", "co.cr", "ac.cr", "go.cr", "com.cu",
+    "com.hn", "com.pr", "com.jm", "com.tt", "com.bz",
+    # Canada uses provincial codes only rarely; the common ones are enough.
+    "ab.ca", "bc.ca", "on.ca", "qc.ca", "gc.ca",
 }
 
 # Per-process, never persisted: makes the in-memory client set unusable even to
@@ -53,13 +161,16 @@ def _client_key(client):
 
 
 class SiteStats:
-    def __init__(self, now=None):
+    def __init__(self, now=None, resolver=None):
         self.lock = threading.Lock()
         self._bucket = int((time.time() if now is None else now) // BUCKET_SECONDS)
         self._clients = {}        # site -> set of salted client digests
         self._pending = {}        # site -> {"up": n, "down": n}
         self._countries = {}      # destination country -> pending bytes
+        self._unlocated = {}      # site -> pending bytes with no country yet
         self._ports = {}          # (site, port, network) -> pending bytes, research only
+        self._resolver = resolver  # site -> country code; see resolve_country()
+        self._site_country = {}   # resolved, cached for the life of the process
         self.sites = {}           # exposed cumulative counters
         self.countries = {}
         self.ports = {}
@@ -76,14 +187,36 @@ class SiteStats:
             p = self._pending.setdefault(site, {"up": 0, "down": 0})
             p["up"] += max(0, up)
             p["down"] += max(0, down)
-            # sing-box records destinationIP or host, not both, so a country is
-            # only known for IP-dialed connections. The rest is counted as
-            # "unknown" so the chart sums to the real total.
-            c = dest_country or "unknown"
-            self._countries[c] = self._countries.get(c, 0) + up + down
+            if dest_country:
+                self._countries[dest_country] = self._countries.get(dest_country, 0) + up + down
+            else:
+                # sing-box reports destinationIP or host, never both, so most
+                # connections arrive with no country. Held per site and located
+                # at roll time; see _locate().
+                self._unlocated[site] = self._unlocated.get(site, 0) + up + down
             if RESEARCH and port:
                 k = (site, str(port), network or "tcp")
                 self._ports[k] = self._ports.get(k, 0) + up + down
+
+    def _locate(self, named):
+        """Country for each named site, resolving at most RESOLVE_BUDGET new ones.
+
+        Only sites that cleared the k threshold are looked up, so the set of
+        names resolved here is already non-identifying. Called without the lock.
+        """
+        if self._resolver is None:
+            return
+        budget = RESOLVE_BUDGET
+        for site in named:
+            if site in self._site_country or site == OTHER:
+                continue
+            if budget <= 0:
+                break
+            budget -= 1
+            try:
+                self._site_country[site] = self._resolver(site) or ""
+            except Exception:
+                self._site_country[site] = ""
 
     def maybe_roll(self, now=None):
         """Fold the finished bucket into the exposed counters. Idempotent."""
@@ -96,24 +229,31 @@ class SiteStats:
             qualifying = [(n, s) for n, s in qualifying if n >= MIN_CLIENTS]
             qualifying.sort(reverse=True)
             named = {s for _, s in qualifying[:TOP_N]}
+            pending, countries = self._pending, self._countries
+            unlocated, ports = self._unlocated, self._ports
+            self._clients = {}
+            self._pending, self._countries = {}, {}
+            self._unlocated, self._ports = {}, {}
+            self._bucket = bucket
 
-            for site, p in self._pending.items():
+        # Outside the lock: a cold DNS answer must not stall recording.
+        self._locate(named)
+
+        with self.lock:
+            for site, p in pending.items():
                 key = site if site in named else OTHER
                 cur = self.sites.setdefault(key, {"up": 0, "down": 0})
                 cur["up"] += p["up"]
                 cur["down"] += p["down"]
-            for c, n in self._countries.items():
+            for c, n in countries.items():
                 self.countries[c] = self.countries.get(c, 0) + n
-            for k, n in self._ports.items():
+            for site, n in unlocated.items():
+                c = self._site_country.get(site, "") if site in named else ""
+                self.countries[c or "unknown"] = self.countries.get(c or "unknown", 0) + n
+            for k, n in ports.items():
                 if k[0] in named:
                     self.ports[k] = self.ports.get(k, 0) + n
-
-            self._clients.clear()
-            self._pending.clear()
-            self._countries.clear()
-            self._ports.clear()
-            self._bucket = bucket
-            return True
+        return True
 
     def render(self):
         if not ENABLED:

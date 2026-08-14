@@ -1407,7 +1407,7 @@
           "id": 125,
           "type": "piechart",
           "title": "Traffic by Destination Country",
-          "description": "Where the traffic goes, from the local GeoIP database. sing-box reports a destination IP only when the client dialed one, so domain-addressed traffic counts as 'unknown' -- usually most of it. CDN traffic resolves to the nearest edge, not the service's home country.",
+          "description": "Where the traffic goes, from the local GeoIP database. Only sites past the k-anonymity threshold are located, so everything under 'other' shows as 'unknown' -- that slice is the honest coverage gap, not missing data. CDN traffic resolves to the nearest edge, not the service's home country.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
