@@ -714,7 +714,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (country) (increase(tor_snowflake_proxy_connections_total[$__range]))",
+          "expr": "round(sum by (country) (increase(tor_snowflake_proxy_connections_total[$__range])))",
           "legendFormat": "{{country}}",
           "refId": "A",
           "instant": true

@@ -1164,7 +1164,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (country) (increase(singbox_connections_by_country[$__range]))",
+          "expr": "round(sum by (country) (increase(singbox_connections_by_country[$__range])))",
           "legendFormat": "{{country}}",
           "refId": "A",
           "instant": true
@@ -1484,7 +1484,7 @@
             },
             {
               "refId": "B",
-              "expr": "sum by (site) (increase(moav_site_connections_total[$__range]))",
+              "expr": "round(sum by (site) (increase(moav_site_connections_total[$__range])))",
               "instant": true,
               "format": "table",
               "legendFormat": "{{site}}",
