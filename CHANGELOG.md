@@ -7,10 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Fixes for problems that only appear on a **running, upgraded** server, found by
-testing 2.1.0 on live servers rather than in CI. Two of them were silent: they
-reported success and did nothing. Plus Snowflake monitoring that finally shows
-who is being served.
+**Monitoring stopped recording which client visited which site.** Everything
+else here is secondary to that.
+
+The rest are fixes for problems that only appear on a **running, upgraded**
+server, found by testing 2.1.0 on live servers rather than in CI. Two of them
+were silent: they reported success and did nothing. Plus Snowflake monitoring
+that finally shows who is being served.
 
 Keys, users and certificates are untouched.
 
@@ -24,6 +27,13 @@ moav doctor             # two new checks report on this box
 moav net apply          # if doctor says the tuning file is from an older MoaV
 ```
 
+`moav start` is required rather than `moav restart`: the sing-box image and the
+sing-box exporter are both rebuilt, and a restart reuses the old image.
+
+**If you have ever run the monitoring profile, that data is on disk until it
+ages out.** Nothing new is recorded from this release on. To remove it now, see
+[Purging old monitoring data](https://moav.sh/docs/OPSEC#purging-old-monitoring-data).
+
 - **`moav start`, not `moav restart`.** This release changes
   `docker-compose.yml`, and `moav restart` restarts containers with their
   existing config. Only `moav start` (`docker compose up -d`) recreates them.
@@ -34,6 +44,50 @@ moav net apply          # if doctor says the tuning file is from an older MoaV
 - **The Snowflake dashboard's history does not carry over.** Its metrics are now
   the proxy's own, under new names; existing panels keep their old series until
   retention expires. Nothing to do, but the graphs will look empty at first.
+
+### Security
+
+- **Monitoring stored `client IP` x `destination hostname`, and kept it for the
+  full retention window** ([#297](https://github.com/MotherofallVPNs/MoaV/issues/297)).
+  `ghcr.io/zxh326/clash-exporter` was shipped with `-collectDest`, which emits
+  one time series per (client, destination) pair. Measured on one live server:
+  4,849 client IPs against 7,592 hostnames, 389,324 series, **83% of the entire
+  TSDB**, retained 15 days. It is a browsing log keyed by user, on servers whose
+  users are the people least able to afford one. No dashboard ever read it.
+
+  The exporter is removed rather than filtered, so re-adding a scrape job cannot
+  bring it back. The four aggregate metrics the dashboards actually used now
+  come from MoaV's own sing-box exporter.
+
+- **sing-box logged the same pairing to disk**, on every server, not only those
+  running monitoring: `[<username>] inbound connection to <host>:443` at the
+  default log level. Destinations are now stripped from every line shape before
+  anything is written — a 3,000-line sample had them in five — while the client
+  IP, username and connection id are kept, because the exporter needs those and
+  no consumer needs the hostname. The log written before the upgrade is cleared
+  once on start, since it still holds the pairing.
+
+- **Per-user volume and liveness are untouched.** The problem was linkage, not
+  visibility: operators still need username, bytes and country for quota and
+  abuse handling, and none of that says where anyone went.
+
+- **Optional site analytics**, off unless `ENABLE_SITE_ANALYTICS=true`. Answers
+  *what is this proxy used for* without touching who did it: domains folded to
+  the registrable name, a domain named only once at least
+  `SITE_ANALYTICS_MIN_CLIENTS` (5) distinct clients reached it in a bucket,
+  ranked by how many people used it rather than by bytes, and counters that
+  advance once per bucket so a timeline cannot be lined up against per-user
+  connection counts. Measured on a real server, that threshold discards 94% of
+  domains while still attributing about 89% of traffic — because the median
+  domain is visited by exactly one person, and that is the part that identifies
+  them. On a server with very few users even aggregates leak, which is why it is
+  opt-in. `ENABLE_SITE_ANALYTICS_RESEARCH` additionally records destination port
+  and protocol, and is a separate switch because a rare port identifies far more
+  than a popular domain.
+
+- **Prometheus retention is bounded by size as well as age**
+  (`PROMETHEUS_RETENTION_SIZE`, 2 GB). `retention.time` alone cannot stop
+  cardinality filling a disk, which is how the above went unnoticed.
 
 ### Fixed
 
@@ -119,6 +173,25 @@ moav net apply          # if doctor says the tuning file is from an older MoaV
 
 ### Added
 
+- **`moav doctor net` decides for itself whether packet drops are still
+  happening.** The kernel counters are since-boot and never reset, so after
+  `moav net apply` fixed the cause the warning could never clear — and it told
+  the operator to run `nstat` twice, ten seconds apart, and diff it by eye. It
+  now re-reads after a short pause and reports which counters are still
+  climbing, pausing only when something tripped. A failing sysctl check names
+  `moav net apply` as the fix.
+- **Site analytics panels** on the sing-box dashboard, in a collapsed row so
+  they add nothing when the flag is off: share of traffic by site, site traffic
+  per hour, destination countries, a Site Usage table (clients, connections,
+  bytes) and a **Threshold Cost** panel reporting how many sites the k-anonymity
+  gate folded away and how close the nearest miss came — so the threshold can be
+  tuned on evidence rather than guessed.
+- `PROMETHEUS_RETENTION_TIME` (now 90 days, was a hardcoded 15),
+  `PROMETHEUS_RETENTION_SIZE`, `LOG_MAX_SIZE` and `LOG_MAX_FILES`. A long window
+  is affordable because the per-user destination series are gone: roughly 7,000
+  active series against 389,000 before. The size cap remains the real guard.
+
+
 - **Snowflake dashboard, rebuilt on the proxy's own metrics.** Beyond the
   per-country panels: rendezvous success rate, countries reached, proxy uptime,
   failed connections per hour, and traffic stats that follow the time picker
@@ -144,6 +217,26 @@ moav net apply          # if doctor says the tuning file is from an older MoaV
   publishes only when a chart actually changed.
 
 ### Changed
+
+- **Every dashboard panel that read a cumulative counter raw now wraps it.**
+  Those counters restart with their container, so a "total" silently fell to
+  zero: on one server `Total Downloaded` read 779 KiB while `Downloaded` over
+  the same data read 31.5 MiB, because only the second summed across the reset.
+  Audited across all ten dashboards and re-executed all 219 expressions against
+  a live Prometheus.
+- **Snowflake's connection counts use `max_over_time`, not `increase`.** Those
+  counters tick once when a connection completes and then sit flat, and
+  `increase()` can only see growth from a previous sample — so every country's
+  *first* connection was invisible. Measured at one instant: `increase` saw 2
+  countries where `max_over_time` saw 7.
+- Panels whose series are labelled (country, user, site, container) colour by
+  series name, so one country keeps one colour across time-series panels. Pie
+  charts are excluded: Grafana names fields differently for the instant queries
+  they use, and by-name paints every slice identically.
+- `clash-exporter` is gone, along with `CLASH_EXPORTER_VERSION`,
+  `IMAGE_CLASH_EXPORTER` and its `--local` build entry. `moav start` passes
+  `--remove-orphans`, so the container disappears on the next start.
+
 
 - **The Snowflake log-parsing exporter is deleted.** 213 lines of regex over log
   lines, replaced by the proxy's own Prometheus endpoint, which carries the same
