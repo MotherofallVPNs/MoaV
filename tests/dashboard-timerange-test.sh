@@ -22,8 +22,6 @@ import json, os, re, sys
 
 # Panels that must move with the picker, and the counter each one reads.
 RANGE_SCOPED = {
-    ("snowflake.json", "Share of Users by Country"),
-    ("snowflake.json", "Rendezvous Success Rate"),
     ("singbox.json",   "Connections by Country"),
     ("singbox.json",   "Users by Country"),
     ("singbox.json",   "Site Usage"),
@@ -86,6 +84,24 @@ PY
 [ $? -eq 0 ] \
     && ok "the two country panels say why their numbers differ" \
     || bad "nothing explains why connections and users disagree; it reads as a bug"
+
+# Snowflake's counters tick once per completed connection and then sit flat, so
+# increase() over a window that misses that moment is legitimately zero -- which
+# reads as a broken panel. Those stay lifetime, and must say so.
+out=$(python3 - "$DASH/snowflake.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+bad = [p["title"] for p in d["panels"]
+       if p.get("targets") and "tor_snowflake_proxy_connections_total" in str(p["targets"])
+       and "increase(" not in str(p["targets"])
+       and p.get("type") != "timeseries"
+       and "since start" not in p.get("title", "")]
+print("UNLABELLED=%s" % (bad or "none"))
+PY
+)
+grep -q 'UNLABELLED=none' <<<"$out" \
+    && ok "every lifetime snowflake panel says so in its title" \
+    || bad "a lifetime panel looks range-scoped: $out"
 
 echo ""
 echo "  passed: $pass   failed: $fail"

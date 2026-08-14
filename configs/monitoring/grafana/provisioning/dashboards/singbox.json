@@ -1652,6 +1652,77 @@
               ]
             }
           }
+        },
+        {
+          "id": 127,
+          "type": "stat",
+          "title": "Threshold Cost",
+          "description": "How much the k-anonymity threshold folded into 'other' in the last full hour. Folded sites is how many missed it; closest miss is the largest client count among them -- if that sits just under SITE_ANALYTICS_MIN_CLIENTS, lowering it by one would name that site. Neither names anything.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 24,
+            "x": 0,
+            "y": 68
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "text"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto",
+            "colorMode": "none",
+            "graphMode": "none",
+            "orientation": "horizontal"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "moav_site_folded_sites",
+              "instant": true,
+              "legendFormat": "Sites folded into 'other'",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            },
+            {
+              "refId": "B",
+              "expr": "moav_site_folded_clients_max",
+              "instant": true,
+              "legendFormat": "Closest miss (clients)",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            },
+            {
+              "refId": "C",
+              "expr": "count(moav_site_clients)",
+              "instant": true,
+              "legendFormat": "Sites named",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ]
         }
       ]
     }

@@ -72,14 +72,14 @@
           "refId": "A"
         }
       ],
-      "title": "People Served",
+      "title": "People Served (since start)",
       "type": "stat",
       "description": "Cumulative since the proxy last started \u2014 this stat does not follow the time picker. Counters reset when the container restarts."
     },
     {
       "id": 14,
       "type": "stat",
-      "title": "Countries Reached",
+      "title": "Countries Reached (since start)",
       "description": "Distinct countries with at least one completed connection since the proxy started. '??' counts as one: the client IP was not in the geoip database.",
       "datasource": {
         "type": "prometheus",
@@ -124,8 +124,8 @@
     {
       "id": 15,
       "type": "gauge",
-      "title": "Rendezvous Success Rate",
-      "description": "Share of rendezvous attempts in the selected time range that produced a connection. Empty when nothing was attempted in the range.",
+      "title": "Rendezvous Success Rate (since start)",
+      "description": "Share of rendezvous attempts that produced a connection, since the proxy last started. Restarting snowflake resets it.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -164,7 +164,7 @@
       },
       "targets": [
         {
-          "expr": "100 * sum(increase(tor_snowflake_proxy_connections_total[$__range])) / (sum(increase(tor_snowflake_proxy_connections_total[$__range])) + sum(increase(tor_snowflake_proxy_connection_timeouts_total[$__range])))",
+          "expr": "100 * sum(tor_snowflake_proxy_connections_total) / (sum(tor_snowflake_proxy_connections_total) + sum(tor_snowflake_proxy_connection_timeouts_total))",
           "refId": "A",
           "instant": true
         }
@@ -661,8 +661,8 @@
     {
       "id": 10,
       "type": "piechart",
-      "title": "Share of Users by Country",
-      "description": "Connections completed in the selected time range, by the country of the client IP. '??' means the address was not in the geoip database.",
+      "title": "Share of Users by Country (since start)",
+      "description": "Every country this proxy has served since it last started. Not scoped to the time picker on purpose: the counter ticks once when a connection completes and then sits flat, so any window not containing that moment reads zero. 'Users Served by Country over Time' is the range-aware view.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -714,7 +714,7 @@
       },
       "targets": [
         {
-          "expr": "round(sum by (country) (increase(tor_snowflake_proxy_connections_total[$__range])))",
+          "expr": "sum by (country) (tor_snowflake_proxy_connections_total)",
           "legendFormat": "{{country}}",
           "refId": "A",
           "instant": true

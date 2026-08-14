@@ -182,7 +182,8 @@ grep -q 'moav_site_port_bytes_total' <<<"$out" \
     || ok "port metric requires its own flag"
 
 # --- counters only advance on a bucket boundary ------------------------------
-out=$(run_py ENABLE_SITE_ANALYTICS=true SITE_ANALYTICS_BUCKET_SECONDS=3600 <<'PY'
+out=$(run_py ENABLE_SITE_ANALYTICS=true SITE_ANALYTICS_BUCKET_SECONDS=3600 \
+             SITE_ANALYTICS_STATE=/nonexistent/state.json <<'PY'
 import sitestats
 s = sitestats.SiteStats(now=0)
 for i in range(9):
@@ -267,6 +268,69 @@ grep -q 'moav_site_clients{site="other"}' <<<"$out" \
 grep -q 'moav_site_connections_total{site="other"} 1' <<<"$out" \
     && ok "sub-threshold connections are still counted, under 'other'" \
     || bad "connections below the threshold were dropped: $out"
+
+# --- aggregates survive a restart ---------------------------------------------
+# Everything lived in memory, so a restart emptied every instant-query panel for
+# up to a full bucket and reset the counters Prometheus had been tracking.
+STATE_DIR=$(mktemp -d)
+out=$(run_py ENABLE_SITE_ANALYTICS=true SITE_ANALYTICS_MIN_CLIENTS=2 \
+             SITE_ANALYTICS_STATE="$STATE_DIR/state.json" <<'PY'
+import sitestats
+s = sitestats.SiteStats(now=0)
+for i in range(4):
+    s.record("10.0.0.%d" % i, "a.popular.net", 100, 200, new_conn=True)
+s.maybe_roll(now=99999)
+print("BEFORE=%d" % len(s.render()))
+
+s2 = sitestats.SiteStats(now=99999)          # a fresh process, same state file
+body = "\n".join(s2.render())
+print("AFTER_BYTES=%s" % ('site="popular.net",direction="up"} 400' in body))
+print("AFTER_CONNS=%s" % ('moav_site_connections_total{site="popular.net"} 4' in body))
+PY
+)
+grep -q 'AFTER_BYTES=True' <<<"$out" && grep -q 'AFTER_CONNS=True' <<<"$out" \
+    && ok "totals survive a restart instead of resetting to nothing" \
+    || bad "a restart lost every aggregate: $out"
+
+# The salted client digests must never be among what is written.
+if grep -qE '"_clients"|"clients": *\[' "$STATE_DIR/state.json" 2>/dev/null; then
+    bad "client digests were persisted to disk"
+else
+    ok "only aggregates are written; the client digests stay in memory"
+fi
+python3 -c "
+import json,sys
+d=json.load(open('$STATE_DIR/state.json'))
+c=d.get('clients') or {}
+sys.exit(0 if all(isinstance(v,int) for v in c.values()) else 1)" \
+    && ok "the persisted client field is a count, not a set of identifiers" \
+    || bad "the persisted client field holds something other than counts"
+rm -rf "$STATE_DIR"
+
+# --- the threshold must show what it costs ------------------------------------
+# "other" swamping the chart looks like a bug. These say how many sites were
+# folded and how close the biggest came, so k can be tuned on evidence.
+out=$(run_py ENABLE_SITE_ANALYTICS=true SITE_ANALYTICS_MIN_CLIENTS=5 \
+             SITE_ANALYTICS_STATE=/nonexistent/state.json <<'PY'
+import sitestats
+s = sitestats.SiteStats(now=0)
+for i in range(4):
+    s.record("10.0.0.%d" % i, "a.nearmiss.net", 10, 10, new_conn=True)
+for i in range(2):
+    s.record("10.0.1.%d" % i, "b.faroff.org", 10, 10, new_conn=True)
+s.maybe_roll(now=99999)
+print("\n".join(l for l in s.render() if "folded" in l and not l.startswith("#")))
+PY
+)
+grep -q 'moav_site_folded_sites 2' <<<"$out" \
+    && ok "the number of folded sites is reported" \
+    || bad "no way to see how much the threshold is folding away: $out"
+grep -q 'moav_site_folded_clients_max 4' <<<"$out" \
+    && ok "the closest miss is reported, so k can be tuned on evidence" \
+    || bad "cannot tell whether lowering k by one would help: $out"
+grep -qE 'nearmiss|faroff' <<<"$out" \
+    && bad "a folded site was named; that is the whole point of folding it" \
+    || ok "folded sites are counted, never named"
 
 # --- the exporter must actually drive the object ------------------------------
 # record() without maybe_roll() collects and never exposes: the failure is

@@ -21,6 +21,9 @@ RESEARCH = os.environ.get("ENABLE_SITE_ANALYTICS_RESEARCH", "false").lower() == 
 MIN_CLIENTS = int(os.environ.get("SITE_ANALYTICS_MIN_CLIENTS", "5"))
 TOP_N = int(os.environ.get("SITE_ANALYTICS_TOP_N", "50"))
 BUCKET_SECONDS = int(os.environ.get("SITE_ANALYTICS_BUCKET_SECONDS", "3600"))
+# Aggregates survive a restart here. Only post-threshold totals are written;
+# the in-flight client digests never are.
+STATE_PATH = os.environ.get("SITE_ANALYTICS_STATE", "/var/lib/sitestats/state.json")
 
 OTHER = "other"
 
@@ -177,6 +180,10 @@ class SiteStats:
         self.ports = {}
         self.conns = {}
         self.clients = {}         # distinct clients in the last closed bucket
+        self._rolled = False      # nothing is exposed before the first bucket closes
+        self.folded = 0           # sites that missed the threshold last bucket
+        self.folded_max = 0       # and the largest client count among them
+        self._load()
 
     def record(self, client, host, up, down, dest_country="", port="", network="",
                new_conn=False):
@@ -203,6 +210,38 @@ class SiteStats:
             if RESEARCH and port:
                 k = (site, str(port), network or "tcp")
                 self._ports[k] = self._ports.get(k, 0) + up + down
+
+    def _load(self):
+        if not ENABLED:
+            return
+        try:
+            with open(STATE_PATH) as fh:
+                d = json.load(fh)
+        except Exception:
+            return
+        self.sites = {k: v for k, v in (d.get("sites") or {}).items()}
+        self.countries = d.get("countries") or {}
+        self.conns = d.get("conns") or {}
+        self.clients = d.get("clients") or {}
+        self._site_country = d.get("site_country") or {}
+        self._rolled = True
+        self.ports = {tuple(k.split("\x1f")): v for k, v in (d.get("ports") or {}).items()}
+
+    def _save(self):
+        """Aggregates only. self._clients holds per-client digests and is excluded."""
+        if not ENABLED:
+            return
+        d = {"sites": self.sites, "countries": self.countries, "conns": self.conns,
+             "clients": self.clients, "site_country": self._site_country,
+             "ports": {"\x1f".join(k): v for k, v in self.ports.items()}}
+        try:
+            os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)
+            tmp = STATE_PATH + ".tmp"
+            with open(tmp, "w") as fh:
+                json.dump(d, fh)
+            os.replace(tmp, STATE_PATH)
+        except Exception:
+            pass                   # metrics are not worth crashing the exporter
 
     def _locate(self, named):
         """Country for each named site, resolving at most RESOLVE_BUDGET new ones.
@@ -240,6 +279,11 @@ class SiteStats:
             # Only named sites get a client count, and they cleared the
             # threshold, so the number describes a crowd rather than a person.
             clients = {s: len(self._clients.get(s, ())) for s in named}
+            # How much the threshold is costing, so k can be tuned on evidence
+            # rather than guessed. Counts only -- no site is named.
+            below = [len(self._clients.get(s, ())) for s in self._pending
+                     if s != OTHER and s not in named]
+            folded, folded_max = len(below), (max(below) if below else 0)
             self._clients = {}
             self._pending, self._countries = {}, {}
             self._unlocated, self._ports, self._conns = {}, {}, {}
@@ -266,6 +310,9 @@ class SiteStats:
                 key = site if site in named else OTHER
                 self.conns[key] = self.conns.get(key, 0) + n
             self.clients = clients
+            self.folded, self.folded_max = folded, folded_max
+            self._rolled = True
+        self._save()
         return True
 
     def render(self):
@@ -275,6 +322,8 @@ class SiteStats:
         with self.lock:
             sites, countries, ports = dict(self.sites), dict(self.countries), dict(self.ports)
             conns, clients = dict(self.conns), dict(self.clients)
+            folded, folded_max = self.folded, self.folded_max
+            rolled = self._rolled
         if sites:
             out.append("# HELP moav_site_traffic_bytes_total Bytes relayed per destination site")
             out.append("# TYPE moav_site_traffic_bytes_total counter")
@@ -292,6 +341,13 @@ class SiteStats:
             out.append("# TYPE moav_site_clients gauge")
             for site, n in sorted(clients.items()):
                 out.append('moav_site_clients{site="%s"} %d' % (site, n))
+        if rolled:
+            out.append("# HELP moav_site_folded_sites Sites that missed the client threshold and went to 'other'")
+            out.append("# TYPE moav_site_folded_sites gauge")
+            out.append("moav_site_folded_sites %d" % folded)
+            out.append("# HELP moav_site_folded_clients_max Largest client count among the folded sites")
+            out.append("# TYPE moav_site_folded_clients_max gauge")
+            out.append("moav_site_folded_clients_max %d" % folded_max)
         if countries:
             out.append("# HELP moav_site_destination_country_bytes_total Bytes relayed per destination country")
             out.append("# TYPE moav_site_destination_country_bytes_total counter")
