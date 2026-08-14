@@ -734,7 +734,7 @@ confirm_disabled_profile() {
 }
 
 # Ensure CLASH_API_SECRET is set in .env for monitoring
-# This is needed for clash-exporter to authenticate with sing-box Clash API
+# The singbox exporter authenticates to the sing-box Clash API with this
 # Returns: 0 = continue, 1 = skip monitoring (user declined when using 'all' profile)
 # Materialize the Conduit lifetime recording-rules file before Prometheus
 # bind-mounts it. The live file is gitignored and runtime-rewritten by
@@ -1508,7 +1508,7 @@ resolve_service() {
         snow|tor)                     echo "snowflake" ;;
         # Monitoring services (pass through or resolve aliases)
         grafana-cdn)                  echo "grafana-proxy" ;;
-        grafana|grafana-proxy|prometheus|cadvisor|node-exporter|clash-exporter|wireguard-exporter|snowflake-exporter|singbox-exporter)
+        grafana|grafana-proxy|prometheus|cadvisor|node-exporter|wireguard-exporter|snowflake-exporter|singbox-exporter)
             echo "$svc" ;;
         *)                            echo "$svc" ;;
     esac

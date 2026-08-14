@@ -46,6 +46,8 @@ conn_bytes_seen = {}  # connection id -> (upload, download) already accounted fo
 # Lock for thread safety
 metrics_lock = threading.Lock()
 site_stats = sitestats.SiteStats() if sitestats else None
+active_connections = 0      # current, from the last poll
+singbox_version = ""        # from the Clash API /version
 
 # GeoIP lookup
 geoip = GeoIPLookup()
@@ -196,6 +198,20 @@ def update_active_users():
         }
 
 
+def fetch_singbox_version():
+    """Clash API /version. Replaces clash_info from the removed exporter."""
+    global singbox_version
+    if urlopen is None:
+        return
+    try:
+        req = Request(f"{CLASH_API}/version")
+        if CLASH_SECRET:
+            req.add_header("Authorization", "Bearer " + CLASH_SECRET)
+        singbox_version = json.loads(urlopen(req, timeout=5).read().decode()).get("version", "")
+    except Exception:
+        pass
+
+
 def poll_clash_connections():
     """Poll Clash API /connections for source IPs and update country metrics."""
     if urlopen is None:
@@ -207,6 +223,8 @@ def poll_clash_connections():
     while True:
         poll_count += 1
         try:
+            if poll_count == 1 or poll_count % 720 == 0:
+                fetch_singbox_version()
             url = f"{CLASH_API}/connections"
             req = Request(url)
             if CLASH_SECRET:
@@ -276,6 +294,9 @@ def poll_clash_connections():
                         if user:
                             new_user_hits[user] += 1
                         new_proto_hits[proto_label] += 1
+
+            global active_connections
+            active_connections = len(connections)
 
             # Forget IDs that are gone so neither map grows without bound.
             counted_connection_ids.intersection_update(current_ids)
@@ -399,6 +420,15 @@ class MetricsHandler(BaseHTTPRequestHandler):
                     active_country_counts[c] += 1
                 for country, count in sorted(active_country_counts.items()):
                     output.append(f'singbox_active_users_by_country{{country="{country}"}} {count}')
+
+            output.append('# HELP singbox_active_connections Connections open right now')
+            output.append('# TYPE singbox_active_connections gauge')
+            output.append(f'singbox_active_connections {active_connections}')
+
+            if singbox_version:
+                output.append('# HELP singbox_version_info sing-box version')
+                output.append('# TYPE singbox_version_info gauge')
+                output.append(f'singbox_version_info{{version="{singbox_version}"}} 1')
 
             if site_stats is not None:
                 output.extend(site_stats.render())

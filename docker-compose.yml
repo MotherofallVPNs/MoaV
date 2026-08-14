@@ -1079,34 +1079,6 @@ services:
       - monitoring
       - all
 
-  clash-exporter:
-    # Use IMAGE_CLASH_EXPORTER env var, or build locally with: moav build --local
-    image: ${IMAGE_CLASH_EXPORTER:-ghcr.io/zxh326/clash-exporter:latest}
-    container_name: moav-clash-exporter
-    restart: unless-stopped
-    logging: *default-logging
-    networks:
-      - moav_net
-    expose:
-      - "2112"
-    environment:
-      - CLASH_HOST=moav-sing-box:9090
-      - CLASH_TOKEN=${CLASH_API_SECRET:-}
-      - TZ=${TZ:-UTC}
-    command: ["-collectDest"]
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    read_only: true
-    tmpfs:
-      - /tmp:rw,noexec,size=10m
-    mem_limit: 64m
-    cpus: 0.25
-    profiles:
-      - monitoring
-      - all
-
   # Sing-box User Exporter - parses sing-box logs for user connection metrics
   singbox-exporter:
     build:

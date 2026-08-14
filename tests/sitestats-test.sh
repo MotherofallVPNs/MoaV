@@ -159,6 +159,25 @@ grep -qF "COPY lib/sitestats.py" "$ROOT/exporters/singbox/Dockerfile" \
     && ok "the module is shipped in the image" \
     || bad "sitestats.py is not COPYed into the image; the import degrades to None"
 
+# --- the metric names the dashboard queries must be the ones emitted ---------
+# A renamed metric on either side shows as an empty panel, never as an error.
+DASH="$ROOT/configs/monitoring/grafana/provisioning/dashboards/singbox.json"
+for m in moav_site_traffic_bytes_total moav_site_destination_country_bytes_total; do
+    if grep -qF "$m" "$DASH" && grep -qF "$m" "$ROOT/exporters/lib/sitestats.py"; then
+        ok "$m is emitted and charted"
+    else
+        bad "$m is not on both sides (exporter emits / dashboard queries)"
+    fi
+done
+python3 - "$DASH" <<'PY' && ok "the site panels sit in a collapsed row (they are empty when the flag is off)" \
+                          || bad "site panels are always expanded; with the flag off that is three empty panels"
+import json, sys
+d = json.load(open(sys.argv[1]))
+row = next((p for p in d["panels"]
+            if p["type"] == "row" and "moav_site" in json.dumps(p.get("panels", []))), None)
+sys.exit(0 if row and row.get("collapsed") else 1)
+PY
+
 echo ""
 echo "  passed: $pass   failed: $fail"
 [ "$fail" -eq 0 ] || exit 1

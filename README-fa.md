@@ -487,8 +487,7 @@ MoaV یک لایهٔ استقرار است. کار روی خود پروتکل‌
 | [MahsaNet](https://www.mahsaserver.com/) · [MahsaNG](https://github.com/GFW-knocker/MahsaNG) | اهدای کانفیگ و کلاینتی که بیشتر کاربران ایرانی دارند |
 
 **مانیتورینگ** — [Prometheus](https://github.com/prometheus/prometheus)، [Grafana](https://github.com/grafana/grafana)،
-[node_exporter](https://github.com/prometheus/node_exporter)، [cAdvisor](https://github.com/google/cadvisor)،
-[clash-exporter](https://github.com/zxh326/clash-exporter).
+[node_exporter](https://github.com/prometheus/node_exporter)، [cAdvisor](https://github.com/google/cadvisor).
 
 نسخه‌های پین‌شدهٔ همهٔ این‌ها در [`.env.example`](.env.example) است.
 

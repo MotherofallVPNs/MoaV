@@ -46,6 +46,27 @@ else
     bad "the per-(client,destination) metric is still stored — a browsing log keyed by user"
 fi
 
+# --- the exporter that produced it must be gone, not merely filtered ---------
+# A drop rule is containment for data already on disk. The metric should not be
+# produced at all, so re-adding the scrape job cannot bring the pairing back.
+if grep -q '^  clash-exporter:' "$COMPOSE"; then
+    bad "clash-exporter is still a service — the drop rule is one config edit away from being undone"
+else
+    ok "clash-exporter is removed, not filtered"
+fi
+
+# --- no dashboard may query a metric nothing produces ------------------------
+# A panel pointing at a deleted metric renders "No data" rather than failing, so
+# the break is invisible until someone opens the dashboard.
+orphan=0
+for d in "$ROOT"/configs/monitoring/grafana/provisioning/dashboards/*.json; do
+    if grep -o 'clash_[a-z_]*' "$d" | sort -u | grep -q .; then
+        bad "$(basename "$d") still queries $(grep -o 'clash_[a-z_]*' "$d" | sort -u | tr '\n' ' ')"
+        orphan=1
+    fi
+done
+[ "$orphan" = "0" ] && ok "no dashboard queries a clash_* metric that no longer exists"
+
 # --- and nothing may reintroduce the pairing ---------------------------------
 # A future exporter that emits both labels would pass the check above while
 # recreating the exact problem, so scan what we ship for the pairing.

@@ -60,7 +60,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clash_active_connections",
+          "expr": "singbox_active_connections",
           "refId": "A"
         }
       ],
@@ -235,7 +235,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clash_upload_bytes_total",
+          "expr": "sum(singbox_protocol_bytes_up)",
           "refId": "A"
         }
       ],
@@ -294,7 +294,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clash_download_bytes_total",
+          "expr": "sum(singbox_protocol_bytes_down)",
           "refId": "A"
         }
       ],
@@ -352,7 +352,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clash_info",
+          "expr": "singbox_version_info",
           "legendFormat": "{{version}}",
           "refId": "A"
         }
@@ -442,7 +442,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clash_active_connections",
+          "expr": "singbox_active_connections",
           "legendFormat": "Connections",
           "refId": "A"
         },
@@ -574,7 +574,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(clash_upload_bytes_total[5m])",
+          "expr": "sum(rate(singbox_protocol_bytes_up[5m]))",
           "legendFormat": "Upload",
           "refId": "A"
         },
@@ -583,7 +583,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(clash_download_bytes_total[5m])",
+          "expr": "sum(rate(singbox_protocol_bytes_down[5m]))",
           "legendFormat": "Download",
           "refId": "B"
         }
@@ -925,7 +925,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clash_upload_bytes_total",
+          "expr": "sum(singbox_protocol_bytes_up)",
           "legendFormat": "Upload Total",
           "refId": "A"
         },
@@ -934,7 +934,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clash_download_bytes_total",
+          "expr": "sum(singbox_protocol_bytes_down)",
           "legendFormat": "Download Total",
           "refId": "B"
         }
@@ -1287,6 +1287,170 @@
               }
             ]
           }
+        }
+      ]
+    },
+    {
+      "id": 122,
+      "type": "row",
+      "collapsed": true,
+      "title": "Site analytics (opt-in \u2014 ENABLE_SITE_ANALYTICS)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "panels": [
+        {
+          "id": 123,
+          "type": "piechart",
+          "title": "Share of Traffic by Site",
+          "description": "Destination sites, aggregated across all users. A site is named only after at least SITE_ANALYTICS_MIN_CLIENTS distinct clients reached it; the rest is counted under 'other'.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 8,
+            "x": 0,
+            "y": 41
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "options": {
+            "pieType": "donut",
+            "displayLabels": [
+              "percent"
+            ],
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "values": [
+                "value",
+                "percent"
+              ]
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (site) (moav_site_traffic_bytes_total)",
+              "legendFormat": "{{site}}",
+              "refId": "A",
+              "instant": true
+            }
+          ]
+        },
+        {
+          "id": 124,
+          "type": "timeseries",
+          "title": "Site Usage over Time",
+          "description": "Counters advance once per bucket, so this is deliberately coarse.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 16,
+            "x": 8,
+            "y": 41
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "Bps",
+              "min": 0,
+              "custom": {
+                "fillOpacity": 25,
+                "showPoints": "never",
+                "stacking": {
+                  "mode": "normal",
+                  "group": "A"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (site) (rate(moav_site_traffic_bytes_total[$__rate_interval]))",
+              "legendFormat": "{{site}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 125,
+          "type": "piechart",
+          "title": "Traffic by Destination Country",
+          "description": "Where the traffic goes, from the local GeoIP database. CDN traffic resolves to the nearest edge, not the service's home country.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 50
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "options": {
+            "pieType": "pie",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "values": [
+                "value",
+                "percent"
+              ]
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (country) (moav_site_destination_country_bytes_total)",
+              "legendFormat": "{{country}}",
+              "refId": "A",
+              "instant": true
+            }
+          ]
         }
       ]
     }

@@ -276,12 +276,11 @@ prune_build_cache() {
 
 # Map of services that can be built locally
 # Format: "dockerfile|image_tag|image_env_var|version_env_var|version_arg|description"
-ALL_LOCAL_BUILD_SERVICES="cadvisor clash-exporter prometheus grafana node-exporter nginx certbot"
+ALL_LOCAL_BUILD_SERVICES="cadvisor prometheus grafana node-exporter nginx certbot"
 
 _local_build_info() {
     case "$1" in
         cadvisor)       echo "dockerfiles/Dockerfile.cadvisor|moav-cadvisor:local|IMAGE_CADVISOR|CADVISOR_VERSION|CADVISOR_VERSION|cAdvisor container metrics (gcr.io)" ;;
-        clash-exporter) echo "dockerfiles/Dockerfile.clash-exporter|moav-clash-exporter:local|IMAGE_CLASH_EXPORTER|CLASH_EXPORTER_VERSION|CLASH_EXPORTER_VERSION|Clash API exporter (ghcr.io)" ;;
         prometheus)     echo "dockerfiles/Dockerfile.prometheus|moav-prometheus:local|IMAGE_PROMETHEUS|PROMETHEUS_VERSION|PROMETHEUS_VERSION|Prometheus time-series DB" ;;
         grafana)        echo "dockerfiles/Dockerfile.grafana|moav-grafana:local|IMAGE_GRAFANA|GRAFANA_VERSION|GRAFANA_VERSION|Grafana dashboards" ;;
         node-exporter)  echo "dockerfiles/Dockerfile.node-exporter|moav-node-exporter:local|IMAGE_NODE_EXPORTER|NODE_EXPORTER_VERSION|NODE_EXPORTER_VERSION|Node system metrics" ;;
@@ -292,7 +291,7 @@ _local_build_info() {
 }
 
 # Default services to build with --local (commonly blocked registries)
-DEFAULT_LOCAL_BUILDS="cadvisor clash-exporter"
+DEFAULT_LOCAL_BUILDS="cadvisor"
 
 # Build images locally for regions with blocked registries
 build_local_images() {

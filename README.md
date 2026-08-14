@@ -453,8 +453,7 @@ through whichever is live and fastest ([docs](https://moav.sh/docs/client)).
 | [MahsaNet](https://www.mahsaserver.com/) · [MahsaNG](https://github.com/GFW-knocker/MahsaNG) | config donation and the client most Iranian users have |
 
 **Monitoring** — [Prometheus](https://github.com/prometheus/prometheus), [Grafana](https://github.com/grafana/grafana),
-[node_exporter](https://github.com/prometheus/node_exporter), [cAdvisor](https://github.com/google/cadvisor),
-[clash-exporter](https://github.com/zxh326/clash-exporter).
+[node_exporter](https://github.com/prometheus/node_exporter), [cAdvisor](https://github.com/google/cadvisor).
 
 Pinned versions for all of these live in [`.env.example`](.env.example).
 

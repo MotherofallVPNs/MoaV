@@ -347,7 +347,7 @@ do_uninstall() {
         echo ""
 
         # External images used by MoaV (from docker-compose.yml)
-        local external_image_patterns="prom/prometheus|grafana/grafana|prom/node-exporter|gcr.io/cadvisor|ghcr.io/zxh326/clash-exporter|certbot/certbot|nginx:alpine"
+        local external_image_patterns="prom/prometheus|grafana/grafana|prom/node-exporter|gcr.io/cadvisor|certbot/certbot|nginx:alpine"
 
         # Find MoaV-built images (moav-* prefix)
         local moav_images
