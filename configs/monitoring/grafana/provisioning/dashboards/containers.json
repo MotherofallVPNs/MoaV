@@ -1112,7 +1112,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max by (name) (container_memory_usage_bytes{name=~\"moav-.+\", name!~\"moav-(prometheus|grafana|cadvisor|node-exporter|snowflake-exporter|wireguard-exporter|singbox-exporter)\"})",
+          "expr": "last_over_time((max by (name) (container_memory_usage_bytes{name=~\"moav-.+\", name!~\"moav-(prometheus|grafana|cadvisor|node-exporter|snowflake-exporter|wireguard-exporter|singbox-exporter)\"}))[5m:])",
           "format": "table",
           "instant": true,
           "refId": "Memory"

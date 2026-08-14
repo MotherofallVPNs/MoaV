@@ -592,7 +592,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "amneziawg_peer_transfer_rx_bytes",
+          "expr": "last_over_time((amneziawg_peer_transfer_rx_bytes)[5m:])",
           "format": "table",
           "instant": true,
           "refId": "RX"
@@ -602,7 +602,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "amneziawg_peer_transfer_tx_bytes",
+          "expr": "last_over_time((amneziawg_peer_transfer_tx_bytes)[5m:])",
           "format": "table",
           "instant": true,
           "refId": "TX"
@@ -612,7 +612,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "amneziawg_peer_latest_handshake_seconds * 1000",
+          "expr": "last_over_time((amneziawg_peer_latest_handshake_seconds * 1000)[5m:])",
           "format": "table",
           "instant": true,
           "refId": "HS"
@@ -622,7 +622,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "amneziawg_peer_active",
+          "expr": "last_over_time((amneziawg_peer_active)[5m:])",
           "format": "table",
           "instant": true,
           "refId": "Active"
@@ -833,7 +833,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "count by (country) (amneziawg_peer_active)",
+          "expr": "last_over_time((count by (country) (amneziawg_peer_active))[5m:])",
           "format": "table",
           "instant": true,
           "legendFormat": "",

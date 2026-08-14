@@ -186,6 +186,30 @@ grep -q 'BYINDEX=none' <<<"$out" \
     && ok "label-driven panels colour by series name, so a country keeps one colour" \
     || bad "colours assigned by index; the same label differs between panels: $(grep '^BYINDEX=' <<<"$out" | head -c 200)"
 
+# --- every target must name its datasource --------------------------------------
+# Panels inside a collapsed row were created without one and inherited nothing.
+out=$(python3 - "$DASH" <<'PY'
+import json, os, sys
+missing = []
+for fn in sorted(os.listdir(sys.argv[1])):
+    if not fn.endswith(".json"):
+        continue
+    d = json.load(open(os.path.join(sys.argv[1], fn)))
+    def walk(p):
+        for t in p.get("targets", []):
+            if t.get("expr") and not t.get("datasource"):
+                missing.append("%s/%s" % (fn, p.get("title")))
+        for n in p.get("panels", []):
+            walk(n)
+    for p in d["panels"]:
+        walk(p)
+print("NODS=%s" % (sorted(set(missing)) or "none"))
+PY
+)
+grep -q 'NODS=none' <<<"$out" \
+    && ok "every target names its datasource" \
+    || bad "target has no datasource: $(grep '^NODS=' <<<"$out" | head -c 160)"
+
 echo ""
 echo "  passed: $pass   failed: $fail"
 [ "$fail" -eq 0 ] || exit 1

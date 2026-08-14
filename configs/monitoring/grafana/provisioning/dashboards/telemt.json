@@ -939,7 +939,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "telemt_user_connections_current",
+          "expr": "last_over_time((telemt_user_connections_current)[5m:])",
           "format": "table",
           "instant": true,
           "refId": "B"
@@ -949,7 +949,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "telemt_user_octets_from_client",
+          "expr": "last_over_time((telemt_user_octets_from_client)[5m:])",
           "format": "table",
           "instant": true,
           "refId": "C"
@@ -959,7 +959,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "telemt_user_octets_to_client",
+          "expr": "last_over_time((telemt_user_octets_to_client)[5m:])",
           "format": "table",
           "instant": true,
           "refId": "D"
@@ -969,7 +969,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "telemt_user_unique_ips_current",
+          "expr": "last_over_time((telemt_user_unique_ips_current)[5m:])",
           "format": "table",
           "instant": true,
           "refId": "E"

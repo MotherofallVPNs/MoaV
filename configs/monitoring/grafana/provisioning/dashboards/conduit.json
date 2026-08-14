@@ -5985,7 +5985,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (region) (conduit_region_connected_clients)",
+          "expr": "last_over_time((sum by (region) (conduit_region_connected_clients))[5m:])",
           "format": "table",
           "instant": true,
           "refId": "Connected"
@@ -5995,7 +5995,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (region) (conduit_region_bytes_downloaded)",
+          "expr": "last_over_time((sum by (region) (conduit_region_bytes_downloaded))[5m:])",
           "format": "table",
           "instant": true,
           "refId": "Download"
@@ -6005,7 +6005,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (region) (conduit_region_bytes_uploaded)",
+          "expr": "last_over_time((sum by (region) (conduit_region_bytes_uploaded))[5m:])",
           "format": "table",
           "instant": true,
           "refId": "Upload"

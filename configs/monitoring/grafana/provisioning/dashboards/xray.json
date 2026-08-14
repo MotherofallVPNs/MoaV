@@ -1093,7 +1093,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "xray_user_connections",
+          "expr": "last_over_time((xray_user_connections)[5m:])",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -1103,7 +1103,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "xray_user_active",
+          "expr": "last_over_time((xray_user_active)[5m:])",
           "format": "table",
           "instant": true,
           "refId": "B"
@@ -1113,7 +1113,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "xray_user_upload_bytes",
+          "expr": "last_over_time((xray_user_upload_bytes)[5m:])",
           "format": "table",
           "instant": true,
           "refId": "C"
@@ -1123,7 +1123,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "xray_user_download_bytes",
+          "expr": "last_over_time((xray_user_download_bytes)[5m:])",
           "format": "table",
           "instant": true,
           "refId": "D"
@@ -1345,7 +1345,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "xray_connections_by_country",
+          "expr": "last_over_time((xray_connections_by_country)[5m:])",
           "format": "table",
           "instant": true,
           "legendFormat": "",
@@ -1492,7 +1492,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "xray_inbound_upload_bytes",
+          "expr": "last_over_time((xray_inbound_upload_bytes)[5m:])",
           "format": "table",
           "instant": true,
           "legendFormat": "",
@@ -1503,7 +1503,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "xray_inbound_download_bytes",
+          "expr": "last_over_time((xray_inbound_download_bytes)[5m:])",
           "format": "table",
           "instant": true,
           "legendFormat": "",

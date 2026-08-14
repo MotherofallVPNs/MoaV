@@ -113,7 +113,11 @@
         {
           "expr": "count(sum by (country) (max_over_time(tor_snowflake_proxy_connections_total[$__range])) > 0)",
           "refId": "A",
-          "instant": true
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "gridPos": {
@@ -169,7 +173,11 @@
         {
           "expr": "100 * sum(max_over_time(tor_snowflake_proxy_connections_total[$__range])) / (sum(max_over_time(tor_snowflake_proxy_connections_total[$__range])) + sum(max_over_time(tor_snowflake_proxy_connection_timeouts_total[$__range])))",
           "refId": "A",
-          "instant": true
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "gridPos": {
@@ -214,7 +222,11 @@
         {
           "expr": "time() - process_start_time_seconds{job=\"snowflake-proxy\"}",
           "refId": "A",
-          "instant": true
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "gridPos": {
@@ -321,7 +333,11 @@
         {
           "expr": "sum(increase(tor_snowflake_proxy_traffic_inbound_bytes_total[$__range])) * 1024",
           "refId": "A",
-          "instant": true
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "gridPos": {
@@ -428,7 +444,11 @@
         {
           "expr": "sum(increase(tor_snowflake_proxy_traffic_outbound_bytes_total[$__range])) * 1024",
           "refId": "A",
-          "instant": true
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "gridPos": {
@@ -727,7 +747,11 @@
           "expr": "sum by (country) (max_over_time(tor_snowflake_proxy_connections_total[$__range])) > 0",
           "legendFormat": "{{country}}",
           "refId": "A",
-          "instant": true
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
@@ -780,7 +804,11 @@
         {
           "expr": "sum by (country) (max_over_time(tor_snowflake_proxy_connections_total[$__interval]))",
           "legendFormat": "{{country}}",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
@@ -814,7 +842,11 @@
         {
           "expr": "increase(tor_snowflake_proxy_connection_timeouts_total[1h])",
           "legendFormat": "failed/hour",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
