@@ -69,19 +69,19 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(tor_snowflake_proxy_connections_total[$__range]))",
+          "expr": "sum(max_over_time(tor_snowflake_proxy_connections_total[$__range]))",
           "refId": "A"
         }
       ],
       "title": "People Served",
       "type": "stat",
-      "description": "Connections completed in the selected time range. snowflake's counters restart with the container, so this is an increase() over the window rather than the raw counter, which would drop to zero on every restart. snowflake counts a connection only when it ENDS, so a long-lived client relaying right now contributes nothing here until it disconnects \u2014 this can read 0 while Relay Throughput is busy."
+      "description": "Connections completed in the selected time range. Counted with max_over_time, not increase: these tick once per completed connection and then sit flat, and increase() can only see growth from a previous sample, so every country's FIRST connection was invisible. Measured on a live proxy, increase saw 2 countries where max_over_time saw 7. Trade-off: if the container restarts mid-window this shows the larger run rather than the sum. snowflake counts a connection only when it ENDS, so a long-lived client relaying right now contributes nothing here until it disconnects \u2014 this can read 0 while Relay Throughput is busy."
     },
     {
       "id": 14,
       "type": "stat",
       "title": "Countries Reached",
-      "description": "Countries with at least one completed connection in the selected time range. '??' counts as one: the client IP was not in the geoip database.",
+      "description": "Countries with at least one completed connection in the selected time range. '??' counts as one: the client IP was not in the geoip database. Counted with max_over_time, not increase: these tick once per completed connection and then sit flat, and increase() can only see growth from a previous sample, so every country's FIRST connection was invisible. Measured on a live proxy, increase saw 2 countries where max_over_time saw 7. Trade-off: if the container restarts mid-window this shows the larger run rather than the sum.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -111,7 +111,7 @@
       },
       "targets": [
         {
-          "expr": "count(sum by (country) (increase(tor_snowflake_proxy_connections_total[$__range])) > 0)",
+          "expr": "count(sum by (country) (max_over_time(tor_snowflake_proxy_connections_total[$__range])) > 0)",
           "refId": "A",
           "instant": true
         }
@@ -127,7 +127,7 @@
       "id": 15,
       "type": "gauge",
       "title": "Rendezvous Success Rate",
-      "description": "Share of rendezvous attempts in the selected time range that produced a connection. snowflake's counters restart with the container, so this is an increase() over the window rather than the raw counter, which would drop to zero on every restart. A low number is normal: most rendezvous attempts are clients that never come back, not failures on this proxy.",
+      "description": "Share of rendezvous attempts in the selected time range that produced a connection. A low number is normal: most attempts are clients that never come back, not failures on this proxy. Counted with max_over_time, not increase: these tick once per completed connection and then sit flat, and increase() can only see growth from a previous sample, so every country's FIRST connection was invisible. Measured on a live proxy, increase saw 2 countries where max_over_time saw 7. Trade-off: if the container restarts mid-window this shows the larger run rather than the sum.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -167,7 +167,7 @@
       },
       "targets": [
         {
-          "expr": "100 * sum(increase(tor_snowflake_proxy_connections_total[$__range])) / (sum(increase(tor_snowflake_proxy_connections_total[$__range])) + sum(increase(tor_snowflake_proxy_connection_timeouts_total[$__range])))",
+          "expr": "100 * sum(max_over_time(tor_snowflake_proxy_connections_total[$__range])) / (sum(max_over_time(tor_snowflake_proxy_connections_total[$__range])) + sum(max_over_time(tor_snowflake_proxy_connection_timeouts_total[$__range])))",
           "refId": "A",
           "instant": true
         }
@@ -656,20 +656,20 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(tor_snowflake_proxy_connections_total[1h]))",
+          "expr": "sum(max_over_time(tor_snowflake_proxy_connections_total[$__interval]))",
           "legendFormat": "connections/hour",
           "refId": "A"
         }
       ],
-      "title": "Connections Served (per hour)",
+      "title": "Connections Served",
       "type": "timeseries",
-      "description": "Completed connections per hour. The proxy reports every 90s but completes only a handful an hour, so shorter windows read as zero. snowflake counts a connection only when it ENDS, so a long-lived client relaying right now contributes nothing here until it disconnects \u2014 this can read 0 while Relay Throughput is busy."
+      "description": "Running total of completed connections across the selected range. Counted with max_over_time, not increase: these tick once per completed connection and then sit flat, and increase() can only see growth from a previous sample, so every country's FIRST connection was invisible. Measured on a live proxy, increase saw 2 countries where max_over_time saw 7. Trade-off: if the container restarts mid-window this shows the larger run rather than the sum. snowflake counts a connection only when it ENDS, so a long-lived client relaying right now contributes nothing here until it disconnects \u2014 this can read 0 while Relay Throughput is busy."
     },
     {
       "id": 10,
       "type": "piechart",
       "title": "Share of Users by Country",
-      "description": "Connections completed in the selected time range, by the country of the client IP. Countries with nothing in the range are left out rather than shown as zero. Matches 'Users Served by Country over Time' beside it. snowflake counts a connection only when it ENDS, so a long-lived client relaying right now contributes nothing here until it disconnects \u2014 this can read 0 while Relay Throughput is busy.",
+      "description": "Connections completed in the selected time range, by the country of the client IP. Matches the chart beside it. Counted with max_over_time, not increase: these tick once per completed connection and then sit flat, and increase() can only see growth from a previous sample, so every country's FIRST connection was invisible. Measured on a live proxy, increase saw 2 countries where max_over_time saw 7. Trade-off: if the container restarts mid-window this shows the larger run rather than the sum. snowflake counts a connection only when it ENDS, so a long-lived client relaying right now contributes nothing here until it disconnects \u2014 this can read 0 while Relay Throughput is busy.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -724,7 +724,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (country) (increase(tor_snowflake_proxy_connections_total[$__range])) > 0",
+          "expr": "sum by (country) (max_over_time(tor_snowflake_proxy_connections_total[$__range])) > 0",
           "legendFormat": "{{country}}",
           "refId": "A",
           "instant": true
@@ -735,7 +735,7 @@
       "id": 11,
       "type": "timeseries",
       "title": "Users Served by Country over Time",
-      "description": "Completed connections per hour, stacked by country.",
+      "description": "Running total per country across the selected range, so the right-hand edge matches the pie beside it. Steps down if the container restarts. Counted with max_over_time, not increase: these tick once per completed connection and then sit flat, and increase() can only see growth from a previous sample, so every country's FIRST connection was invisible. Measured on a live proxy, increase saw 2 countries where max_over_time saw 7. Trade-off: if the container restarts mid-window this shows the larger run rather than the sum.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -778,7 +778,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (country) (increase(tor_snowflake_proxy_connections_total[1h]))",
+          "expr": "sum by (country) (max_over_time(tor_snowflake_proxy_connections_total[$__interval]))",
           "legendFormat": "{{country}}",
           "refId": "A"
         }

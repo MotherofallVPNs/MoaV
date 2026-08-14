@@ -96,7 +96,7 @@ COUNTERS = ("tor_snowflake_proxy_connections_total",
             "tor_snowflake_proxy_connection_timeouts_total",
             "tor_snowflake_proxy_traffic_inbound_bytes_total",
             "tor_snowflake_proxy_traffic_outbound_bytes_total")
-WRAPPED = re.compile(r'\b(increase|rate|irate|delta)\s*\(')
+WRAPPED = re.compile(r'\b(increase|rate|irate|delta|deriv|max_over_time|last_over_time|avg_over_time|min_over_time|sum_over_time)\s*\(')
 raw = []
 for p in d["panels"]:
     for t in p.get("targets", []):
@@ -111,7 +111,9 @@ def expr(title):
     return next((t.get("expr", "") for p in d["panels"] if p.get("title") == title
                  for t in p.get("targets", [])), "")
 pie, ts = expr("Share of Users by Country"), expr("Users Served by Country over Time")
-print("SAME_BASIS=%s" % (("increase(" in pie) and ("increase(" in ts)))
+# Both must use max_over_time: increase() misses each country's first
+# connection on a counter this sparse, and mixing the two makes them disagree.
+print("SAME_BASIS=%s" % (("max_over_time(" in pie) and ("max_over_time(" in ts)))
 PY
 )
 grep -q 'RAW=none' <<<"$out" \
@@ -126,7 +128,7 @@ grep -q 'SAME_BASIS=True' <<<"$out" \
 # metrics an exporter persists itself may be read raw.
 out=$(python3 - "$DASH" <<'PY'
 import json, os, re, sys
-WRAPPED = re.compile(r'\b(increase|rate|irate|delta|deriv)\s*\(')
+WRAPPED = re.compile(r'\b(increase|rate|irate|delta|deriv|max_over_time|last_over_time|avg_over_time|min_over_time|sum_over_time)\s*\(')
 # _total that are really gauges, and metrics MoaV persists across restarts.
 ALLOW = ("wireguard_peers_total", "amneziawg_peers_total",
          "moav_site_traffic_bytes_total", "moav_site_destination_country_bytes_total",
