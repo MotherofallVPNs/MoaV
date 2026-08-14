@@ -102,10 +102,20 @@ if [ -d /var/log/sing-box ] && mkfifo -m 600 "$RAW_LOG" 2>/dev/null; then
     # so something must always be draining.
     ( while true; do
           awk '{
-              sub(/ connection to .*$/,           " connection to -")
-              sub(/dns: exchanged .*$/,           "dns: exchanged -")
-              sub(/dns: lookup succeed for .*$/,  "dns: lookup succeed for -")
-              sub(/dns: lookup failed for [^:]*/, "dns: lookup failed for -")
+              sub(/ connection to .*$/, " connection to -")
+              # Everything after a dns verb is a name. Keep the verb only, so a
+              # verb we have not seen cannot leak by default.
+              if (match($0, /dns: /)) {
+                  head = substr($0, 1, RSTART + RLENGTH - 1)
+                  rest = substr($0, RSTART + RLENGTH)
+                  split(rest, w, " ")
+                  if (w[1] == "lookup" && w[2] == "failed") {
+                      i = index(rest, ": ")     # keep the reason, drop the name
+                      $0 = head "lookup failed for -" (i ? substr(rest, i) : "")
+                  } else {
+                      $0 = head w[1] " -"
+                  }
+              }
               print; fflush()
           }' < "$RAW_LOG" >> "$ACCESS_LOG" 2>/dev/null
           sleep 1

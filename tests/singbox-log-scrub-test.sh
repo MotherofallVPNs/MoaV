@@ -33,6 +33,9 @@ INFO [2543373071 0.4s] dns: exchanged A scontent.cdninstagram.com. 55 IN A 157.2
 INFO [1023548901 0.3s] dns: exchanged AAAA mtalk.google.com. 228 IN AAAA 2a00:1450::200e
 INFO [3937803010 0.2s] dns: lookup succeed for z-m-gateway.facebook.com: 157.240.196.40
 ERROR [3213091123 0.1s] dns: lookup failed for badhost.example.org: connection refused
+INFO [4001 1.40s] dns: cached CNAME test-gateway.instagram.com. 0 IN CNAME dgw-ig.c10r.facebook.com.
+INFO [4002 1.60s] dns: cached A scontent.cdninstagram.com. 2 IN A 157.240.196.63
+INFO [4003 0.5s] dns: some-future-verb whatever.example.net. 30 IN A 1.2.3.4
 ERROR [3406667087 1.37s] inbound/vless[vless-reality-in]: process connection from 178.176.84.148:25746: EOF
 LOG
 )
@@ -54,15 +57,19 @@ ok "the scrubber is defined in the shipped entrypoint"
 SCRUBBED=$(printf '%s\n' "$FIXTURE" | awk "$PROG")
 
 # --- no destination may survive ------------------------------------------------
+leaked=$(grep -oE '[a-z0-9-]+\.[a-z0-9.-]+\.[a-z]{2,}' <<<"$SCRUBBED" | sort -u | tr '\n' ' ')
+[ -z "$leaked" ] \
+    && ok "no domain-shaped token survives, in any line shape" \
+    || bad "destination still on disk: $leaked"
+
+# Destination IPs too. Client IPs are allowed, so check the known ones by value.
 leaked=""
-for dest in scontent.cdninstagram.com graph.facebook.com mtalk.google.com \
-            z-m-gateway.facebook.com badhost.example.org \
-            157.240.196.40 2a00:1450::200e 8.8.8.8; do
+for dest in 157.240.196.40 157.240.196.63 2a00:1450::200e 8.8.8.8 1.2.3.4; do
     grep -qF "$dest" <<<"$SCRUBBED" && leaked="$leaked $dest"
 done
 [ -z "$leaked" ] \
-    && ok "no destination host or IP survives, in any line shape" \
-    || bad "destination still on disk:$leaked"
+    && ok "no destination IP survives either" \
+    || bad "destination IP still on disk:$leaked"
 
 # --- what the exporter needs must survive --------------------------------------
 # Scrubbing too hard is the other failure: it silently empties the dashboards.
