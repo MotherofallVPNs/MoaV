@@ -75,7 +75,7 @@
       ],
       "title": "People Served",
       "type": "stat",
-      "description": "Connections completed in the selected time range. snowflake's counters restart with the container, so this is an increase() over the window rather than the raw counter, which would drop to zero on every restart."
+      "description": "Connections completed in the selected time range. snowflake's counters restart with the container, so this is an increase() over the window rather than the raw counter, which would drop to zero on every restart. snowflake counts a connection only when it ENDS, so a long-lived client relaying right now contributes nothing here until it disconnects \u2014 this can read 0 while Relay Throughput is busy."
     },
     {
       "id": 14,
@@ -127,7 +127,7 @@
       "id": 15,
       "type": "gauge",
       "title": "Rendezvous Success Rate",
-      "description": "Share of rendezvous attempts in the selected time range that produced a connection. snowflake's counters restart with the container, so this is an increase() over the window rather than the raw counter, which would drop to zero on every restart.",
+      "description": "Share of rendezvous attempts in the selected time range that produced a connection. snowflake's counters restart with the container, so this is an increase() over the window rather than the raw counter, which would drop to zero on every restart. A low number is normal: most rendezvous attempts are clients that never come back, not failures on this proxy.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -663,13 +663,13 @@
       ],
       "title": "Connections Served (per hour)",
       "type": "timeseries",
-      "description": "Completed connections per hour. The proxy reports every 90s but completes only a handful an hour, so shorter windows read as zero."
+      "description": "Completed connections per hour. The proxy reports every 90s but completes only a handful an hour, so shorter windows read as zero. snowflake counts a connection only when it ENDS, so a long-lived client relaying right now contributes nothing here until it disconnects \u2014 this can read 0 while Relay Throughput is busy."
     },
     {
       "id": 10,
       "type": "piechart",
       "title": "Share of Users by Country",
-      "description": "Connections completed in the selected time range, by the country of the client IP. Countries with nothing in the range are left out rather than shown as zero. Matches 'Users Served by Country over Time' beside it.",
+      "description": "Connections completed in the selected time range, by the country of the client IP. Countries with nothing in the range are left out rather than shown as zero. Matches 'Users Served by Country over Time' beside it. snowflake counts a connection only when it ENDS, so a long-lived client relaying right now contributes nothing here until it disconnects \u2014 this can read 0 while Relay Throughput is busy.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -690,9 +690,8 @@
               "viz": false
             }
           },
-          "noValue": "0",
           "color": {
-            "mode": "palette-classic-by-name"
+            "mode": "palette-classic"
           }
         },
         "overrides": []

@@ -599,7 +599,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic-by-name"
+            "mode": "palette-classic"
           },
           "custom": {
             "hideFrom": {
@@ -1117,7 +1117,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic-by-name"
+            "mode": "palette-classic"
           },
           "custom": {
             "hideFrom": {
@@ -1327,7 +1327,7 @@
             "defaults": {
               "unit": "bytes",
               "color": {
-                "mode": "palette-classic-by-name"
+                "mode": "palette-classic"
               }
             },
             "overrides": []
@@ -1479,7 +1479,7 @@
                 }
               },
               "color": {
-                "mode": "palette-classic-by-name"
+                "mode": "palette-classic"
               }
             },
             "overrides": [
@@ -1641,7 +1641,7 @@
             "defaults": {
               "unit": "bytes",
               "color": {
-                "mode": "palette-classic-by-name"
+                "mode": "palette-classic"
               }
             },
             "overrides": []

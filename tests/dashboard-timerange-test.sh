@@ -168,8 +168,11 @@ for fn in sorted(os.listdir(sys.argv[1])):
     def walk(p):
         col = (p.get("fieldConfig", {}).get("defaults", {}).get("color") or {})
         lf = " ".join(t.get("legendFormat", "") for t in p.get("targets", []))
-        if "{{" in lf and col.get("mode") == "palette-classic":
+        if ("{{" in lf and col.get("mode") == "palette-classic"
+                and p.get("type") in ("timeseries", "barchart")):
             wrong.append("%s/%s" % (fn, p.get("title")))
+        if col.get("mode") == "palette-classic-by-name" and p.get("type") == "piechart":
+            wrong.append("%s/%s (by-name paints every slice alike)" % (fn, p.get("title")))
         for n in p.get("panels", []):
             walk(n)
     for p in d["panels"]:
