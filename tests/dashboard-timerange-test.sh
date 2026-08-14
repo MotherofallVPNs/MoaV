@@ -121,6 +121,66 @@ grep -q 'SAME_BASIS=True' <<<"$out" \
     && ok "the country pie and the country timeline are computed the same way" \
     || bad "pie and timeline use different bases, so they list different countries"
 
+# --- counters that reset must not be read raw, anywhere -----------------------
+# cAdvisor's and the proxies' counters restart with their container. Only
+# metrics an exporter persists itself may be read raw.
+out=$(python3 - "$DASH" <<'PY'
+import json, os, re, sys
+WRAPPED = re.compile(r'\b(increase|rate|irate|delta|deriv)\s*\(')
+# _total that are really gauges, and metrics MoaV persists across restarts.
+ALLOW = ("wireguard_peers_total", "amneziawg_peers_total",
+         "moav_site_traffic_bytes_total", "moav_site_destination_country_bytes_total",
+         "moav_site_connections_total")
+raw = []
+for fn in sorted(os.listdir(sys.argv[1])):
+    if not fn.endswith(".json"):
+        continue
+    d = json.load(open(os.path.join(sys.argv[1], fn)))
+    def walk(p):
+        for t in p.get("targets", []):
+            e = t.get("expr", "")
+            if WRAPPED.search(e):
+                continue
+            for m in re.findall(r'\b([a-z][a-z0-9_]*_total)\b', e):
+                if m not in ALLOW:
+                    raw.append("%s/%s: %s" % (fn, p.get("title"), m))
+        for n in p.get("panels", []):
+            walk(n)
+    for p in d["panels"]:
+        walk(p)
+print("RAW=%s" % (sorted(set(raw)) or "none"))
+PY
+)
+grep -q 'RAW=none' <<<"$out" \
+    && ok "no dashboard reads a resettable counter raw" \
+    || bad "reads a counter that resets with its container: $(grep '^RAW=' <<<"$out" | head -c 200)"
+
+# --- one country, one colour, everywhere --------------------------------------
+# palette-classic assigns colours by series index, so US was green in the pie and
+# red in the timeline beside it. by-name hashes the series name instead.
+out=$(python3 - "$DASH" <<'PY'
+import json, os, sys
+wrong = []
+for fn in sorted(os.listdir(sys.argv[1])):
+    if not fn.endswith(".json"):
+        continue
+    d = json.load(open(os.path.join(sys.argv[1], fn)))
+    def walk(p):
+        col = (p.get("fieldConfig", {}).get("defaults", {}).get("color") or {})
+        lf = " ".join(t.get("legendFormat", "") for t in p.get("targets", []))
+        if "{{" in lf and col.get("mode") == "palette-classic":
+            wrong.append("%s/%s" % (fn, p.get("title")))
+        for n in p.get("panels", []):
+            walk(n)
+    for p in d["panels"]:
+        walk(p)
+print("BYINDEX=%s" % (wrong or "none"))
+PY
+)
+grep -q 'BYINDEX=none' <<<"$out" \
+    && ok "label-driven panels colour by series name, so a country keeps one colour" \
+    || bad "colours assigned by index; the same label differs between panels: $(grep '^BYINDEX=' <<<"$out" | head -c 200)"
+
 echo ""
 echo "  passed: $pass   failed: $fail"
 [ "$fail" -eq 0 ] || exit 1

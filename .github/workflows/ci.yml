@@ -103,6 +103,8 @@ jobs:
         run: bash tests/singbox-log-scrub-test.sh
       - name: dashboard time-range scoping
         run: bash tests/dashboard-timerange-test.sh
+      - name: doctor net drop counters
+        run: bash tests/net-drops-test.sh
       - name: snowflake native metrics + dashboard (#183)
         run: bash tests/snowflake-metrics-test.sh
       - name: admin TLS enforcement

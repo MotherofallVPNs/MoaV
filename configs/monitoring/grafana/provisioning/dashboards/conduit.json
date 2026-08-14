@@ -811,7 +811,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "palette-classic-by-name"
           },
           "custom": {
             "axisCenteredZero": false,
@@ -7099,6 +7099,9 @@
               "type": "auto"
             },
             "inspect": false
+          },
+          "color": {
+            "mode": "palette-classic-by-name"
           }
         },
         "overrides": []

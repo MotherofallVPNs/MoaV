@@ -47,7 +47,7 @@ volumes:
   moav_snowflake_logs:
   moav_webroot:
   moav_geoip:
-  moav_sitestats:
+  moav_exporter_state:
 
 services:
   # ===========================================================================
@@ -1096,7 +1096,7 @@ services:
       - moav_geoip:/geoip:ro
       - moav_state:/state:ro
       - moav_logs:/var/log/sing-box:ro
-      - moav_sitestats:/var/lib/sitestats
+      - moav_exporter_state:/var/lib/moav-exporter-state
     environment:
       - CLASH_TOKEN=${CLASH_API_SECRET:-}
       - TZ=${TZ:-UTC}

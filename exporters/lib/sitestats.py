@@ -23,7 +23,7 @@ TOP_N = int(os.environ.get("SITE_ANALYTICS_TOP_N", "50"))
 BUCKET_SECONDS = int(os.environ.get("SITE_ANALYTICS_BUCKET_SECONDS", "3600"))
 # Aggregates survive a restart here. Only post-threshold totals are written;
 # the in-flight client digests never are.
-STATE_PATH = os.environ.get("SITE_ANALYTICS_STATE", "/var/lib/sitestats/state.json")
+STATE_PATH = os.environ.get("SITE_ANALYTICS_STATE", "/var/lib/moav-exporter-state/sitestats.json")
 
 OTHER = "other"
 

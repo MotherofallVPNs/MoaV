@@ -690,7 +690,10 @@
               "viz": false
             }
           },
-          "noValue": "0"
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic-by-name"
+          }
         },
         "overrides": []
       },
@@ -756,6 +759,9 @@
               "mode": "normal",
               "group": "A"
             }
+          },
+          "color": {
+            "mode": "palette-classic-by-name"
           }
         },
         "overrides": []
