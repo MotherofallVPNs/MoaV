@@ -12,6 +12,29 @@
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
         "type": "dashboard"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "enable": true,
+        "filter": {
+          "exclude": false,
+          "ids": [
+            7
+          ]
+        },
+        "hide": false,
+        "iconColor": "orange",
+        "name": "Window Max (Connected)",
+        "target": {
+          "expr": "conduit_connected_clients == max_over_time(conduit_connected_clients[$__range:$__interval] @ end())",
+          "interval": "15s",
+          "refId": "Anno"
+        },
+        "textFormat": "{{value}} connected clients",
+        "titleFormat": "Window Max"
       }
     ]
   },
@@ -20,6 +43,486 @@
   "graphTooltip": 1,
   "links": [],
   "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {
+          "valueSize": 36
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(conduit_connecting_clients)",
+          "refId": "A"
+        }
+      ],
+      "title": "Connecting",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "-m"
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "BW"
+              },
+              {
+                "id": "unit",
+                "value": "bps"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 3,
+        "x": 4,
+        "y": 0
+      },
+      "id": 11,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 11,
+          "valueSize": 18
+        },
+        "textMode": "auto",
+        "wideLayout": false
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "conduit_max_common_clients",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "conduit_bandwidth_limit_bytes_per_second * 8",
+          "refId": "B"
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 3,
+        "x": 7,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(conduit_bytes_downloaded)",
+          "refId": "A"
+        }
+      ],
+      "title": "D/L",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "green",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 10,
+        "y": 0
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {
+          "valueSize": 36
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(conduit_bytes_downloaded[5m]))",
+          "refId": "A"
+        }
+      ],
+      "title": "D/L Rate",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "purple",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 3,
+        "x": 14,
+        "y": 0
+      },
+      "id": 20,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {
+          "valueSize": 36
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(conduit_bytes_downloaded_lifetime)",
+          "legendFormat": "Lifetime D/L",
+          "refId": "A"
+        }
+      ],
+      "title": "Lifetime D/L",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Max ${client_state_total:text}"
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Time"
+              },
+              {
+                "id": "unit",
+                "value": "time:YYYY-MM-DD HH:mm:ss"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 17,
+        "y": 0
+      },
+      "id": 28,
+      "maxDataPoints": 3000,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "vertical",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 11,
+          "valueSize": 14
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "$client_state_total == on() max_over_time($client_state_total[$__range:$__interval] @ end())",
+          "interval": "15s",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "timestamp($client_state_total == on() max_over_time($client_state_total[$__range:$__interval] @ end())) * 1000",
+          "interval": "15s",
+          "refId": "B"
+        }
+      ],
+      "title": "Window Max",
+      "type": "stat"
+    },
     {
       "datasource": {
         "type": "prometheus",
@@ -64,7 +567,7 @@
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 0,
+        "x": 21,
         "y": 0
       },
       "id": 5,
@@ -116,22 +619,29 @@
               {
                 "color": "green",
                 "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "orange",
+                "value": 100
               }
             ]
-          },
-          "unit": "decbytes"
+          }
         },
         "overrides": []
       },
       "gridPos": {
         "h": 3,
         "w": 4,
-        "x": 3,
-        "y": 0
+        "x": 0,
+        "y": 3
       },
-      "id": 3,
+      "id": 1,
       "options": {
-        "colorMode": "value",
+        "colorMode": "none",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
@@ -144,6 +654,9 @@
           "values": false
         },
         "showPercentChange": false,
+        "text": {
+          "valueSize": 36
+        },
         "textMode": "auto",
         "wideLayout": true
       },
@@ -154,11 +667,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(conduit_bytes_downloaded)",
+          "expr": "sum(conduit_connected_clients)",
           "refId": "A"
         }
       ],
-      "title": "Total Download",
+      "title": "Connected",
       "type": "stat"
     },
     {
@@ -169,7 +682,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "purple",
+            "fixedColor": "orange",
             "mode": "fixed"
           },
           "mappings": [],
@@ -177,210 +690,25 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "orange",
                 "value": 0
               }
             ]
           },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 4,
-        "x": 7,
-        "y": 0
-      },
-      "id": 20,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "12.4.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(conduit_bytes_downloaded_lifetime)",
-          "legendFormat": "Lifetime Download",
-          "refId": "A"
-        }
-      ],
-      "title": "Lifetime Download",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
-          },
-          "unit": "Bps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 9,
-        "x": 11,
-        "y": 0
-      },
-      "id": 6,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "12.4.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(rate(conduit_bytes_downloaded[5m])) + sum(rate(conduit_bytes_uploaded[5m]))",
-          "refId": "A"
-        }
-      ],
-      "title": "Current Rate",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 4,
-        "x": 20,
-        "y": 0
-      },
-      "id": 2,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "12.4.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(conduit_connecting_clients)",
-          "refId": "A"
-        }
-      ],
-      "title": "Connecting",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "purple",
-                "value": 0
-              }
-            ]
-          }
+          "unit": "none"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 0,
+        "x": 4,
         "y": 3
       },
-      "id": 11,
+      "id": 24,
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
+        "colorMode": "none",
+        "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
         "percentChangeColorMode": "standard",
@@ -402,11 +730,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "conduit_max_common_clients",
+          "expr": "conduit_announcing",
           "refId": "A"
         }
       ],
-      "title": "Max Clients",
+      "title": "Announcing",
       "type": "stat"
     },
     {
@@ -435,13 +763,13 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 4,
-        "x": 3,
+        "w": 3,
+        "x": 7,
         "y": 3
       },
       "id": 4,
       "options": {
-        "colorMode": "value",
+        "colorMode": "none",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
@@ -468,7 +796,73 @@
           "refId": "A"
         }
       ],
-      "title": "Total Upload",
+      "title": "U/L",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 10,
+        "y": 3
+      },
+      "id": 22,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {
+          "valueSize": 36
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(conduit_bytes_uploaded[5m]))",
+          "refId": "A"
+        }
+      ],
+      "title": "U/L Rate",
       "type": "stat"
     },
     {
@@ -498,13 +892,13 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 4,
-        "x": 7,
+        "w": 3,
+        "x": 14,
         "y": 3
       },
       "id": 21,
       "options": {
-        "colorMode": "value",
+        "colorMode": "none",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
@@ -517,6 +911,9 @@
           "values": false
         },
         "showPercentChange": false,
+        "text": {
+          "valueSize": 36
+        },
         "textMode": "auto",
         "wideLayout": true
       },
@@ -528,11 +925,11 @@
             "uid": "prometheus"
           },
           "expr": "sum(conduit_bytes_uploaded_lifetime)",
-          "legendFormat": "Lifetime Upload",
+          "legendFormat": "Lifetime U/L",
           "refId": "A"
         }
       ],
-      "title": "Lifetime Upload",
+      "title": "Lifetime U/L",
       "type": "stat"
     },
     {
@@ -550,32 +947,105 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "yellow",
-                "value": 50
-              },
-              {
                 "color": "orange",
-                "value": 100
+                "value": 0
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Session High ${client_state_total:text}"
               }
             ]
           }
+        ]
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 17,
+        "y": 3
+      },
+      "id": 29,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "vertical",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 11,
+          "valueSize": 28
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max_over_time($client_state_total[72h:] @ end())",
+          "refId": "A"
+        }
+      ],
+      "title": "Session High",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "purple",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "dtdurations"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 3,
-        "w": 4,
-        "x": 20,
+        "w": 3,
+        "x": 21,
         "y": 3
       },
-      "id": 1,
+      "id": 23,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "percentChangeColorMode": "standard",
@@ -597,11 +1067,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(conduit_connected_clients)",
+          "expr": "conduit_uptime_seconds",
           "refId": "A"
         }
       ],
-      "title": "Connected",
+      "title": "Uptime",
       "type": "stat"
     },
     {
@@ -659,11 +1129,81 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Connected"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#5794F2",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Connecting"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF0000",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Announcing"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#32CD32",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "Connected"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": true,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 11,
-        "w": 12,
+        "w": 24,
         "x": 0,
         "y": 6
       },
@@ -704,6 +1244,15 @@
           "expr": "sum(conduit_connecting_clients)",
           "legendFormat": "Connecting",
           "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(conduit_announcing)",
+          "legendFormat": "Announcing",
+          "refId": "C"
         }
       ],
       "title": "Client Connections",
@@ -728,7 +1277,7 @@
             "barAlignment": 0,
             "barWidthFactor": 0.6,
             "drawStyle": "line",
-            "fillOpacity": 20,
+            "fillOpacity": 15,
             "gradientMode": "opacity",
             "hideFrom": {
               "legend": false,
@@ -762,18 +1311,74 @@
                 "value": 0
               }
             ]
-          },
-          "unit": "Bps"
+          }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IR"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#9e3809",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MM"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "DE",
+                  "IR",
+                  "AZ"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": true,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 11,
-        "w": 12,
-        "x": 12,
-        "y": 6
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 17
       },
-      "id": 8,
+      "id": 27,
       "options": {
         "legend": {
           "calcs": [
@@ -783,7 +1388,9 @@
           ],
           "displayMode": "table",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": true,
+          "sortBy": "Name",
+          "sortDesc": true
         },
         "tooltip": {
           "hideZeros": false,
@@ -798,21 +1405,341 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(conduit_bytes_downloaded[5m]))",
-          "legendFormat": "Download",
+          "expr": "$client_state and on (region) topk(5, avg_over_time($client_state[$__range] @ end()))",
+          "legendFormat": "{{region}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Top 5 Regions by ${client_state:text}",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Limited (broker backoff)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#5794F2",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ICE Timeouts"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF0000",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Broker Resets"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#32CD32",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "No Match"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FFFFFF",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "id": 25,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "expr": "rate(conduit_log_events_total{type=\"limited\"}[5m])*60",
+          "legendFormat": "Limited (broker backoff)",
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(rate(conduit_bytes_uploaded[5m]))",
-          "legendFormat": "Upload",
+          "expr": "rate(conduit_log_events_total{type=\"ice_timeout\"}[5m])*60",
+          "legendFormat": "ICE Timeouts",
           "refId": "B"
+        },
+        {
+          "expr": "rate(conduit_log_events_total{type=\"broker_reset\"}[5m])*60",
+          "legendFormat": "Broker Resets",
+          "refId": "C"
+        },
+        {
+          "expr": "rate(conduit_log_events_total{type=\"no_match\"}[5m])*60",
+          "legendFormat": "No Match",
+          "refId": "D"
         }
       ],
-      "title": "Bandwidth Rate",
+      "title": "Conduit Log Event Rates",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Invalid IP Packet"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#5794F2",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Other DoS attack"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF0000",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Policy (filtersets, etc.)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#32CD32",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Error"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FFFFFF",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "id": 26,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "expr": "sum(rate(router_log_events_total[60m])*60) by (reason)",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Router Log Event Rates (by reason)",
       "type": "timeseries"
     },
     {
@@ -871,13 +1798,44 @@
           },
           "unit": "decbytes"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Download"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#5794F2",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Upload"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF0000",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 12,
+        "h": 9,
         "w": 12,
         "x": 0,
-        "y": 17
+        "y": 56
       },
       "id": 9,
       "options": {
@@ -918,6 +1876,1327 @@
       ],
       "title": "Total Bandwidth Over Time",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Download"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#5794F2",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Upload"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF0000",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 56
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(conduit_bytes_downloaded[5m]))",
+          "legendFormat": "Download",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(conduit_bytes_uploaded[5m]))",
+          "legendFormat": "Upload",
+          "refId": "B"
+        }
+      ],
+      "title": "Bandwidth Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Current connected clients and cumulative traffic per region",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "AD": {
+                  "index": 0,
+                  "text": "AD: Andorra"
+                },
+                "AE": {
+                  "index": 1,
+                  "text": "AE: United Arab Emirates"
+                },
+                "AF": {
+                  "index": 2,
+                  "text": "AF: Afghanistan"
+                },
+                "AG": {
+                  "index": 3,
+                  "text": "AG: Antigua and Barbuda"
+                },
+                "AI": {
+                  "index": 4,
+                  "text": "AI: Anguilla"
+                },
+                "AL": {
+                  "index": 5,
+                  "text": "AL: Albania"
+                },
+                "AM": {
+                  "index": 6,
+                  "text": "AM: Armenia"
+                },
+                "AO": {
+                  "index": 7,
+                  "text": "AO: Angola"
+                },
+                "AQ": {
+                  "index": 8,
+                  "text": "AQ: Antarctica"
+                },
+                "AR": {
+                  "index": 9,
+                  "text": "AR: Argentina"
+                },
+                "AS": {
+                  "index": 10,
+                  "text": "AS: American Samoa"
+                },
+                "AT": {
+                  "index": 11,
+                  "text": "AT: Austria"
+                },
+                "AU": {
+                  "index": 12,
+                  "text": "AU: Australia"
+                },
+                "AW": {
+                  "index": 13,
+                  "text": "AW: Aruba"
+                },
+                "AX": {
+                  "index": 14,
+                  "text": "AX: \u00c5land Islands"
+                },
+                "AZ": {
+                  "index": 15,
+                  "text": "AZ: Azerbaijan"
+                },
+                "BA": {
+                  "index": 16,
+                  "text": "BA: Bosnia and Herzegovina"
+                },
+                "BB": {
+                  "index": 17,
+                  "text": "BB: Barbados"
+                },
+                "BD": {
+                  "index": 18,
+                  "text": "BD: Bangladesh"
+                },
+                "BE": {
+                  "index": 19,
+                  "text": "BE: Belgium"
+                },
+                "BF": {
+                  "index": 20,
+                  "text": "BF: Burkina Faso"
+                },
+                "BG": {
+                  "index": 21,
+                  "text": "BG: Bulgaria"
+                },
+                "BH": {
+                  "index": 22,
+                  "text": "BH: Bahrain"
+                },
+                "BI": {
+                  "index": 23,
+                  "text": "BI: Burundi"
+                },
+                "BJ": {
+                  "index": 24,
+                  "text": "BJ: Benin"
+                },
+                "BL": {
+                  "index": 25,
+                  "text": "BL: Saint Barth\u00e9lemy"
+                },
+                "BM": {
+                  "index": 26,
+                  "text": "BM: Bermuda"
+                },
+                "BN": {
+                  "index": 27,
+                  "text": "BN: Brunei Darussalam"
+                },
+                "BO": {
+                  "index": 28,
+                  "text": "BO: Bolivia, Plurinational State of"
+                },
+                "BQ": {
+                  "index": 29,
+                  "text": "BQ: Bonaire, Sint Eustatius and Saba"
+                },
+                "BR": {
+                  "index": 30,
+                  "text": "BR: Brazil"
+                },
+                "BS": {
+                  "index": 31,
+                  "text": "BS: Bahamas"
+                },
+                "BT": {
+                  "index": 32,
+                  "text": "BT: Bhutan"
+                },
+                "BV": {
+                  "index": 33,
+                  "text": "BV: Bouvet Island"
+                },
+                "BW": {
+                  "index": 34,
+                  "text": "BW: Botswana"
+                },
+                "BY": {
+                  "index": 35,
+                  "text": "BY: Belarus"
+                },
+                "BZ": {
+                  "index": 36,
+                  "text": "BZ: Belize"
+                },
+                "CA": {
+                  "index": 37,
+                  "text": "CA: Canada"
+                },
+                "CC": {
+                  "index": 38,
+                  "text": "CC: Cocos (Keeling) Islands"
+                },
+                "CD": {
+                  "index": 39,
+                  "text": "CD: Congo, The Democratic Republic of the"
+                },
+                "CF": {
+                  "index": 40,
+                  "text": "CF: Central African Republic"
+                },
+                "CG": {
+                  "index": 41,
+                  "text": "CG: Congo"
+                },
+                "CH": {
+                  "index": 42,
+                  "text": "CH: Switzerland"
+                },
+                "CI": {
+                  "index": 43,
+                  "text": "CI: C\u00f4te d'Ivoire"
+                },
+                "CK": {
+                  "index": 44,
+                  "text": "CK: Cook Islands"
+                },
+                "CL": {
+                  "index": 45,
+                  "text": "CL: Chile"
+                },
+                "CM": {
+                  "index": 46,
+                  "text": "CM: Cameroon"
+                },
+                "CN": {
+                  "index": 47,
+                  "text": "CN: China"
+                },
+                "CO": {
+                  "index": 48,
+                  "text": "CO: Colombia"
+                },
+                "CR": {
+                  "index": 49,
+                  "text": "CR: Costa Rica"
+                },
+                "CU": {
+                  "index": 50,
+                  "text": "CU: Cuba"
+                },
+                "CV": {
+                  "index": 51,
+                  "text": "CV: Cabo Verde"
+                },
+                "CW": {
+                  "index": 52,
+                  "text": "CW: Cura\u00e7ao"
+                },
+                "CX": {
+                  "index": 53,
+                  "text": "CX: Christmas Island"
+                },
+                "CY": {
+                  "index": 54,
+                  "text": "CY: Cyprus"
+                },
+                "CZ": {
+                  "index": 55,
+                  "text": "CZ: Czechia"
+                },
+                "DE": {
+                  "index": 56,
+                  "text": "DE: Germany"
+                },
+                "DJ": {
+                  "index": 57,
+                  "text": "DJ: Djibouti"
+                },
+                "DK": {
+                  "index": 58,
+                  "text": "DK: Denmark"
+                },
+                "DM": {
+                  "index": 59,
+                  "text": "DM: Dominica"
+                },
+                "DO": {
+                  "index": 60,
+                  "text": "DO: Dominican Republic"
+                },
+                "DZ": {
+                  "index": 61,
+                  "text": "DZ: Algeria"
+                },
+                "EC": {
+                  "index": 62,
+                  "text": "EC: Ecuador"
+                },
+                "EE": {
+                  "index": 63,
+                  "text": "EE: Estonia"
+                },
+                "EG": {
+                  "index": 64,
+                  "text": "EG: Egypt"
+                },
+                "EH": {
+                  "index": 65,
+                  "text": "EH: Western Sahara"
+                },
+                "ER": {
+                  "index": 66,
+                  "text": "ER: Eritrea"
+                },
+                "ES": {
+                  "index": 67,
+                  "text": "ES: Spain"
+                },
+                "ET": {
+                  "index": 68,
+                  "text": "ET: Ethiopia"
+                },
+                "FI": {
+                  "index": 69,
+                  "text": "FI: Finland"
+                },
+                "FJ": {
+                  "index": 70,
+                  "text": "FJ: Fiji"
+                },
+                "FK": {
+                  "index": 71,
+                  "text": "FK: Falkland Islands (Malvinas)"
+                },
+                "FM": {
+                  "index": 72,
+                  "text": "FM: Micronesia, Federated States of"
+                },
+                "FO": {
+                  "index": 73,
+                  "text": "FO: Faroe Islands"
+                },
+                "FR": {
+                  "index": 74,
+                  "text": "FR: France"
+                },
+                "GA": {
+                  "index": 75,
+                  "text": "GA: Gabon"
+                },
+                "GB": {
+                  "index": 76,
+                  "text": "GB: United Kingdom"
+                },
+                "GD": {
+                  "index": 77,
+                  "text": "GD: Grenada"
+                },
+                "GE": {
+                  "index": 78,
+                  "text": "GE: Georgia"
+                },
+                "GF": {
+                  "index": 79,
+                  "text": "GF: French Guiana"
+                },
+                "GG": {
+                  "index": 80,
+                  "text": "GG: Guernsey"
+                },
+                "GH": {
+                  "index": 81,
+                  "text": "GH: Ghana"
+                },
+                "GI": {
+                  "index": 82,
+                  "text": "GI: Gibraltar"
+                },
+                "GL": {
+                  "index": 83,
+                  "text": "GL: Greenland"
+                },
+                "GM": {
+                  "index": 84,
+                  "text": "GM: Gambia"
+                },
+                "GN": {
+                  "index": 85,
+                  "text": "GN: Guinea"
+                },
+                "GP": {
+                  "index": 86,
+                  "text": "GP: Guadeloupe"
+                },
+                "GQ": {
+                  "index": 87,
+                  "text": "GQ: Equatorial Guinea"
+                },
+                "GR": {
+                  "index": 88,
+                  "text": "GR: Greece"
+                },
+                "GS": {
+                  "index": 89,
+                  "text": "GS: South Georgia and the South Sandwich Islands"
+                },
+                "GT": {
+                  "index": 90,
+                  "text": "GT: Guatemala"
+                },
+                "GU": {
+                  "index": 91,
+                  "text": "GU: Guam"
+                },
+                "GW": {
+                  "index": 92,
+                  "text": "GW: Guinea-Bissau"
+                },
+                "GY": {
+                  "index": 93,
+                  "text": "GY: Guyana"
+                },
+                "HK": {
+                  "index": 94,
+                  "text": "HK: Hong Kong"
+                },
+                "HM": {
+                  "index": 95,
+                  "text": "HM: Heard Island and McDonald Islands"
+                },
+                "HN": {
+                  "index": 96,
+                  "text": "HN: Honduras"
+                },
+                "HR": {
+                  "index": 97,
+                  "text": "HR: Croatia"
+                },
+                "HT": {
+                  "index": 98,
+                  "text": "HT: Haiti"
+                },
+                "HU": {
+                  "index": 99,
+                  "text": "HU: Hungary"
+                },
+                "ID": {
+                  "index": 100,
+                  "text": "ID: Indonesia"
+                },
+                "IE": {
+                  "index": 101,
+                  "text": "IE: Ireland"
+                },
+                "IL": {
+                  "index": 102,
+                  "text": "IL: Israel"
+                },
+                "IM": {
+                  "index": 103,
+                  "text": "IM: Isle of Man"
+                },
+                "IN": {
+                  "index": 104,
+                  "text": "IN: India"
+                },
+                "IO": {
+                  "index": 105,
+                  "text": "IO: British Indian Ocean Territory"
+                },
+                "IQ": {
+                  "index": 106,
+                  "text": "IQ: Iraq"
+                },
+                "IR": {
+                  "index": 107,
+                  "text": "IR: Iran, Islamic Republic of"
+                },
+                "IS": {
+                  "index": 108,
+                  "text": "IS: Iceland"
+                },
+                "IT": {
+                  "index": 109,
+                  "text": "IT: Italy"
+                },
+                "JE": {
+                  "index": 110,
+                  "text": "JE: Jersey"
+                },
+                "JM": {
+                  "index": 111,
+                  "text": "JM: Jamaica"
+                },
+                "JO": {
+                  "index": 112,
+                  "text": "JO: Jordan"
+                },
+                "JP": {
+                  "index": 113,
+                  "text": "JP: Japan"
+                },
+                "KE": {
+                  "index": 114,
+                  "text": "KE: Kenya"
+                },
+                "KG": {
+                  "index": 115,
+                  "text": "KG: Kyrgyzstan"
+                },
+                "KH": {
+                  "index": 116,
+                  "text": "KH: Cambodia"
+                },
+                "KI": {
+                  "index": 117,
+                  "text": "KI: Kiribati"
+                },
+                "KM": {
+                  "index": 118,
+                  "text": "KM: Comoros"
+                },
+                "KN": {
+                  "index": 119,
+                  "text": "KN: Saint Kitts and Nevis"
+                },
+                "KP": {
+                  "index": 120,
+                  "text": "KP: Korea, Democratic People's Republic of"
+                },
+                "KR": {
+                  "index": 121,
+                  "text": "KR: Korea, Republic of"
+                },
+                "KW": {
+                  "index": 122,
+                  "text": "KW: Kuwait"
+                },
+                "KY": {
+                  "index": 123,
+                  "text": "KY: Cayman Islands"
+                },
+                "KZ": {
+                  "index": 124,
+                  "text": "KZ: Kazakhstan"
+                },
+                "LA": {
+                  "index": 125,
+                  "text": "LA: Lao People's Democratic Republic"
+                },
+                "LB": {
+                  "index": 126,
+                  "text": "LB: Lebanon"
+                },
+                "LC": {
+                  "index": 127,
+                  "text": "LC: Saint Lucia"
+                },
+                "LI": {
+                  "index": 128,
+                  "text": "LI: Liechtenstein"
+                },
+                "LK": {
+                  "index": 129,
+                  "text": "LK: Sri Lanka"
+                },
+                "LR": {
+                  "index": 130,
+                  "text": "LR: Liberia"
+                },
+                "LS": {
+                  "index": 131,
+                  "text": "LS: Lesotho"
+                },
+                "LT": {
+                  "index": 132,
+                  "text": "LT: Lithuania"
+                },
+                "LU": {
+                  "index": 133,
+                  "text": "LU: Luxembourg"
+                },
+                "LV": {
+                  "index": 134,
+                  "text": "LV: Latvia"
+                },
+                "LY": {
+                  "index": 135,
+                  "text": "LY: Libya"
+                },
+                "MA": {
+                  "index": 136,
+                  "text": "MA: Morocco"
+                },
+                "MC": {
+                  "index": 137,
+                  "text": "MC: Monaco"
+                },
+                "MD": {
+                  "index": 138,
+                  "text": "MD: Moldova, Republic of"
+                },
+                "ME": {
+                  "index": 139,
+                  "text": "ME: Montenegro"
+                },
+                "MF": {
+                  "index": 140,
+                  "text": "MF: Saint Martin (French part)"
+                },
+                "MG": {
+                  "index": 141,
+                  "text": "MG: Madagascar"
+                },
+                "MH": {
+                  "index": 142,
+                  "text": "MH: Marshall Islands"
+                },
+                "MK": {
+                  "index": 143,
+                  "text": "MK: North Macedonia"
+                },
+                "ML": {
+                  "index": 144,
+                  "text": "ML: Mali"
+                },
+                "MM": {
+                  "index": 145,
+                  "text": "MM: Myanmar"
+                },
+                "MN": {
+                  "index": 146,
+                  "text": "MN: Mongolia"
+                },
+                "MO": {
+                  "index": 147,
+                  "text": "MO: Macao"
+                },
+                "MP": {
+                  "index": 148,
+                  "text": "MP: Northern Mariana Islands"
+                },
+                "MQ": {
+                  "index": 149,
+                  "text": "MQ: Martinique"
+                },
+                "MR": {
+                  "index": 150,
+                  "text": "MR: Mauritania"
+                },
+                "MS": {
+                  "index": 151,
+                  "text": "MS: Montserrat"
+                },
+                "MT": {
+                  "index": 152,
+                  "text": "MT: Malta"
+                },
+                "MU": {
+                  "index": 153,
+                  "text": "MU: Mauritius"
+                },
+                "MV": {
+                  "index": 154,
+                  "text": "MV: Maldives"
+                },
+                "MW": {
+                  "index": 155,
+                  "text": "MW: Malawi"
+                },
+                "MX": {
+                  "index": 156,
+                  "text": "MX: Mexico"
+                },
+                "MY": {
+                  "index": 157,
+                  "text": "MY: Malaysia"
+                },
+                "MZ": {
+                  "index": 158,
+                  "text": "MZ: Mozambique"
+                },
+                "NA": {
+                  "index": 159,
+                  "text": "NA: Namibia"
+                },
+                "NC": {
+                  "index": 160,
+                  "text": "NC: New Caledonia"
+                },
+                "NE": {
+                  "index": 161,
+                  "text": "NE: Niger"
+                },
+                "NF": {
+                  "index": 162,
+                  "text": "NF: Norfolk Island"
+                },
+                "NG": {
+                  "index": 163,
+                  "text": "NG: Nigeria"
+                },
+                "NI": {
+                  "index": 164,
+                  "text": "NI: Nicaragua"
+                },
+                "NL": {
+                  "index": 165,
+                  "text": "NL: Netherlands"
+                },
+                "NO": {
+                  "index": 166,
+                  "text": "NO: Norway"
+                },
+                "NP": {
+                  "index": 167,
+                  "text": "NP: Nepal"
+                },
+                "NR": {
+                  "index": 168,
+                  "text": "NR: Nauru"
+                },
+                "NU": {
+                  "index": 169,
+                  "text": "NU: Niue"
+                },
+                "NZ": {
+                  "index": 170,
+                  "text": "NZ: New Zealand"
+                },
+                "OM": {
+                  "index": 171,
+                  "text": "OM: Oman"
+                },
+                "PA": {
+                  "index": 172,
+                  "text": "PA: Panama"
+                },
+                "PE": {
+                  "index": 173,
+                  "text": "PE: Peru"
+                },
+                "PF": {
+                  "index": 174,
+                  "text": "PF: French Polynesia"
+                },
+                "PG": {
+                  "index": 175,
+                  "text": "PG: Papua New Guinea"
+                },
+                "PH": {
+                  "index": 176,
+                  "text": "PH: Philippines"
+                },
+                "PK": {
+                  "index": 177,
+                  "text": "PK: Pakistan"
+                },
+                "PL": {
+                  "index": 178,
+                  "text": "PL: Poland"
+                },
+                "PM": {
+                  "index": 179,
+                  "text": "PM: Saint Pierre and Miquelon"
+                },
+                "PN": {
+                  "index": 180,
+                  "text": "PN: Pitcairn"
+                },
+                "PR": {
+                  "index": 181,
+                  "text": "PR: Puerto Rico"
+                },
+                "PS": {
+                  "index": 182,
+                  "text": "PS: Palestine, State of"
+                },
+                "PT": {
+                  "index": 183,
+                  "text": "PT: Portugal"
+                },
+                "PW": {
+                  "index": 184,
+                  "text": "PW: Palau"
+                },
+                "PY": {
+                  "index": 185,
+                  "text": "PY: Paraguay"
+                },
+                "QA": {
+                  "index": 186,
+                  "text": "QA: Qatar"
+                },
+                "RE": {
+                  "index": 187,
+                  "text": "RE: R\u00e9union"
+                },
+                "RO": {
+                  "index": 188,
+                  "text": "RO: Romania"
+                },
+                "RS": {
+                  "index": 189,
+                  "text": "RS: Serbia"
+                },
+                "RU": {
+                  "index": 190,
+                  "text": "RU: Russian Federation"
+                },
+                "RW": {
+                  "index": 191,
+                  "text": "RW: Rwanda"
+                },
+                "SA": {
+                  "index": 192,
+                  "text": "SA: Saudi Arabia"
+                },
+                "SB": {
+                  "index": 193,
+                  "text": "SB: Solomon Islands"
+                },
+                "SC": {
+                  "index": 194,
+                  "text": "SC: Seychelles"
+                },
+                "SD": {
+                  "index": 195,
+                  "text": "SD: Sudan"
+                },
+                "SE": {
+                  "index": 196,
+                  "text": "SE: Sweden"
+                },
+                "SG": {
+                  "index": 197,
+                  "text": "SG: Singapore"
+                },
+                "SH": {
+                  "index": 198,
+                  "text": "SH: Saint Helena, Ascension and Tristan da Cunha"
+                },
+                "SI": {
+                  "index": 199,
+                  "text": "SI: Slovenia"
+                },
+                "SJ": {
+                  "index": 200,
+                  "text": "SJ: Svalbard and Jan Mayen"
+                },
+                "SK": {
+                  "index": 201,
+                  "text": "SK: Slovakia"
+                },
+                "SL": {
+                  "index": 202,
+                  "text": "SL: Sierra Leone"
+                },
+                "SM": {
+                  "index": 203,
+                  "text": "SM: San Marino"
+                },
+                "SN": {
+                  "index": 204,
+                  "text": "SN: Senegal"
+                },
+                "SO": {
+                  "index": 205,
+                  "text": "SO: Somalia"
+                },
+                "SR": {
+                  "index": 206,
+                  "text": "SR: Suriname"
+                },
+                "SS": {
+                  "index": 207,
+                  "text": "SS: South Sudan"
+                },
+                "ST": {
+                  "index": 208,
+                  "text": "ST: Sao Tome and Principe"
+                },
+                "SV": {
+                  "index": 209,
+                  "text": "SV: El Salvador"
+                },
+                "SX": {
+                  "index": 210,
+                  "text": "SX: Sint Maarten (Dutch part)"
+                },
+                "SY": {
+                  "index": 211,
+                  "text": "SY: Syrian Arab Republic"
+                },
+                "SZ": {
+                  "index": 212,
+                  "text": "SZ: Eswatini"
+                },
+                "TC": {
+                  "index": 213,
+                  "text": "TC: Turks and Caicos Islands"
+                },
+                "TD": {
+                  "index": 214,
+                  "text": "TD: Chad"
+                },
+                "TF": {
+                  "index": 215,
+                  "text": "TF: French Southern Territories"
+                },
+                "TG": {
+                  "index": 216,
+                  "text": "TG: Togo"
+                },
+                "TH": {
+                  "index": 217,
+                  "text": "TH: Thailand"
+                },
+                "TJ": {
+                  "index": 218,
+                  "text": "TJ: Tajikistan"
+                },
+                "TK": {
+                  "index": 219,
+                  "text": "TK: Tokelau"
+                },
+                "TL": {
+                  "index": 220,
+                  "text": "TL: Timor-Leste"
+                },
+                "TM": {
+                  "index": 221,
+                  "text": "TM: Turkmenistan"
+                },
+                "TN": {
+                  "index": 222,
+                  "text": "TN: Tunisia"
+                },
+                "TO": {
+                  "index": 223,
+                  "text": "TO: Tonga"
+                },
+                "TR": {
+                  "index": 224,
+                  "text": "TR: T\u00fcrkiye"
+                },
+                "TT": {
+                  "index": 225,
+                  "text": "TT: Trinidad and Tobago"
+                },
+                "TV": {
+                  "index": 226,
+                  "text": "TV: Tuvalu"
+                },
+                "TW": {
+                  "index": 227,
+                  "text": "TW: Taiwan, Province of China"
+                },
+                "TZ": {
+                  "index": 228,
+                  "text": "TZ: Tanzania, United Republic of"
+                },
+                "UA": {
+                  "index": 229,
+                  "text": "UA: Ukraine"
+                },
+                "UG": {
+                  "index": 230,
+                  "text": "UG: Uganda"
+                },
+                "UM": {
+                  "index": 231,
+                  "text": "UM: United States Minor Outlying Islands"
+                },
+                "US": {
+                  "index": 232,
+                  "text": "US: United States"
+                },
+                "UY": {
+                  "index": 233,
+                  "text": "UY: Uruguay"
+                },
+                "UZ": {
+                  "index": 234,
+                  "text": "UZ: Uzbekistan"
+                },
+                "VA": {
+                  "index": 235,
+                  "text": "VA: Holy See (Vatican City State)"
+                },
+                "VC": {
+                  "index": 236,
+                  "text": "VC: Saint Vincent and the Grenadines"
+                },
+                "VE": {
+                  "index": 237,
+                  "text": "VE: Venezuela, Bolivarian Republic of"
+                },
+                "VG": {
+                  "index": 238,
+                  "text": "VG: Virgin Islands, British"
+                },
+                "VI": {
+                  "index": 239,
+                  "text": "VI: Virgin Islands, U.S."
+                },
+                "VN": {
+                  "index": 240,
+                  "text": "VN: Viet Nam"
+                },
+                "VU": {
+                  "index": 241,
+                  "text": "VU: Vanuatu"
+                },
+                "WF": {
+                  "index": 242,
+                  "text": "WF: Wallis and Futuna"
+                },
+                "WS": {
+                  "index": 243,
+                  "text": "WS: Samoa"
+                },
+                "YE": {
+                  "index": 244,
+                  "text": "YE: Yemen"
+                },
+                "YT": {
+                  "index": 245,
+                  "text": "YT: Mayotte"
+                },
+                "ZA": {
+                  "index": 246,
+                  "text": "ZA: South Africa"
+                },
+                "ZM": {
+                  "index": 247,
+                  "text": "ZM: Zambia"
+                },
+                "ZW": {
+                  "index": 248,
+                  "text": "ZW: Zimbabwe"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Region"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 223
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Download"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Upload"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "include",
+                "names": [
+                  "Connected",
+                  "Download",
+                  "Upload"
+                ]
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.footer.reducers",
+                "value": [
+                  "sum"
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Connected"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 117
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 62,
+        "w": 12,
+        "x": 0,
+        "y": 65
+      },
+      "id": 13,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Connected"
+          }
+        ]
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (region) (conduit_region_connected_clients)",
+          "format": "table",
+          "instant": true,
+          "refId": "Connected"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (region) (increase(conduit_region_bytes_downloaded[1h]))",
+          "format": "table",
+          "instant": true,
+          "refId": "Download"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (region) (increase(conduit_region_bytes_uploaded[1h]))",
+          "format": "table",
+          "instant": true,
+          "refId": "Upload"
+        }
+      ],
+      "title": "Traffic by Region",
+      "transformations": [
+        {
+          "id": "seriesToColumns",
+          "options": {
+            "byField": "region"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true
+            },
+            "renameByName": {
+              "Value #Connected": "Connected",
+              "Value #Download": "Download",
+              "Value #Upload": "Upload",
+              "region": "Region"
+            }
+          }
+        }
+      ],
+      "type": "table"
     },
     {
       "datasource": {
@@ -4968,18 +7247,22 @@
         ]
       },
       "gridPos": {
-        "h": 16,
+        "h": 25,
         "w": 12,
         "x": 12,
-        "y": 17
+        "y": 65
       },
       "id": 12,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "hidden",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "displayMode": "list",
           "placement": "bottom",
-          "showLegend": false
+          "showLegend": true
         },
         "tooltip": {
           "hideZeros": false,
@@ -4994,1197 +7277,13 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (region) (conduit_region_connected_clients)",
+          "expr": "conduit_region_connected_clients and on (region) topk(15, avg_over_time(conduit_region_connected_clients[$__range] @ end()))",
           "legendFormat": "{{region}}",
           "refId": "A"
         }
       ],
       "title": "Connected Clients by Region",
       "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Current connected clients and cumulative traffic per region",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "footer": {
-              "reducers": []
-            },
-            "inspect": false
-          },
-          "mappings": [
-            {
-              "options": {
-                "AD": {
-                  "index": 0,
-                  "text": "AD: Andorra"
-                },
-                "AE": {
-                  "index": 1,
-                  "text": "AE: United Arab Emirates"
-                },
-                "AF": {
-                  "index": 2,
-                  "text": "AF: Afghanistan"
-                },
-                "AG": {
-                  "index": 3,
-                  "text": "AG: Antigua and Barbuda"
-                },
-                "AI": {
-                  "index": 4,
-                  "text": "AI: Anguilla"
-                },
-                "AL": {
-                  "index": 5,
-                  "text": "AL: Albania"
-                },
-                "AM": {
-                  "index": 6,
-                  "text": "AM: Armenia"
-                },
-                "AO": {
-                  "index": 7,
-                  "text": "AO: Angola"
-                },
-                "AQ": {
-                  "index": 8,
-                  "text": "AQ: Antarctica"
-                },
-                "AR": {
-                  "index": 9,
-                  "text": "AR: Argentina"
-                },
-                "AS": {
-                  "index": 10,
-                  "text": "AS: American Samoa"
-                },
-                "AT": {
-                  "index": 11,
-                  "text": "AT: Austria"
-                },
-                "AU": {
-                  "index": 12,
-                  "text": "AU: Australia"
-                },
-                "AW": {
-                  "index": 13,
-                  "text": "AW: Aruba"
-                },
-                "AX": {
-                  "index": 14,
-                  "text": "AX: \u00c5land Islands"
-                },
-                "AZ": {
-                  "index": 15,
-                  "text": "AZ: Azerbaijan"
-                },
-                "BA": {
-                  "index": 16,
-                  "text": "BA: Bosnia and Herzegovina"
-                },
-                "BB": {
-                  "index": 17,
-                  "text": "BB: Barbados"
-                },
-                "BD": {
-                  "index": 18,
-                  "text": "BD: Bangladesh"
-                },
-                "BE": {
-                  "index": 19,
-                  "text": "BE: Belgium"
-                },
-                "BF": {
-                  "index": 20,
-                  "text": "BF: Burkina Faso"
-                },
-                "BG": {
-                  "index": 21,
-                  "text": "BG: Bulgaria"
-                },
-                "BH": {
-                  "index": 22,
-                  "text": "BH: Bahrain"
-                },
-                "BI": {
-                  "index": 23,
-                  "text": "BI: Burundi"
-                },
-                "BJ": {
-                  "index": 24,
-                  "text": "BJ: Benin"
-                },
-                "BL": {
-                  "index": 25,
-                  "text": "BL: Saint Barth\u00e9lemy"
-                },
-                "BM": {
-                  "index": 26,
-                  "text": "BM: Bermuda"
-                },
-                "BN": {
-                  "index": 27,
-                  "text": "BN: Brunei Darussalam"
-                },
-                "BO": {
-                  "index": 28,
-                  "text": "BO: Bolivia, Plurinational State of"
-                },
-                "BQ": {
-                  "index": 29,
-                  "text": "BQ: Bonaire, Sint Eustatius and Saba"
-                },
-                "BR": {
-                  "index": 30,
-                  "text": "BR: Brazil"
-                },
-                "BS": {
-                  "index": 31,
-                  "text": "BS: Bahamas"
-                },
-                "BT": {
-                  "index": 32,
-                  "text": "BT: Bhutan"
-                },
-                "BV": {
-                  "index": 33,
-                  "text": "BV: Bouvet Island"
-                },
-                "BW": {
-                  "index": 34,
-                  "text": "BW: Botswana"
-                },
-                "BY": {
-                  "index": 35,
-                  "text": "BY: Belarus"
-                },
-                "BZ": {
-                  "index": 36,
-                  "text": "BZ: Belize"
-                },
-                "CA": {
-                  "index": 37,
-                  "text": "CA: Canada"
-                },
-                "CC": {
-                  "index": 38,
-                  "text": "CC: Cocos (Keeling) Islands"
-                },
-                "CD": {
-                  "index": 39,
-                  "text": "CD: Congo, The Democratic Republic of the"
-                },
-                "CF": {
-                  "index": 40,
-                  "text": "CF: Central African Republic"
-                },
-                "CG": {
-                  "index": 41,
-                  "text": "CG: Congo"
-                },
-                "CH": {
-                  "index": 42,
-                  "text": "CH: Switzerland"
-                },
-                "CI": {
-                  "index": 43,
-                  "text": "CI: C\u00f4te d'Ivoire"
-                },
-                "CK": {
-                  "index": 44,
-                  "text": "CK: Cook Islands"
-                },
-                "CL": {
-                  "index": 45,
-                  "text": "CL: Chile"
-                },
-                "CM": {
-                  "index": 46,
-                  "text": "CM: Cameroon"
-                },
-                "CN": {
-                  "index": 47,
-                  "text": "CN: China"
-                },
-                "CO": {
-                  "index": 48,
-                  "text": "CO: Colombia"
-                },
-                "CR": {
-                  "index": 49,
-                  "text": "CR: Costa Rica"
-                },
-                "CU": {
-                  "index": 50,
-                  "text": "CU: Cuba"
-                },
-                "CV": {
-                  "index": 51,
-                  "text": "CV: Cabo Verde"
-                },
-                "CW": {
-                  "index": 52,
-                  "text": "CW: Cura\u00e7ao"
-                },
-                "CX": {
-                  "index": 53,
-                  "text": "CX: Christmas Island"
-                },
-                "CY": {
-                  "index": 54,
-                  "text": "CY: Cyprus"
-                },
-                "CZ": {
-                  "index": 55,
-                  "text": "CZ: Czechia"
-                },
-                "DE": {
-                  "index": 56,
-                  "text": "DE: Germany"
-                },
-                "DJ": {
-                  "index": 57,
-                  "text": "DJ: Djibouti"
-                },
-                "DK": {
-                  "index": 58,
-                  "text": "DK: Denmark"
-                },
-                "DM": {
-                  "index": 59,
-                  "text": "DM: Dominica"
-                },
-                "DO": {
-                  "index": 60,
-                  "text": "DO: Dominican Republic"
-                },
-                "DZ": {
-                  "index": 61,
-                  "text": "DZ: Algeria"
-                },
-                "EC": {
-                  "index": 62,
-                  "text": "EC: Ecuador"
-                },
-                "EE": {
-                  "index": 63,
-                  "text": "EE: Estonia"
-                },
-                "EG": {
-                  "index": 64,
-                  "text": "EG: Egypt"
-                },
-                "EH": {
-                  "index": 65,
-                  "text": "EH: Western Sahara"
-                },
-                "ER": {
-                  "index": 66,
-                  "text": "ER: Eritrea"
-                },
-                "ES": {
-                  "index": 67,
-                  "text": "ES: Spain"
-                },
-                "ET": {
-                  "index": 68,
-                  "text": "ET: Ethiopia"
-                },
-                "FI": {
-                  "index": 69,
-                  "text": "FI: Finland"
-                },
-                "FJ": {
-                  "index": 70,
-                  "text": "FJ: Fiji"
-                },
-                "FK": {
-                  "index": 71,
-                  "text": "FK: Falkland Islands (Malvinas)"
-                },
-                "FM": {
-                  "index": 72,
-                  "text": "FM: Micronesia, Federated States of"
-                },
-                "FO": {
-                  "index": 73,
-                  "text": "FO: Faroe Islands"
-                },
-                "FR": {
-                  "index": 74,
-                  "text": "FR: France"
-                },
-                "GA": {
-                  "index": 75,
-                  "text": "GA: Gabon"
-                },
-                "GB": {
-                  "index": 76,
-                  "text": "GB: United Kingdom"
-                },
-                "GD": {
-                  "index": 77,
-                  "text": "GD: Grenada"
-                },
-                "GE": {
-                  "index": 78,
-                  "text": "GE: Georgia"
-                },
-                "GF": {
-                  "index": 79,
-                  "text": "GF: French Guiana"
-                },
-                "GG": {
-                  "index": 80,
-                  "text": "GG: Guernsey"
-                },
-                "GH": {
-                  "index": 81,
-                  "text": "GH: Ghana"
-                },
-                "GI": {
-                  "index": 82,
-                  "text": "GI: Gibraltar"
-                },
-                "GL": {
-                  "index": 83,
-                  "text": "GL: Greenland"
-                },
-                "GM": {
-                  "index": 84,
-                  "text": "GM: Gambia"
-                },
-                "GN": {
-                  "index": 85,
-                  "text": "GN: Guinea"
-                },
-                "GP": {
-                  "index": 86,
-                  "text": "GP: Guadeloupe"
-                },
-                "GQ": {
-                  "index": 87,
-                  "text": "GQ: Equatorial Guinea"
-                },
-                "GR": {
-                  "index": 88,
-                  "text": "GR: Greece"
-                },
-                "GS": {
-                  "index": 89,
-                  "text": "GS: South Georgia and the South Sandwich Islands"
-                },
-                "GT": {
-                  "index": 90,
-                  "text": "GT: Guatemala"
-                },
-                "GU": {
-                  "index": 91,
-                  "text": "GU: Guam"
-                },
-                "GW": {
-                  "index": 92,
-                  "text": "GW: Guinea-Bissau"
-                },
-                "GY": {
-                  "index": 93,
-                  "text": "GY: Guyana"
-                },
-                "HK": {
-                  "index": 94,
-                  "text": "HK: Hong Kong"
-                },
-                "HM": {
-                  "index": 95,
-                  "text": "HM: Heard Island and McDonald Islands"
-                },
-                "HN": {
-                  "index": 96,
-                  "text": "HN: Honduras"
-                },
-                "HR": {
-                  "index": 97,
-                  "text": "HR: Croatia"
-                },
-                "HT": {
-                  "index": 98,
-                  "text": "HT: Haiti"
-                },
-                "HU": {
-                  "index": 99,
-                  "text": "HU: Hungary"
-                },
-                "ID": {
-                  "index": 100,
-                  "text": "ID: Indonesia"
-                },
-                "IE": {
-                  "index": 101,
-                  "text": "IE: Ireland"
-                },
-                "IL": {
-                  "index": 102,
-                  "text": "IL: Israel"
-                },
-                "IM": {
-                  "index": 103,
-                  "text": "IM: Isle of Man"
-                },
-                "IN": {
-                  "index": 104,
-                  "text": "IN: India"
-                },
-                "IO": {
-                  "index": 105,
-                  "text": "IO: British Indian Ocean Territory"
-                },
-                "IQ": {
-                  "index": 106,
-                  "text": "IQ: Iraq"
-                },
-                "IR": {
-                  "index": 107,
-                  "text": "IR: Iran, Islamic Republic of"
-                },
-                "IS": {
-                  "index": 108,
-                  "text": "IS: Iceland"
-                },
-                "IT": {
-                  "index": 109,
-                  "text": "IT: Italy"
-                },
-                "JE": {
-                  "index": 110,
-                  "text": "JE: Jersey"
-                },
-                "JM": {
-                  "index": 111,
-                  "text": "JM: Jamaica"
-                },
-                "JO": {
-                  "index": 112,
-                  "text": "JO: Jordan"
-                },
-                "JP": {
-                  "index": 113,
-                  "text": "JP: Japan"
-                },
-                "KE": {
-                  "index": 114,
-                  "text": "KE: Kenya"
-                },
-                "KG": {
-                  "index": 115,
-                  "text": "KG: Kyrgyzstan"
-                },
-                "KH": {
-                  "index": 116,
-                  "text": "KH: Cambodia"
-                },
-                "KI": {
-                  "index": 117,
-                  "text": "KI: Kiribati"
-                },
-                "KM": {
-                  "index": 118,
-                  "text": "KM: Comoros"
-                },
-                "KN": {
-                  "index": 119,
-                  "text": "KN: Saint Kitts and Nevis"
-                },
-                "KP": {
-                  "index": 120,
-                  "text": "KP: Korea, Democratic People's Republic of"
-                },
-                "KR": {
-                  "index": 121,
-                  "text": "KR: Korea, Republic of"
-                },
-                "KW": {
-                  "index": 122,
-                  "text": "KW: Kuwait"
-                },
-                "KY": {
-                  "index": 123,
-                  "text": "KY: Cayman Islands"
-                },
-                "KZ": {
-                  "index": 124,
-                  "text": "KZ: Kazakhstan"
-                },
-                "LA": {
-                  "index": 125,
-                  "text": "LA: Lao People's Democratic Republic"
-                },
-                "LB": {
-                  "index": 126,
-                  "text": "LB: Lebanon"
-                },
-                "LC": {
-                  "index": 127,
-                  "text": "LC: Saint Lucia"
-                },
-                "LI": {
-                  "index": 128,
-                  "text": "LI: Liechtenstein"
-                },
-                "LK": {
-                  "index": 129,
-                  "text": "LK: Sri Lanka"
-                },
-                "LR": {
-                  "index": 130,
-                  "text": "LR: Liberia"
-                },
-                "LS": {
-                  "index": 131,
-                  "text": "LS: Lesotho"
-                },
-                "LT": {
-                  "index": 132,
-                  "text": "LT: Lithuania"
-                },
-                "LU": {
-                  "index": 133,
-                  "text": "LU: Luxembourg"
-                },
-                "LV": {
-                  "index": 134,
-                  "text": "LV: Latvia"
-                },
-                "LY": {
-                  "index": 135,
-                  "text": "LY: Libya"
-                },
-                "MA": {
-                  "index": 136,
-                  "text": "MA: Morocco"
-                },
-                "MC": {
-                  "index": 137,
-                  "text": "MC: Monaco"
-                },
-                "MD": {
-                  "index": 138,
-                  "text": "MD: Moldova, Republic of"
-                },
-                "ME": {
-                  "index": 139,
-                  "text": "ME: Montenegro"
-                },
-                "MF": {
-                  "index": 140,
-                  "text": "MF: Saint Martin (French part)"
-                },
-                "MG": {
-                  "index": 141,
-                  "text": "MG: Madagascar"
-                },
-                "MH": {
-                  "index": 142,
-                  "text": "MH: Marshall Islands"
-                },
-                "MK": {
-                  "index": 143,
-                  "text": "MK: North Macedonia"
-                },
-                "ML": {
-                  "index": 144,
-                  "text": "ML: Mali"
-                },
-                "MM": {
-                  "index": 145,
-                  "text": "MM: Myanmar"
-                },
-                "MN": {
-                  "index": 146,
-                  "text": "MN: Mongolia"
-                },
-                "MO": {
-                  "index": 147,
-                  "text": "MO: Macao"
-                },
-                "MP": {
-                  "index": 148,
-                  "text": "MP: Northern Mariana Islands"
-                },
-                "MQ": {
-                  "index": 149,
-                  "text": "MQ: Martinique"
-                },
-                "MR": {
-                  "index": 150,
-                  "text": "MR: Mauritania"
-                },
-                "MS": {
-                  "index": 151,
-                  "text": "MS: Montserrat"
-                },
-                "MT": {
-                  "index": 152,
-                  "text": "MT: Malta"
-                },
-                "MU": {
-                  "index": 153,
-                  "text": "MU: Mauritius"
-                },
-                "MV": {
-                  "index": 154,
-                  "text": "MV: Maldives"
-                },
-                "MW": {
-                  "index": 155,
-                  "text": "MW: Malawi"
-                },
-                "MX": {
-                  "index": 156,
-                  "text": "MX: Mexico"
-                },
-                "MY": {
-                  "index": 157,
-                  "text": "MY: Malaysia"
-                },
-                "MZ": {
-                  "index": 158,
-                  "text": "MZ: Mozambique"
-                },
-                "NA": {
-                  "index": 159,
-                  "text": "NA: Namibia"
-                },
-                "NC": {
-                  "index": 160,
-                  "text": "NC: New Caledonia"
-                },
-                "NE": {
-                  "index": 161,
-                  "text": "NE: Niger"
-                },
-                "NF": {
-                  "index": 162,
-                  "text": "NF: Norfolk Island"
-                },
-                "NG": {
-                  "index": 163,
-                  "text": "NG: Nigeria"
-                },
-                "NI": {
-                  "index": 164,
-                  "text": "NI: Nicaragua"
-                },
-                "NL": {
-                  "index": 165,
-                  "text": "NL: Netherlands"
-                },
-                "NO": {
-                  "index": 166,
-                  "text": "NO: Norway"
-                },
-                "NP": {
-                  "index": 167,
-                  "text": "NP: Nepal"
-                },
-                "NR": {
-                  "index": 168,
-                  "text": "NR: Nauru"
-                },
-                "NU": {
-                  "index": 169,
-                  "text": "NU: Niue"
-                },
-                "NZ": {
-                  "index": 170,
-                  "text": "NZ: New Zealand"
-                },
-                "OM": {
-                  "index": 171,
-                  "text": "OM: Oman"
-                },
-                "PA": {
-                  "index": 172,
-                  "text": "PA: Panama"
-                },
-                "PE": {
-                  "index": 173,
-                  "text": "PE: Peru"
-                },
-                "PF": {
-                  "index": 174,
-                  "text": "PF: French Polynesia"
-                },
-                "PG": {
-                  "index": 175,
-                  "text": "PG: Papua New Guinea"
-                },
-                "PH": {
-                  "index": 176,
-                  "text": "PH: Philippines"
-                },
-                "PK": {
-                  "index": 177,
-                  "text": "PK: Pakistan"
-                },
-                "PL": {
-                  "index": 178,
-                  "text": "PL: Poland"
-                },
-                "PM": {
-                  "index": 179,
-                  "text": "PM: Saint Pierre and Miquelon"
-                },
-                "PN": {
-                  "index": 180,
-                  "text": "PN: Pitcairn"
-                },
-                "PR": {
-                  "index": 181,
-                  "text": "PR: Puerto Rico"
-                },
-                "PS": {
-                  "index": 182,
-                  "text": "PS: Palestine, State of"
-                },
-                "PT": {
-                  "index": 183,
-                  "text": "PT: Portugal"
-                },
-                "PW": {
-                  "index": 184,
-                  "text": "PW: Palau"
-                },
-                "PY": {
-                  "index": 185,
-                  "text": "PY: Paraguay"
-                },
-                "QA": {
-                  "index": 186,
-                  "text": "QA: Qatar"
-                },
-                "RE": {
-                  "index": 187,
-                  "text": "RE: R\u00e9union"
-                },
-                "RO": {
-                  "index": 188,
-                  "text": "RO: Romania"
-                },
-                "RS": {
-                  "index": 189,
-                  "text": "RS: Serbia"
-                },
-                "RU": {
-                  "index": 190,
-                  "text": "RU: Russian Federation"
-                },
-                "RW": {
-                  "index": 191,
-                  "text": "RW: Rwanda"
-                },
-                "SA": {
-                  "index": 192,
-                  "text": "SA: Saudi Arabia"
-                },
-                "SB": {
-                  "index": 193,
-                  "text": "SB: Solomon Islands"
-                },
-                "SC": {
-                  "index": 194,
-                  "text": "SC: Seychelles"
-                },
-                "SD": {
-                  "index": 195,
-                  "text": "SD: Sudan"
-                },
-                "SE": {
-                  "index": 196,
-                  "text": "SE: Sweden"
-                },
-                "SG": {
-                  "index": 197,
-                  "text": "SG: Singapore"
-                },
-                "SH": {
-                  "index": 198,
-                  "text": "SH: Saint Helena, Ascension and Tristan da Cunha"
-                },
-                "SI": {
-                  "index": 199,
-                  "text": "SI: Slovenia"
-                },
-                "SJ": {
-                  "index": 200,
-                  "text": "SJ: Svalbard and Jan Mayen"
-                },
-                "SK": {
-                  "index": 201,
-                  "text": "SK: Slovakia"
-                },
-                "SL": {
-                  "index": 202,
-                  "text": "SL: Sierra Leone"
-                },
-                "SM": {
-                  "index": 203,
-                  "text": "SM: San Marino"
-                },
-                "SN": {
-                  "index": 204,
-                  "text": "SN: Senegal"
-                },
-                "SO": {
-                  "index": 205,
-                  "text": "SO: Somalia"
-                },
-                "SR": {
-                  "index": 206,
-                  "text": "SR: Suriname"
-                },
-                "SS": {
-                  "index": 207,
-                  "text": "SS: South Sudan"
-                },
-                "ST": {
-                  "index": 208,
-                  "text": "ST: Sao Tome and Principe"
-                },
-                "SV": {
-                  "index": 209,
-                  "text": "SV: El Salvador"
-                },
-                "SX": {
-                  "index": 210,
-                  "text": "SX: Sint Maarten (Dutch part)"
-                },
-                "SY": {
-                  "index": 211,
-                  "text": "SY: Syrian Arab Republic"
-                },
-                "SZ": {
-                  "index": 212,
-                  "text": "SZ: Eswatini"
-                },
-                "TC": {
-                  "index": 213,
-                  "text": "TC: Turks and Caicos Islands"
-                },
-                "TD": {
-                  "index": 214,
-                  "text": "TD: Chad"
-                },
-                "TF": {
-                  "index": 215,
-                  "text": "TF: French Southern Territories"
-                },
-                "TG": {
-                  "index": 216,
-                  "text": "TG: Togo"
-                },
-                "TH": {
-                  "index": 217,
-                  "text": "TH: Thailand"
-                },
-                "TJ": {
-                  "index": 218,
-                  "text": "TJ: Tajikistan"
-                },
-                "TK": {
-                  "index": 219,
-                  "text": "TK: Tokelau"
-                },
-                "TL": {
-                  "index": 220,
-                  "text": "TL: Timor-Leste"
-                },
-                "TM": {
-                  "index": 221,
-                  "text": "TM: Turkmenistan"
-                },
-                "TN": {
-                  "index": 222,
-                  "text": "TN: Tunisia"
-                },
-                "TO": {
-                  "index": 223,
-                  "text": "TO: Tonga"
-                },
-                "TR": {
-                  "index": 224,
-                  "text": "TR: T\u00fcrkiye"
-                },
-                "TT": {
-                  "index": 225,
-                  "text": "TT: Trinidad and Tobago"
-                },
-                "TV": {
-                  "index": 226,
-                  "text": "TV: Tuvalu"
-                },
-                "TW": {
-                  "index": 227,
-                  "text": "TW: Taiwan, Province of China"
-                },
-                "TZ": {
-                  "index": 228,
-                  "text": "TZ: Tanzania, United Republic of"
-                },
-                "UA": {
-                  "index": 229,
-                  "text": "UA: Ukraine"
-                },
-                "UG": {
-                  "index": 230,
-                  "text": "UG: Uganda"
-                },
-                "UM": {
-                  "index": 231,
-                  "text": "UM: United States Minor Outlying Islands"
-                },
-                "US": {
-                  "index": 232,
-                  "text": "US: United States"
-                },
-                "UY": {
-                  "index": 233,
-                  "text": "UY: Uruguay"
-                },
-                "UZ": {
-                  "index": 234,
-                  "text": "UZ: Uzbekistan"
-                },
-                "VA": {
-                  "index": 235,
-                  "text": "VA: Holy See (Vatican City State)"
-                },
-                "VC": {
-                  "index": 236,
-                  "text": "VC: Saint Vincent and the Grenadines"
-                },
-                "VE": {
-                  "index": 237,
-                  "text": "VE: Venezuela, Bolivarian Republic of"
-                },
-                "VG": {
-                  "index": 238,
-                  "text": "VG: Virgin Islands, British"
-                },
-                "VI": {
-                  "index": 239,
-                  "text": "VI: Virgin Islands, U.S."
-                },
-                "VN": {
-                  "index": 240,
-                  "text": "VN: Viet Nam"
-                },
-                "VU": {
-                  "index": 241,
-                  "text": "VU: Vanuatu"
-                },
-                "WF": {
-                  "index": 242,
-                  "text": "WF: Wallis and Futuna"
-                },
-                "WS": {
-                  "index": 243,
-                  "text": "WS: Samoa"
-                },
-                "YE": {
-                  "index": 244,
-                  "text": "YE: Yemen"
-                },
-                "YT": {
-                  "index": 245,
-                  "text": "YT: Mayotte"
-                },
-                "ZA": {
-                  "index": 246,
-                  "text": "ZA: South Africa"
-                },
-                "ZM": {
-                  "index": 247,
-                  "text": "ZM: Zambia"
-                },
-                "ZW": {
-                  "index": 248,
-                  "text": "ZW: Zimbabwe"
-                }
-              },
-              "type": "value"
-            }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Region"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 223
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Download"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "decbytes"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Upload"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "decbytes"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "include",
-                "names": [
-                  "Connected",
-                  "Download",
-                  "Upload"
-                ]
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.footer.reducers",
-                "value": [
-                  "sum"
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Connected"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 117
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 19,
-        "w": 12,
-        "x": 0,
-        "y": 29
-      },
-      "id": 13,
-      "options": {
-        "cellHeight": "sm",
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Connected"
-          }
-        ]
-      },
-      "pluginVersion": "12.4.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum by (region) (conduit_region_connected_clients)",
-          "format": "table",
-          "instant": true,
-          "refId": "Connected"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum by (region) (conduit_region_bytes_downloaded)",
-          "format": "table",
-          "instant": true,
-          "refId": "Download"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum by (region) (conduit_region_bytes_uploaded)",
-          "format": "table",
-          "instant": true,
-          "refId": "Upload"
-        }
-      ],
-      "title": "Traffic by Region",
-      "transformations": [
-        {
-          "id": "seriesToColumns",
-          "options": {
-            "byField": "region"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "Time 1": true,
-              "Time 2": true,
-              "Time 3": true
-            },
-            "renameByName": {
-              "Value #Connected": "Connected",
-              "Value #Download": "Download",
-              "Value #Upload": "Upload",
-              "region": "Region"
-            }
-          }
-        }
-      ],
-      "type": "table"
     },
     {
       "datasource": {
@@ -7236,10 +8335,10 @@
         ]
       },
       "gridPos": {
-        "h": 15,
+        "h": 37,
         "w": 12,
         "x": 12,
-        "y": 33
+        "y": 90
       },
       "id": 14,
       "options": {
@@ -7299,7 +8398,28 @@
     "psiphon"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {},
+        "includeAll": false,
+        "label": "Client State",
+        "name": "client_state",
+        "options": [],
+        "query": "Connected : conduit_region_connected_clients,Connecting : conduit_region_connecting_clients",
+        "type": "custom",
+        "valuesFormat": "csv"
+      },
+      {
+        "current": {},
+        "includeAll": false,
+        "label": "Client State (Total)",
+        "name": "client_state_total",
+        "options": [],
+        "query": "Connected : conduit_connected_clients,Connecting : conduit_connecting_clients",
+        "type": "custom",
+        "valuesFormat": "csv"
+      }
+    ]
   },
   "time": {
     "from": "now-30m",
@@ -7308,6 +8428,6 @@
   "timepicker": {},
   "timezone": "browser",
   "title": "MoaV - Conduit",
-  "weekStart": "",
-  "uid": "moav-conduit"
+  "uid": "moav-conduit",
+  "weekStart": ""
 }
