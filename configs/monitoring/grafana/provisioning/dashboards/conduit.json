@@ -963,7 +963,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Session High ${client_state_total:text}"
+                "value": "Session High ${client_state_session_high:text}"
               }
             ]
           }
@@ -1004,7 +1004,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max_over_time($client_state_total[72h:] @ end())",
+          "expr": "$client_state_session_high",
           "refId": "A"
         }
       ],
@@ -1208,6 +1208,7 @@
         "y": 6
       },
       "id": 7,
+      "maxDataPoints": 3000,
       "options": {
         "legend": {
           "calcs": [
@@ -1266,7 +1267,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "palette-classic-by-name"
           },
           "custom": {
             "axisBorderShow": false,
@@ -3206,7 +3207,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "palette-classic-by-name"
           },
           "custom": {
             "axisBorderShow": false,
@@ -8416,6 +8417,16 @@
         "name": "client_state_total",
         "options": [],
         "query": "Connected : conduit_connected_clients,Connecting : conduit_connecting_clients",
+        "type": "custom",
+        "valuesFormat": "csv"
+      },
+      {
+        "current": {},
+        "includeAll": false,
+        "label": "Client State (Session High)",
+        "name": "client_state_session_high",
+        "options": [],
+        "query": "Connected : conduit_session_high_connected_clients,Connecting : conduit_session_high_connecting_clients",
         "type": "custom",
         "valuesFormat": "csv"
       }

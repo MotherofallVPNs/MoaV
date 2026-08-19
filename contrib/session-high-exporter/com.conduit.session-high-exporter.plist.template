@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.conduit.session-high-exporter</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/path/to/session-high-exporter.py</string>
+    </array>
+    <!-- Optional: override defaults (127.0.0.1:9090 metrics source,
+         ~/.session-high-state.json, 127.0.0.1:9201 listen address) -->
+    <!--
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CONDUIT_METRICS_URL</key>
+        <string>http://127.0.0.1:9090/metrics</string>
+        <key>SESSION_HIGH_STATE_FILE</key>
+        <string>/path/to/session-high-state.json</string>
+    </dict>
+    -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/path/to/session-high-exporter.log</string>
+    <key>StandardErrorPath</key>
+    <string>/path/to/session-high-exporter.log</string>
+</dict>
+</plist>

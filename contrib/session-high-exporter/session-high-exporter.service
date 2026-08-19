@@ -1,0 +1,20 @@
+[Unit]
+Description=Conduit session-high Prometheus exporter
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/conduit/session-high-exporter.py
+Restart=always
+RestartSec=5
+Environment=SESSION_HIGH_STATE_FILE=/var/lib/conduit/session-high-state.json
+# Uncomment and adjust if Conduit's metrics endpoint isn't on the default:
+# Environment=CONDUIT_METRICS_URL=http://127.0.0.1:9090/metrics
+DynamicUser=yes
+StateDirectory=conduit
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
