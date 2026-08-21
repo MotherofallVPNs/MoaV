@@ -149,6 +149,8 @@ jobs:
         run: bash tests/hostload-test.sh
       - name: self-signed TLS note (fresh-install cert warning)
         run: bash tests/tls-note-test.sh
+      - name: moav cert (domainless no-op + install idempotency)
+        run: bash tests/cert-test.sh
       - name: release footer generator
         run: bash tests/release-footer-test.sh
       - name: release footer links resolve (network)
