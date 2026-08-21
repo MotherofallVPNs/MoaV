@@ -105,6 +105,16 @@ for stem in SUB_FILES:
             uris.append(line)
             break
 
+# Append the compact moav:// bundle (one URL for every enabled proxy) so
+# moav-client receives it in the subscription too; it expands + dedups it
+# against the legacy URIs above. Other clients ignore the unknown scheme.
+_moav = _read("moav-bundle.txt")
+if _moav:
+    for _line in _moav.replace("\r", "").splitlines():
+        if _line.startswith("moav://"):
+            uris.append(_line)
+            break
+
 sub_b64 = base64.b64encode(("\n".join(uris) + "\n").encode()).decode() if uris else ""
 # Unconditional: the bundle always carries subscription.txt (empty if no links).
 with open(os.path.join(OUT, "subscription.txt"), "w", encoding="utf-8") as f:

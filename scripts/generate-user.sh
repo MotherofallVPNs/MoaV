@@ -16,6 +16,7 @@ source /app/lib/masterdns.sh
 source /app/lib/gooserelay.sh
 source /app/lib/telemt.sh
 source /app/lib/sing-box.sh
+source /app/lib/moav-bundle.sh
 source /app/lib/trusttunnel.sh
 source /app/lib/xray.sh
 source /app/lib/bundle-readme.sh
@@ -643,6 +644,17 @@ if [[ "${ENABLE_XDNS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
             log_info "  - XDNS configs generated"
         fi
     fi
+fi
+
+# -----------------------------------------------------------------------------
+# Emit the compact moav:// bundle — one URL covering every enabled proxy
+# protocol, alongside the legacy per-protocol URIs. moav-client expands + dedups
+# it; other clients ignore the unknown scheme. See docs/MOAV_BUNDLE.md.
+# -----------------------------------------------------------------------------
+MOAV_BUNDLE=$(moav_bundle_link "$USER_ID" "$SERVER_IP")
+if [[ -n "$MOAV_BUNDLE" ]]; then
+    echo "$MOAV_BUNDLE" > "$OUTPUT_DIR/moav-bundle.txt"
+    log_info "  - moav:// compact bundle generated"
 fi
 
 # -----------------------------------------------------------------------------

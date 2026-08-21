@@ -33,6 +33,8 @@ jobs:
         run: xargs shellcheck --severity=error < /tmp/shfiles
       - name: share-link golden test
         run: bash tests/singbox-links-test.sh
+      - name: moav:// bundle emitter golden test
+        run: bash tests/moav-bundle-test.sh
       - name: peer-IP allocator unit test
         run: bash tests/net-alloc-test.sh
       - name: strict-mode regression test
