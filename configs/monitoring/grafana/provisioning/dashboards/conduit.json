@@ -27,7 +27,7 @@
         },
         "hide": false,
         "iconColor": "orange",
-        "name": "Window Max (Connected)",
+        "name": "Mark Peak on Client Connections Graph",
         "target": {
           "expr": "conduit_connected_clients == max_over_time(conduit_connected_clients[$__range:$__interval] @ end())",
           "interval": "15s",
@@ -520,7 +520,7 @@
           "refId": "B"
         }
       ],
-      "title": "Window Max",
+      "title": "Window Max - ${client_state_total:text}",
       "type": "stat"
     },
     {
@@ -1008,7 +1008,7 @@
           "refId": "A"
         }
       ],
-      "title": "Session High",
+      "title": "Session High - ${client_state_session_high:text}",
       "type": "stat"
     },
     {
@@ -8403,7 +8403,7 @@
       {
         "current": {},
         "includeAll": false,
-        "label": "Client State",
+        "label": "Client State (Top 5 Regions)",
         "name": "client_state",
         "options": [],
         "query": "Connected : conduit_region_connected_clients,Connecting : conduit_region_connecting_clients",
@@ -8413,7 +8413,7 @@
       {
         "current": {},
         "includeAll": false,
-        "label": "Client State (Total)",
+        "label": "Client State (Window Max)",
         "name": "client_state_total",
         "options": [],
         "query": "Connected : conduit_connected_clients,Connecting : conduit_connecting_clients",
