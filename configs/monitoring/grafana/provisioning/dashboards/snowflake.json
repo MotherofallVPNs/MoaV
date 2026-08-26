@@ -70,6 +70,7 @@
             "uid": "prometheus"
           },
           "expr": "sum(moav_snowflake_completed_connections_total)",
+          "instant": true,
           "refId": "A"
         }
       ],
@@ -290,6 +291,7 @@
             "uid": "prometheus"
           },
           "expr": "sum(moav_snowflake_relayed_bytes_window{direction=\"inbound\",window=\"14d\"})",
+          "instant": true,
           "refId": "A"
         }
       ],
@@ -401,6 +403,7 @@
             "uid": "prometheus"
           },
           "expr": "sum(moav_snowflake_relayed_bytes_window{direction=\"outbound\",window=\"14d\"})",
+          "instant": true,
           "refId": "A"
         }
       ],
