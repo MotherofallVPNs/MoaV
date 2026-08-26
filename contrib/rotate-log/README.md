@@ -33,6 +33,37 @@ Meant to be called periodically from your own health-check loop or cron
 job — it manages its own weekly cadence internally, so calling it more
 often than that is a harmless no-op.
 
+## How to run
+
+Run it on a schedule, or let another script call it (conduit-monitor invokes it
+via `ROTATE_LOG_SCRIPT`). It self-limits to one rotation per 7 days, so running
+it daily is fine.
+
+### Linux / macOS — cron (simplest)
+
+```bash
+# crontab -e  (daily; the script self-limits to a weekly rotation)
+0 4 * * * /opt/moav/contrib/rotate-log/rotate-log.sh /var/log/conduit/conduit.log conduit
+```
+
+### Linux — systemd timer
+
+A `Type=oneshot` service running `rotate-log.sh <log> <prefix>`, on a timer with
+`OnUnitActiveSec=1d` (same shape as conduit-monitor's timer).
+
+### As a container (when the log lives in a Docker volume)
+
+To rotate a log a MoaV container writes to a named volume, run it from the host
+on a schedule against that volume (bash + gzip, so use a `debian` base):
+
+```bash
+# e.g. rotate the snowflake proxy log volume
+docker run --rm \
+  -v moav_snowflake_logs:/logs \
+  -v /opt/moav/contrib/rotate-log/rotate-log.sh:/rotate-log.sh:ro \
+  debian:stable-slim bash /rotate-log.sh /logs/snowflake.log snowflake
+```
+
 ## A real bug this script's history is worth knowing about
 
 An earlier version ran gzip in the background (`nohup gzip ... &`) so a

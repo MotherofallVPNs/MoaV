@@ -76,6 +76,90 @@ public-IP lookup, a stuck proxy that was already restarted too recently to
 restart again) gets logged and pushed as a notification instead of
 silently ignored.
 
+## How to run
+
+conduit-monitor is for a machine running a **native Conduit CLI station** (the
+service is managed by `launchctl` on macOS or `systemctl` on Linux). Run it
+every 15-30 minutes from a scheduled job so it survives closed terminals and
+sleep. Configure it with the environment variables documented at the top of
+`conduit-monitor.sh`; set only what differs from the defaults.
+
+> **Running the dockerized MoaV server?** You don't need this. `psiphon-conduit`
+> is a container with `restart: unless-stopped`, so Docker already restarts it on
+> crash. This tool restarts a *host* Conduit service and (on macOS) repairs host
+> network interfaces, neither of which applies to the container.
+
+### Linux — systemd timer (recommended)
+
+`/etc/systemd/system/conduit-monitor.service`:
+```ini
+[Unit]
+Description=Conduit health check + known-fix autopilot
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=CONDUIT_SERVICE_LABEL=conduit
+Environment=NTFY_TOPIC_FILE=%h/.conduit-ntfy-topic
+ExecStart=/opt/moav/contrib/conduit-monitor/conduit-monitor.sh
+```
+
+`/etc/systemd/system/conduit-monitor.timer`:
+```ini
+[Unit]
+Description=Run conduit-monitor every 15 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+
+[Install]
+WantedBy=timers.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now conduit-monitor.timer
+systemctl list-timers conduit-monitor.timer   # confirm it is scheduled
+```
+
+### Linux / macOS — cron
+
+```bash
+# crontab -e  (every 15 minutes)
+*/15 * * * * CONDUIT_SERVICE_LABEL=conduit /opt/moav/contrib/conduit-monitor/conduit-monitor.sh >> "$HOME/conduit-monitor.log" 2>&1
+```
+
+### macOS — LaunchAgent
+
+`~/Library/LaunchAgents/sh.moav.conduit-monitor.plist`:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>sh.moav.conduit-monitor</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/opt/moav/contrib/conduit-monitor/conduit-monitor.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>NETWORK_INTERFACE</key><string>en0</string>
+  </dict>
+  <key>StartInterval</key><integer>900</integer>
+  <key>RunAtLoad</key><true/>
+</dict>
+</plist>
+```
+```bash
+launchctl load ~/Library/LaunchAgents/sh.moav.conduit-monitor.plist
+```
+
+See the top of `conduit-monitor.sh` for the full list of environment variables
+and their defaults.
+
 ## Platform differences
 
 The core logic — checking Conduit's own metrics, deciding whether it's
