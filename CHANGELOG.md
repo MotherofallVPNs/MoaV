@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Grafana updated to 13.2.0, which includes upstream security fixes.
+
+### Changed
+- telemt updated to 3.5.2.
+
 ## [2.2.2] - 2026-08-23
 
 Two new Grafana dashboards and consistent colours across monitoring; AmneziaWG
