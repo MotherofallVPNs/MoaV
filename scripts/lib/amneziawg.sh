@@ -146,6 +146,18 @@ generate_amneziawg_config() {
     local awg_dcookies=""
     [[ "${AWG_DISABLE_COOKIES:-false}" == "true" ]] && awg_dcookies="DisableCookies = on"
 
+    # AWG 1.5 header-protection obfuscation (HeaderProtectionKey / ContentPadding /
+    # RandomTrailers). OFF by default: the AmneziaVPN app's .conf importer silently
+    # drops these keys, so a bundle imported there sends un-protected handshakes the
+    # server can no longer parse -> connects but relays zero traffic. The dedicated
+    # AmneziaWG app supports them. Enable only when every client runs the AmneziaWG
+    # app, for stronger obfuscation. Read at generation time so regenerate applies it.
+    local awg_hdrprot=""
+    if [[ "${AMNEZIAWG_HEADER_PROTECTION:-false}" == "true" ]]; then
+        printf -v awg_hdrprot 'HeaderProtectionKey = %s\nContentPaddingAddition = %s\nRandomTrailers = %s' \
+            "$AWG_H_KEY" "$AWG_CPA" "$AWG_RTRAILERS"
+    fi
+
     cat > "$AWG_CONFIG_DIR/awg0.conf" <<EOF
 [Interface]
 Address = $server_addresses
@@ -163,14 +175,12 @@ H1 = $AWG_H1
 H2 = $AWG_H2
 H3 = $AWG_H3
 H4 = $AWG_H4
-HeaderProtectionKey = $AWG_H_KEY
-ContentPaddingAddition = $AWG_CPA
+$awg_hdrprot
 RekeyAfterTime = $AWG_REKEY_AFTER
 RekeyTimeout = $AWG_REKEY_TIMEOUT
 RejectAfterTime = $AWG_REJECT_AFTER
 KeepaliveTimeout = $AWG_KEEPALIVE_TIMEOUT
 MaxHandshakeAttempts = $AWG_MAX_HANDSHAKE
-RandomTrailers = $AWG_RTRAILERS
 $awg_dcookies
 PostUp = $postup_rules
 PostDown = $postdown_rules
@@ -337,6 +347,16 @@ amneziawg_generate_client_config() {
     local dcookies_line=""
     [[ -n "$AWG_DCOOKIES" ]] && dcookies_line="DisableCookies = $AWG_DCOOKIES"
 
+    # Mirror the server's awg0.conf: emit the AWG 1.5 header-protection block only
+    # when the server actually has it (AMNEZIAWG_HEADER_PROTECTION=true). Empty ->
+    # omit, so a compat-mode bundle never ships a bare `HeaderProtectionKey =` and
+    # every client (incl. the AmneziaVPN importer) can handshake.
+    local awg_hdrprot=""
+    if [[ -n "$AWG_HKEY" ]]; then
+        printf -v awg_hdrprot 'HeaderProtectionKey = %s\nContentPaddingAddition = %s\nRandomTrailers = %s' \
+            "$AWG_HKEY" "$AWG_CPA" "$AWG_RTRAILERS"
+    fi
+
     local server_public_key
     server_public_key=$(cat "$AWG_CONFIG_DIR/server.pub")
 
@@ -364,14 +384,12 @@ H1 = $AWG_H1
 H2 = $AWG_H2
 H3 = $AWG_H3
 H4 = $AWG_H4
-HeaderProtectionKey = $AWG_HKEY
-ContentPaddingAddition = $AWG_CPA
+$awg_hdrprot
 RekeyAfterTime = $AWG_REKEY_AFTER
 RekeyTimeout = $AWG_REKEY_TIMEOUT
 RejectAfterTime = $AWG_REJECT_AFTER
 KeepaliveTimeout = $AWG_KEEPALIVE_TIMEOUT
 MaxHandshakeAttempts = $AWG_MAX_HANDSHAKE
-RandomTrailers = $AWG_RTRAILERS
 $dcookies_line
 
 [Peer]
@@ -400,14 +418,12 @@ H1 = $AWG_H1
 H2 = $AWG_H2
 H3 = $AWG_H3
 H4 = $AWG_H4
-HeaderProtectionKey = $AWG_HKEY
-ContentPaddingAddition = $AWG_CPA
+$awg_hdrprot
 RekeyAfterTime = $AWG_REKEY_AFTER
 RekeyTimeout = $AWG_REKEY_TIMEOUT
 RejectAfterTime = $AWG_REJECT_AFTER
 KeepaliveTimeout = $AWG_KEEPALIVE_TIMEOUT
 MaxHandshakeAttempts = $AWG_MAX_HANDSHAKE
-RandomTrailers = $AWG_RTRAILERS
 $dcookies_line
 
 [Peer]
