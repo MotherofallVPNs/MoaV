@@ -444,7 +444,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.telemt
       args:
-        TELEMT_VERSION: ${TELEMT_VERSION:-3.4.23}
+        TELEMT_VERSION: ${TELEMT_VERSION:-3.5.2}
     container_name: moav-telemt
     restart: unless-stopped
     logging: *default-logging
