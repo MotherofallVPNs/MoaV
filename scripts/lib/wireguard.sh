@@ -195,6 +195,12 @@ wireguard_generate_client_config() {
         client_addresses="$WG_CLIENT_IP/32, $WG_CLIENT_IP_V6/128"
     fi
 
+    # docker-compose env_file keeps inline comments, so `PORT_WIREGUARD=51820 # ...`
+    # would leak the comment into the Endpoint. Keep only the leading digits.
+    local wg_port="${PORT_WIREGUARD:-51820}"
+    wg_port="${wg_port%%[!0-9]*}"
+    [[ -n "$wg_port" ]] || wg_port="51820"
+
     # Direct WireGuard config (IPv4 endpoint)
     cat > "$output_dir/$(moav_wg_basename wg).conf" <<EOF
 [Interface]
@@ -206,7 +212,7 @@ MTU = 1280
 [Peer]
 PublicKey = $server_public_key
 AllowedIPs = 0.0.0.0/0, ::/0
-Endpoint = ${SERVER_IP}:${PORT_WIREGUARD:-51820}
+Endpoint = ${SERVER_IP}:${wg_port}
 PersistentKeepalive = 25
 EOF
 
@@ -222,7 +228,7 @@ MTU = 1280
 [Peer]
 PublicKey = $server_public_key
 AllowedIPs = 0.0.0.0/0, ::/0
-Endpoint = [${SERVER_IPV6}]:${PORT_WIREGUARD:-51820}
+Endpoint = [${SERVER_IPV6}]:${wg_port}
 PersistentKeepalive = 25
 EOF
         log_info "Generated WireGuard IPv6 endpoint config"
