@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Snowflake cumulative Prometheus exporter.
+Snowflake cumulative + windowed Prometheus exporter.
 
 The proxy's own /internal/metrics endpoint (scraped directly by Prometheus) is
 authoritative for per-country connections and connection failures, but its
@@ -9,21 +9,33 @@ restarts. A dashboard that sums them therefore shows only the traffic since the
 last restart -- which is why a proxy that relayed tens of GB reads near-zero
 after a routine `docker compose up -d`.
 
-This exporter closes that gap. It reads the proxy's persistent summary log
-(tee'd to a named volume that survives container recreation) and accumulates the
-per-window totals into monotonic counters that persist across BOTH proxy
-restarts (the log volume) AND its own restarts (a small state file). The result
-is a lifetime "bytes relayed / connections served" that only ever goes up.
+This exporter closes that gap by reading the proxy's persistent summary log
+(tee'd to a named volume that survives container recreation). It exposes two
+kinds of metric, both derived from the log so both survive proxy AND exporter
+restarts:
+
+  * Cumulative counters -- lifetime bytes relayed / connections served. Seeded
+    from a state file so they only ever go up. Backfilled in one pass, so they
+    are FLAT afterwards: read them raw for a lifetime total, NEVER with
+    increase()/rate() over a range (there is no per-scrape history to diff).
+
+  * Trailing-window gauges -- bytes/connections within the last 1h/24h/7d/14d,
+    summed from the log's OWN timestamps. This is what the "last N days" panels
+    need: Prometheus stamps samples at scrape time, so a backfilled counter can
+    never answer "how much in the last 14 days" via increase(); computing it
+    from the log timestamps can, and it is correct immediately and after any
+    restart.
 
 Split of responsibility (see tests/snowflake-metrics-test.sh):
   native /internal/metrics  -> per-country, failures, live throughput (rate)
-  this exporter             -> cumulative bytes relayed + connections served
+  this exporter             -> cumulative + windowed bytes/connections
 
 Summary line format (snowflake proxy, -summary-interval):
   2026/08/26 16:37:41 In the last 1m30s, there were 3 completed successful
   connections. Traffic Relayed ↓ 8667 KB (0.00 KB/s), ↑ 512 KB (0.00 KB/s).
 """
 
+import datetime
 import json
 import os
 import re
@@ -35,6 +47,15 @@ LOG_FILE = os.environ.get("SNOWFLAKE_LOG_FILE", "/var/log/snowflake/snowflake.lo
 STATE_FILE = os.environ.get("SNOWFLAKE_STATE_FILE", "/var/lib/snowflake-exporter/state.json")
 PORT = int(os.environ.get("SNOWFLAKE_EXPORTER_PORT", "9105"))
 POLL_INTERVAL = int(os.environ.get("SNOWFLAKE_POLL_INTERVAL", "15"))
+# Recompute the trailing-window gauges every Nth poll (they need minutes, not
+# seconds, of freshness, and each rebuild re-parses a log tail).
+WINDOW_EVERY = max(1, int(os.environ.get("SNOWFLAKE_WINDOW_EVERY", "4")))
+# How much of the log tail to re-parse for the windows. 8 MB of ~150-byte
+# summary lines at one per 90s covers well over 14 days.
+WINDOW_TAIL_BYTES = int(os.environ.get("SNOWFLAKE_WINDOW_TAIL_BYTES", str(8_000_000)))
+
+# Trailing windows to expose, label -> seconds.
+WINDOWS = {"1h": 3600, "24h": 86400, "7d": 604800, "14d": 1209600}
 
 # KB=1024 to match the native traffic counters, which the dashboard already
 # scales by 1024 (tests/snowflake-metrics-test.sh trap #2). Snowflake's own log
@@ -48,6 +69,10 @@ UNIT_BYTES = {
     "TB": 1024 ** 4, "TIB": 1024 ** 4,
 }
 
+# Leading log timestamp, e.g. "2026/08/26 16:37:41". Parsed naive: the snowflake
+# and exporter containers share one TZ env, so naive-vs-naive age is correct
+# without assuming which zone it is.
+TS_RE = re.compile(r"^(\d{4})/(\d{2})/(\d{2}) (\d{2}):(\d{2}):(\d{2})")
 # "there were N completed successful connections"
 CONN_RE = re.compile(r"there were (\d+) completed successful connection")
 # "Traffic Relayed ↓ X UNIT (...), ↑ Y UNIT (...)". Down (↓) is inbound to
@@ -67,11 +92,66 @@ state = {
     "last_summary": 0,    # epoch of the newest parsed summary line
 }
 state_lock = threading.Lock()
+
+# Trailing-window rollups, recomputed from the log tail. Served under its own
+# lock so a slow rebuild never blocks the cumulative poll.
+window_state = {"bytes": {}, "conns": {}, "computed_at": 0}
+window_lock = threading.Lock()
 exporter_ready = False
 
 
 def _to_bytes(value: str, unit: str) -> int:
     return int(float(value) * UNIT_BYTES.get(unit.upper(), 0))
+
+
+def parse_dt(line: str):
+    """Datetime from a summary line's leading timestamp, or None."""
+    m = TS_RE.match(line)
+    if not m:
+        return None
+    try:
+        return datetime.datetime(*(int(x) for x in m.groups()))
+    except ValueError:
+        return None
+
+
+def parse_counts(line: str):
+    """(connections, inbound_bytes, outbound_bytes) for a summary line, or None."""
+    cm = CONN_RE.search(line)
+    if not cm:
+        return None
+    tm = TRAFFIC_RE.search(line)
+    inb = _to_bytes(tm.group(1), tm.group(2)) if tm else 0
+    outb = _to_bytes(tm.group(3), tm.group(4)) if tm else 0
+    return int(cm.group(1)), inb, outb
+
+
+def compute_windows(text, now):
+    """Sum bytes/connections per trailing window from timestamped summary lines.
+
+    Pure: given the log text and a `now` datetime, return (bytes, conns) where
+    bytes maps (direction, window) -> int and conns maps window -> int. Lines
+    without a parseable timestamp or count are skipped.
+    """
+    b = {(d, w): 0 for d in ("inbound", "outbound") for w in WINDOWS}
+    c = {w: 0 for w in WINDOWS}
+    for line in text.splitlines():
+        dt = parse_dt(line)
+        if dt is None:
+            continue
+        counts = parse_counts(line)
+        if counts is None:
+            continue
+        conns, inb, outb = counts
+        age = (now - dt).total_seconds()
+        if age < 0:
+            age = 0.0
+        for w, secs in WINDOWS.items():
+            if age <= secs:
+                b[("inbound", w)] += inb
+                b[("outbound", w)] += outb
+                c[w] += conns
+    return b, c
 
 
 def load_state():
@@ -110,14 +190,13 @@ def save_state():
 
 def parse_line(line: str):
     """Add one summary line's counts to the cumulative state (caller holds lock)."""
-    m = CONN_RE.search(line)
-    if not m:
+    counts = parse_counts(line)
+    if counts is None:
         return  # not a summary line
-    state["connections"] += int(m.group(1))
-    t = TRAFFIC_RE.search(line)
-    if t:
-        state["inbound_bytes"] += _to_bytes(t.group(1), t.group(2))
-        state["outbound_bytes"] += _to_bytes(t.group(3), t.group(4))
+    conns, inb, outb = counts
+    state["connections"] += conns
+    state["inbound_bytes"] += inb
+    state["outbound_bytes"] += outb
     state["windows"] += 1
     state["last_summary"] = int(time.time())
 
@@ -161,10 +240,36 @@ def poll_once():
     save_state()
 
 
+def rebuild_windows():
+    """Recompute the trailing-window gauges from a bounded tail of the log."""
+    try:
+        st = os.stat(LOG_FILE)
+    except OSError:
+        return
+    try:
+        with open(LOG_FILE, "rb") as fh:
+            if st.st_size > WINDOW_TAIL_BYTES:
+                fh.seek(st.st_size - WINDOW_TAIL_BYTES)
+                fh.readline()  # drop the partial line the seek landed inside
+            text = fh.read().decode("utf-8", "replace")
+    except OSError as exc:
+        print(f"snowflake-exporter: cannot read log tail for windows: {exc}")
+        return
+    b, c = compute_windows(text, datetime.datetime.now())
+    with window_lock:
+        window_state["bytes"] = b
+        window_state["conns"] = c
+        window_state["computed_at"] = int(time.time())
+
+
 def poll_loop():
     global exporter_ready
+    n = 0
     while True:
         poll_once()
+        if n % WINDOW_EVERY == 0:
+            rebuild_windows()
+        n += 1
         exporter_ready = True
         time.sleep(POLL_INTERVAL)
 
@@ -178,15 +283,30 @@ class MetricsHandler(BaseHTTPRequestHandler):
 
         with state_lock:
             snap = dict(state)
+        with window_lock:
+            wb = dict(window_state["bytes"])
+            wc = dict(window_state["conns"])
 
         out = [
-            "# HELP moav_snowflake_relayed_bytes_total Cumulative bytes relayed to Snowflake clients, across proxy and exporter restarts.",
+            "# HELP moav_snowflake_relayed_bytes_total Cumulative bytes relayed to Snowflake clients, across proxy and exporter restarts. Read raw for a lifetime total; the counter is backfilled flat, so increase()/rate() over a range reads 0.",
             "# TYPE moav_snowflake_relayed_bytes_total counter",
             f'moav_snowflake_relayed_bytes_total{{direction="inbound"}} {snap["inbound_bytes"]}',
             f'moav_snowflake_relayed_bytes_total{{direction="outbound"}} {snap["outbound_bytes"]}',
-            "# HELP moav_snowflake_completed_connections_total Cumulative completed successful connections, across restarts.",
+            "# HELP moav_snowflake_completed_connections_total Cumulative completed successful connections, across restarts. Read raw (backfilled flat).",
             "# TYPE moav_snowflake_completed_connections_total counter",
             f'moav_snowflake_completed_connections_total {snap["connections"]}',
+            "# HELP moav_snowflake_relayed_bytes_window Bytes relayed within a trailing window, summed from the log's own timestamps (restart-independent).",
+            "# TYPE moav_snowflake_relayed_bytes_window gauge",
+        ]
+        for (d, w) in sorted(wb):
+            out.append(f'moav_snowflake_relayed_bytes_window{{direction="{d}",window="{w}"}} {wb[(d, w)]}')
+        out += [
+            "# HELP moav_snowflake_completed_connections_window Completed connections within a trailing window, from the log timestamps.",
+            "# TYPE moav_snowflake_completed_connections_window gauge",
+        ]
+        for w in sorted(wc):
+            out.append(f'moav_snowflake_completed_connections_window{{window="{w}"}} {wc[w]}')
+        out += [
             "# HELP moav_snowflake_summary_windows_total Number of proxy summary windows parsed from the log.",
             "# TYPE moav_snowflake_summary_windows_total counter",
             f'moav_snowflake_summary_windows_total {snap["windows"]}',

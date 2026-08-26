@@ -85,10 +85,13 @@ dash=/tmp/sfdash.$$
 trap 'rm -f "$dash"' EXIT
 
 while IFS='|' read -r type title expr unit min; do
-    # A cumulative byte/connection panel must NOT read the resetting native
-    # counters. The tells: increase()/max_over_time() of a tor_snowflake_* total.
+    # A cumulative/lifetime byte-or-connection panel must NOT read the resetting
+    # native counters -- those totals come from the exporter now. Live per-hour
+    # and rate panels legitimately use the native counter (increase() handles the
+    # reset within the window); the tell for the FORBIDDEN case is a range-scoped
+    # reduction ($__range) or max_over_time() of a native total.
     case "$expr" in
-        *"increase(tor_snowflake_proxy_traffic"*|*"max_over_time(tor_snowflake_proxy_connections_total"*)
+        *'increase(tor_snowflake_proxy_traffic'*'[$__range]'*|*'max_over_time(tor_snowflake_proxy_connections_total'*)
             case "$title" in
                 # per-country + success-rate legitimately reduce the native
                 # counter across a range; they are not cumulative-total panels.
@@ -104,9 +107,10 @@ while IFS='|' read -r type title expr unit min; do
                 *)      bad "'$title' uses a native traffic counter without *1024 — off by 1024x" ;;
             esac ;;
     esac
-    # The exporter already emits BYTES: its panels must NOT *1024.
+    # The exporter already emits BYTES (both the _total counter and the _window
+    # gauge): its panels must NOT *1024.
     case "$expr" in
-        *moav_snowflake_relayed_bytes_total*)
+        *moav_snowflake_relayed_bytes*)
             case "$expr" in
                 *1024*) bad "'$title' scales the exporter's byte counter by 1024 — 1024x too high" ;;
                 *)      ok "'$title' uses the exporter's byte counter as-is" ;;
@@ -124,6 +128,14 @@ grep -q 'connection_timeouts_total' "$dash" \
 grep -q 'moav_snowflake_completed_connections_total' "$dash" \
     && ok "the People/Connections panels use the cumulative exporter counter" \
     || bad "no panel reads the cumulative connection counter"
+# The "last N days" panels must read the log-window gauge, not increase() over
+# the backfilled counter (which is flat, so increase() reads 0 -- the bug).
+grep -q 'moav_snowflake_relayed_bytes_window' "$dash" \
+    && ok "the windowed panels use the exporter's log-timestamp window gauge" \
+    || bad "a 'last N days' panel still uses increase() over the flat backfilled counter (reads 0)"
+grep -q 'increase(moav_snowflake_relayed_bytes_total' "$dash" \
+    && bad "increase() over the backfilled cumulative byte counter reads 0 -- use the window gauge" \
+    || ok "no panel does increase() over the flat cumulative byte counter"
 
 # --- exporter parsing unit test ----------------------------------------------
 python3 - "$EXP" <<'PY'
@@ -148,6 +160,24 @@ assert m.state["connections"] == exp_conn, ("connections", m.state["connections"
 assert m.state["inbound_bytes"] == exp_in, ("inbound", m.state["inbound_bytes"], exp_in)
 assert m.state["outbound_bytes"] == exp_out, ("outbound", m.state["outbound_bytes"], exp_out)
 assert m.state["windows"] == 3, ("windows", m.state["windows"])   # the non-summary line ignored
+
+# trailing-window rollups computed from the log's own timestamps
+import datetime
+now = datetime.datetime(2026, 8, 26, 20, 0, 0)
+def L(dt, c, dn, up):
+    return "%s In the last 1m30s, there were %d completed successful connections. Traffic Relayed ↓ %d KB (0 KB/s), ↑ %d KB (0 KB/s)." % (
+        dt.strftime("%Y/%m/%d %H:%M:%S"), c, dn, up)
+wlines = [
+    L(now - datetime.timedelta(minutes=30), 5, 1000, 100),   # inside every window
+    L(now - datetime.timedelta(hours=2),    3,  500,  50),   # 24h, 7d, 14d
+    L(now - datetime.timedelta(days=10),    7, 2000, 200),   # 14d only
+    L(now - datetime.timedelta(days=20),    9, 9999, 999),   # outside all windows
+]
+wb, wc = m.compute_windows("\n".join(wlines), now)
+assert (wc["1h"], wc["24h"], wc["7d"], wc["14d"]) == (5, 8, 8, 15), wc
+assert wb[("inbound", "1h")] == 1000 * 1024, wb[("inbound", "1h")]
+assert wb[("inbound", "14d")] == (1000 + 500 + 2000) * 1024, wb[("inbound", "14d")]
+assert wb[("outbound", "14d")] == (100 + 50 + 200) * 1024, wb[("outbound", "14d")]
 print("PARSE_OK")
 PY
 if [ $? -eq 0 ]; then ok "exporter parses connections + KB/MB traffic, ignores non-summary lines"
