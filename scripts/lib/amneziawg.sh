@@ -346,6 +346,14 @@ amneziawg_generate_client_config() {
         client_addresses="$AWG_CLIENT_IP/32, $AWG_CLIENT_IP_V6/128"
     fi
 
+    # docker-compose env_file does not strip inline comments, so a .env line like
+    # `PORT_AMNEZIAWG=51821 # AmneziaWG (obfuscated WireGuard, UDP)` arrives as the
+    # whole string. Keep only the leading digits, or the generated Endpoint becomes
+    # `IP:51821 # AmneziaWG ...` and clients reject the config outright.
+    local awg_port="${PORT_AMNEZIAWG:-51821}"
+    awg_port="${awg_port%%[!0-9]*}"
+    [[ -n "$awg_port" ]] || awg_port="51821"
+
     # AmneziaWG client config (includes obfuscation params)
     cat > "$output_dir/$(moav_wg_basename awg).conf" <<EOF
 [Interface]
@@ -377,7 +385,7 @@ $dcookies_line
 [Peer]
 PublicKey = $server_public_key
 AllowedIPs = 0.0.0.0/0, ::/0
-Endpoint = ${SERVER_IP}:${PORT_AMNEZIAWG:-51821}
+Endpoint = ${SERVER_IP}:${awg_port}
 PersistentKeepalive = 22-30
 EOF
 
@@ -413,7 +421,7 @@ $dcookies_line
 [Peer]
 PublicKey = $server_public_key
 AllowedIPs = 0.0.0.0/0, ::/0
-Endpoint = [${SERVER_IPV6}]:${PORT_AMNEZIAWG:-51821}
+Endpoint = [${SERVER_IPV6}]:${awg_port}
 PersistentKeepalive = 22-30
 EOF
         log_info "Generated AmneziaWG IPv6 endpoint config"
