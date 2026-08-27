@@ -444,7 +444,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.telemt
       args:
-        TELEMT_VERSION: ${TELEMT_VERSION:-3.4.23}
+        TELEMT_VERSION: ${TELEMT_VERSION:-3.5.2}
     container_name: moav-telemt
     restart: unless-stopped
     logging: *default-logging
@@ -1198,6 +1198,41 @@ services:
       - moav_geoip:/geoip:ro
     environment:
       - TZ=${TZ:-UTC}
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,size=10m
+    mem_limit: 64m
+    cpus: 0.25
+    profiles:
+      - monitoring
+      - all
+
+  # Snowflake cumulative exporter - parses the proxy's persistent summary log
+  # into lifetime byte/connection counters that survive proxy restarts. The
+  # native /internal/metrics counters (scraped directly, see prometheus.yml
+  # 'snowflake-proxy') reset to zero on every restart and stay authoritative for
+  # per-country + failures; this fills the cumulative gap.
+  snowflake-exporter:
+    build:
+      context: ./exporters
+      dockerfile: snowflake/Dockerfile
+    container_name: moav-snowflake-exporter
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - moav_net
+    volumes:
+      - moav_snowflake_logs:/var/log/snowflake:ro
+      - moav_exporter_state:/var/lib/moav-exporter-state
+    environment:
+      - TZ=${TZ:-UTC}
+      - SNOWFLAKE_STATE_FILE=/var/lib/moav-exporter-state/snowflake-state.json
+    expose:
+      - "9105"
     cap_drop:
       - ALL
     security_opt:

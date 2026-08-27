@@ -146,6 +146,18 @@ generate_amneziawg_config() {
     local awg_dcookies=""
     [[ "${AWG_DISABLE_COOKIES:-false}" == "true" ]] && awg_dcookies="DisableCookies = on"
 
+    # AWG 1.5 header-protection obfuscation (HeaderProtectionKey / ContentPadding /
+    # RandomTrailers). OFF by default: the AmneziaVPN app's .conf importer silently
+    # drops these keys, so a bundle imported there sends un-protected handshakes the
+    # server can no longer parse -> connects but relays zero traffic. The dedicated
+    # AmneziaWG app supports them. Enable only when every client runs the AmneziaWG
+    # app, for stronger obfuscation. Read at generation time so regenerate applies it.
+    local awg_hdrprot=""
+    if [[ "${AMNEZIAWG_HEADER_PROTECTION:-false}" == "true" ]]; then
+        printf -v awg_hdrprot 'HeaderProtectionKey = %s\nContentPaddingAddition = %s\nRandomTrailers = %s' \
+            "$AWG_H_KEY" "$AWG_CPA" "$AWG_RTRAILERS"
+    fi
+
     cat > "$AWG_CONFIG_DIR/awg0.conf" <<EOF
 [Interface]
 Address = $server_addresses
@@ -163,14 +175,12 @@ H1 = $AWG_H1
 H2 = $AWG_H2
 H3 = $AWG_H3
 H4 = $AWG_H4
-HeaderProtectionKey = $AWG_H_KEY
-ContentPaddingAddition = $AWG_CPA
+$awg_hdrprot
 RekeyAfterTime = $AWG_REKEY_AFTER
 RekeyTimeout = $AWG_REKEY_TIMEOUT
 RejectAfterTime = $AWG_REJECT_AFTER
 KeepaliveTimeout = $AWG_KEEPALIVE_TIMEOUT
 MaxHandshakeAttempts = $AWG_MAX_HANDSHAKE
-RandomTrailers = $AWG_RTRAILERS
 $awg_dcookies
 PostUp = $postup_rules
 PostDown = $postdown_rules
@@ -337,6 +347,16 @@ amneziawg_generate_client_config() {
     local dcookies_line=""
     [[ -n "$AWG_DCOOKIES" ]] && dcookies_line="DisableCookies = $AWG_DCOOKIES"
 
+    # Mirror the server's awg0.conf: emit the AWG 1.5 header-protection block only
+    # when the server actually has it (AMNEZIAWG_HEADER_PROTECTION=true). Empty ->
+    # omit, so a compat-mode bundle never ships a bare `HeaderProtectionKey =` and
+    # every client (incl. the AmneziaVPN importer) can handshake.
+    local awg_hdrprot=""
+    if [[ -n "$AWG_HKEY" ]]; then
+        printf -v awg_hdrprot 'HeaderProtectionKey = %s\nContentPaddingAddition = %s\nRandomTrailers = %s' \
+            "$AWG_HKEY" "$AWG_CPA" "$AWG_RTRAILERS"
+    fi
+
     local server_public_key
     server_public_key=$(cat "$AWG_CONFIG_DIR/server.pub")
 
@@ -345,6 +365,14 @@ amneziawg_generate_client_config() {
     if [[ -n "${AWG_CLIENT_IP_V6:-}" ]]; then
         client_addresses="$AWG_CLIENT_IP/32, $AWG_CLIENT_IP_V6/128"
     fi
+
+    # docker-compose env_file does not strip inline comments, so a .env line like
+    # `PORT_AMNEZIAWG=51821 # AmneziaWG (obfuscated WireGuard, UDP)` arrives as the
+    # whole string. Keep only the leading digits, or the generated Endpoint becomes
+    # `IP:51821 # AmneziaWG ...` and clients reject the config outright.
+    local awg_port="${PORT_AMNEZIAWG:-51821}"
+    awg_port="${awg_port%%[!0-9]*}"
+    [[ -n "$awg_port" ]] || awg_port="51821"
 
     # AmneziaWG client config (includes obfuscation params)
     cat > "$output_dir/$(moav_wg_basename awg).conf" <<EOF
@@ -364,20 +392,18 @@ H1 = $AWG_H1
 H2 = $AWG_H2
 H3 = $AWG_H3
 H4 = $AWG_H4
-HeaderProtectionKey = $AWG_HKEY
-ContentPaddingAddition = $AWG_CPA
+$awg_hdrprot
 RekeyAfterTime = $AWG_REKEY_AFTER
 RekeyTimeout = $AWG_REKEY_TIMEOUT
 RejectAfterTime = $AWG_REJECT_AFTER
 KeepaliveTimeout = $AWG_KEEPALIVE_TIMEOUT
 MaxHandshakeAttempts = $AWG_MAX_HANDSHAKE
-RandomTrailers = $AWG_RTRAILERS
 $dcookies_line
 
 [Peer]
 PublicKey = $server_public_key
 AllowedIPs = 0.0.0.0/0, ::/0
-Endpoint = ${SERVER_IP}:${PORT_AMNEZIAWG:-51821}
+Endpoint = ${SERVER_IP}:${awg_port}
 PersistentKeepalive = 22-30
 EOF
 
@@ -400,20 +426,18 @@ H1 = $AWG_H1
 H2 = $AWG_H2
 H3 = $AWG_H3
 H4 = $AWG_H4
-HeaderProtectionKey = $AWG_HKEY
-ContentPaddingAddition = $AWG_CPA
+$awg_hdrprot
 RekeyAfterTime = $AWG_REKEY_AFTER
 RekeyTimeout = $AWG_REKEY_TIMEOUT
 RejectAfterTime = $AWG_REJECT_AFTER
 KeepaliveTimeout = $AWG_KEEPALIVE_TIMEOUT
 MaxHandshakeAttempts = $AWG_MAX_HANDSHAKE
-RandomTrailers = $AWG_RTRAILERS
 $dcookies_line
 
 [Peer]
 PublicKey = $server_public_key
 AllowedIPs = 0.0.0.0/0, ::/0
-Endpoint = [${SERVER_IPV6}]:${PORT_AMNEZIAWG:-51821}
+Endpoint = [${SERVER_IPV6}]:${awg_port}
 PersistentKeepalive = 22-30
 EOF
         log_info "Generated AmneziaWG IPv6 endpoint config"

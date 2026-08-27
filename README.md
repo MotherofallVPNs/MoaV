@@ -63,16 +63,19 @@ for the longer argument.
   - **Full VPN** — WireGuard (direct & wstunnel), AmneziaWG
   - **Specialty** — TrustTunnel (HTTP/2+QUIC), Telegram MTProxy (fake-TLS), Shadowsocks-2022, GooseRelay (SOCKS5 via Google Apps Script)
   - **DNS tunnels** — dnstt, Slipstream, MasterDNS, and XDNS — all four run simultaneously on port 53 via `dns-router`
-- **Stealth-first** - All traffic looks like normal HTTPS, WebSocket, DNS, or IMAPS
+- **Stealth-first** - All traffic looks like normal or garbled HTTPS, WebSocket, DNS, or IMAPS
 - **Per-user credentials** - Create, revoke, and manage users independently
 - **Easy deployment** - Docker Compose based, single command setup
-- **Mobile-friendly** - QR codes and links for easy client import
-- **Decoy website** - Serves innocent content to unauthenticated visitors
+- **Cross-platform** - Popular clients on iOS, Android, macOS, Windows, and Linux; QR codes and links for easy import
+- **Compact `moav://` subscription** - one line encodes the whole enabled proxy surface ([docs](https://moav.sh/docs/moav-bundle))
+- **[Decoy website](https://moav.sh/docs/decoy)** - Serves innocent content to unauthenticated visitors
 - **Home server ready** - Run on Raspberry Pi or any ARM64/x64 Linux as a personal VPN
 - **[Psiphon Conduit](https://github.com/Psiphon-Inc/conduit)** - Optional bandwidth donation to help others bypass censorship
 - **[Tor Snowflake](https://snowflake.torproject.org/)** - Optional bandwidth donation to help Tor users bypass censorship
-- **[MahsaNet](https://www.mahsaserver.com/)** - Donate VPN configs to help Mahsa VPN users (2M+ users in Iran)
+- **[MahsaNet](https://www.mahsaserver.com/)** - Donate VPN configs to help Mahsa VPN users (12M+ users in Iran)
 - **Monitoring** - Optional Grafana + Prometheus observability stack
+- **Open source & self-hosted** - Run your own, audit the code, contribute back
+- **Forever free** - No subscriptions, no accounts, no paywalls; MIT licensed
 
 > **[Read the full documentation](https://moav.sh/docs/)** — setup guides, CLI reference, client apps, monitoring, OPSEC, and more.
 
@@ -269,9 +272,9 @@ See the [Client Setup guide](https://moav.sh/docs/CLIENTS) for the complete list
 
 Full docs: **[moav.sh/docs](https://moav.sh/docs/)**
 
-**Deploy** — [Quick Start](https://moav.sh/docs/quick-start) · [Setup Guide](https://moav.sh/docs/SETUP) · [VPS Deployment](https://moav.sh/docs/DEPLOY) · [DNS Configuration](https://moav.sh/docs/DNS)
+**Deploy** — [Quick Start](https://moav.sh/docs/quick-start) · [Setup Guide](https://moav.sh/docs/SETUP) · [VPS Deployment](https://moav.sh/docs/DEPLOY) · [DNS Configuration](https://moav.sh/docs/DNS) · [Video Tutorials](https://moav.sh/docs/video-tutorials)
 
-**Understand** — [Supported Protocols](https://moav.sh/docs/protocols) · [Architecture](https://moav.sh/docs/architecture) · [Threat Model](https://moav.sh/docs/threat-model) · [Mission](https://moav.sh/docs/mission) · [Philosophy](https://moav.sh/docs/philosophy)
+**Understand** — [Supported Protocols](https://moav.sh/docs/protocols) · [Architecture](https://moav.sh/docs/architecture) · [Threat Model](https://moav.sh/docs/threat-model) · [Mission](https://moav.sh/docs/mission) · [Impact](https://moav.sh/docs/impact) · [Philosophy](https://moav.sh/docs/philosophy)
 
 **Connect users** — [Client Apps](https://moav.sh/docs/CLIENTS) · [MahsaNG Import](https://moav.sh/docs/mahsanet) · [MoaV Client](https://moav.sh/docs/client)
 
@@ -279,7 +282,7 @@ Full docs: **[moav.sh/docs](https://moav.sh/docs/)**
 
 **Contribute** — [Development & Testing](https://moav.sh/docs/development) · [Translating the Docs](https://moav.sh/docs/TRANSLATING) · [Support MoaV](https://moav.sh/docs/support)
 
-**For AI agents** — [AGENTS.md](AGENTS.md) for working in this repo, [llms.txt](https://moav.sh/llms.txt) as a compact index, [llms-full.txt](https://moav.sh/llms-full.txt) for the whole corpus.
+**For AI agents** — [Run MoaV with an agent](https://moav.sh/docs/ai-agent) to set up from a bare VPS, [AGENTS.md](AGENTS.md) for working in this repo, [llms.txt](https://moav.sh/llms.txt) as a compact index, [llms-full.txt](https://moav.sh/llms-full.txt) for the whole corpus.
 
 ## Requirements
 

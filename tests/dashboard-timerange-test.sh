@@ -132,7 +132,12 @@ WRAPPED = re.compile(r'\b(increase|rate|irate|delta|deriv|max_over_time|last_ove
 # _total that are really gauges, and metrics MoaV persists across restarts.
 ALLOW = ("wireguard_peers_total", "amneziawg_peers_total",
          "moav_site_traffic_bytes_total", "moav_site_destination_country_bytes_total",
-         "moav_site_connections_total")
+         "moav_site_connections_total",
+         # snowflake-exporter accumulates these from the persistent proxy log and
+         # keeps its own state file, so they survive proxy AND exporter restarts.
+         # The lifetime-total panels read them raw on purpose (the counter is
+         # backfilled in one scrape, so increase() over a range would read 0).
+         "moav_snowflake_relayed_bytes_total", "moav_snowflake_completed_connections_total")
 raw = []
 for fn in sorted(os.listdir(sys.argv[1])):
     if not fn.endswith(".json"):
