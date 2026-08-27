@@ -7,11 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3] - 2026-08-27
+
+AmneziaWG connectivity fixes for the current client apps, restart-proof Snowflake
+donation metrics, and a Grafana security update. Keys, users, and certificates
+are untouched.
+
+### Added
+- **Snowflake donation metrics that survive restarts.** A new `snowflake-exporter`
+  parses the proxy's persistent summary log into cumulative lifetime counters and
+  trailing-window gauges (1h / 24h / 7d / 14d) for bytes relayed and connections
+  served. The proxy's own `-metrics` counters reset to zero on every restart, so
+  the Snowflake Grafana dashboard used to read near-zero for proxies that had
+  relayed tens of GB; it now shows real lifetime totals and recent windows, while
+  per-country and live-throughput panels still come straight from the proxy.
+
+### Changed
+- **AmneziaWG header-protection obfuscation (AWG 1.5) is now opt-in**, default off,
+  via `AMNEZIAWG_HEADER_PROTECTION`. The default profile keeps the junk-packet and
+  magic-header obfuscation that disguises WireGuard while staying compatible with
+  both the AmneziaWG and AmneziaVPN apps. Turn it on (and re-issue bundles with
+  `moav regenerate-users`) only when every client uses the AmneziaWG app. See
+  Upgrading.
+- telemt updated to 3.5.2.
+
+### Fixed
+- **AmneziaWG / WireGuard bundle import.** An inline comment on `PORT_AMNEZIAWG` /
+  `PORT_WIREGUARD` in `.env` leaked into the generated client `Endpoint`
+  (`<ip>:51821 # AmneziaWG ...`), so the AmneziaVPN app rejected the config with
+  `ErrorCode 900`. The port is now sanitized to digits only.
+- **AmneziaWG "connects but no traffic" in the AmneziaVPN app.** The AWG 1.5
+  header-protection params are silently dropped by the AmneziaVPN app's `.conf`
+  importer, so its handshakes no longer matched a server that required them. With
+  header protection now opt-in (above), the default profile works in both apps.
+
 ### Security
 - Grafana updated to 13.2.0, which includes upstream security fixes.
 
-### Changed
-- telemt updated to 3.5.2.
+### Upgrading
+- **AmneziaVPN-app users connect but get no traffic?** Your server was generated
+  with header protection on. Set `AMNEZIAWG_HEADER_PROTECTION=false` (the new
+  default) and run `moav regenerate-users` to re-issue bundles, then have users
+  re-download theirs. Users on the dedicated AmneziaWG app are unaffected either
+  way. One AmneziaWG interface has a single obfuscation profile, so client and
+  server must agree — a client whose old bundle still carries the header-protection
+  keys must re-download after regenerating.
 
 ## [2.2.2] - 2026-08-23
 
@@ -2041,7 +2081,8 @@ TrustTunnel config validity.
 - uTLS fingerprint spoofing (Chrome)
 - Automatic short ID generation for Reality
 
-[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v2.2.2...HEAD
+[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v2.2.3...HEAD
+[2.2.3]: https://github.com/MotherofallVPNs/moav/compare/v2.2.2...v2.2.3
 [2.2.2]: https://github.com/MotherofallVPNs/moav/compare/v2.2.1...v2.2.2
 [2.2.1]: https://github.com/MotherofallVPNs/moav/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/MotherofallVPNs/moav/compare/v2.1.0...v2.2.0
