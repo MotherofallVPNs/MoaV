@@ -313,6 +313,7 @@ MoaV/
 ├── data/                # protocols.json — the protocol roster, source of truth
 ├── tests/               # the regression suite, named after the bug class each pins
 ├── docs/devdocs/        # contributor docs (the user docs live in moav-site)
+├── contrib/             # optional operator-contributed tools (opt-in, not core) — see contrib/README.md
 ├── docker-compose.yml
 └── .env.example         # annotated config reference; commonly-changed vars up top
 ```
