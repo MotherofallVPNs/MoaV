@@ -18,8 +18,16 @@ cd "$SCRIPT_DIR/.."
 
 source scripts/lib/common.sh
 
-USERNAME="${1:-}"
-KEEP_BUNDLE="${2:-}"
+USERNAME=""
+KEEP_BUNDLE=""
+NO_RELOAD=""
+for _a in "$@"; do
+    case "$_a" in
+        --keep-bundle) KEEP_BUNDLE="--keep-bundle" ;;
+        --no-reload)   NO_RELOAD="--no-reload" ;;
+        *) [[ -z "$USERNAME" ]] && USERNAME="$_a" ;;
+    esac
+done
 
 if [[ -z "$USERNAME" ]]; then
     echo "Usage: $0 <username> [--keep-bundle]"
@@ -117,7 +125,7 @@ REVOKED=false
 # -----------------------------------------------------------------------------
 if proxy_user_exists; then
     log_info "[1/3] Revoking from proxy transports..."
-    if "$SCRIPT_DIR/singbox-user-revoke.sh" "$USERNAME"; then
+    if "$SCRIPT_DIR/singbox-user-revoke.sh" "$USERNAME" ${NO_RELOAD:+"$NO_RELOAD"}; then
         log_info "✓ Revoked from proxy transports"
         REVOKED=true
     else

@@ -117,6 +117,8 @@ jobs:
         run: bash tests/amneziawg-v3-test.sh
       - name: regenerate-users reloads WG/AWG
         run: bash tests/regenerate-reload-test.sh
+      - name: batch/--all revoke resets services once
+        run: bash tests/revoke-batch-reload-test.sh
       - name: doctor CDN detection + scrape targets
         run: bash tests/doctor-cdn-test.sh
       - name: snowflake native metrics + dashboard (#183)

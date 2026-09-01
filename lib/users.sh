@@ -308,16 +308,44 @@ cmd_user() {
             ;;
         revoke|rm|remove|delete)
             if [[ -z "${1:-}" ]]; then
-                error "Usage: moav user revoke USERNAME [USERNAME2...]"
+                error "Usage: moav user revoke USERNAME [USERNAME2...] | --all [--yes]"
                 exit 1
             fi
             if [[ ! -x "./scripts/user-revoke.sh" ]]; then
                 error "User revoke script not found"
                 exit 1
             fi
-            for u in "$@"; do
-                ./scripts/user-revoke.sh "$u" || true
+            # Build the target list. `--all` enumerates every user from the
+            # authoritative bundle dirs (skipping the *-configs zip dirs).
+            revoke_targets=()
+            if [[ "$1" == "--all" ]]; then
+                if [[ -d outputs/bundles ]]; then
+                    for _d in outputs/bundles/*/; do
+                        [[ -d "$_d" ]] || continue
+                        _u="$(basename "$_d")"
+                        [[ "$_u" == *-configs || "$_u" == *-moav-configs || "$_u" == "." ]] && continue
+                        revoke_targets+=("$_u")
+                    done
+                fi
+                if [[ ${#revoke_targets[@]} -eq 0 ]]; then
+                    info "No users to revoke."
+                    exit 0
+                fi
+                warn "This will revoke ALL ${#revoke_targets[@]} user(s): ${revoke_targets[*]}"
+                if [[ "${2:-}" != "--yes" && "${2:-}" != "-y" ]]; then
+                    read -r -p "This is irreversible. Continue? [y/N] " _ans
+                    [[ "$_ans" == y* || "$_ans" == Y* ]] || { info "Aborted."; exit 0; }
+                fi
+            else
+                revoke_targets=("$@")
+            fi
+            # Revoke each with the per-user reload deferred, then reset the proxy
+            # services ONCE at the end -- revoking N users used to trigger N
+            # sing-box reload + xray/trusttunnel restart cycles.
+            for _u in "${revoke_targets[@]}"; do
+                ./scripts/user-revoke.sh "$_u" --no-reload || true
             done
+            [[ -x ./scripts/reload-proxy.sh ]] && ./scripts/reload-proxy.sh || true
             ;;
         package|pkg)
             if [[ -z "$username" ]]; then
