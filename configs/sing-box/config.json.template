@@ -86,9 +86,10 @@
       "users": ${HYSTERIA2_USERS_JSON},
       "ignore_client_bandwidth": true,
       "obfs": {
-        "type": "salamander",
+        "type": "${HYSTERIA2_OBFS_TYPE}",
         "password": "${HYSTERIA2_OBFS_PASSWORD}"
       },
+      ${HYSTERIA2_BBR_LINE}
       "tls": {
         "enabled": true,
         "server_name": "${DOMAIN}",

@@ -23,7 +23,7 @@ echo "sing-box config: valid JSON + 1.14 compatibility"
 # not sing-box semantics).
 export ANYTLS_USERS_JSON='[]' REALITY_USERS_JSON='[]' SHADOWSOCKS_USERS_JSON='[]' \
        TROJAN_USERS_JSON='[]' VLESS_WS_USERS_JSON='[]' HYSTERIA2_USERS_JSON='[]' \
-       HYSTERIA2_OBFS_PASSWORD='obfspw' \
+       HYSTERIA2_OBFS_PASSWORD='obfspw' HYSTERIA2_OBFS_TYPE='salamander' HYSTERIA2_BBR_LINE='' \
        CDN_TRANSPORT='ws' CDN_WS_PATH='/ws' CLASH_API_SECRET='testsecret' \
        DOMAIN='example.com' LOG_LEVEL='info' PORT_ANYTLS='8445' PORT_SS='8388' \
        REALITY_PRIVATE_KEY='k' REALITY_SERVER_NAME='www.microsoft.com' \

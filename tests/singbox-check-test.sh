@@ -65,7 +65,8 @@ ss_psk="$(printf '1234567890123456' | base64)"  # 16 bytes for aes-128
 # Representative render values (kept in sync with singbox-config-valid-test.sh).
 export ANYTLS_USERS_JSON='[]' REALITY_USERS_JSON='[]' SHADOWSOCKS_USERS_JSON='[]' \
        TROJAN_USERS_JSON='[]' VLESS_WS_USERS_JSON='[]' HYSTERIA2_USERS_JSON='[]' \
-       HYSTERIA2_OBFS_PASSWORD='obfspw' CDN_TRANSPORT='ws' CDN_WS_PATH='/ws' \
+       HYSTERIA2_OBFS_PASSWORD='obfspw' HYSTERIA2_OBFS_TYPE='salamander' HYSTERIA2_BBR_LINE='' \
+       CDN_TRANSPORT='ws' CDN_WS_PATH='/ws' \
        CLASH_API_SECRET='testsecret' DOMAIN='example.com' LOG_LEVEL='info' \
        PORT_ANYTLS='8445' PORT_SS='8388' REALITY_PRIVATE_KEY="$rkey" \
        REALITY_SERVER_NAME='www.microsoft.com' REALITY_SHORT_ID='0123abcd' \
@@ -101,6 +102,21 @@ if grep -qiE "deprecat|will be removed" "$work/fmt.err"; then
     bad "deprecation warnings from format:"; sed 's/^/        /' "$work/fmt.err"
 else
     ok "no deprecation warnings"
+fi
+
+# Also validate the opt-in Hysteria2 hardening path (gecko obfs + bbr_profile).
+export HYSTERIA2_OBFS_TYPE='gecko' HYSTERIA2_BBR_LINE='"bbr_profile": "standard",'
+rendered2="$work/config-gecko.json"
+if command -v envsubst >/dev/null 2>&1; then
+    envsubst < "$TEMPLATE" > "$rendered2"
+else
+    python3 -c 'import os,re,sys; s=open(sys.argv[1]).read(); open(sys.argv[2],"w").write(re.sub(r"\$\{([A-Z0-9_]+)\}", lambda m: os.environ.get(m.group(1),""), s))' "$TEMPLATE" "$rendered2"
+fi
+sed -i.bak "s#/certs/#$work/certs/#g" "$rendered2" && rm -f "$rendered2.bak"
+if "$bin" check -c "$rendered2" 2>"$work/check2.err"; then
+    ok "opt-in hardening (gecko obfs + bbr_profile) also validates"
+else
+    bad "gecko + bbr_profile config failed check:"; sed 's/^/        /' "$work/check2.err"
 fi
 
 echo ""
