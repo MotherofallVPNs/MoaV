@@ -1,7 +1,7 @@
 #!/bin/bash
 # sing-box specific functions
 
-# singbox_add_user <config> <username> <uuid> <password> <ss_psk>
+# singbox_add_user <config> <username> <uuid> <password> <ss_psk> [snell_userkey]
 # Canonical sing-box server-config mutation — the single source of truth for
 # inserting a user into the proxy inbounds (used by the host `user add` path and
 # the bootstrap/regenerate reconcile). Each insert is INDEPENDENTLY idempotent:
@@ -16,10 +16,10 @@
 # when the config actually changed. Returns 0 if the config changed, 1 if
 # unchanged or on jq failure.
 singbox_add_user() {
-    local sb="$1" n="$2" id="$3" p="$4" ss="$5" tmp
+    local sb="$1" n="$2" id="$3" p="$4" ss="$5" snell="${6:-}" tmp
     [[ -f "$sb" ]] || return 1
     tmp=$(mktemp)
-    if jq --arg n "$n" --arg id "$id" --arg p "$p" --arg ss "$ss" '
+    if jq --arg n "$n" --arg id "$id" --arg p "$p" --arg ss "$ss" --arg snell "$snell" '
             def addbyuuid($tag; $e):
               .inbounds |= map(if .tag==$tag and ((any(.users[]?; .uuid==$e.uuid)) | not)
                                then .users += [$e] else . end);
@@ -32,6 +32,7 @@ singbox_add_user() {
             | addbyname("hysteria2-in";  {name:$n, password:$p})
             | addbyuuid("vless-ws-in";   {name:$n, uuid:$id})
             | (if $ss != "" then addbyname("shadowsocks-in"; {name:$n, password:$ss}) else . end)
+            | (if $snell != "" then addbyname("snell-in"; {name:$n, userkey:$snell}) else . end)
         ' "$sb" > "$tmp" 2>/dev/null && jq empty "$tmp" 2>/dev/null; then
         if ! cmp -s "$tmp" "$sb"; then cat "$tmp" > "$sb"; rm -f "$tmp"; return 0; fi
     fi

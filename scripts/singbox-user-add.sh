@@ -150,6 +150,24 @@ EOF
     fi
 fi
 
+# Snell per-user key (only if enabled AND the server has a snell-in inbound).
+if [[ "${ENABLE_SNELL:-false}" == "true" ]]; then
+    _snell_inbound_present=false
+    if [[ -f "$CONFIG_FILE" ]] && jq -e '.inbounds[] | select(.tag == "snell-in")' "$CONFIG_FILE" >/dev/null 2>&1; then
+        _snell_inbound_present=true
+    fi
+    if ! $_snell_inbound_present; then
+        log_error "ENABLE_SNELL=true in .env, but there is no 'snell-in' inbound in $CONFIG_FILE."
+        log_error "  Run 'moav bootstrap' first to apply the Snell enablement, then re-run 'moav user add $USERNAME'."
+        log_warn "Skipping Snell for $USERNAME (other protocols will still be added)."
+    else
+        SNELL_USER_KEY=$(openssl rand -hex 16)
+        cat > "$STATE_DIR/users/$USERNAME/snell.env" <<EOF
+SNELL_USER_KEY=$SNELL_USER_KEY
+EOF
+    fi
+fi
+
 log_info "Generated credentials for $USERNAME"
 
 # Add user to sing-box config (canonical mutation: lib/sing-box.sh). Shadowsocks
@@ -160,7 +178,12 @@ if [[ "${ENABLE_SS:-true}" == "true" ]] && [[ -n "${SS_USER_PSK:-}" ]] \
         && jq -e '.inbounds[] | select(.tag == "shadowsocks-in")' "$CONFIG_FILE" >/dev/null 2>&1; then
     SS_ARG="$SS_USER_PSK"
 fi
-if ! singbox_add_user "$CONFIG_FILE" "$USERNAME" "$USER_UUID" "$USER_PASSWORD" "$SS_ARG"; then
+SNELL_ARG=""
+if [[ "${ENABLE_SNELL:-false}" == "true" ]] && [[ -n "${SNELL_USER_KEY:-}" ]] \
+        && jq -e '.inbounds[] | select(.tag == "snell-in")' "$CONFIG_FILE" >/dev/null 2>&1; then
+    SNELL_ARG="$SNELL_USER_KEY"
+fi
+if ! singbox_add_user "$CONFIG_FILE" "$USERNAME" "$USER_UUID" "$USER_PASSWORD" "$SS_ARG" "$SNELL_ARG"; then
     log_error "Failed to add $USERNAME to sing-box config (invalid JSON or no matching inbound)"
     exit 1
 fi

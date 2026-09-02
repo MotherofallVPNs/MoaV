@@ -188,6 +188,7 @@ Then use `moav` from anywhere. See the [Setup Guide](https://moav.sh/docs/SETUP)
 | Trojan | 8443/tcp | Yes | ★★★★☆ | ★★★★☆ | ✅ | Backup, uses your domain |
 | AnyTLS | 8445/tcp | Yes | ★★★★★ | ★★★★☆ | ⬜ | Defeats TLS-in-TLS fingerprinting |
 | Shadowsocks-2022 | 8388/tcp+udp | No | ★★★★☆ | ★★★★☆ | ✅ | AEAD-2022 anti-probing; Outline-app compatible |
+| Snell | 8389/tcp | No | ★★★★☆ | ★★★★☆ | ⬜ | Lightweight TCP proxy with HTTP obfs; Surge/Stash/Mihomo |
 | CDN (VLESS+WS) | 2082/tcp² | via CDN² | ★★★★★ | ★★★☆☆ | ⬜ | When the server IP is blocked; needs a CDN in front |
 | TrustTunnel | 4443/tcp+udp | Yes | ★★★★★ | ★★★★☆ | ✅ | HTTP/2 & QUIC, looks like HTTPS |
 | WireGuard (Direct) | 51820/udp | No | ★★★☆☆ | ★★★★★ | ✅ | Full VPN, simple setup |

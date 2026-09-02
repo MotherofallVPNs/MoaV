@@ -605,13 +605,14 @@ profile_enabled() {
     local profile="$1" env_file="${2:-$SCRIPT_DIR/.env}"
     case "$profile" in
         proxy)
-            local _r _t _a _h _s
+            local _r _t _a _h _s _sn
             _r=$(get_env_val "ENABLE_REALITY"   "$env_file" "true")
             _t=$(get_env_val "ENABLE_TROJAN"    "$env_file" "true")
             _a=$(get_env_val "ENABLE_ANYTLS"    "$env_file" "false")
             _h=$(get_env_val "ENABLE_HYSTERIA2" "$env_file" "true")
             _s=$(get_env_val "ENABLE_SS"        "$env_file" "true")
-            [[ "$_r" == "true" || "$_t" == "true" || "$_a" == "true" || "$_h" == "true" || "$_s" == "true" ]] \
+            _sn=$(get_env_val "ENABLE_SNELL"    "$env_file" "false")
+            [[ "$_r" == "true" || "$_t" == "true" || "$_a" == "true" || "$_h" == "true" || "$_s" == "true" || "$_sn" == "true" ]] \
                 && echo true || echo false ;;
         wireguard)   [[ "$(get_env_val "ENABLE_WIREGUARD"   "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
         amneziawg)   [[ "$(get_env_val "ENABLE_AMNEZIAWG"   "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
@@ -1498,6 +1499,7 @@ resolve_service() {
         conduit|psiphon)              echo "psiphon-conduit" ;;
         singbox|sing|proxy|reality)   echo "sing-box" ;;
         ss|shadowsocks|outline)       echo "sing-box" ;;
+        snell)                        echo "sing-box" ;;
         wg)                           echo "wireguard" ;;
         ws|tunnel)                    echo "wstunnel" ;;
         dns)                          echo "dnstt" ;;
