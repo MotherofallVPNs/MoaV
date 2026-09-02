@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Snell protocol (new sing-box inbound).** A lightweight TCP proxy (Surge /
+  Stash / Mihomo clients) with HTTP obfuscation, no TLS/domain required.
+  Opt-in via `ENABLE_SNELL` (default off), `PORT_SNELL` (8389), `SNELL_OBFS`.
+  Per-user keys, provisioning through both `moav bootstrap` and `moav user add`,
+  and enable-gating — all validated against the real sing-box 1.14 binary.
 - **sing-box updated to 1.14.0.** Our config is already on 1.14's modern surface,
   so no config change is required; validated by running the real 1.14 `sing-box
   check` against the live config (clean, no deprecation warnings). New CI gates
