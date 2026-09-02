@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-09-02
+
+Operator quality-of-life: bulk user revocation with a single service reset, safer
+config donation, and automated PR review / issue triage — plus refreshed
+transport and monitoring component versions. Keys, users, and certificates are
+untouched.
+
+### Added
+- **`moav user revoke --all`** revokes every user in one pass (enumerated from the
+  bundle directories), with a confirmation prompt unless `--yes`. Several
+  usernames can also be passed at once: `moav user revoke alice bob carol`.
+- **Donation resume.** `moav donate` now skips configs already recorded in the
+  ledger, so a re-run continues where a previous one stopped;
+  `moav donate submit --force` re-submits on purpose (e.g. after regenerating a
+  user).
+- **Automated PR review and issue triage** via Claude Code — admin-triggered and
+  advisory. Comment `@claude review` on a PR or `@claude triage` on an issue. See
+  [`docs/devdocs/CLAUDE-REVIEW.md`](docs/devdocs/CLAUDE-REVIEW.md).
+
+### Changed
+- **Batch revoke resets the proxy services once.** Revoking several users (or
+  `--all`) used to reload sing-box and restart xray/trusttunnel per user — N
+  reload cycles that repeatedly dropped live tunnels. It now defers the per-user
+  reloads and resets the services once at the end.
+- **Component updates:** wstunnel 10.6.2 → 10.7.1 (lower memory on asymmetric
+  links, SOCKS5 waits for tunnel establishment, self-signed cert valid ≥1 year),
+  TrustTunnel 1.0.33 → 1.1.0 (UDP socket-leak fix, global-IPv6 classification fix,
+  opt-in per-user metrics), telemt 3.5.2 → 3.5.5 (carrier negotiation, iOS carrier
+  fix), AmneziaWG-go → v3.1.20260828 (obfuscation correctness fixes), Prometheus
+  3.13.2 → 3.14.0. No config changes required.
+
+### Fixed
+- **Config donation no longer overloads the MahsaNet API on a quota cap.** A
+  new-donor submission limit returns HTTP 400; the loop previously kept firing
+  every remaining config (all rejected). It now detects the quota message, stops
+  the run, and reports what was donated so a later run resumes.
+
 ## [2.2.3] - 2026-08-27
 
 AmneziaWG connectivity fixes for the current client apps, restart-proof Snowflake
@@ -2081,7 +2118,8 @@ TrustTunnel config validity.
 - uTLS fingerprint spoofing (Chrome)
 - Automatic short ID generation for Reality
 
-[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v2.2.3...HEAD
+[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/MotherofallVPNs/moav/compare/v2.2.3...v2.3.0
 [2.2.3]: https://github.com/MotherofallVPNs/moav/compare/v2.2.2...v2.2.3
 [2.2.2]: https://github.com/MotherofallVPNs/moav/compare/v2.2.1...v2.2.2
 [2.2.1]: https://github.com/MotherofallVPNs/moav/compare/v2.2.0...v2.2.1
