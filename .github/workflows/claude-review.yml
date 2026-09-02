@@ -1,0 +1,85 @@
+name: Claude PR Review
+
+# Automated PR review by Claude Code (the official anthropics/claude-code-action
+# running the `code-review` plugin). It reads the PR diff, reasons over it along
+# the dimensions in REVIEW.md, and posts findings as inline review comments plus
+# a grouped summary. It is review-only: it never commits, pushes, or merges.
+#
+# ── Trigger model (start = admin-only) ──────────────────────────────────────
+# Right now it runs ONLY when a maintainer asks for it:
+#   • a maintainer comments `@claude review` on a PR, or
+#   • a maintainer runs it from the Actions tab (Run workflow → PR number).
+# The `author_association` gate below is what restricts it to the org.
+#
+# To move to the HYBRID model (auto on every PR + on-demand) once it's tuned,
+# uncomment the `pull_request` trigger and the diff-size guard marked TWEAK
+# below. Keep the comment/dispatch triggers so a maintainer can still re-run it.
+#
+# ── Prerequisite ────────────────────────────────────────────────────────────
+# A repo or org Actions secret `CLAUDE_CODE_OAUTH_TOKEN` (Claude subscription):
+# run `claude setup-token` locally and paste the token into
+# Settings → Secrets and variables → Actions. The MoaV org already sets this at
+# the org level, so this repo inherits it. See docs/devdocs/CLAUDE-REVIEW.md.
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "PR number to review"
+        required: true
+        type: string
+  # ── TWEAK: uncomment to enable automatic review (the hybrid model) ──
+  # pull_request:
+  #   types: [opened, ready_for_review, reopened]
+
+# One review at a time per PR; a newer request supersedes an in-flight one.
+concurrency:
+  group: claude-review-${{ github.event.issue.number || github.event.inputs.pr || github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Run only for: a maintainer's `@claude review` comment on a PR, OR a manual
+    # dispatch, OR (once enabled) a pull_request event. `author_association`
+    # keeps the comment path org-only — OWNER/MEMBER/COLLABORATOR, not drive-bys.
+    # The pull_request branch carries a diff-size cost guard (additions < 800),
+    # so when you enable the auto trigger above it is already bounded; huge PRs
+    # skip auto-review but a maintainer can still run them on demand. Admin
+    # triggers (comment / dispatch) are deliberate and not size-capped.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.additions < 800) ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request != null &&
+       contains(github.event.comment.body, '@claude review') &&
+       contains(fromJson('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write   # post inline review comments + the summary
+      issues: read
+      id-token: write        # authenticate as the Claude GitHub App
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Resolve PR number
+        id: pr
+        run: |
+          num="${{ github.event.issue.number || github.event.inputs.pr || github.event.pull_request.number }}"
+          echo "number=$num" >> "$GITHUB_OUTPUT"
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # The bundled multi-agent reviewer. It reads REVIEW.md (severity +
+          # per-dimension rubric); REVIEW.md points it at AGENTS.md for the repo
+          # context (this repo uses AGENTS.md, not CLAUDE.md).
+          plugins: "code-review@claude-code-plugins"
+          prompt: "/code-review:code-review --comment ${{ github.repository }}/pull/${{ steps.pr.outputs.number }}"
+          # The inline-comment MCP tool must be allow-listed here for the action
+          # to start its server, even though the skill also declares it.
+          claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment"'
