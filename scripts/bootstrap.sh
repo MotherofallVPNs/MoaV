@@ -622,8 +622,11 @@ if [[ "${ENABLE_SS:-true}" == "true" ]]; then
 fi
 
 # -----------------------------------------------------------------------------
-# Generate / load Snell server PSK (stable across re-bootstraps). Snell has no
-# cipher-length constraint like SS-2022, so any secret string works.
+# Generate / load the Snell PSK (stable across re-bootstraps). Snell is
+# SHARED-KEY: every user connects with this one PSK (sing-box's multi-user snell
+# needs a per-user key no standard client — Surge/Mihomo/Stash — can send). So
+# there is no per-user snell credential; revoking a user does not remove snell
+# access (rotate this key + re-issue bundles to fully revoke). Like dnstt.
 # -----------------------------------------------------------------------------
 if [[ "${ENABLE_SNELL:-false}" == "true" ]]; then
     if [[ -f "$STATE_DIR/keys/snell-server.psk" ]]; then
@@ -649,7 +652,6 @@ ANYTLS_USERS_JSON="["
 HYSTERIA2_USERS_JSON="["
 VLESS_WS_USERS_JSON="["
 SHADOWSOCKS_USERS_JSON="["
-SNELL_USERS_JSON="["
 TRUSTTUNNEL_CREDENTIALS=""
 XRAY_USERS_JSON=""
 TELEMT_USERS_TOML=""
@@ -693,7 +695,6 @@ EOF
     [[ $i -gt 1 ]] && HYSTERIA2_USERS_JSON+=","
     [[ $i -gt 1 ]] && VLESS_WS_USERS_JSON+=","
     [[ $i -gt 1 ]] && SHADOWSOCKS_USERS_JSON+=","
-    [[ $i -gt 1 ]] && SNELL_USERS_JSON+=","
 
     REALITY_USERS_JSON+="{\"name\":\"$USER_ID\",\"uuid\":\"$USER_UUID\",\"flow\":\"xtls-rprx-vision\"}"
     TROJAN_USERS_JSON+="{\"name\":\"$USER_ID\",\"password\":\"$USER_PASSWORD\"}"
@@ -712,19 +713,6 @@ SS_USER_PSK=$SS_USER_PSK
 EOF
         fi
         SHADOWSOCKS_USERS_JSON+="{\"name\":\"$USER_ID\",\"password\":\"$SS_USER_PSK\"}"
-    fi
-
-    # Snell per-user key (the value the client uses as its psk).
-    if [[ "${ENABLE_SNELL:-false}" == "true" ]]; then
-        if [[ -f "$STATE_DIR/users/$USER_ID/snell.env" ]]; then
-            source "$STATE_DIR/users/$USER_ID/snell.env"
-        else
-            SNELL_USER_KEY=$(openssl rand -hex 16)
-            cat > "$STATE_DIR/users/$USER_ID/snell.env" <<EOF
-SNELL_USER_KEY=$SNELL_USER_KEY
-EOF
-        fi
-        SNELL_USERS_JSON+="{\"name\":\"$USER_ID\",\"userkey\":\"$SNELL_USER_KEY\"}"
     fi
 
     # TrustTunnel credentials (TOML format - uses [[client]] not [[credentials]])
@@ -880,7 +868,6 @@ ANYTLS_USERS_JSON+="]"
 HYSTERIA2_USERS_JSON+="]"
 VLESS_WS_USERS_JSON+="]"
 SHADOWSOCKS_USERS_JSON+="]"
-SNELL_USERS_JSON+="]"
 
 # -----------------------------------------------------------------------------
 # Generate TrustTunnel config (if enabled)
@@ -1015,7 +1002,6 @@ if [[ "$singbox_needed" == "true" ]]; then
     export SS_SERVER_PSK="${SS_SERVER_PSK:-}"
     export SS_METHOD
     export PORT_SS
-    export SNELL_USERS_JSON="${SNELL_USERS_JSON:-[]}"
     export SNELL_SERVER_PSK="${SNELL_SERVER_PSK:-}"
     export PORT_SNELL="${PORT_SNELL:-8389}"
     export SNELL_OBFS="${SNELL_OBFS:-http}"
