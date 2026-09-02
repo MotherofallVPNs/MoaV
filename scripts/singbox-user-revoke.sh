@@ -11,10 +11,17 @@ cd "$SCRIPT_DIR/.."
 
 source scripts/lib/common.sh
 
-USERNAME="${1:-}"
+USERNAME=""
+NO_RELOAD=""
+for _a in "$@"; do
+    case "$_a" in
+        --no-reload) NO_RELOAD=1 ;;
+        *) [[ -z "$USERNAME" ]] && USERNAME="$_a" ;;
+    esac
+done
 
 if [[ -z "$USERNAME" ]]; then
-    echo "Usage: $0 <username>"
+    echo "Usage: $0 <username> [--no-reload]"
     exit 1
 fi
 
@@ -168,38 +175,11 @@ if [[ -f "$TELEMT_CONFIG" ]]; then
     fi
 fi
 
-# Reload sing-box
-if docker compose ps sing-box --status running 2>/dev/null | tail -n +2 | grep -q .; then
-    log_info "Reloading sing-box..."
-    if docker compose exec -T sing-box sing-box reload 2>/dev/null; then
-        log_info "sing-box reloaded"
-    else
-        docker compose restart sing-box
-    fi
-fi
-
-# Reload Xray (XHTTP + XDNS — picks up the revoked-user removal)
-if [[ -f "$XRAY_CONFIG" ]]; then
-    if docker compose --profile xhttp ps xray --status running 2>/dev/null | tail -n +2 | grep -q .; then
-        log_info "Restarting Xray..."
-        docker compose --profile xhttp restart xray
-    fi
-fi
-
-# Reload TrustTunnel (if running)
-if [[ -f "$TRUSTTUNNEL_CREDS" ]]; then
-    if docker compose ps trusttunnel --status running 2>/dev/null | tail -n +2 | grep -q .; then
-        log_info "Restarting TrustTunnel..."
-        docker compose restart trusttunnel
-    fi
-fi
-
-# Reload telemt (if running)
-if [[ -f "$TELEMT_CONFIG" ]]; then
-    if docker compose --profile telegram ps telemt --status running 2>/dev/null | tail -n +2 | grep -q .; then
-        log_info "Restarting telemt..."
-        docker compose --profile telegram restart telemt
-    fi
+# Reload the proxy services, unless the caller defers it. A batch revoke passes
+# --no-reload and reloads once at the end (see lib/users.sh), instead of a
+# sing-box reload + xray/trusttunnel restart per user.
+if [[ -z "$NO_RELOAD" ]]; then
+    "$SCRIPT_DIR/reload-proxy.sh"
 fi
 
 log_info "User '$USERNAME' revoked"

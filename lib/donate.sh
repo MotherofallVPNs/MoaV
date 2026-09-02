@@ -161,6 +161,18 @@ mahsanet_save_donation() {
     echo "$donations" > "$MAHSANET_DONATIONS_FILE"
 }
 
+# Already recorded in the ledger? Lets a re-run resume without re-submitting
+# (and re-burning quota on) configs that already went through. Keyed by
+# (user, protocol); `--force` bypasses this to re-donate a regenerated user.
+mahsanet_already_donated() {
+    local user="$1"
+    local protocol="$2"
+    [[ -f "$MAHSANET_DONATIONS_FILE" ]] || return 1
+    jq -e --arg u "$user" --arg p "$protocol" \
+        'any(.configs[]?; .user == $u and .protocol == $p)' \
+        "$MAHSANET_DONATIONS_FILE" >/dev/null 2>&1
+}
+
 cmd_donate_mahsanet_setup() {
     echo ""
     info "MahsaNet API Key Setup"
@@ -460,6 +472,7 @@ _get_donate_api_key() {
 
 cmd_donate_mahsanet_donate() {
     local api_key="$1"
+    local force="${2:-}"
 
     info "Validating API key..."
     if ! mahsanet_validate_key "$api_key"; then
@@ -568,11 +581,19 @@ cmd_donate_mahsanet_donate() {
     local donated=0
     local skipped=0
     local failed=0
+    local quota_hit=0
 
     for username in "${generated_users[@]}"; do
         local bundle_dir="outputs/bundles/$username"
 
         for protocol in $protocols; do
+            # Resume: skip anything already in the ledger unless --force.
+            if [[ -z "$force" ]] && mahsanet_already_donated "$username" "$protocol"; then
+                echo -e "  ${DIM}•${NC} $username/$protocol → already donated (skipping; --force to re-donate)"
+                skipped=$((skipped + 1))
+                continue
+            fi
+
             local link_file
             link_file=$(mahsanet_protocol_to_file "$protocol")
 
@@ -649,9 +670,19 @@ cmd_donate_mahsanet_donate() {
                     echo -e "  ${RED}✗${NC} $username/$protocol → failed after retry ($http_code)"
                 fi
             else
-                failed=$((failed + 1))
                 local err_msg
                 err_msg=$(echo "$body" | jq -r '.detail // .url // .non_field_errors // "unknown error"' 2>/dev/null || echo "HTTP $http_code")
+                # A submission quota (new donors capped at N configs) makes every
+                # remaining submit a guaranteed rejection — stop the run instead of
+                # hammering the API. The ledger already has what succeeded, so a
+                # later re-run resumes the rest.
+                if [[ "$http_code" == "400" ]] && \
+                   echo "$body" | grep -qiE 'submit up to|good-quality submission|can submit more'; then
+                    quota_hit=1
+                    echo -e "  ${YELLOW}⚠${NC} $username/$protocol → submission quota reached: $err_msg"
+                    break 2
+                fi
+                failed=$((failed + 1))
                 echo -e "  ${RED}✗${NC} $username/$protocol → failed ($http_code): $err_msg"
             fi
         done
@@ -665,6 +696,13 @@ cmd_donate_mahsanet_donate() {
     [[ $skipped -gt 0 ]] && echo -e "  Skipped: ${YELLOW}$skipped${NC}"
     [[ $failed -gt 0 ]] && echo -e "  Failed: ${RED}$failed${NC}"
     echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+    if [[ $quota_hit -eq 1 ]]; then
+        echo ""
+        warn "Stopped early: MahsaNet submission quota reached."
+        echo -e "  New accounts are capped until you have a week of good-quality"
+        echo -e "  submissions. What already went through is recorded — re-run"
+        echo -e "  ${CYAN}moav donate${NC} later to resume the rest (donated configs are skipped)."
+    fi
 }
 
 _format_bytes_sh() {
@@ -975,6 +1013,16 @@ cmd_donate() {
             local key; key=$(_get_donate_api_key) || return 1
             cmd_donate_mahsanet_remove "$key"
             ;;
+        donate|submit)
+            # Non-wizard MahsaNet submit. `--force` re-donates configs already in
+            # the ledger (e.g. after regenerating a user); default resumes/skips.
+            local force=""
+            for _a in "$@"; do
+                case "$_a" in --force|-f) force="--force" ;; esac
+            done
+            local key; key=$(_get_donate_api_key) || return 1
+            cmd_donate_mahsanet_donate "$key" "$force"
+            ;;
         info|--info)
             cmd_donate_conduit_info
             ;;
@@ -986,6 +1034,7 @@ cmd_donate() {
             echo "Commands:"
             echo "  (none)     Interactive donation wizard"
             echo "  setup      Configure donation services (MahsaNet, Conduit, Snowflake)"
+            echo "  donate     Submit MahsaNet configs (add --force to re-donate skipped ones)"
             echo "  status     Show all donation services status and stats"
             echo "  list       List donated MahsaNet configs"
             echo "  delete     Select and delete specific MahsaNet configs"
