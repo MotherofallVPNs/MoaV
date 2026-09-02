@@ -624,6 +624,7 @@
                 <li style="{{TROJAN_DISPLAY}}"><a href="#en" onclick="scrollToSection('trojan-en')">3. Trojan <span class="toc-badge badge-secondary">Backup</span></a></li>
                 <li style="{{ANYTLS_DISPLAY}}"><a href="#en" onclick="scrollToSection('anytls-en')">3c. AnyTLS <span class="toc-badge badge-secondary">Anti-Fingerprint</span></a></li>
                 <li style="{{SHADOWSOCKS_DISPLAY}}"><a href="#en" onclick="scrollToSection('shadowsocks-en')">3b. Shadowsocks-2022</a></li>
+                <li style="{{SNELL_DISPLAY}}"><a href="#en" onclick="scrollToSection('snell-en')">3c. Snell</a></li>
                 <li style="{{CDN_DISPLAY}}"><a href="#en" onclick="scrollToSection('cdn-en')">4. CDN VLESS+WS <span class="toc-badge badge-secondary">IP Blocked?</span></a></li>
                 <li style="{{XHTTP_DISPLAY}}"><a href="#en" onclick="scrollToSection('xhttp-en')">4b. XHTTP <span class="toc-badge badge-secondary">Xray-core</span></a></li>
                 <li style="{{AMNEZIAWG_DISPLAY}}"><a href="#en" onclick="scrollToSection('amneziawg-en')">5. AmneziaWG <span class="toc-badge badge-secondary">Anti-DPI</span></a></li>
@@ -843,6 +844,36 @@
                 <div class="config-box">
                     <h4>Config Link (click to copy)</h4>
                     <div class="config-value" onclick="copyConfig(this)">{{CONFIG_SHADOWSOCKS}}</div>
+                </div>
+            </div>
+        </details>
+
+        <!-- Snell -->
+        <details class="protocol-section" id="snell-en" style="{{SNELL_DISPLAY}}">
+            <summary class="protocol-header">
+                <div class="protocol-title">
+                    <h2>3c. Snell</h2>
+                </div>
+                <span class="protocol-port">Port {{PORT_SNELL}}/tcp</span>
+            </summary>
+            <div class="protocol-content">
+                <p class="protocol-desc">Lightweight TCP proxy with HTTP obfuscation. <strong>Requires a Snell v5 client</strong> — Surge 5+, Stash, or a recent Mihomo/Clash.Meta. There is no share-URI: paste the config below into your client.</p>
+                <div class="qr-section">
+                    <div class="qr-code">
+                        <img src="data:image/png;base64,{{QR_SNELL}}" alt="Snell QR Code" onerror="this.parentElement.classList.add('qr-missing'); this.parentElement.innerHTML='QR not available<br>Use config below';">
+                    </div>
+                    <div class="qr-instructions">
+                        <h4>How to connect:</h4>
+                        <ol>
+                            <li>Install <strong>Surge</strong> (5+), <strong>Stash</strong>, or <strong>Mihomo / Clash.Meta</strong></li>
+                            <li>Paste the config below into your profile (Surge <code>[Proxy]</code> or Clash <code>proxies:</code>)</li>
+                            <li>Select the <strong>MoaV-Snell</strong> proxy and connect</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="config-box">
+                    <h4>Config (click to copy)</h4>
+                    <div class="config-value multiline" onclick="copyConfig(this)">{{CONFIG_SNELL}}</div>
                 </div>
             </div>
         </details>
@@ -1554,6 +1585,7 @@
                 <li style="{{TROJAN_DISPLAY}}"><a href="#fa" onclick="scrollToSection('trojan-fa')">۳. Trojan <span class="toc-badge badge-secondary">پشتیبان</span></a></li>
                 <li style="{{ANYTLS_DISPLAY}}"><a href="#fa" onclick="scrollToSection('anytls-fa')">۳پ. AnyTLS <span class="toc-badge badge-secondary">ضد اثرانگشت</span></a></li>
                 <li style="{{SHADOWSOCKS_DISPLAY}}"><a href="#fa" onclick="scrollToSection('shadowsocks-fa')">۳ب. Shadowsocks-2022</a></li>
+                <li style="{{SNELL_DISPLAY}}"><a href="#fa" onclick="scrollToSection('snell-fa')">۳ج. Snell</a></li>
                 <li style="{{CDN_DISPLAY}}"><a href="#fa" onclick="scrollToSection('cdn-fa')">۴. CDN VLESS+WS <span class="toc-badge badge-secondary">IP مسدود؟</span></a></li>
                 <li style="{{XHTTP_DISPLAY}}"><a href="#fa" onclick="scrollToSection('xhttp-fa')">۴ب. XHTTP <span class="toc-badge badge-secondary">Xray-core</span></a></li>
                 <li style="{{AMNEZIAWG_DISPLAY}}"><a href="#fa" onclick="scrollToSection('amneziawg-fa')">۵. AmneziaWG <span class="toc-badge badge-secondary">ضد فیلتر</span></a></li>
@@ -1773,6 +1805,36 @@
                 <div class="config-box">
                     <h4>لینک کانفیگ (کلیک برای کپی)</h4>
                     <div class="config-value" onclick="copyConfig(this)">{{CONFIG_SHADOWSOCKS}}</div>
+                </div>
+            </div>
+        </details>
+
+        <!-- Snell -->
+        <details class="protocol-section" id="snell-fa" style="{{SNELL_DISPLAY}}">
+            <summary class="protocol-header">
+                <div class="protocol-title">
+                    <h2>۳ج. Snell</h2>
+                </div>
+                <span class="protocol-port">پورت {{PORT_SNELL}}/tcp</span>
+            </summary>
+            <div class="protocol-content">
+                <p class="protocol-desc">پروکسی سبک TCP با مبهم‌سازی HTTP. <strong>به کلاینت سازگار با Snell نسخهٔ ۵ نیاز دارد</strong> — Surge نسخهٔ ۵ به بالا، Stash یا Mihomo/Clash.Meta جدید. لینک اشتراک ندارد؛ کانفیگ زیر را در کلاینت خود پیست کنید.</p>
+                <div class="qr-section">
+                    <div class="qr-code">
+                        <img src="data:image/png;base64,{{QR_SNELL}}" alt="QR Code Snell" onerror="this.parentElement.classList.add('qr-missing'); this.parentElement.innerHTML='QR در دسترس نیست<br>از کانفیگ زیر استفاده کنید';">
+                    </div>
+                    <div class="qr-instructions">
+                        <h4>نحوه اتصال:</h4>
+                        <ol>
+                            <li><strong>Surge</strong> (۵+)، <strong>Stash</strong> یا <strong>Mihomo / Clash.Meta</strong> را نصب کنید</li>
+                            <li>کانفیگ زیر را در پروفایل خود پیست کنید (بخش <code>[Proxy]</code> در Surge یا <code>proxies:</code> در Clash)</li>
+                            <li>پروکسی <strong>MoaV-Snell</strong> را انتخاب و متصل شوید</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="config-box">
+                    <h4>کانفیگ (کلیک برای کپی)</h4>
+                    <div class="config-value multiline" onclick="copyConfig(this)">{{CONFIG_SNELL}}</div>
                 </div>
             </div>
         </details>

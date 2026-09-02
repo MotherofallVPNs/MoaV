@@ -53,6 +53,8 @@ jobs:
         run: bash tests/singbox-config-valid-test.sh
       - name: sing-box real-binary check + format (pinned version)
         run: bash tests/singbox-check-test.sh
+      - name: Snell protocol wiring + add-user
+        run: bash tests/snell-test.sh
       - name: wg/awg keygen fallback (local image, not lscr.io)
         run: bash tests/wg-keygen-fallback-test.sh
       - name: user UUID capture (no two-line double-capture)

@@ -414,6 +414,51 @@ EOF
 fi
 
 # -----------------------------------------------------------------------------
+# Generate Snell client config (Surge / Clash.Meta). No standard share-URI.
+# Requires a client that supports Snell v5: Surge 5+, Stash, recent Mihomo.
+# -----------------------------------------------------------------------------
+if [[ "${ENABLE_SNELL:-false}" == "true" ]]; then
+  if [[ -f "$OUTPUT_DIR/snell.txt" ]] && [[ "$FORCE_REGENERATE" != "force" ]]; then
+    log_info "  - Snell config exists, skipping"
+  else
+    SNELL_USER_KEY=""
+    if [[ -f "$STATE_DIR/users/$USER_ID/snell.env" ]]; then
+        # shellcheck source=/dev/null
+        source "$STATE_DIR/users/$USER_ID/snell.env"
+    fi
+    if [[ -z "$SNELL_USER_KEY" ]]; then
+        log_error "  - Snell key missing for $USER_ID, skipping"
+    else
+        BUNDLE_CHANGED=true
+        SNELL_PORT="${PORT_SNELL:-8389}"
+        SNELL_OBFS_LOCAL="${SNELL_OBFS:-http}"
+        if [[ "$SNELL_OBFS_LOCAL" == "http" ]]; then
+            SNELL_SURGE_LINE="MoaV-Snell-$USER_ID = snell, $SERVER_IP, $SNELL_PORT, psk=$SNELL_USER_KEY, version=5, obfs=http, obfs-host=www.bing.com"
+            SNELL_CLASH_OBFS=$'\n  obfs-opts:\n    mode: http\n    host: www.bing.com'
+        else
+            SNELL_SURGE_LINE="MoaV-Snell-$USER_ID = snell, $SERVER_IP, $SNELL_PORT, psk=$SNELL_USER_KEY, version=5"
+            SNELL_CLASH_OBFS=""
+        fi
+        cat > "$OUTPUT_DIR/snell.txt" <<EOF
+# MoaV Snell — requires a Snell v5 client (Surge 5+, Stash, recent Mihomo/Clash.Meta).
+# --- Surge (add under [Proxy]) ---
+$SNELL_SURGE_LINE
+
+# --- Clash.Meta / Mihomo (add under proxies:) ---
+- name: MoaV-Snell-$USER_ID
+  type: snell
+  server: $SERVER_IP
+  port: $SNELL_PORT
+  psk: $SNELL_USER_KEY
+  version: 5$SNELL_CLASH_OBFS
+EOF
+        qrencode -o "$OUTPUT_DIR/snell-qr.png" -s 6 "$SNELL_SURGE_LINE" 2>/dev/null || true
+        log_info "  - Snell config generated"
+    fi
+  fi
+fi
+
+# -----------------------------------------------------------------------------
 # Generate CDN VLESS+WS client config (if CDN_DOMAIN is set)
 # -----------------------------------------------------------------------------
 # Construct CDN_DOMAIN from CDN_SUBDOMAIN + DOMAIN if not explicitly set

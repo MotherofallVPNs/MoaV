@@ -418,6 +418,34 @@ EOF
     fi
 fi
 
+# Generate Snell bundle (Surge / Clash.Meta; requires a Snell v5 client).
+if [[ "${ENABLE_SNELL:-false}" == "true" ]] && [[ -n "${SNELL_USER_KEY:-}" ]]; then
+    SNELL_PORT_LOCAL="${PORT_SNELL:-$(get_env_val "PORT_SNELL" ".env" "8389")}"
+    SNELL_OBFS_LOCAL="${SNELL_OBFS:-$(get_env_val "SNELL_OBFS" ".env" "http")}"
+    if [[ "$SNELL_OBFS_LOCAL" == "http" ]]; then
+        SNELL_SURGE_LINE="MoaV-Snell-$USERNAME = snell, $SERVER_IP, $SNELL_PORT_LOCAL, psk=$SNELL_USER_KEY, version=5, obfs=http, obfs-host=www.bing.com"
+        SNELL_CLASH_OBFS=$'\n  obfs-opts:\n    mode: http\n    host: www.bing.com'
+    else
+        SNELL_SURGE_LINE="MoaV-Snell-$USERNAME = snell, $SERVER_IP, $SNELL_PORT_LOCAL, psk=$SNELL_USER_KEY, version=5"
+        SNELL_CLASH_OBFS=""
+    fi
+    cat > "$OUTPUT_DIR/snell.txt" <<EOF
+# MoaV Snell — requires a Snell v5 client (Surge 5+, Stash, recent Mihomo/Clash.Meta).
+# --- Surge (add under [Proxy]) ---
+$SNELL_SURGE_LINE
+
+# --- Clash.Meta / Mihomo (add under proxies:) ---
+- name: MoaV-Snell-$USERNAME
+  type: snell
+  server: $SERVER_IP
+  port: $SNELL_PORT_LOCAL
+  psk: $SNELL_USER_KEY
+  version: 5$SNELL_CLASH_OBFS
+EOF
+    command -v qrencode &>/dev/null && qrencode -o "$OUTPUT_DIR/snell-qr.png" -s 6 "$SNELL_SURGE_LINE" 2>/dev/null || true
+    log_info "Generated Snell bundle (port $SNELL_PORT_LOCAL, obfs $SNELL_OBFS_LOCAL)"
+fi
+
 # Add user to TrustTunnel (if enabled and its config exists). The file-exists
 # check alone was not enough: credentials.toml survives disabling the protocol,
 # so bundles kept shipping TrustTunnel configs after ENABLE_TRUSTTUNNEL=false.
