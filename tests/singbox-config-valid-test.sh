@@ -28,7 +28,8 @@ export ANYTLS_USERS_JSON='[]' REALITY_USERS_JSON='[]' SHADOWSOCKS_USERS_JSON='[]
        DOMAIN='example.com' LOG_LEVEL='info' PORT_ANYTLS='8445' PORT_SS='8388' \
        REALITY_PRIVATE_KEY='k' REALITY_SERVER_NAME='www.microsoft.com' \
        REALITY_SHORT_ID='0123abcd' REALITY_TARGET_HOST='www.microsoft.com' \
-       REALITY_TARGET_PORT='443' SS_METHOD='2022-blake3-aes-128-gcm' SS_SERVER_PSK='psk'
+       REALITY_TARGET_PORT='443' SS_METHOD='2022-blake3-aes-128-gcm' SS_SERVER_PSK='psk' \
+       PORT_SNELL='8389' SNELL_SERVER_PSK='snellpsk123456' SNELL_OBFS='http' SNELL_USERS_JSON='[]'
 
 # Render (envsubst if present, else a Python fallback so the test runs anywhere).
 if command -v envsubst >/dev/null 2>&1; then

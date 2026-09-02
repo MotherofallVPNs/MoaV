@@ -71,7 +71,8 @@ export ANYTLS_USERS_JSON='[]' REALITY_USERS_JSON='[]' SHADOWSOCKS_USERS_JSON='[]
        PORT_ANYTLS='8445' PORT_SS='8388' REALITY_PRIVATE_KEY="$rkey" \
        REALITY_SERVER_NAME='www.microsoft.com' REALITY_SHORT_ID='0123abcd' \
        REALITY_TARGET_HOST='www.microsoft.com' REALITY_TARGET_PORT='443' \
-       SS_METHOD='2022-blake3-aes-128-gcm' SS_SERVER_PSK="$ss_psk"
+       SS_METHOD='2022-blake3-aes-128-gcm' SS_SERVER_PSK="$ss_psk" \
+       PORT_SNELL='8389' SNELL_SERVER_PSK='snellpsk123456' SNELL_OBFS='http' SNELL_USERS_JSON='[]'
 
 rendered="$work/config.json"
 if command -v envsubst >/dev/null 2>&1; then

@@ -126,6 +126,16 @@
         "enabled": true,
         "padding": true
       }
+    },
+    {
+      "type": "snell",
+      "tag": "snell-in",
+      "listen": "::",
+      "listen_port": ${PORT_SNELL},
+      "version": 5,
+      "psk": "${SNELL_SERVER_PSK}",
+      "obfs_mode": "${SNELL_OBFS}",
+      "users": ${SNELL_USERS_JSON}
     }
   ],
   "outbounds": [
