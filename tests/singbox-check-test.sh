@@ -55,15 +55,22 @@ fi
 
 work="$(mktemp -d)"; trap 'rm -rf "$work"' EXIT
 
+# Fields with a validated format need real-shaped fixtures, or `check` rejects
+# them: reality wants an x25519 key (generate one with the binary itself so it's
+# always version-correct), and 2022-blake3-aes-128-gcm wants a 16-byte base64 PSK.
+rkey="$("$bin" generate reality-keypair 2>/dev/null | awk '/PrivateKey/{print $2}')"
+[ -n "$rkey" ] || rkey="wJ7dEpZ6gTfQ0nQb3l2xk9m8yq1sVd4uHc5rNpA6oXk"  # fallback x25519
+ss_psk="$(printf '1234567890123456' | base64)"  # 16 bytes for aes-128
+
 # Representative render values (kept in sync with singbox-config-valid-test.sh).
 export ANYTLS_USERS_JSON='[]' REALITY_USERS_JSON='[]' SHADOWSOCKS_USERS_JSON='[]' \
        TROJAN_USERS_JSON='[]' VLESS_WS_USERS_JSON='[]' HYSTERIA2_USERS_JSON='[]' \
        HYSTERIA2_OBFS_PASSWORD='obfspw' CDN_TRANSPORT='ws' CDN_WS_PATH='/ws' \
        CLASH_API_SECRET='testsecret' DOMAIN='example.com' LOG_LEVEL='info' \
-       PORT_ANYTLS='8445' PORT_SS='8388' REALITY_PRIVATE_KEY='k' \
+       PORT_ANYTLS='8445' PORT_SS='8388' REALITY_PRIVATE_KEY="$rkey" \
        REALITY_SERVER_NAME='www.microsoft.com' REALITY_SHORT_ID='0123abcd' \
        REALITY_TARGET_HOST='www.microsoft.com' REALITY_TARGET_PORT='443' \
-       SS_METHOD='2022-blake3-aes-128-gcm' SS_SERVER_PSK='psk'
+       SS_METHOD='2022-blake3-aes-128-gcm' SS_SERVER_PSK="$ss_psk"
 
 rendered="$work/config.json"
 if command -v envsubst >/dev/null 2>&1; then
