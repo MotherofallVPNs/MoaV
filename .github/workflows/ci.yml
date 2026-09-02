@@ -49,6 +49,8 @@ jobs:
         run: bash tests/entrypoint-strict-test.sh
       - name: sing-box state read-only (no key-ownership downgrade)
         run: bash tests/singbox-state-readonly-test.sh
+      - name: sing-box config valid JSON + 1.14 compatibility
+        run: bash tests/singbox-config-valid-test.sh
       - name: wg/awg keygen fallback (local image, not lscr.io)
         run: bash tests/wg-keygen-fallback-test.sh
       - name: user UUID capture (no two-line double-capture)
