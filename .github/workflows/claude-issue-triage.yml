@@ -1,0 +1,88 @@
+name: Claude Issue Triage
+
+# Automated issue triage by Claude Code. It reads a new or existing issue,
+# applies labels from the repo's EXISTING label set, and posts one concise
+# triage comment. It is triage-only: it never edits code, opens a PR, commits,
+# or closes issues. Unlike PR review there is no bundled plugin — this is a
+# custom prompt driving the `gh` CLI, following the rubric in TRIAGE.md.
+#
+# ── Trigger model (start = admin-only) ──────────────────────────────────────
+# Runs only when a maintainer asks:
+#   • a maintainer comments `@claude triage` on an issue, or
+#   • a maintainer runs it from the Actions tab (Run workflow → issue number).
+# The `author_association` gate restricts the comment path to the org.
+# To auto-triage every new issue, uncomment the `issues` trigger below.
+#
+# ── Prerequisite ────────────────────────────────────────────────────────────
+# The same `CLAUDE_CODE_OAUTH_TOKEN` secret as the review workflow (set at the
+# org level), and the Claude GitHub App approved on the repo (it carries
+# `issues: write`).
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "Issue number to triage"
+        required: true
+        type: string
+  # ── TWEAK: uncomment to auto-triage new issues ──
+  # issues:
+  #   types: [opened, reopened]
+
+concurrency:
+  group: claude-triage-${{ github.event.issue.number || github.event.inputs.issue }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    # A maintainer's `@claude triage` comment on an ISSUE (not a PR), OR a manual
+    # dispatch, OR (once enabled) a new issue. `author_association` keeps the
+    # comment path org-only.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'issues' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request == null &&
+       contains(github.event.comment.body, '@claude triage') &&
+       contains(fromJson('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read       # read TRIAGE.md / AGENTS.md from the checkout
+      issues: write        # apply labels + post the triage comment
+      id-token: write      # authenticate as the Claude GitHub App
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Resolve issue number
+        id: issue
+        run: echo "number=${{ github.event.issue.number || github.event.inputs.issue }}" >> "$GITHUB_OUTPUT"
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Triage GitHub issue #${{ steps.issue.outputs.number }} in ${{ github.repository }}.
+            First read TRIAGE.md (the rubric, including the security rules) and AGENTS.md (repo context).
+
+            Steps:
+            1. Read the issue: `gh issue view ${{ steps.issue.outputs.number }}`.
+            2. List existing labels: `gh label list`. Apply ONLY labels that already
+               exist — never invent one. Add labels with
+               `gh issue edit ${{ steps.issue.outputs.number }} --add-label "<label>"`. Use 1–3 at most.
+            3. Post ONE concise triage comment with
+               `gh issue comment ${{ steps.issue.outputs.number }} --body "..."`: restate the ask in a
+               line, name the likely area (CLI/lib · scripts/entrypoints · configs/compose ·
+               monitoring · docs), say what is still needed, and ask up to 2–3
+               clarifying questions if useful.
+
+            Hard limits (see TRIAGE.md): triage only — no code changes, no PRs, no
+            commits, do not close the issue. This is a censorship-circumvention
+            server: if the issue contains a secret, admin password, private key,
+            server IP, or a user's full share-URI/config, do NOT repeat it back;
+            flag it and ask the reporter to redact. Don't re-triage an issue you've
+            already commented on.
+          claude_args: '--max-turns 6 --allowedTools "Read,Bash(gh issue view:*),Bash(gh label list:*),Bash(gh issue edit:*),Bash(gh issue comment:*)"'
