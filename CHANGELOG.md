@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **sing-box updated to 1.14.0.** Our config is already on 1.14's modern surface,
+  so no config change is required; validated by running the real 1.14 `sing-box
+  check` against the live config (clean, no deprecation warnings). New CI gates
+  render the config and run both a static compatibility check and the real
+  `sing-box check`/`format`.
+- **Opt-in Hysteria2 hardening.** `HYSTERIA2_OBFS_TYPE` (default `salamander`)
+  can select the new **gecko** obfuscator, which fragments the QUIC handshake and
+  resists Iran/CN/RU DPI better. It stays opt-in because gecko needs a client app
+  whose core is sing-box ≥ 1.14 or hysteria ≥ 2.9.2 — switching the server breaks
+  clients on older cores, so **re-issue bundles and confirm your users' apps
+  before enabling it**. Planned to become the default once client support is
+  broad. `HYSTERIA2_BBR_PROFILE` optionally selects BBR congestion control
+  (default keeps hysteria2's Brutal control, which is usually better under
+  loss-based throttling).
+
+### Changed
+- **Client test tool:** migrated the WireGuard path from the removed sing-box
+  `wireguard` *outbound* to the 1.14 *endpoint* form.
+
 ## [2.2.3] - 2026-08-27
 
 AmneziaWG connectivity fixes for the current client apps, restart-proof Snowflake
