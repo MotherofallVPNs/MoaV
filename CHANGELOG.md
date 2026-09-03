@@ -7,28 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-09-03
+
+sing-box 1.14, the new **Snell** protocol (on by default), and opt-in Hysteria2 gecko obfuscation. No breaking changes; keys, users, and certificates are untouched.
+
 ### Added
-- **Snell protocol (new sing-box inbound).** A lightweight TCP proxy (Surge /
-  Stash / Mihomo clients) with HTTP obfuscation, no TLS/domain required.
-  Opt-in via `ENABLE_SNELL` (default off), `PORT_SNELL` (8389), `SNELL_OBFS`.
-  Per-user keys, provisioning through both `moav bootstrap` and `moav user add`,
-  and enable-gating — all validated against the real sing-box 1.14 binary.
+- **Snell protocol (new sing-box inbound), on by default.** A lightweight TCP
+  proxy with HTTP obfuscation, no TLS/domain required (`ENABLE_SNELL=true`,
+  `PORT_SNELL=8389`, `SNELL_OBFS`). **Shared-key** (one PSK for all users, like the
+  DNS tunnels) — sing-box's multi-user snell has no client-compatible auth, so
+  revoking a user needs a key rotation + re-issue. Needs a Snell v5 client
+  (Surge 5 / Stash / Clash Mi / Mihomo / Clash Meta for Android / FlClash — **not**
+  v2rayNG or Hiddify). Validated end-to-end against a real Mihomo client and the
+  real sing-box 1.14 binary.
 - **sing-box updated to 1.14.0.** Our config is already on 1.14's modern surface,
   so no config change is required; validated by running the real 1.14 `sing-box
   check` against the live config (clean, no deprecation warnings). New CI gates
   render the config and run both a static compatibility check and the real
-  `sing-box check`/`format`.
+  `sing-box check` / `format`.
 - **Opt-in Hysteria2 gecko obfuscation.** `HYSTERIA2_OBFS_TYPE` (default
   `salamander`) can select the new **gecko** obfuscator, which fragments the QUIC
-  handshake and resists Iran/CN/RU DPI better. It stays opt-in because gecko needs
-  a client app whose core is sing-box ≥ 1.14 or hysteria ≥ 2.9.2 — switching the
-  server breaks clients on older cores, so **re-issue bundles and confirm your
-  users' apps before enabling it**. Planned to become the default once client
-  support is broad.
+  handshake and resists Iran/CN/RU DPI better. Opt-in because gecko needs a client
+  core of sing-box >= 1.14 or hysteria >= 2.9.2 — re-issue bundles and confirm your
+  users' apps before enabling it.
 
 ### Changed
 - **Client test tool:** migrated the WireGuard path from the removed sing-box
   `wireguard` *outbound* to the 1.14 *endpoint* form.
+
+## [2.2.4] - 2026-09-02
+
+Operator quality-of-life: bulk user revocation with a single service reset, safer
+config donation, and automated PR review / issue triage — plus refreshed
+transport and monitoring component versions. Keys, users, and certificates are
+untouched.
+
+### Added
+- **`moav user revoke --all`** revokes every user in one pass (enumerated from the
+  bundle directories), with a confirmation prompt unless `--yes`. Several
+  usernames can also be passed at once: `moav user revoke alice bob carol`.
+- **Donation resume.** `moav donate` now skips configs already recorded in the
+  ledger, so a re-run continues where a previous one stopped;
+  `moav donate submit --force` re-submits on purpose (e.g. after regenerating a
+  user).
+- **Automated PR review and issue triage** via Claude Code — admin-triggered and
+  advisory. Comment `@claude review` on a PR or `@claude triage` on an issue. See
+  [`docs/devdocs/CLAUDE-REVIEW.md`](docs/devdocs/CLAUDE-REVIEW.md).
+
+### Changed
+- **Batch revoke resets the proxy services once.** Revoking several users (or
+  `--all`) used to reload sing-box and restart xray/trusttunnel per user — N
+  reload cycles that repeatedly dropped live tunnels. It now defers the per-user
+  reloads and resets the services once at the end.
+- **Component updates:** wstunnel 10.6.2 → 10.7.1 (lower memory on asymmetric
+  links, SOCKS5 waits for tunnel establishment, self-signed cert valid ≥1 year),
+  TrustTunnel 1.0.33 → 1.1.0 (UDP socket-leak fix, global-IPv6 classification fix,
+  opt-in per-user metrics), telemt 3.5.2 → 3.5.5 (carrier negotiation, iOS carrier
+  fix), AmneziaWG-go → v3.1.20260828 (obfuscation correctness fixes), Prometheus
+  3.13.2 → 3.14.0. No config changes required.
+
+### Fixed
+- **Config donation no longer overloads the MahsaNet API on a quota cap.** A
+  new-donor submission limit returns HTTP 400; the loop previously kept firing
+  every remaining config (all rejected). It now detects the quota message, stops
+  the run, and reports what was donated so a later run resumes.
 
 ## [2.2.3] - 2026-08-27
 
@@ -2104,7 +2146,9 @@ TrustTunnel config validity.
 - uTLS fingerprint spoofing (Chrome)
 - Automatic short ID generation for Reality
 
-[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v2.2.3...HEAD
+[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/MotherofallVPNs/moav/compare/v2.2.4...v2.3.0
+[2.2.4]: https://github.com/MotherofallVPNs/moav/compare/v2.2.3...v2.2.4
 [2.2.3]: https://github.com/MotherofallVPNs/moav/compare/v2.2.2...v2.2.3
 [2.2.2]: https://github.com/MotherofallVPNs/moav/compare/v2.2.1...v2.2.2
 [2.2.1]: https://github.com/MotherofallVPNs/moav/compare/v2.2.0...v2.2.1

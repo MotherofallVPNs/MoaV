@@ -129,7 +129,7 @@ cp .env.example .env      # DOMAIN, ACME_EMAIL, ADMIN_PASSWORD (top block)
 | `configs/` | `*.template` → rendered configs; Grafana dashboards under `configs/monitoring/…` |
 | `dockerfiles/`, `exporters/`, `admin/` | Image builds, Prometheus exporters, the FastAPI admin app |
 | `tests/*.sh` | Regression suite (one file per bug class) |
-| `docs/devdocs/` | E2E-TESTING, PROTOCOL-INTEGRATION-CHECKLIST, VERSION-BUMP-CHECKLIST |
+| `docs/devdocs/` | E2E-TESTING, PROTOCOL-INTEGRATION-CHECKLIST, VERSION-BUMP-CHECKLIST, CLAUDE-REVIEW |
 
 **Conventions that bite** (when editing bash): entrypoints run `set -eu` +
 pipefail (subshell-probed — `set -o pipefail` is fatal in dash even with
