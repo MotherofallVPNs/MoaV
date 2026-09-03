@@ -49,7 +49,7 @@ fi
 # --- 4. env + compose --------------------------------------------------------
 has '^ENABLE_SNELL='  ".env.example" && has '^PORT_SNELL='  ".env.example" \
     && ok ".env.example has ENABLE_SNELL + PORT_SNELL" || bad ".env.example missing Snell knobs"
-grep -q '^ENABLE_SNELL=false' "$ROOT/.env.example" && ok "ENABLE_SNELL defaults off" || bad "ENABLE_SNELL should default off"
+grep -q '^ENABLE_SNELL=true' "$ROOT/.env.example" && ok "ENABLE_SNELL defaults on (2.3.0)" || bad "ENABLE_SNELL should default on"
 has 'PORT_SNELL' "docker-compose.yml" && has 'ENABLE_SNELL' "docker-compose.yml" \
     && ok "docker-compose exposes the port + passes ENABLE_SNELL to bootstrap" || bad "docker-compose missing Snell wiring"
 

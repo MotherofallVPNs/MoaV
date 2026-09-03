@@ -397,7 +397,7 @@ fi
 
 # Generate Snell bundle (SHARED-KEY: same config for every user). Snell is not
 # per-user — all users connect with the one server PSK. Needs a Snell v5 client.
-if [[ "${ENABLE_SNELL:-false}" == "true" ]] && jq -e '.inbounds[] | select(.tag == "snell-in")' "$CONFIG_FILE" >/dev/null 2>&1; then
+if [[ "${ENABLE_SNELL:-true}" == "true" ]] && jq -e '.inbounds[] | select(.tag == "snell-in")' "$CONFIG_FILE" >/dev/null 2>&1; then
     SNELL_PSK=""
     if [[ -f "$STATE_DIR/keys/snell-server.psk" ]]; then
         SNELL_PSK=$(cat "$STATE_DIR/keys/snell-server.psk" 2>/dev/null | tr -d '\n')

@@ -611,7 +611,7 @@ profile_enabled() {
             _a=$(get_env_val "ENABLE_ANYTLS"    "$env_file" "false")
             _h=$(get_env_val "ENABLE_HYSTERIA2" "$env_file" "true")
             _s=$(get_env_val "ENABLE_SS"        "$env_file" "true")
-            _sn=$(get_env_val "ENABLE_SNELL"    "$env_file" "false")
+            _sn=$(get_env_val "ENABLE_SNELL"    "$env_file" "true")
             [[ "$_r" == "true" || "$_t" == "true" || "$_a" == "true" || "$_h" == "true" || "$_s" == "true" || "$_sn" == "true" ]] \
                 && echo true || echo false ;;
         wireguard)   [[ "$(get_env_val "ENABLE_WIREGUARD"   "$env_file" "true")"  == "true" ]] && echo true || echo false ;;

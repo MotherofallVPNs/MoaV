@@ -143,7 +143,7 @@ if [[ -z "${DOMAIN:-}" ]]; then
     _domainless_protos="Reality"
     [[ "${ENABLE_XHTTP:-true}"     == "true" ]] && _domainless_protos="$_domainless_protos, XHTTP"
     [[ "${ENABLE_SS:-true}"        == "true" ]] && _domainless_protos="$_domainless_protos, Shadowsocks-2022"
-    [[ "${ENABLE_SNELL:-false}"    == "true" ]] && _domainless_protos="$_domainless_protos, Snell"
+    [[ "${ENABLE_SNELL:-true}"    == "true" ]] && _domainless_protos="$_domainless_protos, Snell"
     [[ "${ENABLE_WIREGUARD:-true}" == "true" ]] && _domainless_protos="$_domainless_protos, WireGuard"
     [[ "${ENABLE_AMNEZIAWG:-true}" == "true" ]] && _domainless_protos="$_domainless_protos, AmneziaWG"
     [[ "${ENABLE_TELEMT:-true}"    == "true" ]] && _domainless_protos="$_domainless_protos, Telegram MTProxy"
@@ -363,7 +363,7 @@ export PORT_TELEMT="${PORT_TELEMT:-993}"
 export ENABLE_SS="${ENABLE_SS:-true}"
 export PORT_SS="${PORT_SS:-8388}"
 export SS_METHOD="${SS_METHOD:-2022-blake3-aes-128-gcm}"
-export ENABLE_SNELL="${ENABLE_SNELL:-false}"
+export ENABLE_SNELL="${ENABLE_SNELL:-true}"
 export PORT_SNELL="${PORT_SNELL:-8389}"
 export SNELL_OBFS="${SNELL_OBFS:-http}"
 export TELEMT_TLS_DOMAIN="${TELEMT_TLS_DOMAIN:-dl.google.com}"
@@ -628,7 +628,7 @@ fi
 # there is no per-user snell credential; revoking a user does not remove snell
 # access (rotate this key + re-issue bundles to fully revoke). Like dnstt.
 # -----------------------------------------------------------------------------
-if [[ "${ENABLE_SNELL:-false}" == "true" ]]; then
+if [[ "${ENABLE_SNELL:-true}" == "true" ]]; then
     if [[ -f "$STATE_DIR/keys/snell-server.psk" ]]; then
         SNELL_SERVER_PSK=$(cat "$STATE_DIR/keys/snell-server.psk")
         log_info "Loaded existing Snell server PSK"
@@ -979,7 +979,7 @@ singbox_needed=false
 [[ "${ENABLE_ANYTLS:-false}" == "true" ]] && singbox_needed=true
 [[ "${ENABLE_HYSTERIA2:-true}" == "true" ]] && singbox_needed=true
 [[ "${ENABLE_SS:-true}" == "true" ]] && singbox_needed=true
-[[ "${ENABLE_SNELL:-false}" == "true" ]] && singbox_needed=true
+[[ "${ENABLE_SNELL:-true}" == "true" ]] && singbox_needed=true
 
 if [[ "$singbox_needed" == "true" ]]; then
     log_info "Generating sing-box configuration (using existing keys)..."
@@ -1050,7 +1050,7 @@ if [[ "$singbox_needed" == "true" ]]; then
         jq 'del(.inbounds[] | select(.tag == "shadowsocks-in"))' "$config_file" > "${config_file}.tmp" && mv -f "${config_file}.tmp" "$config_file"
         log_info "  Removed Shadowsocks inbound (disabled)"
     fi
-    if [[ "${ENABLE_SNELL:-false}" != "true" ]]; then
+    if [[ "${ENABLE_SNELL:-true}" != "true" ]]; then
         jq 'del(.inbounds[] | select(.tag == "snell-in"))' "$config_file" > "${config_file}.tmp" && mv -f "${config_file}.tmp" "$config_file"
         log_info "  Removed Snell inbound (disabled)"
     fi

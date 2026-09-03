@@ -418,7 +418,7 @@ fi
 # not per-user). No standard share-URI. Needs a Snell v5 client (Surge 5+, Stash,
 # Mihomo/Clash.Meta; CMFA/FlClash on Android).
 # -----------------------------------------------------------------------------
-if [[ "${ENABLE_SNELL:-false}" == "true" ]]; then
+if [[ "${ENABLE_SNELL:-true}" == "true" ]]; then
   if [[ -f "$OUTPUT_DIR/snell.txt" ]] && [[ "$FORCE_REGENERATE" != "force" ]]; then
     log_info "  - Snell config exists, skipping"
   else

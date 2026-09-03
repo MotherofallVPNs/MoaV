@@ -1379,7 +1379,7 @@ services:
       - ENABLE_SS=${ENABLE_SS:-false}
       - PORT_SS=${PORT_SS:-8388}
       - SS_METHOD=${SS_METHOD:-2022-blake3-aes-128-gcm}
-      - ENABLE_SNELL=${ENABLE_SNELL:-false}
+      - ENABLE_SNELL=${ENABLE_SNELL:-true}
       - PORT_SNELL=${PORT_SNELL:-8389}
       - SNELL_OBFS=${SNELL_OBFS:-http}
       - TELEMT_TLS_DOMAIN=${TELEMT_TLS_DOMAIN:-dl.google.com}

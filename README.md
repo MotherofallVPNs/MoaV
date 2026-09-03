@@ -58,7 +58,7 @@ for the longer argument.
 
 ## Features
 
-- **Multiple protocols** — 16+ circumvention transports and fallback paths, plus optional Psiphon, Tor and MahsaNet donation integrations:
+- **Multiple protocols** — 18 circumvention transports and fallback paths, plus optional Psiphon, Tor and MahsaNet donation integrations:
   - **High-stealth proxy** — Reality (VLESS), Trojan, Hysteria2, XHTTP (VLESS+XHTTP+Reality), CDN (VLESS+WS via Cloudflare)
   - **Full VPN** — WireGuard (direct & wstunnel), AmneziaWG
   - **Specialty** — TrustTunnel (HTTP/2+QUIC), Telegram MTProxy (fake-TLS), Shadowsocks-2022, GooseRelay (SOCKS5 via Google Apps Script)
@@ -188,7 +188,7 @@ Then use `moav` from anywhere. See the [Setup Guide](https://moav.sh/docs/SETUP)
 | Trojan | 8443/tcp | Yes | ★★★★☆ | ★★★★☆ | ✅ | Backup, uses your domain |
 | AnyTLS | 8445/tcp | Yes | ★★★★★ | ★★★★☆ | ⬜ | Defeats TLS-in-TLS fingerprinting |
 | Shadowsocks-2022 | 8388/tcp+udp | No | ★★★★☆ | ★★★★☆ | ✅ | AEAD-2022 anti-probing; Outline-app compatible |
-| Snell | 8389/tcp | No | ★★★★☆ | ★★★★☆ | ⬜ | Lightweight TCP proxy, HTTP obfs, shared-key; Surge/Stash/Mihomo (not v2rayNG/Hiddify) |
+| Snell | 8389/tcp | No | ★★★★☆ | ★★★★☆ | ✅ | Lightweight TCP proxy, HTTP obfs, shared-key; Surge/Stash/Mihomo (not v2rayNG/Hiddify) |
 | CDN (VLESS+WS) | 2082/tcp² | via CDN² | ★★★★★ | ★★★☆☆ | ⬜ | When the server IP is blocked; needs a CDN in front |
 | TrustTunnel | 4443/tcp+udp | Yes | ★★★★★ | ★★★★☆ | ✅ | HTTP/2 & QUIC, looks like HTTPS |
 | WireGuard (Direct) | 51820/udp | No | ★★★☆☆ | ★★★★★ | ✅ | Full VPN, simple setup |
