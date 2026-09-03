@@ -165,6 +165,10 @@ jobs:
         run: bash tests/tls-note-test.sh
       - name: moav cert (domainless no-op + install idempotency)
         run: bash tests/cert-test.sh
+      - name: moav update -b accepts a tag (release candidate)
+        run: bash tests/update-tag-test.sh
+      - name: .env has no inline comments on variable lines
+        run: bash tests/env-no-inline-comment-test.sh
       - name: release footer generator
         run: bash tests/release-footer-test.sh
       - name: release footer links resolve (network)
