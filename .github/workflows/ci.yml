@@ -103,6 +103,8 @@ jobs:
         run: bash tests/llms-links-test.sh
       - name: moav update rebuild prompts (baked-in changes)
         run: bash tests/update-rebuild-test.sh
+      - name: moav update Discard resets staged + unstaged
+        run: bash tests/update-discard-test.sh
       - name: build cache cap (sizing reaches docker builder)
         run: bash tests/build-cache-test.sh
       - name: monitoring privacy (no user x destination) (#297)

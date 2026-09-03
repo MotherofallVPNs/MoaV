@@ -139,7 +139,10 @@ cmd_update() {
                 read -rp "Are you sure? [y/N]: " confirm
                 if [[ "$confirm" =~ ^[Yy]$ ]]; then
                     info "Discarding local changes..."
-                    git -C "$install_dir" checkout -- . 2>/dev/null
+                    # reset --hard, not checkout -- . : the latter leaves STAGED
+                    # changes (git status MM / A) in the index, so the pull still
+                    # aborts with "local changes would be overwritten by merge".
+                    git -C "$install_dir" reset --hard HEAD 2>/dev/null
                     git -C "$install_dir" clean -fd 2>/dev/null
                     success "Local changes discarded"
                     echo ""
@@ -154,7 +157,7 @@ cmd_update() {
                 echo -e "  ${WHITE}cd $install_dir${NC}"
                 echo -e "  ${WHITE}git status${NC}           # View changes"
                 echo -e "  ${WHITE}git stash${NC}            # Save changes temporarily"
-                echo -e "  ${WHITE}git checkout -- .${NC}    # Discard changes"
+                echo -e "  ${WHITE}git reset --hard${NC}     # Discard changes (staged + unstaged)"
                 echo -e "  ${WHITE}moav update${NC}          # Try again"
                 echo ""
                 return 0
