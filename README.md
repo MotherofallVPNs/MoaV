@@ -58,7 +58,7 @@ for the longer argument.
 
 ## Features
 
-- **Multiple protocols** — 18 circumvention transports and fallback paths, plus optional Psiphon, Tor and MahsaNet donation integrations:
+- **Multiple protocols** — 18+ circumvention transports and fallback paths, plus optional Psiphon, Tor and MahsaNet donation integrations:
   - **High-stealth proxy** — Reality (VLESS), Trojan, Hysteria2, XHTTP (VLESS+XHTTP+Reality), CDN (VLESS+WS via Cloudflare)
   - **Full VPN** — WireGuard (direct & wstunnel), AmneziaWG
   - **Specialty** — TrustTunnel (HTTP/2+QUIC), Telegram MTProxy (fake-TLS), Shadowsocks-2022, GooseRelay (SOCKS5 via Google Apps Script)
