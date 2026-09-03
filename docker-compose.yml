@@ -59,7 +59,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.sing-box
       args:
-        SINGBOX_VERSION: ${SINGBOX_VERSION:-1.13.19}
+        SINGBOX_VERSION: ${SINGBOX_VERSION:-1.14.0}
     container_name: moav-sing-box
     restart: unless-stopped
     logging: *default-logging
@@ -73,6 +73,7 @@ services:
       - "${PORT_CDN:-2082}:2082/tcp"      # CDN WebSocket (VLESS+WS)
       - "${PORT_SS:-8388}:${PORT_SS:-8388}/tcp"  # Shadowsocks-2022 (only if ENABLE_SS=true)
       - "${PORT_SS:-8388}:${PORT_SS:-8388}/udp"  # Shadowsocks-2022 UDP relay
+      - "${PORT_SNELL:-8389}:${PORT_SNELL:-8389}/tcp"  # Snell (only if ENABLE_SNELL=true)
     volumes:
       - ./configs/sing-box:/etc/sing-box:ro
       - moav_certs:/certs:ro
@@ -1343,7 +1344,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.bootstrap
       args:
-        SINGBOX_VERSION: ${SINGBOX_VERSION:-1.13.19}
+        SINGBOX_VERSION: ${SINGBOX_VERSION:-1.14.0}
     container_name: moav-bootstrap
     volumes:
       - ./configs:/configs
@@ -1367,6 +1368,7 @@ services:
       - ENABLE_ANYTLS=${ENABLE_ANYTLS:-false}
       - PORT_ANYTLS=${PORT_ANYTLS:-8445}
       - ENABLE_HYSTERIA2=${ENABLE_HYSTERIA2:-true}
+      - HYSTERIA2_OBFS_TYPE=${HYSTERIA2_OBFS_TYPE:-salamander}
       - ENABLE_WIREGUARD=${ENABLE_WIREGUARD:-true}
       - ENABLE_DNSTT=${ENABLE_DNSTT:-true}
       - ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM:-true}
@@ -1377,6 +1379,9 @@ services:
       - ENABLE_SS=${ENABLE_SS:-false}
       - PORT_SS=${PORT_SS:-8388}
       - SS_METHOD=${SS_METHOD:-2022-blake3-aes-128-gcm}
+      - ENABLE_SNELL=${ENABLE_SNELL:-true}
+      - PORT_SNELL=${PORT_SNELL:-8389}
+      - SNELL_OBFS=${SNELL_OBFS:-http}
       - TELEMT_TLS_DOMAIN=${TELEMT_TLS_DOMAIN:-dl.google.com}
       - TELEMT_MAX_TCP_CONNS=${TELEMT_MAX_TCP_CONNS:-100}
       - TELEMT_MAX_UNIQUE_IPS=${TELEMT_MAX_UNIQUE_IPS:-10}
@@ -1419,7 +1424,7 @@ services:
       args:
         GOPROXY: "${GOPROXY:-https://proxy.golang.org|https://goproxy.cn|direct}"
         GOSUMDB: "${GOSUMDB:-off}"
-        SINGBOX_VERSION: ${SINGBOX_VERSION:-1.13.19}
+        SINGBOX_VERSION: ${SINGBOX_VERSION:-1.14.0}
         WSTUNNEL_VERSION: ${WSTUNNEL_VERSION:-10.7.1}
         TRUSTTUNNEL_CLIENT_VERSION: ${TRUSTTUNNEL_CLIENT_VERSION:-1.0.49}
         AWGTOOLS_VERSION: ${AWGTOOLS_VERSION:-3.1.20260812}

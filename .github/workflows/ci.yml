@@ -49,6 +49,12 @@ jobs:
         run: bash tests/entrypoint-strict-test.sh
       - name: sing-box state read-only (no key-ownership downgrade)
         run: bash tests/singbox-state-readonly-test.sh
+      - name: sing-box config valid JSON + 1.14 compatibility
+        run: bash tests/singbox-config-valid-test.sh
+      - name: sing-box real-binary check + format (pinned version)
+        run: bash tests/singbox-check-test.sh
+      - name: Snell protocol wiring + add-user
+        run: bash tests/snell-test.sh
       - name: wg/awg keygen fallback (local image, not lscr.io)
         run: bash tests/wg-keygen-fallback-test.sh
       - name: user UUID capture (no two-line double-capture)
@@ -97,6 +103,8 @@ jobs:
         run: bash tests/llms-links-test.sh
       - name: moav update rebuild prompts (baked-in changes)
         run: bash tests/update-rebuild-test.sh
+      - name: moav update Discard resets staged + unstaged
+        run: bash tests/update-discard-test.sh
       - name: build cache cap (sizing reaches docker builder)
         run: bash tests/build-cache-test.sh
       - name: monitoring privacy (no user x destination) (#297)

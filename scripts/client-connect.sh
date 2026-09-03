@@ -443,20 +443,29 @@ EOF
 
             log_debug "WireGuard config: server=$server port=$port"
 
+            # sing-box 1.14 removed the WireGuard *outbound*; it is now a
+            # bidirectional *endpoint* (address/peers[] instead of
+            # local_address/peer_public_key). Userspace (gVisor) mode is the
+            # default with no `system` field, matching the old outbound.
             cat > "$output_file" << EOF
 {
   "log": {"level": "info", "timestamp": true},
   "inbounds": $inbounds,
-  "outbounds": [
+  "endpoints": [
     {
       "type": "wireguard",
       "tag": "proxy",
-      "server": "$server",
-      "server_port": $port,
-      "local_address": ["$address"],
+      "address": ["$address"],
       "private_key": "$private_key",
-      "peer_public_key": "$peer_public_key",
-      "mtu": 1280
+      "mtu": 1280,
+      "peers": [
+        {
+          "address": "$server",
+          "port": $port,
+          "public_key": "$peer_public_key",
+          "allowed_ips": ["0.0.0.0/0", "::/0"]
+        }
+      ]
     }
   ],
   "route": {"final": "proxy"}

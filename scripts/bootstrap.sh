@@ -39,8 +39,11 @@ load_state_secrets() {
     [[ -f "$STATE_DIR/keys/cdn.env"       ]] && source "$STATE_DIR/keys/cdn.env"
     [[ -f "$STATE_DIR/keys/shadowsocks-server.psk" ]] && \
         SS_SERVER_PSK=$(cat "$STATE_DIR/keys/shadowsocks-server.psk" 2>/dev/null)
+    [[ -f "$STATE_DIR/keys/snell-server.psk" ]] && \
+        SNELL_SERVER_PSK=$(cat "$STATE_DIR/keys/snell-server.psk" 2>/dev/null)
     export REALITY_SHORT_ID REALITY_PRIVATE_KEY REALITY_PUBLIC_KEY \
-           CLASH_API_SECRET HYSTERIA2_OBFS_PASSWORD CDN_WS_PATH SS_SERVER_PSK 2>/dev/null || true
+           CLASH_API_SECRET HYSTERIA2_OBFS_PASSWORD CDN_WS_PATH SS_SERVER_PSK \
+           SNELL_SERVER_PSK 2>/dev/null || true
 }
 
 # Fail LOUDLY if a render dropped the Reality identity that state holds. Compares
@@ -140,6 +143,7 @@ if [[ -z "${DOMAIN:-}" ]]; then
     _domainless_protos="Reality"
     [[ "${ENABLE_XHTTP:-true}"     == "true" ]] && _domainless_protos="$_domainless_protos, XHTTP"
     [[ "${ENABLE_SS:-true}"        == "true" ]] && _domainless_protos="$_domainless_protos, Shadowsocks-2022"
+    [[ "${ENABLE_SNELL:-true}"    == "true" ]] && _domainless_protos="$_domainless_protos, Snell"
     [[ "${ENABLE_WIREGUARD:-true}" == "true" ]] && _domainless_protos="$_domainless_protos, WireGuard"
     [[ "${ENABLE_AMNEZIAWG:-true}" == "true" ]] && _domainless_protos="$_domainless_protos, AmneziaWG"
     [[ "${ENABLE_TELEMT:-true}"    == "true" ]] && _domainless_protos="$_domainless_protos, Telegram MTProxy"
@@ -359,6 +363,9 @@ export PORT_TELEMT="${PORT_TELEMT:-993}"
 export ENABLE_SS="${ENABLE_SS:-true}"
 export PORT_SS="${PORT_SS:-8388}"
 export SS_METHOD="${SS_METHOD:-2022-blake3-aes-128-gcm}"
+export ENABLE_SNELL="${ENABLE_SNELL:-true}"
+export PORT_SNELL="${PORT_SNELL:-8389}"
+export SNELL_OBFS="${SNELL_OBFS:-http}"
 export TELEMT_TLS_DOMAIN="${TELEMT_TLS_DOMAIN:-dl.google.com}"
 export TELEMT_MAX_TCP_CONNS="${TELEMT_MAX_TCP_CONNS:-100}"
 export TELEMT_MAX_UNIQUE_IPS="${TELEMT_MAX_UNIQUE_IPS:-10}"
@@ -612,6 +619,26 @@ if [[ "${ENABLE_SS:-true}" == "true" ]]; then
         log_info "Generated Shadowsocks server PSK"
     fi
     export SS_SERVER_PSK
+fi
+
+# -----------------------------------------------------------------------------
+# Generate / load the Snell PSK (stable across re-bootstraps). Snell is
+# SHARED-KEY: every user connects with this one PSK (sing-box's multi-user snell
+# needs a per-user key no standard client — Surge/Mihomo/Stash — can send). So
+# there is no per-user snell credential; revoking a user does not remove snell
+# access (rotate this key + re-issue bundles to fully revoke). Like dnstt.
+# -----------------------------------------------------------------------------
+if [[ "${ENABLE_SNELL:-true}" == "true" ]]; then
+    if [[ -f "$STATE_DIR/keys/snell-server.psk" ]]; then
+        SNELL_SERVER_PSK=$(cat "$STATE_DIR/keys/snell-server.psk")
+        log_info "Loaded existing Snell server PSK"
+    else
+        SNELL_SERVER_PSK=$(openssl rand -hex 16)
+        mkdir -p "$STATE_DIR/keys"
+        echo "$SNELL_SERVER_PSK" > "$STATE_DIR/keys/snell-server.psk"
+        log_info "Generated Snell server PSK"
+    fi
+    export SNELL_SERVER_PSK
 fi
 
 # -----------------------------------------------------------------------------
@@ -952,6 +979,7 @@ singbox_needed=false
 [[ "${ENABLE_ANYTLS:-false}" == "true" ]] && singbox_needed=true
 [[ "${ENABLE_HYSTERIA2:-true}" == "true" ]] && singbox_needed=true
 [[ "${ENABLE_SS:-true}" == "true" ]] && singbox_needed=true
+[[ "${ENABLE_SNELL:-true}" == "true" ]] && singbox_needed=true
 
 if [[ "$singbox_needed" == "true" ]]; then
     log_info "Generating sing-box configuration (using existing keys)..."
@@ -974,6 +1002,9 @@ if [[ "$singbox_needed" == "true" ]]; then
     export SS_SERVER_PSK="${SS_SERVER_PSK:-}"
     export SS_METHOD
     export PORT_SS
+    export SNELL_SERVER_PSK="${SNELL_SERVER_PSK:-}"
+    export PORT_SNELL="${PORT_SNELL:-8389}"
+    export SNELL_OBFS="${SNELL_OBFS:-http}"
     export REALITY_PRIVATE_KEY
     export REALITY_SHORT_ID
     export REALITY_TARGET_HOST
@@ -984,6 +1015,12 @@ if [[ "$singbox_needed" == "true" ]]; then
     export CDN_WS_PATH
     export CDN_TRANSPORT
     export LOG_LEVEL="${LOG_LEVEL:-info}"
+
+    # Hysteria2 obfuscation type. Default salamander (universal client support).
+    # gecko (sing-box >=1.14 / hysteria >=2.9.2) fragments the QUIC handshake and
+    # resists Iran/CN/RU DPI better, but the client's app core must support it,
+    # so it is opt-in until client support is broad. See docs/devdocs.
+    export HYSTERIA2_OBFS_TYPE="${HYSTERIA2_OBFS_TYPE:-salamander}"
 
     envsubst < /configs/sing-box/config.json.template > /configs/sing-box/config.json
 
@@ -1012,6 +1049,10 @@ if [[ "$singbox_needed" == "true" ]]; then
     if [[ "${ENABLE_SS:-true}" != "true" ]]; then
         jq 'del(.inbounds[] | select(.tag == "shadowsocks-in"))' "$config_file" > "${config_file}.tmp" && mv -f "${config_file}.tmp" "$config_file"
         log_info "  Removed Shadowsocks inbound (disabled)"
+    fi
+    if [[ "${ENABLE_SNELL:-true}" != "true" ]]; then
+        jq 'del(.inbounds[] | select(.tag == "snell-in"))' "$config_file" > "${config_file}.tmp" && mv -f "${config_file}.tmp" "$config_file"
+        log_info "  Removed Snell inbound (disabled)"
     fi
 
     # No server IPv6: re-resolve sniffed domains preferring IPv4 so proxied

@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-09-03
+
+sing-box 1.14, the new **Snell** protocol (on by default), opt-in Hysteria2 gecko obfuscation, and a fix so `moav update` cleanly discards staged local changes. No breaking changes; keys, users, and certificates are untouched.
+
+### Added
+- **Snell protocol (new sing-box inbound), on by default.** A lightweight TCP
+  proxy with HTTP obfuscation, no TLS/domain required (`ENABLE_SNELL=true`,
+  `PORT_SNELL=8389`, `SNELL_OBFS`). **Shared-key** (one PSK for all users, like the
+  DNS tunnels) — sing-box's multi-user snell has no client-compatible auth, so
+  revoking a user needs a key rotation + re-issue. Needs a Snell v5 client
+  (Surge 5 / Stash / Clash Mi / Mihomo / Clash Meta for Android / FlClash — **not**
+  v2rayNG or Hiddify). Validated end-to-end against a real Mihomo client and the
+  real sing-box 1.14 binary.
+- **sing-box updated to 1.14.0.** Our config is already on 1.14's modern surface,
+  so no config change is required; validated by running the real 1.14 `sing-box
+  check` against the live config (clean, no deprecation warnings). New CI gates
+  render the config and run both a static compatibility check and the real
+  `sing-box check` / `format`.
+- **Opt-in Hysteria2 gecko obfuscation.** `HYSTERIA2_OBFS_TYPE` (default
+  `salamander`) can select the new **gecko** obfuscator, which fragments the QUIC
+  handshake and resists Iran/CN/RU DPI better. Opt-in because gecko needs a client
+  core of sing-box >= 1.14 or hysteria >= 2.9.2 — re-issue bundles and confirm your
+  users' apps before enabling it.
+
+### Changed
+- **Client test tool:** migrated the WireGuard path from the removed sing-box
+  `wireguard` *outbound* to the 1.14 *endpoint* form.
+- **Protocol count is now 18+** across the README, agent guide, and docs (Snell
+  brought the transports to 18; the roster is 21 counting the 3 donation
+  integrations).
+- **Claude issue-triage** `--max-turns` raised 6 → 15: the triage finished its
+  work in ~8 turns, but the action failed a run that exceeded the cap. It no
+  longer fails after completing.
+
+### Fixed
+- **`moav update` "Discard changes" now fully resets.** The Discard option used
+  `git checkout -- .`, which only clears *unstaged* edits; staged changes (git
+  status `MM` / `A`, e.g. a hand-edited `docker-compose.yml` or added exporter
+  files) survived and the pull still aborted with "local changes would be
+  overwritten by merge" even after Discard reported success. It now uses
+  `git reset --hard`, which clears the index too.
+
 ## [2.2.4] - 2026-09-02
 
 Operator quality-of-life: bulk user revocation with a single service reset, safer
@@ -2118,7 +2160,8 @@ TrustTunnel config validity.
 - uTLS fingerprint spoofing (Chrome)
 - Automatic short ID generation for Reality
 
-[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v2.2.4...HEAD
+[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/MotherofallVPNs/moav/compare/v2.2.4...v2.3.0
 [2.2.4]: https://github.com/MotherofallVPNs/moav/compare/v2.2.3...v2.2.4
 [2.2.3]: https://github.com/MotherofallVPNs/moav/compare/v2.2.2...v2.2.3
 [2.2.2]: https://github.com/MotherofallVPNs/moav/compare/v2.2.1...v2.2.2

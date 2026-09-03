@@ -20,7 +20,7 @@ Humans: start with [README.md](README.md); public docs are at
 A single-host, Docker-Compose, multi-protocol Internet-censorship-circumvention
 stack. `moav.sh` is a bash dispatcher over `lib/*.sh` modules; it bootstraps
 keys/certs, generates per-user bundles (configs, QR codes, a V2Ray
-subscription), and runs 16+ transports plus an optional Prometheus/Grafana
+subscription), and runs 18+ transports plus an optional Prometheus/Grafana
 monitoring stack. Protocol servers run as containers; provisioning and the CLI
 are bash. The install lives in **`/opt/moav`** by default.
 

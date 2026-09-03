@@ -395,6 +395,47 @@ EOF
     fi
 fi
 
+# Generate Snell bundle (SHARED-KEY: same config for every user). Snell is not
+# per-user — all users connect with the one server PSK. Needs a Snell v5 client.
+if [[ "${ENABLE_SNELL:-true}" == "true" ]] && jq -e '.inbounds[] | select(.tag == "snell-in")' "$CONFIG_FILE" >/dev/null 2>&1; then
+    SNELL_PSK=""
+    if [[ -f "$STATE_DIR/keys/snell-server.psk" ]]; then
+        SNELL_PSK=$(cat "$STATE_DIR/keys/snell-server.psk" 2>/dev/null | tr -d '\n')
+    fi
+    if [[ -z "$SNELL_PSK" ]]; then
+        SNELL_PSK=$(docker run --rm -v moav_moav_state:/state alpine cat /state/keys/snell-server.psk 2>/dev/null | tr -d '\n' || echo "")
+    fi
+    if [[ -z "$SNELL_PSK" ]]; then
+        log_warn "Snell PSK not found — skipping Snell bundle for $USERNAME"
+    else
+        SNELL_PORT_LOCAL="${PORT_SNELL:-$(get_env_val "PORT_SNELL" ".env" "8389")}"
+        SNELL_OBFS_LOCAL="${SNELL_OBFS:-$(get_env_val "SNELL_OBFS" ".env" "http")}"
+        if [[ "$SNELL_OBFS_LOCAL" == "http" ]]; then
+            SNELL_SURGE_LINE="MoaV-Snell = snell, $SERVER_IP, $SNELL_PORT_LOCAL, psk=$SNELL_PSK, version=5, obfs=http, obfs-host=www.bing.com"
+            SNELL_CLASH_OBFS=$'\n  obfs-opts:\n    mode: http\n    host: www.bing.com'
+        else
+            SNELL_SURGE_LINE="MoaV-Snell = snell, $SERVER_IP, $SNELL_PORT_LOCAL, psk=$SNELL_PSK, version=5"
+            SNELL_CLASH_OBFS=""
+        fi
+        cat > "$OUTPUT_DIR/snell.txt" <<EOF
+# MoaV Snell (shared key) — needs a Snell v5 client: Surge 5+ / Stash (iOS),
+# Mihomo/Clash.Meta, or CMFA / FlClash (Android). v2rayNG/Hiddify do NOT support Snell.
+# --- Surge (add under [Proxy]) ---
+$SNELL_SURGE_LINE
+
+# --- Clash.Meta / Mihomo (add under proxies:) ---
+- name: MoaV-Snell
+  type: snell
+  server: $SERVER_IP
+  port: $SNELL_PORT_LOCAL
+  psk: $SNELL_PSK
+  version: 5$SNELL_CLASH_OBFS
+EOF
+        command -v qrencode &>/dev/null && qrencode -o "$OUTPUT_DIR/snell-qr.png" -s 6 "$SNELL_SURGE_LINE" 2>/dev/null || true
+        log_info "Generated Snell bundle (shared key, port $SNELL_PORT_LOCAL, obfs $SNELL_OBFS_LOCAL)"
+    fi
+fi
+
 # Add user to TrustTunnel (if enabled and its config exists). The file-exists
 # check alone was not enough: credentials.toml survives disabling the protocol,
 # so bundles kept shipping TrustTunnel configs after ENABLE_TRUSTTUNNEL=false.
