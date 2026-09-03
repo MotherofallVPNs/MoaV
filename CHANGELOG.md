@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.3.0] - 2026-09-03
 
-sing-box 1.14, the new **Snell** protocol (on by default), and opt-in Hysteria2 gecko obfuscation. No breaking changes; keys, users, and certificates are untouched.
+sing-box 1.14, the new **Snell** protocol (on by default), opt-in Hysteria2 gecko obfuscation, and a fix so `moav update` cleanly discards staged local changes. No breaking changes; keys, users, and certificates are untouched.
 
 ### Added
 - **Snell protocol (new sing-box inbound), on by default.** A lightweight TCP
@@ -34,6 +34,20 @@ sing-box 1.14, the new **Snell** protocol (on by default), and opt-in Hysteria2 
 ### Changed
 - **Client test tool:** migrated the WireGuard path from the removed sing-box
   `wireguard` *outbound* to the 1.14 *endpoint* form.
+- **Protocol count is now 18+** across the README, agent guide, and docs (Snell
+  brought the transports to 18; the roster is 21 counting the 3 donation
+  integrations).
+- **Claude issue-triage** `--max-turns` raised 6 → 15: the triage finished its
+  work in ~8 turns, but the action failed a run that exceeded the cap. It no
+  longer fails after completing.
+
+### Fixed
+- **`moav update` "Discard changes" now fully resets.** The Discard option used
+  `git checkout -- .`, which only clears *unstaged* edits; staged changes (git
+  status `MM` / `A`, e.g. a hand-edited `docker-compose.yml` or added exporter
+  files) survived and the pull still aborted with "local changes would be
+  overwritten by merge" even after Discard reported success. It now uses
+  `git reset --hard`, which clears the index too.
 
 ## [2.2.4] - 2026-09-02
 
