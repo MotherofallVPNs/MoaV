@@ -48,6 +48,22 @@ sing-box 1.14, the new **Snell** protocol (on by default), opt-in Hysteria2 geck
   files) survived and the pull still aborted with "local changes would be
   overwritten by merge" even after Discard reported success. It now uses
   `git reset --hard`, which clears the index too.
+- **`moav update -b <ref>` now accepts a tag, not only a branch.** Switching an
+  install to a release candidate (`moav update -b v2.3.0-rc.1`) failed with
+  "Branch '…' does not exist" because the target was validated against branch
+  refs only. It now resolves tags too (fetching them first) and checks out a tag
+  in detached HEAD without attempting a pull.
+- **`.env` no longer carries inline comments on variable lines.** `moav update`
+  copied new options from `.env.example` verbatim, so a line like
+  `PORT_SNELL=8389 # Snell` reached the live `.env`; a consumer reading the value
+  with a raw `grep|cut` then folded the comment into it (the AmneziaWG port once
+  became `<ip>:51821 # AmneziaWG …`, so clients connected but relayed nothing).
+  Every note now sits on its own line in `.env.example`, the update path strips a
+  trailing inline comment defensively, and a CI gate keeps it that way.
+- **Telegram release notification pins its link preview to the release page.**
+  The preview showed whatever link appeared first in the notes body (e.g. a
+  client's App Store page) instead of the release. It now sets
+  `link_preview_options.url` to the release/issue URL. Same fix in moav-client.
 
 ## [2.2.4] - 2026-09-02
 
