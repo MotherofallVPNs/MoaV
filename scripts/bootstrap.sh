@@ -1021,15 +1021,6 @@ if [[ "$singbox_needed" == "true" ]]; then
     # resists Iran/CN/RU DPI better, but the client's app core must support it,
     # so it is opt-in until client support is broad. See docs/devdocs.
     export HYSTERIA2_OBFS_TYPE="${HYSTERIA2_OBFS_TYPE:-salamander}"
-    # Optional Hysteria2 BBR congestion profile. OFF by default keeps hysteria2's
-    # native Brutal control, which pushes through loss-based throttling (usually
-    # better on censored networks); BBR backs off on loss. Opt in by setting
-    # HYSTERIA2_BBR_PROFILE (e.g. "standard"); renders the field or nothing.
-    if [[ -n "${HYSTERIA2_BBR_PROFILE:-}" ]]; then
-        export HYSTERIA2_BBR_LINE="\"bbr_profile\": \"${HYSTERIA2_BBR_PROFILE}\","
-    else
-        export HYSTERIA2_BBR_LINE=""
-    fi
 
     envsubst < /configs/sing-box/config.json.template > /configs/sing-box/config.json
 

@@ -18,15 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   check` against the live config (clean, no deprecation warnings). New CI gates
   render the config and run both a static compatibility check and the real
   `sing-box check`/`format`.
-- **Opt-in Hysteria2 hardening.** `HYSTERIA2_OBFS_TYPE` (default `salamander`)
-  can select the new **gecko** obfuscator, which fragments the QUIC handshake and
-  resists Iran/CN/RU DPI better. It stays opt-in because gecko needs a client app
-  whose core is sing-box ≥ 1.14 or hysteria ≥ 2.9.2 — switching the server breaks
-  clients on older cores, so **re-issue bundles and confirm your users' apps
-  before enabling it**. Planned to become the default once client support is
-  broad. `HYSTERIA2_BBR_PROFILE` optionally selects BBR congestion control
-  (default keeps hysteria2's Brutal control, which is usually better under
-  loss-based throttling).
+- **Opt-in Hysteria2 gecko obfuscation.** `HYSTERIA2_OBFS_TYPE` (default
+  `salamander`) can select the new **gecko** obfuscator, which fragments the QUIC
+  handshake and resists Iran/CN/RU DPI better. It stays opt-in because gecko needs
+  a client app whose core is sing-box ≥ 1.14 or hysteria ≥ 2.9.2 — switching the
+  server breaks clients on older cores, so **re-issue bundles and confirm your
+  users' apps before enabling it**. Planned to become the default once client
+  support is broad.
 
 ### Changed
 - **Client test tool:** migrated the WireGuard path from the removed sing-box

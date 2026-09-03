@@ -65,7 +65,7 @@ ss_psk="$(printf '1234567890123456' | base64)"  # 16 bytes for aes-128
 # Representative render values (kept in sync with singbox-config-valid-test.sh).
 export ANYTLS_USERS_JSON='[]' REALITY_USERS_JSON='[]' SHADOWSOCKS_USERS_JSON='[]' \
        TROJAN_USERS_JSON='[]' VLESS_WS_USERS_JSON='[]' HYSTERIA2_USERS_JSON='[]' \
-       HYSTERIA2_OBFS_PASSWORD='obfspw' HYSTERIA2_OBFS_TYPE='salamander' HYSTERIA2_BBR_LINE='' \
+       HYSTERIA2_OBFS_PASSWORD='obfspw' HYSTERIA2_OBFS_TYPE='salamander' \
        CDN_TRANSPORT='ws' CDN_WS_PATH='/ws' \
        CLASH_API_SECRET='testsecret' DOMAIN='example.com' LOG_LEVEL='info' \
        PORT_ANYTLS='8445' PORT_SS='8388' REALITY_PRIVATE_KEY="$rkey" \
@@ -105,8 +105,8 @@ else
     ok "no deprecation warnings"
 fi
 
-# Also validate the opt-in Hysteria2 hardening path (gecko obfs + bbr_profile).
-export HYSTERIA2_OBFS_TYPE='gecko' HYSTERIA2_BBR_LINE='"bbr_profile": "standard",'
+# Also validate the opt-in Hysteria2 gecko obfuscation path.
+export HYSTERIA2_OBFS_TYPE='gecko'
 rendered2="$work/config-gecko.json"
 if command -v envsubst >/dev/null 2>&1; then
     envsubst < "$TEMPLATE" > "$rendered2"
@@ -115,9 +115,9 @@ else
 fi
 sed -i.bak "s#/certs/#$work/certs/#g" "$rendered2" && rm -f "$rendered2.bak"
 if "$bin" check -c "$rendered2" 2>"$work/check2.err"; then
-    ok "opt-in hardening (gecko obfs + bbr_profile) also validates"
+    ok "opt-in gecko obfuscation also validates"
 else
-    bad "gecko + bbr_profile config failed check:"; sed 's/^/        /' "$work/check2.err"
+    bad "gecko obfs config failed check:"; sed 's/^/        /' "$work/check2.err"
 fi
 
 echo ""
