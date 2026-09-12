@@ -7,18 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- **Component version bumps** (audit 2026-09-11):
-  - **Grafana 13.2.0 → [13.2.1](https://github.com/grafana/grafana/releases/tag/v13.2.1)** — upstream **security** fixes (CVE-2026-12704, CVE-2026-14199).
-  - **telemt 3.5.5 → [3.5.7](https://github.com/telemt/telemt/releases/tag/3.5.7)** — install-probe fix, websocket-lane recovery, macOS status-schema fixes.
-  - **Xray-core v26.7.28 → [v26.9.9](https://github.com/XTLS/Xray-core/releases/tag/v26.9.9)**.
-  - **slipstream 2026.02.22.1 → [v2026.04.22.1](https://github.com/net2share/slipstream-rust-build/releases/tag/v2026.04.22.1)** (server + client builds).
-  - **MasterDNS 2026.05.10 → [v2026.06.13](https://github.com/masterking32/MasterDnsVPN/releases/tag/v2026.06.13.234407-7de2476)** (release SHA256SUMS still verified at build).
-  - **TrustTunnelClient held at 1.0.49.** v1.1.5 swaps the QUIC stack (quiche → ngtcp2) while the server side stays 1.1.0, so it needs a live client/server compatibility test before bumping.
-
 ## [2.3.0] - 2026-09-03
 
-sing-box 1.14, the new **Snell** protocol (on by default), opt-in Hysteria2 gecko obfuscation, and a fix so `moav update` cleanly discards staged local changes. No breaking changes; keys, users, and certificates are untouched.
+sing-box 1.14, the new **Snell** protocol (on by default), opt-in Hysteria2 gecko obfuscation, component version bumps (incl. a Grafana security patch), and a fix so `moav update` cleanly discards staged local changes. No breaking changes; keys, users, and certificates are untouched.
 
 ### Added
 - **Snell protocol (new sing-box inbound), on by default.** A lightweight TCP
@@ -41,6 +32,13 @@ sing-box 1.14, the new **Snell** protocol (on by default), opt-in Hysteria2 geck
   users' apps before enabling it.
 
 ### Changed
+- **Component version bumps** (audit 2026-09-11):
+  - **Grafana 13.2.0 → [13.2.1](https://github.com/grafana/grafana/releases/tag/v13.2.1)** — upstream **security** fixes (CVE-2026-12704, CVE-2026-14199).
+  - **telemt 3.5.5 → [3.5.7](https://github.com/telemt/telemt/releases/tag/3.5.7)** — install-probe fix, websocket-lane recovery, macOS status-schema fixes.
+  - **Xray-core v26.7.28 → [v26.9.9](https://github.com/XTLS/Xray-core/releases/tag/v26.9.9)**.
+  - **slipstream 2026.02.22.1 → [v2026.04.22.1](https://github.com/net2share/slipstream-rust-build/releases/tag/v2026.04.22.1)** (server + client builds).
+  - **MasterDNS 2026.05.10 → [v2026.06.13](https://github.com/masterking32/MasterDnsVPN/releases/tag/v2026.06.13.234407-7de2476)** (release SHA256SUMS still verified at build).
+  - **TrustTunnelClient held at 1.0.49.** v1.1.5 swaps the QUIC stack (quiche → ngtcp2) while the server side stays 1.1.0, so it needs a live client/server compatibility test before bumping.
 - **Client test tool:** migrated the WireGuard path from the removed sing-box
   `wireguard` *outbound* to the 1.14 *endpoint* form.
 - **Protocol count is now 18+** across the README, agent guide, and docs (Snell
