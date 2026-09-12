@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.3.0] - 2026-09-03
+## [2.3.0] - 2026-09-12
 
 sing-box 1.14, the new **Snell** protocol (on by default), opt-in Hysteria2 gecko obfuscation, component version bumps (incl. a Grafana security patch), and a fix so `moav update` cleanly discards staged local changes. No breaking changes; keys, users, and certificates are untouched.
 
