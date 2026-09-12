@@ -69,6 +69,12 @@ if [[ -f "$STATE_DIR/keys/clash-api.env" ]]; then
     source "$STATE_DIR/keys/clash-api.env"
 fi
 
+# XDNS VLESS Encryption key — the bundle's xdns configs read XDNS_VLESS_ENCRYPTION
+# (Xray >= 26.9 requires the VLESS layer to carry encryption; see lib/xray.sh).
+if [[ -f "$STATE_DIR/keys/xdns.env" ]]; then
+    source "$STATE_DIR/keys/xdns.env"
+fi
+
 # Fail with a remediation hint rather than an opaque "unbound variable" when a
 # protocol is switched on but bootstrap never generated its key material.
 require_keys() {

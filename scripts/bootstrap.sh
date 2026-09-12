@@ -7,6 +7,7 @@ set -euo pipefail
 # =============================================================================
 
 source /app/lib/common.sh
+source /app/lib/keys.sh
 source /app/lib/sing-box.sh
 source /app/lib/xray.sh
 source /app/lib/wireguard.sh
@@ -37,13 +38,14 @@ load_state_secrets() {
     [[ -f "$STATE_DIR/keys/reality.env"   ]] && source "$STATE_DIR/keys/reality.env"
     [[ -f "$STATE_DIR/keys/clash-api.env" ]] && source "$STATE_DIR/keys/clash-api.env"
     [[ -f "$STATE_DIR/keys/cdn.env"       ]] && source "$STATE_DIR/keys/cdn.env"
+    [[ -f "$STATE_DIR/keys/xdns.env"      ]] && source "$STATE_DIR/keys/xdns.env"
     [[ -f "$STATE_DIR/keys/shadowsocks-server.psk" ]] && \
         SS_SERVER_PSK=$(cat "$STATE_DIR/keys/shadowsocks-server.psk" 2>/dev/null)
     [[ -f "$STATE_DIR/keys/snell-server.psk" ]] && \
         SNELL_SERVER_PSK=$(cat "$STATE_DIR/keys/snell-server.psk" 2>/dev/null)
     export REALITY_SHORT_ID REALITY_PRIVATE_KEY REALITY_PUBLIC_KEY \
            CLASH_API_SECRET HYSTERIA2_OBFS_PASSWORD CDN_WS_PATH SS_SERVER_PSK \
-           SNELL_SERVER_PSK 2>/dev/null || true
+           SNELL_SERVER_PSK XDNS_VLESS_DECRYPTION XDNS_VLESS_ENCRYPTION 2>/dev/null || true
 }
 
 # Fail LOUDLY if a render dropped the Reality identity that state holds. Compares
@@ -283,6 +285,29 @@ else
     log_info "Reality is disabled, skipping key generation"
     REALITY_PUBLIC_KEY=""
     REALITY_SHORT_ID=""
+fi
+
+# -----------------------------------------------------------------------------
+# Generate XDNS VLESS Encryption keypair. Xray >= 26.9 refuses a VLESS outbound
+# with no TLS/encryption that dials a public IP, and xdns dials a public resolver
+# / server over mKCP — so the VLESS layer carries its own encryption. One
+# server-wide keypair, persisted in state and reused across re-bootstraps.
+# -----------------------------------------------------------------------------
+if [[ "${ENABLE_XDNS:-false}" == "true" ]]; then
+    mkdir -p "$STATE_DIR/keys"
+    [[ -f "$STATE_DIR/keys/xdns.env" ]] && source "$STATE_DIR/keys/xdns.env"
+    if [[ -z "${XDNS_VLESS_DECRYPTION:-}" || -z "${XDNS_VLESS_ENCRYPTION:-}" ]]; then
+        log_info "Generating XDNS VLESS Encryption keypair..."
+        if _xdns_pair=$(keys_xdns_vless_pair); then
+            printf '%s\n' "$_xdns_pair" > "$STATE_DIR/keys/xdns.env"
+            eval "$_xdns_pair"
+        else
+            log_error "Failed to generate XDNS VLESS Encryption keypair (openssl X25519)"
+        fi
+    else
+        log_info "XDNS VLESS Encryption keypair already exists, skipping generation"
+    fi
+    export XDNS_VLESS_DECRYPTION XDNS_VLESS_ENCRYPTION
 fi
 
 # -----------------------------------------------------------------------------
@@ -932,7 +957,7 @@ xdns_inbound = {
     'protocol': 'vless',
     'settings': {
         'users': config['inbounds'][1]['settings']['users'],
-        'decryption': 'none'
+        'decryption': '$XDNS_VLESS_DECRYPTION'
     },
     'streamSettings': {
         'network': 'kcp',

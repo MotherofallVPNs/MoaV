@@ -113,9 +113,11 @@ xray_write_xdns_bundle() {
     local fm fmd
     fm=$(xray_xdns_finalmask dns    "$domain" "$resolvers_csv" "$method" "")
     fmd=$(xray_xdns_finalmask direct "$domain" "$resolvers_csv" "$method" "${SERVER_IP}:${port}")
-    # Xray >= 26.9 rejects a VLESS outbound without TLS/encryption to a public IP.
-    # The vnext address is only the nominal endpoint here (the real routing IPs are
-    # literals inside finalmask.resolvers), so use a domain form to satisfy the rule.
+    # Xray >= 26.9 rejects a VLESS outbound with no TLS/encryption dialing a public
+    # IP. xdns dials a public resolver/server over mKCP (the vnext address is the
+    # real dial target), so the VLESS layer carries its own encryption:
+    # XDNS_VLESS_ENCRYPTION pairs with the server inbound's decryption (keypair
+    # minted at bootstrap, in state/keys/xdns.env).
 
     cat > "$out/xdns-config.json" <<XDNSEOF
 {
@@ -123,7 +125,7 @@ xray_write_xdns_bundle() {
   "log": {"loglevel": "warning"},
   "inbounds": [{"listen": "127.0.0.1", "port": 7891, "protocol": "socks", "settings": {"auth": "noauth", "udp": true}}],
   "outbounds": [
-    {"tag": "proxy", "protocol": "vless", "settings": {"vnext": [{"address": "dns.google", "port": 53, "users": [{"id": "$uuid", "encryption": "none"}]}]}, "streamSettings": {"network": "kcp", "kcpSettings": {"mtu": $mtu, "tti": 100, "uplinkCapacity": 0, "downlinkCapacity": 0, "congestion": true}, "finalmask": {"udp": [{"type": "xdns", "settings": ${fm}}]}}},
+    {"tag": "proxy", "protocol": "vless", "settings": {"vnext": [{"address": "8.8.8.8", "port": 53, "users": [{"id": "$uuid", "encryption": "${XDNS_VLESS_ENCRYPTION}"}]}]}, "streamSettings": {"network": "kcp", "kcpSettings": {"mtu": $mtu, "tti": 100, "uplinkCapacity": 0, "downlinkCapacity": 0, "congestion": true}, "finalmask": {"udp": [{"type": "xdns", "settings": ${fm}}]}}},
     {"tag": "direct", "protocol": "freedom"}
   ],
   "routing": {"rules": [{"type": "field", "ip": ["::/0"], "outboundTag": "direct"}]}
@@ -136,7 +138,7 @@ XDNSEOF
   "log": {"loglevel": "warning"},
   "inbounds": [{"listen": "127.0.0.1", "port": 7891, "protocol": "socks", "settings": {"auth": "noauth", "udp": true}}],
   "outbounds": [
-    {"tag": "proxy", "protocol": "vless", "settings": {"vnext": [{"address": "${DOMAIN}", "port": ${port}, "users": [{"id": "$uuid", "encryption": "none"}]}]}, "streamSettings": {"network": "kcp", "kcpSettings": {"mtu": $mtu, "tti": 100, "uplinkCapacity": 0, "downlinkCapacity": 0, "congestion": true}, "finalmask": {"udp": [{"type": "xdns", "settings": ${fmd}}]}}},
+    {"tag": "proxy", "protocol": "vless", "settings": {"vnext": [{"address": "${SERVER_IP}", "port": ${port}, "users": [{"id": "$uuid", "encryption": "${XDNS_VLESS_ENCRYPTION}"}]}]}, "streamSettings": {"network": "kcp", "kcpSettings": {"mtu": $mtu, "tti": 100, "uplinkCapacity": 0, "downlinkCapacity": 0, "congestion": true}, "finalmask": {"udp": [{"type": "xdns", "settings": ${fmd}}]}}},
     {"tag": "direct", "protocol": "freedom"}
   ],
   "routing": {"rules": [{"type": "field", "ip": ["::/0"], "outboundTag": "direct"}]}

@@ -181,6 +181,15 @@ else
     REALITY_SHORT_ID=$(echo "$REALITY_ENV_CONTENT" | grep REALITY_SHORT_ID | cut -d= -f2 || true)
 fi
 
+# XDNS VLESS Encryption key (server-wide) — the xdns client configs need it
+# (Xray >= 26.9 requires the VLESS layer to carry encryption; see lib/xray.sh).
+if [[ -f "$STATE_DIR/keys/xdns.env" ]]; then
+    source "$STATE_DIR/keys/xdns.env"
+else
+    XDNS_ENV_CONTENT=$(docker run --rm -v moav_moav_state:/state alpine cat /state/keys/xdns.env 2>/dev/null || echo "")
+    XDNS_VLESS_ENCRYPTION=$(echo "$XDNS_ENV_CONTENT" | grep XDNS_VLESS_ENCRYPTION | cut -d= -f2 || true)
+fi
+
 # If public key is missing but private key exists, derive it
 if [[ -z "${REALITY_PUBLIC_KEY:-}" ]] && [[ -n "${REALITY_PRIVATE_KEY:-}" ]]; then
     log_info "Reality public key missing, deriving from private key..."
