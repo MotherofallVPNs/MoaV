@@ -67,6 +67,13 @@ sing-box 1.14, the new **Snell** protocol (on by default), opt-in Hysteria2 geck
   became `<ip>:51821 # AmneziaWG …`, so clients connected but relayed nothing).
   Every note now sits on its own line in `.env.example`, the update path strips a
   trailing inline comment defensively, and a CI gate keeps it that way.
+- **XDNS configs made compatible with Xray >= 26.9.** This release's Xray bump
+  (v26.9.9) began rejecting a VLESS outbound that has no TLS/encryption when it
+  dials a bare public IP, so xray refused to start and XDNS failed (caught by the
+  rc.3 e2e). The XDNS client configs used a bare IP as the *nominal* VLESS address
+  (the real routing IPs are literals inside `finalmask.resolvers`), now a domain
+  form (`dns.google` / the server domain). Also unblocks XDNS for anyone on an
+  already-updated Xray client.
 - **Telegram release notification pins its link preview to the release page.**
   The preview showed whatever link appeared first in the notes body (e.g. a
   client's App Store page) instead of the release. It now sets
