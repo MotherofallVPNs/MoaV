@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-09-12
+
+sing-box 1.14, the new **Snell** protocol (on by default), opt-in Hysteria2 gecko obfuscation, component version bumps (incl. a Grafana security patch), and a fix so `moav update` cleanly discards staged local changes. No breaking changes; keys, users, and certificates are untouched.
+
+### Added
+- **Snell protocol (new sing-box inbound), on by default.** A lightweight TCP
+  proxy with HTTP obfuscation, no TLS/domain required (`ENABLE_SNELL=true`,
+  `PORT_SNELL=8389`, `SNELL_OBFS`). **Shared-key** (one PSK for all users, like the
+  DNS tunnels) — sing-box's multi-user snell has no client-compatible auth, so
+  revoking a user needs a key rotation + re-issue. Needs a Snell v5 client
+  (Surge 5 / Stash / Clash Mi / Mihomo / Clash Meta for Android / FlClash — **not**
+  v2rayNG or Hiddify). Validated end-to-end against a real Mihomo client and the
+  real sing-box 1.14 binary.
+- **sing-box updated to 1.14.0.** Our config is already on 1.14's modern surface,
+  so no config change is required; validated by running the real 1.14 `sing-box
+  check` against the live config (clean, no deprecation warnings). New CI gates
+  render the config and run both a static compatibility check and the real
+  `sing-box check` / `format`.
+- **Opt-in Hysteria2 gecko obfuscation.** `HYSTERIA2_OBFS_TYPE` (default
+  `salamander`) can select the new **gecko** obfuscator, which fragments the QUIC
+  handshake and resists Iran/CN/RU DPI better. Opt-in because gecko needs a client
+  core of sing-box >= 1.14 or hysteria >= 2.9.2 — re-issue bundles and confirm your
+  users' apps before enabling it.
+
+### Changed
+- **Component version bumps** (audit 2026-09-11):
+  - **Grafana 13.2.0 → [13.2.1](https://github.com/grafana/grafana/releases/tag/v13.2.1)** — upstream **security** fixes (CVE-2026-12704, CVE-2026-14199).
+  - **telemt 3.5.5 → [3.5.7](https://github.com/telemt/telemt/releases/tag/3.5.7)** — install-probe fix, websocket-lane recovery, macOS status-schema fixes.
+  - **Xray-core v26.7.28 → [v26.9.9](https://github.com/XTLS/Xray-core/releases/tag/v26.9.9)**.
+  - **slipstream 2026.02.22.1 → [v2026.04.22.1](https://github.com/net2share/slipstream-rust-build/releases/tag/v2026.04.22.1)** (server + client builds).
+  - **MasterDNS 2026.05.10 → [v2026.06.13](https://github.com/masterking32/MasterDnsVPN/releases/tag/v2026.06.13.234407-7de2476)** (release SHA256SUMS still verified at build).
+  - **TrustTunnelClient held at 1.0.49.** v1.1.5 swaps the QUIC stack (quiche → ngtcp2) while the server side stays 1.1.0, so it needs a live client/server compatibility test before bumping.
+- **Client test tool:** migrated the WireGuard path from the removed sing-box
+  `wireguard` *outbound* to the 1.14 *endpoint* form.
+- **Protocol count is now 18+** across the README, agent guide, and docs (Snell
+  brought the transports to 18; the roster is 21 counting the 3 donation
+  integrations).
+- **Claude issue-triage** `--max-turns` raised 6 → 15: the triage finished its
+  work in ~8 turns, but the action failed a run that exceeded the cap. It no
+  longer fails after completing.
+
+### Fixed
+- **`moav update` "Discard changes" now fully resets.** The Discard option used
+  `git checkout -- .`, which only clears *unstaged* edits; staged changes (git
+  status `MM` / `A`, e.g. a hand-edited `docker-compose.yml` or added exporter
+  files) survived and the pull still aborted with "local changes would be
+  overwritten by merge" even after Discard reported success. It now uses
+  `git reset --hard`, which clears the index too.
+- **`moav update -b <ref>` now accepts a tag, not only a branch.** Switching an
+  install to a release candidate (`moav update -b v2.3.0-rc.1`) failed with
+  "Branch '…' does not exist" because the target was validated against branch
+  refs only. It now resolves tags too (fetching them first) and checks out a tag
+  in detached HEAD without attempting a pull.
+- **`.env` no longer carries inline comments on variable lines.** `moav update`
+  copied new options from `.env.example` verbatim, so a line like
+  `PORT_SNELL=8389 # Snell` reached the live `.env`; a consumer reading the value
+  with a raw `grep|cut` then folded the comment into it (the AmneziaWG port once
+  became `<ip>:51821 # AmneziaWG …`, so clients connected but relayed nothing).
+  Every note now sits on its own line in `.env.example`, the update path strips a
+  trailing inline comment defensively, and a CI gate keeps it that way.
+- **XDNS now carries VLESS Encryption (Xray >= 26.9 compatible).** This release's
+  Xray bump (v26.9.9) began rejecting a VLESS outbound with no TLS/encryption that
+  dials a public IP, so xray refused to start and XDNS failed (caught by the rc.3
+  e2e). XDNS dials a public resolver/server over mKCP, so the VLESS layer now
+  carries its own encryption: a server-wide X25519 keypair is minted at bootstrap
+  (openssl, no extra binary; stored in `state/keys/xdns.env`), with `decryption`
+  on the server XDNS inbound and `encryption` in every client bundle. This also
+  hardens XDNS (its DNS-tunnelled VLESS was previously unencrypted) and unblocks it
+  for anyone on an already-updated Xray client.
+- **Telegram release notification pins its link preview to the release page.**
+  The preview showed whatever link appeared first in the notes body (e.g. a
+  client's App Store page) instead of the release. It now sets
+  `link_preview_options.url` to the release/issue URL. Same fix in moav-client.
+
 ## [2.2.4] - 2026-09-02
 
 Operator quality-of-life: bulk user revocation with a single service reset, safer
@@ -2118,7 +2192,8 @@ TrustTunnel config validity.
 - uTLS fingerprint spoofing (Chrome)
 - Automatic short ID generation for Reality
 
-[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v2.2.4...HEAD
+[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/MotherofallVPNs/moav/compare/v2.2.4...v2.3.0
 [2.2.4]: https://github.com/MotherofallVPNs/moav/compare/v2.2.3...v2.2.4
 [2.2.3]: https://github.com/MotherofallVPNs/moav/compare/v2.2.2...v2.2.3
 [2.2.2]: https://github.com/MotherofallVPNs/moav/compare/v2.2.1...v2.2.2

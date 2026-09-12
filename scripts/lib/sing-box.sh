@@ -2,6 +2,7 @@
 # sing-box specific functions
 
 # singbox_add_user <config> <username> <uuid> <password> <ss_psk>
+# (Snell is shared-key, not per-user, so there is no snell arg here.)
 # Canonical sing-box server-config mutation — the single source of truth for
 # inserting a user into the proxy inbounds (used by the host `user add` path and
 # the bootstrap/regenerate reconcile). Each insert is INDEPENDENTLY idempotent:

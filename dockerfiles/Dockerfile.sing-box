@@ -3,7 +3,7 @@
 FROM debian:bookworm-slim
 
 ARG TARGETARCH
-ARG SINGBOX_VERSION=1.13.19
+ARG SINGBOX_VERSION=1.14.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \

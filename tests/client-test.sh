@@ -2257,6 +2257,35 @@ test_gooserelay() {
     RESULTS[gooserelay]="skip"; DETAILS[gooserelay]="$detail"
 }
 
+# Test Snell. sing-box's client can't speak Snell v5, so this is a TCP-reachability
+# check (the port is a plain TCP listener) plus a bundle-config sanity check;
+# end-to-end verification needs a real Snell v5 client (Surge 5+/Stash/Mihomo).
+test_snell() {
+    log_info "Testing Snell..."
+    local f="$CONFIG_DIR/snell.txt"
+    if [[ ! -f "$f" ]]; then
+        log_warn "No Snell config in bundle (off by default)"
+        RESULTS[snell]="skip"; DETAILS[snell]="No Snell config in bundle"; return
+    fi
+    local line server port
+    line=$(grep -E '= snell,' "$f" | head -1)
+    server=$(echo "$line" | sed -E 's/.*= snell, *([^,]+),.*/\1/' | tr -d ' ')
+    port=$(echo "$line" | sed -E 's/.*= snell, *[^,]+, *([0-9]+).*/\1/' | tr -cd '0-9')
+    [[ -z "$port" ]] && port="8389"
+    if [[ -z "$server" ]]; then
+        RESULTS[snell]="fail"; DETAILS[snell]="Could not parse Snell server from bundle config"; return
+    fi
+    if nc -z -w 5 "$server" "$port" 2>/dev/null; then
+        local detail="Port $port reachable on $server; verify end-to-end with a Snell v5 client (Surge 5+/Stash/Mihomo)"
+        log_info "  $detail"
+        RESULTS[snell]="pass"; DETAILS[snell]="$detail"
+    else
+        local detail="Snell port $port not reachable on $server (firewall open? ENABLE_SNELL + bootstrap done?)"
+        log_warn "  $detail"
+        RESULTS[snell]="warn"; DETAILS[snell]="$detail"
+    fi
+}
+
 # =============================================================================
 # Output Functions
 # =============================================================================
@@ -2351,7 +2380,7 @@ output_json() {
 EOF
 
     local first=true
-    for protocol in reality trojan anytls hysteria2 shadowsocks cdn xhttp wireguard wstunnel amneziawg dnstt slipstream masterdns xdns gooserelay trusttunnel telemt readme; do
+    for protocol in reality trojan anytls hysteria2 shadowsocks snell cdn xhttp wireguard wstunnel amneziawg dnstt slipstream masterdns xdns gooserelay trusttunnel telemt readme; do
         if [[ -n "${RESULTS[$protocol]:-}" ]]; then
             [[ "$first" != "true" ]] && echo ","
             first=false
@@ -2394,7 +2423,7 @@ output_human() {
     echo ""
     echo "───────────────────────────────────────────────────────────────"
 
-    for protocol in reality trojan anytls hysteria2 shadowsocks cdn xhttp wireguard wstunnel amneziawg dnstt slipstream masterdns xdns gooserelay trusttunnel telemt readme; do
+    for protocol in reality trojan anytls hysteria2 shadowsocks snell cdn xhttp wireguard wstunnel amneziawg dnstt slipstream masterdns xdns gooserelay trusttunnel telemt readme; do
         if [[ -n "${RESULTS[$protocol]:-}" ]]; then
             local status="${RESULTS[$protocol]}"
             local detail="${DETAILS[$protocol]:-}"
@@ -2433,6 +2462,7 @@ main() {
     test_anytls
     test_hysteria2
     test_ss
+    test_snell
     test_cdn
     test_xhttp
     test_wireguard

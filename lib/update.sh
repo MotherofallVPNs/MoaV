@@ -75,9 +75,9 @@ cmd_update() {
     current_branch=$(git -C "$install_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
     echo -e "  Current branch: ${CYAN}$current_branch${NC}"
 
-    # Show target branch if switching
+    # Show target branch/tag if switching
     if [[ -n "$target_branch" ]]; then
-        echo -e "  Target branch: ${GREEN}$target_branch${NC}"
+        echo -e "  Target (branch or tag): ${GREEN}$target_branch${NC}"
     fi
 
     # Warn if not on main branch (and not switching)
@@ -139,7 +139,10 @@ cmd_update() {
                 read -rp "Are you sure? [y/N]: " confirm
                 if [[ "$confirm" =~ ^[Yy]$ ]]; then
                     info "Discarding local changes..."
-                    git -C "$install_dir" checkout -- . 2>/dev/null
+                    # reset --hard, not checkout -- . : the latter leaves STAGED
+                    # changes (git status MM / A) in the index, so the pull still
+                    # aborts with "local changes would be overwritten by merge".
+                    git -C "$install_dir" reset --hard HEAD 2>/dev/null
                     git -C "$install_dir" clean -fd 2>/dev/null
                     success "Local changes discarded"
                     echo ""
@@ -154,7 +157,7 @@ cmd_update() {
                 echo -e "  ${WHITE}cd $install_dir${NC}"
                 echo -e "  ${WHITE}git status${NC}           # View changes"
                 echo -e "  ${WHITE}git stash${NC}            # Save changes temporarily"
-                echo -e "  ${WHITE}git checkout -- .${NC}    # Discard changes"
+                echo -e "  ${WHITE}git reset --hard${NC}     # Discard changes (staged + unstaged)"
                 echo -e "  ${WHITE}moav update${NC}          # Try again"
                 echo ""
                 return 0
@@ -168,27 +171,53 @@ cmd_update() {
         warn "Failed to fetch, continuing with local data..."
     fi
 
-    # Switch branch if requested
+    # Switch branch or TAG if requested. `-b` accepts a tag too (e.g. a release
+    # candidate like v2.3.0-rc.1) — a tag lands in detached HEAD and is not pulled.
+    local switched_to_tag=""
     if [[ -n "$target_branch" && "$target_branch" != "$current_branch" ]]; then
-        info "Switching to branch: $target_branch"
+        info "Switching to: $target_branch"
 
-        # Check if branch exists (locally or on remote)
-        if ! git -C "$install_dir" show-ref --verify --quiet "refs/heads/$target_branch" 2>/dev/null && \
-           ! git -C "$install_dir" show-ref --verify --quiet "refs/remotes/origin/$target_branch" 2>/dev/null; then
-            error "Branch '$target_branch' does not exist"
+        # A newly-pushed rc tag may not be known locally yet.
+        git -C "$install_dir" fetch --tags origin 2>/dev/null || true
+
+        if git -C "$install_dir" show-ref --verify --quiet "refs/tags/$target_branch" 2>/dev/null; then
+            switched_to_tag=1
+        elif ! git -C "$install_dir" show-ref --verify --quiet "refs/heads/$target_branch" 2>/dev/null && \
+             ! git -C "$install_dir" show-ref --verify --quiet "refs/remotes/origin/$target_branch" 2>/dev/null; then
+            error "Branch or tag '$target_branch' does not exist"
             echo ""
             echo "Available branches:"
             git -C "$install_dir" branch -a | sed 's/^/  /' | head -15
+            echo ""
+            echo "Recent tags (release candidates and releases):"
+            git -C "$install_dir" tag --sort=-creatordate 2>/dev/null | head -8 | sed 's/^/  /'
             return 1
         fi
 
-        # Checkout the branch
+        # Checkout the branch or tag (a tag lands in detached HEAD).
         if ! git -C "$install_dir" checkout "$target_branch" 2>/dev/null; then
-            error "Failed to checkout branch '$target_branch'"
+            error "Failed to checkout '$target_branch'"
             return 1
         fi
-        success "Switched to branch: $target_branch"
+        success "Switched to: $target_branch"
         current_branch="$target_branch"
+    fi
+
+    # A tag is a fixed point (detached HEAD) — nothing to pull; the checkout
+    # already moved us to the exact code. Run the post-update checks and stop.
+    if [[ -n "$switched_to_tag" ]]; then
+        echo ""
+        local new_commit
+        new_commit=$(git -C "$install_dir" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+        success "Now at tag $target_branch ($new_commit)"
+        if [[ "$current_commit" != "$new_commit" ]]; then
+            exec "$SCRIPT_DIR/moav.sh" _post-update "$current_commit"
+        fi
+        check_component_versions
+        migrate_dns_tunnel_state
+        check_env_additions
+        print_post_update_apply_steps
+        return 0
     fi
 
     # Pull latest changes
@@ -649,6 +678,12 @@ check_env_additions() {
         local value_line
         value_line=$(grep "^${var}=" "$example_file" | head -1) || true
         [[ -z "$value_line" ]] && continue
+
+        # Never carry a trailing inline "# note" into the user's .env — raw
+        # grep|cut readers fold it into the value (a port once became
+        # "51821 # AmneziaWG ..."). .env.example keeps notes on their own line;
+        # this is the belt-and-suspenders for one that slips through.
+        value_line="$(printf '%s' "$value_line" | sed 's/[[:space:]]\{1,\}#.*$//')"
 
         # Get preceding comment lines (walk backwards)
         local line_num comments=""
