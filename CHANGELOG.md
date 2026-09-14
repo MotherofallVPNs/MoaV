@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`--json` output for automation** (`moav status`, `moav doctor [check]`,
+  `moav user list`, `moav user add`, `moav user remove|revoke`; `moav test --json`
+  unchanged in shape). One document on stdout, progress/logs on stderr, and
+  **secret-free by construction**: no keys, passwords, share-links or server
+  addresses — `status` only emits the dashboard URLs when they are domain-based,
+  `doctor` details are colour-stripped and redacted (IPv4/IPv6, links, key-shaped
+  tokens), `user list` carries names + service membership only. `user remove
+  --json` reports a per-user result and exits non-zero on an unknown user (the
+  text path still exits 0). Requested by the MoaV deploy app
+  (moav-deploy-app#8).
+- **Non-interactive `install.sh`**: `MOAV_NONINTERACTIVE=1` (or
+  `--non-interactive`) with `MOAV_DOMAIN`, `MOAV_EMAIL`, `MOAV_ADMIN_PASSWORD`,
+  `MOAV_DOMAINLESS=1` and `ENABLE_*` toggles from the environment, or
+  `--answers FILE` read from a regular file that must be mode `0600` and owned
+  by the caller. Fails closed on any missing/invalid answer (weak or
+  non-round-trippable passwords included), never accepts the password on the
+  command line, never prints it, writes `.env` at `0600` without `sed`, only
+  fills empty/placeholder values on an existing `.env`, derives
+  `DEFAULT_PROFILES` from the toggles, and skips the swap / kernel-tuning host
+  changes. `MOAV_BOOTSTRAP=1` opts into running `moav bootstrap --yes` at the end.
+
+### Changed
+- **`moav bootstrap --yes` honours the saved `DEFAULT_PROFILES`** instead of
+  entering the interactive service selection (which, without a TTY, fell
+  through to "select later" and left a fresh install with nothing built or
+  started).
+- **`moav test --json` keeps stdout clean**: the progress lines and the client
+  image build now go to stderr, so the JSON no longer has to be scraped out of
+  `docker build` output.
+- `confirm()` (CLI and installer) returns its default without opening `/dev/tty`
+  when `MOAV_NONINTERACTIVE=1`.
+
+### Fixed
+- **`moav status` lost published ports** when `docker compose ps --format json`
+  returned an array: the array-to-lines split cut inside a container's
+  `Publishers` list, so a service with two ports showed none and the next row
+  was skipped. The split is now brace-depth aware.
+
+### Testing
+- `tests/cli-json-test.sh` — every `--json` shape (valid JSON, stdout-only, no
+  planted secret substring), via the real dispatcher with a fake `docker` and
+  fake provisioning scripts.
+- `tests/install-noninteractive-test.sh` — answers validation, `0600` /
+  ownership checks, argv password refusal, `.env` rendering and re-run safety.
+
 ## [2.3.0] - 2026-09-12
 
 sing-box 1.14, the new **Snell** protocol (on by default), opt-in Hysteria2 gecko obfuscation, component version bumps (incl. a Grafana security patch), and a fix so `moav update` cleanly discards staged local changes. No breaking changes; keys, users, and certificates are untouched.

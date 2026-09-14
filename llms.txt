@@ -17,6 +17,7 @@ Enough to deploy and find your way around. Everything else is linked below.
 - **Grafana**: `https://<server>:9444` — username `admin`, same password. Needs the `monitoring` profile and roughly 2 GB RAM.
 - **Discover every command**: `moav help`, or run `moav` with no arguments for an interactive menu.
 - **First moves after install**: `moav status` (what is running), `moav doctor` (diagnose DNS, ports, certificates, resources), `moav user add NAME --package` (create a user and build their bundle .zip), `moav test NAME` (prove that user's configs actually pass traffic).
+- **Automation**: `moav status --json`, `moav doctor --json`, `moav user list --json`, `moav user add|remove NAME --json` and `moav test NAME --json` print one JSON document on stdout (logs go to stderr) and never include secrets — no keys, passwords, share-links or server IPs. Unattended install: `MOAV_NONINTERACTIVE=1` with `MOAV_DOMAIN` / `MOAV_EMAIL` / `MOAV_ADMIN_PASSWORD` / `ENABLE_*` in the environment, or `install.sh --answers FILE` (mode 0600); the password is never taken from argv and a missing answer fails the install.
 - **Applying config changes**: edit `.env`, then `moav restart <service-or-profile>`. A plain `docker compose restart` does **not** re-read `.env`. Structural changes need `moav bootstrap`, and existing users are preserved.
 
 ## For agents working in this repo

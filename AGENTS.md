@@ -44,6 +44,14 @@ curl -fsSL https://raw.githubusercontent.com/MotherofallVPNs/MoaV/dev/install.sh
 
 (Swap `dev` for a tag like `v2.0.0-rc.3` to install a specific release candidate.)
 
+**Unattended install** (no prompts): set `MOAV_NONINTERACTIVE=1` and pass the
+answers in the environment (`MOAV_DOMAIN`, `MOAV_EMAIL`, `MOAV_ADMIN_PASSWORD`,
+`ENABLE_*`, `MOAV_DOMAINLESS=1` for no domain), or `bash install.sh --answers
+FILE` with a `0600` KEY=VALUE file. The password is never accepted on the
+command line; a missing required value aborts. `MOAV_BOOTSTRAP=1` also runs
+`moav bootstrap --yes`, which uses the saved `DEFAULT_PROFILES` instead of
+prompting for a service selection.
+
 **Upgrade in place:** `moav update -b main && moav build && moav start`
 (see [docs/V2-MIGRATION.md](docs/V2-MIGRATION.md) for the 1.9.x → v2 path).
 
@@ -55,7 +63,7 @@ with none they act on the whole stack.
 | Command | What it does |
 |---|---|
 | `moav` | Interactive menu (safe to explore; nothing changes until you pick an action) |
-| `moav status` | Per-container health and which profiles are up |
+| `moav status` | Per-container health and which profiles are up. `--json` for a secret-free machine-readable document (also on `doctor`, `user list`, `user add`/`remove`, `test`) |
 | `moav start [svc\|profile]` / `moav stop [svc]` / `moav restart [svc]` | Bring services up/down. `moav start all` = everything |
 | `moav user list` | List provisioned users |
 | `moav user add <name> [--package]` | Create a user (keys, configs, QR). `--package` also builds the downloadable zip |

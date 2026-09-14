@@ -101,6 +101,10 @@ jobs:
         run: bash tests/cdn-upgrade-test.sh
       - name: llms.txt link hygiene (structure)
         run: bash tests/llms-links-test.sh
+      - name: --json output shapes are valid + secret-free (moav-deploy-app#8)
+        run: bash tests/cli-json-test.sh
+      - name: install.sh non-interactive answers (fail closed, 0600, no argv password)
+        run: bash tests/install-noninteractive-test.sh
       - name: moav update rebuild prompts (baked-in changes)
         run: bash tests/update-rebuild-test.sh
       - name: moav update Discard resets staged + unstaged
