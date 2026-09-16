@@ -119,6 +119,19 @@ This will:
 - Offer to install `moav` command globally
 - Launch the interactive setup
 
+**Non-interactive install** (automation, cloud-init, the deploy app): answers
+come from the environment or from a `KEY=VALUE` file that must be mode `0600`.
+The admin password is never accepted on the command line, and a missing
+required value aborts the install instead of falling back to a default:
+
+```bash
+MOAV_NONINTERACTIVE=1 MOAV_DOMAIN=vpn.example.com MOAV_EMAIL=you@example.com \
+MOAV_ADMIN_PASSWORD='...' ENABLE_TROJAN=false bash install.sh
+#   or: bash install.sh --answers /root/moav-answers.env   (0600; same keys)
+#   MOAV_DOMAINLESS=1 opts into domainless mode; MOAV_BOOTSTRAP=1 also runs
+#   'moav bootstrap --yes' (which now honours the saved DEFAULT_PROFILES).
+```
+
 **Manual install** (alternative):
 
 ```bash
@@ -228,6 +241,9 @@ moav test alice               # prove alice's configs actually pass traffic
 moav start proxy admin        # start specific profiles
 moav restart sing-box         # apply an .env change to one service
 moav donate                   # donate configs/bandwidth (MahsaNet, Psiphon, Snowflake)
+
+moav status --json            # machine-readable, secret-free: also doctor, user list,
+moav user add alice --json    #   user add/remove and test (no keys, links or server IPs)
 ```
 
 Each user gets `outputs/bundles/<username>/` with config files, QR codes and a

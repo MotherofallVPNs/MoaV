@@ -5,6 +5,8 @@ MoaV's test scripts. Three layers, cheapest first:
 | File | Layer | Needs | Run by |
 |---|---|---|---|
 | `singbox-links-test.sh` | **Unit** — golden test for the sing-box share-link builders (pure string functions in `scripts/lib/sing-box.sh`) | nothing (no Docker, no server) | `ci.yml`, locally |
+| `cli-json-test.sh` | **Unit** — every `--json` shape (`status`, `doctor`, `user list|add|remove`): valid JSON, stdout-only, no secret substrings; real dispatcher, fake `docker` + provisioning scripts | bash 4+, jq, python3 | `ci.yml`, locally |
+| `install-noninteractive-test.sh` | **Unit** — `install.sh` answers/env mode: fail-closed validation, `0600` answers file, no argv password, `.env` rendering | nothing | `ci.yml`, locally |
 | `cli-smoke-test.sh` | **CLI smoke** — every `moav` command against a live stack (help/status/users/doctor/cert/export→import/user add+revoke/admin password/…), each hang-guarded | a running MoaV stack | `e2e.yml`, locally |
 | `client-test.sh` | **Protocol e2e** — real connectivity per protocol, checking the exit IP. Runs **inside the `moav-client` container** (copied to `/app/` by `dockerfiles/Dockerfile.client`); invoked via `moav test <user>` | a live MoaV server + the client image | `e2e.yml` (`moav test`), locally |
 

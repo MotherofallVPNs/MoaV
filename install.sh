@@ -4,10 +4,18 @@
 # Usage: curl -fsSL moav.sh/install.sh | bash
 #        curl -fsSL moav.sh/install.sh | bash -s -- -b dev    # use 'dev' branch
 #
+# Non-interactive (automation): answers come from the environment
+#   MOAV_NONINTERACTIVE=1 MOAV_DOMAIN=vpn.example.com MOAV_EMAIL=me@example.com \
+#   MOAV_ADMIN_PASSWORD=... ENABLE_TROJAN=false bash install.sh
+# or from a KEY=VALUE file that must be mode 0600 and owned by the caller:
+#   bash install.sh --answers /root/moav-answers.env
+# The admin password is NEVER accepted on the command line (ps/history-visible).
+# Missing required values fail the install; nothing is defaulted insecurely.
+#
 # This script will:
 # 1. Install missing prerequisites (Docker, git, qrencode) with user confirmation
 # 2. Clone MoaV to /opt/moav (or update if exists)
-# 3. Guide you through the setup process
+# 3. Guide you through the setup process (or apply the answers, non-interactively)
 # =============================================================================
 
 set -euo pipefail
@@ -26,6 +34,8 @@ NC='\033[0m'
 REPO_URL="https://github.com/MotherofallVPNs/moav.git"
 INSTALL_DIR="${MOAV_INSTALL_DIR:-/opt/moav}"
 BRANCH="${MOAV_BRANCH:-main}"
+NONINTERACTIVE="${MOAV_NONINTERACTIVE:-0}"
+ANSWERS_FILE=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -34,6 +44,22 @@ while [[ $# -gt 0 ]]; do
             BRANCH="$2"
             shift 2
             ;;
+        --non-interactive)
+            NONINTERACTIVE=1
+            shift
+            ;;
+        --answers)
+            ANSWERS_FILE="${2:-}"
+            NONINTERACTIVE=1
+            shift 2
+            ;;
+        --admin-password*|--password*|*MOAV_ADMIN_PASSWORD=*)
+            # argv is visible to every local user via ps and lands in shell
+            # history; the password only travels via the environment or a 0600 file.
+            echo "The admin password is not accepted on the command line." >&2
+            echo "Set MOAV_ADMIN_PASSWORD in the environment or in a 0600 --answers file." >&2
+            exit 1
+            ;;
         -h|--help)
             echo "MoaV Installer"
             echo ""
@@ -41,11 +67,26 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  -b, --branch BRANCH   Use specified git branch (default: main)"
+            echo "  --non-interactive     Never prompt; take answers from the environment (below)"
+            echo "  --answers FILE        Non-interactive; read answers from FILE (KEY=VALUE lines,"
+            echo "                        must be mode 0600 and owned by you; overrides the environment)"
             echo "  -h, --help            Show this help"
             echo ""
             echo "Environment variables:"
             echo "  MOAV_INSTALL_DIR      Installation directory (default: /opt/moav)"
             echo "  MOAV_BRANCH           Git branch to use (default: main)"
+            echo "  MOAV_NONINTERACTIVE=1 Same as --non-interactive"
+            echo ""
+            echo "Non-interactive answers (environment or --answers file):"
+            echo "  MOAV_DOMAIN           Domain for TLS protocols (required unless MOAV_DOMAINLESS=1)"
+            echo "  MOAV_EMAIL            Let's Encrypt email (required when MOAV_DOMAIN is set)"
+            echo "  MOAV_ADMIN_PASSWORD   Admin/Grafana password (required; >= 12 chars; never via argv)"
+            echo "  MOAV_DOMAINLESS=1     Explicitly opt into domainless mode (no MOAV_DOMAIN)"
+            echo "  ENABLE_<PROTOCOL>     Protocol toggles, true|false (e.g. ENABLE_TROJAN=false)"
+            echo "  MOAV_BOOTSTRAP=1      Also run 'moav bootstrap --yes' after installing (opt-in)"
+            echo ""
+            echo "Non-interactive runs never touch swap or kernel tuning, never update an"
+            echo "existing checkout, and fail (exit 1) if a required answer is missing."
             exit 0
             ;;
         *)
@@ -65,6 +106,12 @@ error() { echo -e "${RED}✗${NC} $*"; }
 confirm() {
     local prompt="${1:-Continue?}"
     local default="${2:-n}"
+
+    # Non-interactive: the default answers, and /dev/tty is never opened.
+    if [[ "$NONINTERACTIVE" == "1" ]]; then
+        [[ "$default" == "y" ]]
+        return
+    fi
 
     # Detect interactivity by actually opening /dev/tty — under setsid the
     # device node exists but opening returns ENXIO, so -e would lie.
@@ -130,6 +177,244 @@ detect_os() {
         echo "unknown"
     fi
 }
+
+# =============================================================================
+# Non-interactive answers (MOAV_NONINTERACTIVE=1 / --answers FILE)
+# =============================================================================
+# Fail closed: every required value must be present and valid before anything
+# is installed. The password is never echoed, never put on a command line, and
+# is written to .env (0600) through a temp file rather than a sed expression.
+
+# Keys an answers file may set (also the environment keys honoured).
+ni_key_allowed() {
+    case "$1" in
+        MOAV_DOMAIN|MOAV_EMAIL|MOAV_ADMIN_PASSWORD|MOAV_DOMAINLESS|MOAV_BOOTSTRAP) return 0 ;;
+        ENABLE_[A-Z0-9_]*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# ni_load_answers FILE — regular file, mode 0600/0400, owned by the caller;
+# KEY=VALUE lines (optional matching quotes), only allowed keys. File values
+# override the environment. Rejects anything else rather than guessing.
+ni_load_answers() {
+    local file="$1" mode owner line key val
+    if [[ -z "$file" ]]; then error "--answers needs a file path"; return 1; fi
+    if [[ -L "$file" || ! -f "$file" ]]; then error "answers file not found or not a regular file: $file"; return 1; fi
+    mode=$(stat -c '%a' "$file" 2>/dev/null || stat -f '%Lp' "$file" 2>/dev/null || echo "")
+    owner=$(stat -c '%u' "$file" 2>/dev/null || stat -f '%u' "$file" 2>/dev/null || echo "")
+    case "$mode" in
+        600|400) ;;
+        *) error "answers file must be mode 0600 (is ${mode:-unknown}): chmod 600 $file"; return 1 ;;
+    esac
+    if [[ "$owner" != "$(id -u)" ]]; then
+        error "answers file must be owned by the invoking user (uid $(id -u))"; return 1
+    fi
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%$'\r'}"
+        [[ -z "${line// /}" || "$line" == \#* ]] && continue
+        if [[ "$line" != *=* ]]; then error "answers file: expected KEY=VALUE, got: ${line%%=*}"; return 1; fi
+        key="${line%%=*}"; val="${line#*=}"
+        key="${key//[[:space:]]/}"
+        if ! ni_key_allowed "$key"; then error "answers file: key not allowed: $key"; return 1; fi
+        # Strip one pair of matching surrounding quotes.
+        if [[ "$val" == \"*\" && ${#val} -ge 2 ]]; then val="${val:1:${#val}-2}"
+        elif [[ "$val" == \'*\' && ${#val} -ge 2 ]]; then val="${val:1:${#val}-2}"; fi
+        printf -v "$key" '%s' "$val"
+        export "${key?}"
+    done < "$file"
+    return 0
+}
+
+# Same hostname rules as moav.sh (sanitize_domain + is_valid_domain).
+ni_clean_domain() {
+    local d="$1"
+    d="${d#http://}"; d="${d#https://}"; d="${d#HTTP://}"; d="${d#HTTPS://}"
+    d="${d##*@}"; d="${d%%/*}"; d="${d%%:*}"; d="${d//[[:space:]]/}"
+    printf '%s' "$d" | tr '[:upper:]' '[:lower:]'
+}
+ni_valid_domain() {
+    local d="$1"
+    [[ -n "$d" && "$d" == *.* && "$d" =~ ^[a-z0-9.-]+$ && "$d" != *..* ]] || return 1
+    [[ "${d:0:1}" =~ [a-z0-9] && "${d: -1}" =~ [a-z0-9] ]]
+}
+
+# ni_validate — normalises MOAV_* / ENABLE_* and fails on anything missing or
+# unsafe. Sets NI_DOMAIN, NI_EMAIL, NI_DOMAINLESS; the password stays in
+# MOAV_ADMIN_PASSWORD and is only ever tested, never printed.
+ni_validate() {
+    local ok=true v k
+    NI_DOMAIN=$(ni_clean_domain "${MOAV_DOMAIN:-}")
+    NI_EMAIL="${MOAV_EMAIL:-}"
+    NI_DOMAINLESS=false
+    case "$(printf '%s' "${MOAV_DOMAINLESS:-}" | tr '[:upper:]' '[:lower:]')" in
+        1|true|yes) NI_DOMAINLESS=true ;;
+    esac
+
+    if [[ -n "$NI_DOMAIN" ]]; then
+        if ! ni_valid_domain "$NI_DOMAIN"; then
+            error "MOAV_DOMAIN is not a valid hostname: '$NI_DOMAIN'"; ok=false
+        fi
+        if [[ ! "$NI_EMAIL" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]; then
+            error "MOAV_EMAIL is required with MOAV_DOMAIN (Let's Encrypt registration)"; ok=false
+        fi
+    elif [[ "$NI_DOMAINLESS" != "true" ]]; then
+        error "MOAV_DOMAIN is not set. Set it, or set MOAV_DOMAINLESS=1 to opt into domainless mode explicitly."; ok=false
+    fi
+
+    v="${MOAV_ADMIN_PASSWORD:-}"
+    if [[ -z "$v" ]]; then
+        error "MOAV_ADMIN_PASSWORD is required (environment or 0600 --answers file; never argv)"; ok=false
+    else
+        case "$v" in
+            change_me_to_something_secure|admin|password|123456*|moav)
+                error "MOAV_ADMIN_PASSWORD is a known-insecure value"; ok=false ;;
+        esac
+        if [[ ${#v} -lt 12 ]]; then
+            error "MOAV_ADMIN_PASSWORD must be at least 12 characters"; ok=false
+        fi
+        # .env is both sourced by bash and read by get_env_val (which strips
+        # quotes and '#' comments), so these characters cannot round-trip.
+        if [[ "$v" == *[\"\'\\\$\`#]* || "$v" == *[[:space:][:cntrl:]]* ]]; then
+            error "MOAV_ADMIN_PASSWORD may not contain quotes, backslash, \$, backtick, # or whitespace"; ok=false
+        fi
+    fi
+
+    # ENABLE_* toggles: only true/false, lower-cased in place.
+    for k in $(compgen -A variable | grep -E '^ENABLE_[A-Z0-9_]+$' || true); do
+        v=$(printf '%s' "${!k}" | tr '[:upper:]' '[:lower:]')
+        case "$v" in
+            true|false) printf -v "$k" '%s' "$v"; export "${k?}" ;;
+            "") ;;
+            *) error "$k must be true or false (got '${!k}')"; ok=false ;;
+        esac
+    done
+
+    [[ "$ok" == "true" ]]
+}
+
+# ni_env_set FILE KEY VALUE — replace (or append) KEY="VALUE" without sed, so
+# a value with | & / never breaks the expression; the file's inode and mode
+# are preserved (written back through cat). Duplicate active lines collapse
+# to one; a commented "#KEY=" template line is uncommented in place.
+ni_env_set() {
+    local file="$1" tmp
+    tmp=$(mktemp "${file}.XXXXXX")
+    NI_KEY="$2" NI_VAL="$3" awk '
+        BEGIN { k = ENVIRON["NI_KEY"]; v = ENVIRON["NI_VAL"]; done = 0 }
+        index($0, k "=") == 1 { if (!done) { print k "=\"" v "\""; done = 1 }; next }
+        !done && $0 ~ ("^#[ \t]*" k "=") { print k "=\"" v "\""; done = 1; next }
+        { print }
+        END { if (!done) print k "=\"" v "\"" }
+    ' "$file" > "$tmp" && cat "$tmp" > "$file"
+    rm -f "$tmp"
+}
+
+# Current value of KEY in FILE (last wins, quotes stripped) — get_env_val's rules.
+ni_env_get() {
+    grep "^$2=" "$1" 2>/dev/null | tail -1 | cut -d'=' -f2- | sed 's/#.*//' | tr -d '"' | tr -d "'" | xargs || true
+}
+
+# ni_default_profiles — the ENABLE_*-derived profile list, computed by the
+# repo's own derive_enabled_profiles so the installer cannot drift from it.
+ni_default_profiles() {
+    (
+        set +u
+        SCRIPT_DIR="$INSTALL_DIR"
+        info() { :; }
+        # shellcheck source=/dev/null
+        source "$INSTALL_DIR/scripts/lib/common.sh"   # get_env_val
+        # shellcheck source=/dev/null
+        source "$INSTALL_DIR/lib/service.sh"          # derive_enabled_profiles
+        p=$(derive_enabled_profiles "$INSTALL_DIR/.env")
+        [[ "$(get_env_val "ENABLE_MONITORING" "$INSTALL_DIR/.env" "")" == "true" ]] && p="$p monitoring"
+        printf '%s' "$p"
+    )
+}
+
+# ni_configure_env — write the answers into $INSTALL_DIR/.env. A fresh file is
+# created from .env.example; an existing one only has empty/placeholder
+# DOMAIN / ACME_EMAIL / ADMIN_PASSWORD filled, so re-running on a configured box
+# never silently reconfigures it. Explicit ENABLE_* toggles are always applied.
+ni_configure_env() {
+    local env_file="$INSTALL_DIR/.env" fresh=false cur k
+    if [[ ! -f "$env_file" ]]; then
+        [[ -f "$INSTALL_DIR/.env.example" ]] || { error ".env.example not found in $INSTALL_DIR"; return 1; }
+        cp "$INSTALL_DIR/.env.example" "$env_file"
+        fresh=true
+        success "Created .env from .env.example"
+    fi
+    chmod 600 "$env_file"   # ADMIN_PASSWORD + generated secrets live here
+
+    cur=$(ni_env_get "$env_file" DOMAIN)
+    if [[ -n "$NI_DOMAIN" ]]; then
+        if [[ "$fresh" == "true" || -z "$cur" ]]; then
+            ni_env_set "$env_file" DOMAIN "$NI_DOMAIN"; success "DOMAIN set to: $NI_DOMAIN"
+        elif [[ "$cur" != "$NI_DOMAIN" ]]; then
+            warn "DOMAIN already set in .env ('$cur'); keeping it (edit .env to change)"
+        fi
+    fi
+    local effective_domain="${NI_DOMAIN:-$cur}"
+
+    cur=$(ni_env_get "$env_file" ACME_EMAIL)
+    if [[ -n "$NI_EMAIL" ]]; then
+        if [[ "$fresh" == "true" || -z "$cur" ]]; then
+            ni_env_set "$env_file" ACME_EMAIL "$NI_EMAIL"; success "ACME_EMAIL set"
+        elif [[ "$cur" != "$NI_EMAIL" ]]; then
+            warn "ACME_EMAIL already set in .env; keeping it"
+        fi
+    fi
+
+    cur=$(ni_env_get "$env_file" ADMIN_PASSWORD)
+    if [[ "$fresh" == "true" || -z "$cur" || "$cur" == "change_me_to_something_secure" || "$cur" == "admin" ]]; then
+        ni_env_set "$env_file" ADMIN_PASSWORD "$MOAV_ADMIN_PASSWORD"
+        success "ADMIN_PASSWORD set (not shown)"
+    else
+        warn "ADMIN_PASSWORD already set in .env; keeping it (reset later with: moav admin password)"
+    fi
+
+    for k in $(compgen -A variable | grep -E '^ENABLE_[A-Z0-9_]+$' || true); do
+        [[ -n "${!k}" ]] || continue
+        ni_env_set "$env_file" "$k" "${!k}"
+    done
+
+    if [[ -z "$effective_domain" ]]; then
+        # Same set moav.sh disables in domainless mode (needs a certificate or
+        # NS delegation); an explicit ENABLE_x=true for one of these is overridden.
+        for k in ENABLE_TROJAN ENABLE_ANYTLS ENABLE_HYSTERIA2 ENABLE_DNSTT ENABLE_SLIPSTREAM ENABLE_MASTERDNS ENABLE_XDNS ENABLE_TRUSTTUNNEL; do
+            [[ "${!k:-}" == "true" ]] && warn "$k=true needs a domain; disabled (domainless mode)"
+            ni_env_set "$env_file" "$k" "false"
+        done
+        success "Domainless mode: certificate-dependent protocols disabled"
+    fi
+
+    if [[ -z "$(ni_env_get "$env_file" DEFAULT_PROFILES)" ]]; then
+        local profiles
+        profiles=$(ni_default_profiles)
+        if [[ -n "$profiles" ]]; then
+            ni_env_set "$env_file" DEFAULT_PROFILES "$profiles"
+            success "DEFAULT_PROFILES set to: $profiles"
+        fi
+    fi
+    chmod 600 "$env_file"
+    return 0
+}
+
+# Sourced by tests/install-noninteractive-test.sh to exercise the ni_* helpers
+# without cloning or installing anything; never set on a real run.
+if [[ "${MOAV_INSTALL_LIB_ONLY:-0}" == "1" ]]; then
+    return 0 2>/dev/null || exit 0
+fi
+
+if [[ "$NONINTERACTIVE" == "1" ]]; then
+    # Validate first: nothing is installed or cloned if an answer is missing.
+    if [[ -n "$ANSWERS_FILE" ]]; then
+        ni_load_answers "$ANSWERS_FILE" || exit 1
+    fi
+    ni_validate || { error "Non-interactive install aborted: fix the answers above."; exit 1; }
+    # Let moav.sh's own prompts take their defaults too (install / bootstrap --yes).
+    export MOAV_NONINTERACTIVE=1
+fi
 
 # Banner
 echo -e "${CYAN}"
@@ -421,7 +706,9 @@ if ! docker info &>/dev/null 2>&1; then
     warn "Docker daemon is not running."
 
     if [[ "$OS_TYPE" != "macos" ]]; then
-        if confirm "Start Docker now?"; then
+        # Unattended: a box where Docker was just installed must not continue
+        # without it running.
+        if confirm "Start Docker now?" "$([[ "$NONINTERACTIVE" == "1" ]] && echo y || echo n)"; then
             sudo systemctl start docker 2>/dev/null || sudo service docker start 2>/dev/null || true
             sleep 2
 
@@ -451,6 +738,7 @@ maybe_offer_swap() {
     [[ "$(uname -s)" == "Linux" ]] || return 0
     [[ -r /proc/meminfo ]] || return 0
     # Never make host changes on a fully non-interactive install (cloud-init/CI).
+    [[ "$NONINTERACTIVE" != "1" ]] || return 0
     [[ -t 0 || -e /dev/tty ]] || return 0
 
     local total_mb swap_kb
@@ -516,6 +804,7 @@ maybe_offer_swap || true
 # Offer BBR + kernel network tuning at install time. Mirrors `moav net apply`.
 maybe_offer_net_tuning() {
     [[ "$(uname -s)" == "Linux" ]] || return 0
+    [[ "$NONINTERACTIVE" != "1" ]] || return 0   # host change: never unattended
     [[ -t 0 || -e /dev/tty ]] || return 0   # non-interactive → skip
 
     local NT_CONF=/etc/sysctl.d/99-moav-net.conf
@@ -725,6 +1014,12 @@ cd "$INSTALL_DIR"
 chmod +x moav.sh
 chmod +x scripts/*.sh 2>/dev/null || true
 
+if [[ "$NONINTERACTIVE" == "1" ]]; then
+    echo ""
+    info "Applying non-interactive configuration to $INSTALL_DIR/.env"
+    ni_configure_env || exit 1
+fi
+
 echo ""
 echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}  MoaV installed successfully!${NC}"
@@ -763,6 +1058,21 @@ else
     echo ""
     echo -e "  ${YELLOW}Tip:${NC} You can install globally later with: ${WHITE}./moav.sh install${NC}"
     echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+fi
+
+if [[ "$NONINTERACTIVE" == "1" ]]; then
+    case "$(printf '%s' "${MOAV_BOOTSTRAP:-}" | tr '[:upper:]' '[:lower:]')" in
+        1|true|yes)
+            echo ""
+            info "MOAV_BOOTSTRAP set — running 'moav bootstrap --yes' (keys, certs, first user, start)"
+            # stdin closed: under `curl | bash` it is the script itself.
+            ./moav.sh bootstrap --yes < /dev/null
+            ;;
+        *)
+            echo ""
+            info "Next: ${WHITE}moav bootstrap --yes${NC} then ${WHITE}moav start${NC} (or set MOAV_BOOTSTRAP=1)"
+            ;;
+    esac
 fi
 
 echo ""
