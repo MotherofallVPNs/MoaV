@@ -86,7 +86,7 @@
       "users": ${HYSTERIA2_USERS_JSON},
       "ignore_client_bandwidth": true,
       "obfs": {
-        "type": "salamander",
+        "type": "${HYSTERIA2_OBFS_TYPE}",
         "password": "${HYSTERIA2_OBFS_PASSWORD}"
       },
       "tls": {
@@ -125,6 +125,15 @@
         "enabled": true,
         "padding": true
       }
+    },
+    {
+      "type": "snell",
+      "tag": "snell-in",
+      "listen": "::",
+      "listen_port": ${PORT_SNELL},
+      "version": 5,
+      "psk": "${SNELL_SERVER_PSK}",
+      "obfs_mode": "${SNELL_OBFS}"
     }
   ],
   "outbounds": [

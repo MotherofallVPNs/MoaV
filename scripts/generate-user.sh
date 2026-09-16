@@ -69,6 +69,12 @@ if [[ -f "$STATE_DIR/keys/clash-api.env" ]]; then
     source "$STATE_DIR/keys/clash-api.env"
 fi
 
+# XDNS VLESS Encryption key — the bundle's xdns configs read XDNS_VLESS_ENCRYPTION
+# (Xray >= 26.9 requires the VLESS layer to carry encryption; see lib/xray.sh).
+if [[ -f "$STATE_DIR/keys/xdns.env" ]]; then
+    source "$STATE_DIR/keys/xdns.env"
+fi
+
 # Fail with a remediation hint rather than an opaque "unbound variable" when a
 # protocol is switched on but bootstrap never generated its key material.
 require_keys() {
@@ -409,6 +415,52 @@ EOF
         fi
 
         log_info "  - Shadowsocks-2022 config generated"
+    fi
+  fi
+fi
+
+# -----------------------------------------------------------------------------
+# Generate Snell client config (SHARED-KEY: same config for every user; Snell is
+# not per-user). No standard share-URI. Needs a Snell v5 client (Surge 5+, Stash,
+# Mihomo/Clash.Meta; CMFA/FlClash on Android).
+# -----------------------------------------------------------------------------
+if [[ "${ENABLE_SNELL:-true}" == "true" ]]; then
+  if [[ -f "$OUTPUT_DIR/snell.txt" ]] && [[ "$FORCE_REGENERATE" != "force" ]]; then
+    log_info "  - Snell config exists, skipping"
+  else
+    SNELL_PSK="${SNELL_SERVER_PSK:-}"
+    if [[ -z "$SNELL_PSK" && -f "$STATE_DIR/keys/snell-server.psk" ]]; then
+        SNELL_PSK=$(cat "$STATE_DIR/keys/snell-server.psk")
+    fi
+    if [[ -z "$SNELL_PSK" ]]; then
+        log_error "  - Snell PSK missing, skipping"
+    else
+        BUNDLE_CHANGED=true
+        SNELL_PORT="${PORT_SNELL:-8389}"
+        SNELL_OBFS_LOCAL="${SNELL_OBFS:-http}"
+        if [[ "$SNELL_OBFS_LOCAL" == "http" ]]; then
+            SNELL_SURGE_LINE="MoaV-Snell = snell, $SERVER_IP, $SNELL_PORT, psk=$SNELL_PSK, version=5, obfs=http, obfs-host=www.bing.com"
+            SNELL_CLASH_OBFS=$'\n  obfs-opts:\n    mode: http\n    host: www.bing.com'
+        else
+            SNELL_SURGE_LINE="MoaV-Snell = snell, $SERVER_IP, $SNELL_PORT, psk=$SNELL_PSK, version=5"
+            SNELL_CLASH_OBFS=""
+        fi
+        cat > "$OUTPUT_DIR/snell.txt" <<EOF
+# MoaV Snell (shared key) — needs a Snell v5 client: Surge 5+ / Stash (iOS),
+# Mihomo/Clash.Meta, or CMFA / FlClash (Android). v2rayNG/Hiddify do NOT support Snell.
+# --- Surge (add under [Proxy]) ---
+$SNELL_SURGE_LINE
+
+# --- Clash.Meta / Mihomo (add under proxies:) ---
+- name: MoaV-Snell
+  type: snell
+  server: $SERVER_IP
+  port: $SNELL_PORT
+  psk: $SNELL_PSK
+  version: 5$SNELL_CLASH_OBFS
+EOF
+        qrencode -o "$OUTPUT_DIR/snell-qr.png" -s 6 "$SNELL_SURGE_LINE" 2>/dev/null || true
+        log_info "  - Snell config generated"
     fi
   fi
 fi

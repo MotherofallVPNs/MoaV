@@ -180,6 +180,14 @@ confirm() {
     local message="$1"
     local default="${2:-n}"
 
+    # MOAV_NONINTERACTIVE=1 (install.sh answers/env mode, `--json` commands):
+    # take the default without touching /dev/tty, so a prompt can never block
+    # automation or leak into a JSON stream.
+    if [[ "${MOAV_NONINTERACTIVE:-0}" == "1" ]]; then
+        [[ "$default" == "y" ]]
+        return
+    fi
+
     if [[ "$default" == "y" ]]; then
         prompt "$message [Y/n]: "
     else
@@ -256,6 +264,91 @@ get_grafana_cdn_url() {
     fi
 }
 
+
+# -----------------------------------------------------------------------------
+# JSON output helpers (`--json` on status / doctor / user list|add|remove).
+# Pure bash: no jq dependency on the emitting side. Everything that reaches a
+# JSON stream must be secret-free — the mobile app parses and may log it — so
+# free-text details go through json_redact before json_escape.
+# -----------------------------------------------------------------------------
+
+# json_escape <string> — the string's body as a JSON string literal (no quotes).
+# Backslash first, then quotes, then control characters.
+json_escape() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    # Remaining C0 controls (incl. ESC from stray colour codes) -> \u00XX.
+    if [[ "$s" == *[$'\x01'-$'\x1f']* ]]; then
+        local out="" i c
+        for ((i = 0; i < ${#s}; i++)); do
+            c="${s:i:1}"
+            if [[ "$c" == [$'\x01'-$'\x1f'] ]]; then
+                printf -v c '\\u%04x' "'$c"
+            fi
+            out+="$c"
+        done
+        s="$out"
+    fi
+    printf '%s' "$s"
+}
+
+# json_str <string> — a quoted JSON string literal.
+json_str() {
+    printf '"%s"' "$(json_escape "$1")"
+}
+
+# json_bool <true|false|0|1|yes|no> — a JSON boolean.
+json_bool() {
+    case "${1:-}" in
+        true|1|yes|y|on) printf 'true' ;;
+        *)               printf 'false' ;;
+    esac
+}
+
+# json_str_array <item>... — ["a","b"] (empty -> []).
+json_str_array() {
+    local out="[" first=true item
+    for item in "$@"; do
+        [[ "$first" == "true" ]] || out+=","
+        first=false
+        out+="$(json_str "$item")"
+    done
+    printf '%s]' "$out"
+}
+
+# strip_ansi — remove SGR colour codes from stdin (doctor output is coloured).
+strip_ansi() {
+    sed -E "s/$(printf '\033')\\[[0-9;]*[A-Za-z]//g"
+}
+
+# json_redact — mask anything secret-shaped in free text on stdin, for details
+# that are captured from human-oriented output rather than built up from known-
+# safe fields: server IPs (v4 + v6), URLs / share-links (scheme://...), and
+# long hex/base64-looking tokens (keys, UUIDs, passwords, short_ids). The IPv6
+# rule runs twice: a match consumes its trailing delimiter, which would hide an
+# adjacent address from a single pass.
+# Over-redacting a docs hint is fine; leaking one address to a phone log is not.
+json_redact() {
+    sed -E \
+        -e 's#[A-Za-z][A-Za-z0-9+.-]*://[^[:space:]"]+#[redacted-link]#g' \
+        -e 's/(^|[^0-9.])[0-9]{1,3}(\.[0-9]{1,3}){3}(\/[0-9]{1,2})?/\1[redacted-ip]/g' \
+        -e 's/(^|[^0-9A-Za-z:])([0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{1,4}(\/[0-9]{1,3})?([^0-9A-Za-z:]|$)/\1[redacted-ip]\4/g' \
+        -e 's/(^|[^0-9A-Za-z:])([0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{1,4}(\/[0-9]{1,3})?([^0-9A-Za-z:]|$)/\1[redacted-ip]\4/g' \
+        -e 's/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/[redacted]/g' \
+        -e 's/[A-Za-z0-9+\/_=-]{20,}/[redacted]/g'
+}
+
+# json_detail — one-line, ANSI-free, redacted, JSON-escaped body from stdin
+# (used for doctor check details). Lines joined with "; ", whitespace squeezed.
+json_detail() {
+    local text
+    text=$(strip_ansi | json_redact | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//; s/[[:space:]]+/ /g' | grep -v '^$' | awk 'BEGIN { ORS = "" } NR > 1 { print "; " } { print }')
+    json_escape "$text"
+}
 
 run_command() {
     local cmd="$1"

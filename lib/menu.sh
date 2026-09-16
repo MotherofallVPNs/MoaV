@@ -115,23 +115,23 @@ show_usage() {
     echo "                        --yes re-runs non-interactively (idempotent)"
     echo "  domainless            Enable domainless mode"
     echo "  check                 Run prerequisites check"
-    echo "  doctor [CHECK]        Run diagnostics (e.g. 'doctor dns', 'doctor ports')"
+    echo "  doctor [CHECK] [--json]  Run diagnostics (e.g. 'doctor dns', 'doctor ports')"
     echo ""
     echo "Services:"
     echo "  start [PROFILE...]    Start services (default: saved profiles from .env)"
     echo "  stop [SERVICE...] [-r] Stop services (-r removes containers)"
     echo "  restart [SERVICE...]  Restart services"
-    echo "  status                Show service status"
+    echo "  status [--json]       Show service status"
     echo "  logs [SERVICE...] [-n] View logs (follow mode, -n for snapshot)"
     echo "  profiles              Change default services for 'moav start'"
     echo "  build [SVC|PROFILE] [--no-cache]  Build services or profile"
     echo "  build --local [SVC|all]            Build locally (for blocked registries)"
     echo ""
     echo "Users:"
-    echo "  users / user list     List all users"
-    echo "  user add NAME [...] [-p]           Add user(s) (--package creates zip)"
+    echo "  users / user list [--json]  List all users"
+    echo "  user add NAME [...] [-p] [--json]  Add user(s) (--package creates zip)"
     echo "  user add --batch N [--prefix P]    Batch create (user01, user02...)"
-    echo "  user revoke NAME      Revoke a user"
+    echo "  user revoke NAME [--json]  Revoke a user (alias: remove)"
     echo "  user package NAME     Create zip bundle for existing user"
     echo "  user sub NAME         Base64 subscription for phone apps (Streisand, v2rayNG...)"
     echo "  user base64 NAME      Base64 ZIPPED bundle for moav-client e2e (not a subscription)"
@@ -140,7 +140,7 @@ show_usage() {
     echo "Donate & Test:"
     echo "  donate                Donate VPN configs to MahsaNet/Psiphon/Snowflake"
     echo "  conduit [link|status] Psiphon Conduit claim link, QR & sharing guide"
-    echo "  test USERNAME [-v]    Test connectivity for a user"
+    echo "  test USERNAME [-v] [--json]  Test connectivity for a user"
     echo "  client connect USER   Client mode (connect as user, exposes local proxy)"
     echo ""
     echo "Backup & Migration:"
@@ -167,6 +167,8 @@ show_usage() {
     echo "  moav user sub alice                  # Subscription blob to paste into a phone app"
     echo "  moav donate                          # Donate configs to MahsaNet"
     echo "  moav doctor dns                      # Check DNS configuration"
+    echo "  moav status --json                   # Machine-readable (secret-free) output;"
+    echo "                                       #   also: doctor, user list|add|remove, test"
     echo "  moav export                          # Backup to moav-backup-TIMESTAMP.tar.gz"
     echo "  moav migrate-ip 1.2.3.4              # Update to new server IP"
     echo ""
@@ -512,14 +514,22 @@ cmd_test() {
         exit 1
     fi
 
-    info "Testing connectivity for user: $user"
+    # With --json, stdout must carry only the result document: the progress
+    # lines and the image build go to stderr so a consumer can parse stdout as-is.
+    if [[ -n "$json_flag" ]]; then
+        info "Testing connectivity for user: $user" >&2
+        info "Building client image (cached if unchanged)..." >&2
+        compose_build --profile client build client >&2
+    else
+        info "Testing connectivity for user: $user"
 
-    # Always (re)build the client image. Docker's layer cache makes this a
-    # near-noop when nothing changed, but a plain "skip if it exists" check
-    # silently reused a stale image — so `moav test` missed client Dockerfile /
-    # pinned-version changes (e.g. a new sing-box after `moav update`).
-    info "Building client image (cached if unchanged)..."
-    compose_build --profile client build client
+        # Always (re)build the client image. Docker's layer cache makes this a
+        # near-noop when nothing changed, but a plain "skip if it exists" check
+        # silently reused a stale image — so `moav test` missed client Dockerfile /
+        # pinned-version changes (e.g. a new sing-box after `moav update`).
+        info "Building client image (cached if unchanged)..."
+        compose_build --profile client build client
+    fi
 
     # TUN + NET_ADMIN let the WireGuard/AmneziaWG tests bring up a real tunnel
     # inside the test container (its own netns — host routing untouched). The
