@@ -82,6 +82,7 @@ run_case "hysteria2"   hysteria2    hysteria2.txt
 run_case "trojan"      trojan       trojan.txt
 run_case "anytls"      anytls       anytls.txt
 run_case "shadowsocks" shadowsocks  shadowsocks.txt
+run_case "snell"       snell        snell.txt
 run_case "xhttp"       xhttp        xhttp-vless.txt
 run_case "telegram"    telemt       telegram-proxy-link.txt
 run_case "wireguard"   wireguard    moav-srv-wg.conf

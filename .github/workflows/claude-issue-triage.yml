@@ -85,4 +85,8 @@ jobs:
             server IP, or a user's full share-URI/config, do NOT repeat it back;
             flag it and ask the reporter to redact. Don't re-triage an issue you've
             already commented on.
-          claude_args: '--max-turns 6 --allowedTools "Read,Bash(gh issue view:*),Bash(gh label list:*),Bash(gh issue edit:*),Bash(gh issue comment:*)"'
+          # 6 was too tight: reading TRIAGE.md + AGENTS.md, viewing the issue,
+          # listing labels, applying them, and posting the comment can take ~8
+          # turns, and the action fails a run that exceeds the cap even after the
+          # work is done. 15 gives headroom while still bounding a runaway.
+          claude_args: '--max-turns 15 --allowedTools "Read,Bash(gh issue view:*),Bash(gh label list:*),Bash(gh issue edit:*),Bash(gh issue comment:*)"'

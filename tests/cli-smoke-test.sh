@@ -90,6 +90,10 @@ run must "moav version"                 -- "$MOAV" version
 run must "install.sh --help"            -- bash install.sh --help
 run must "moav status"                  -- "$MOAV" status
 run must "moav users"                   -- "$MOAV" users
+# --json surfaces (moav-deploy-app#8): stdout must be exactly one parseable
+# document; jq -e fails on empty/invalid input or a `false`/`null` result.
+run must "moav status --json"           -- bash -c "$MOAV status --json | jq -e '.services | type == \"array\"' >/dev/null"
+run must "moav user list --json"        -- bash -c "$MOAV user list --json | jq -e 'type == \"array\"' >/dev/null"
 run must "moav profiles"                -- "$MOAV" profiles
 run must "moav cert status"             -- "$MOAV" cert status
 run must "moav logs --no-follow"        -- "$MOAV" logs --no-follow --tail 20
@@ -97,6 +101,7 @@ run must "moav logs --no-follow"        -- "$MOAV" logs --no-follow --tail 20
 # --- diagnostics / state-dependent (any clean exit is fine) ---
 run info "moav check"                   -- "$MOAV" check
 run info "moav doctor"                  -- "$MOAV" doctor
+run must "moav doctor --json"           -- bash -c "$MOAV doctor --json | jq -e 'all(.status | IN(\"pass\",\"warn\",\"fail\"))' >/dev/null"
 # doctor peers: duplicate-IP detection must exit 0 on a healthy fresh install
 # (built for a real incident — 45 WG / 50 AWG peers sharing addresses).
 run must "moav doctor peers"            -- "$MOAV" doctor peers
@@ -146,6 +151,8 @@ run must "packaged guide fully rendered" -- bash -c '
 '
 run info "moav user revoke (package)"   -- "$MOAV" user revoke "${SMOKE_USER}p"
 run must "moav user add --batch 2"      -- "$MOAV" user add --batch 2 --prefix "${SMOKE_USER}b"
+run must "moav user add --json"         -- bash -c "$MOAV user add ${SMOKE_USER}j --json | jq -e '.ok == true and .users[0].user == \"${SMOKE_USER}j\"' >/dev/null"
+run must "moav user revoke --json"      -- bash -c "$MOAV user revoke ${SMOKE_USER}j --json | jq -e '.ok == true' >/dev/null"
 run info "moav user revoke (batch)"     -- "$MOAV" user revoke "${SMOKE_USER}b01" "${SMOKE_USER}b02"
 
 # --- admin / backup / misc CLI surface ---

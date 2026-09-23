@@ -8,6 +8,61 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# -----------------------------------------------------------------------------
+# --json: [{"user": NAME, "services": [...], "bundle": BOOL}] on stdout, nothing
+# else. Services are the transport groups a user is provisioned in (sing-box,
+# xray, wireguard, amneziawg, trusttunnel, telemt). Deliberately no addresses,
+# credentials or links: the mobile app parses this and may log it. The
+# extraction expressions are the same ones the text sections below use.
+# bash 3.2-safe on purpose (no associative arrays): pairs -> sort -> awk.
+# -----------------------------------------------------------------------------
+if [[ "${1:-}" == "--json" ]]; then
+    pairs=""
+    add_pair() { [[ -n "$2" ]] && pairs+="$2"$'\t'"$1"$'\n'; }
+    if [[ -f configs/sing-box/config.json ]]; then
+        while read -r u; do add_pair sing-box "$u"; done < <(jq -r '.inbounds[] | select(.users != null) | .users[].name' configs/sing-box/config.json 2>/dev/null | sort -u)
+    fi
+    if [[ -f configs/wireguard/wg0.conf ]]; then
+        while read -r u; do add_pair wireguard "$u"; done < <(awk '/^\[Peer\]/{getline; if(/^# /){sub(/^# /,""); print}}' configs/wireguard/wg0.conf 2>/dev/null)
+    fi
+    if [[ -f configs/amneziawg/awg0.conf ]]; then
+        while read -r u; do add_pair amneziawg "$u"; done < <(awk '/^\[Peer\]/{getline; if(/^# /){sub(/^# /,""); print}}' configs/amneziawg/awg0.conf 2>/dev/null)
+    fi
+    if [[ -f configs/xray/config.json ]]; then
+        while read -r u; do add_pair xray "$u"; done < <(jq -r '.inbounds[]? | (.settings.clients[]?, .settings.users[]?) | .email // empty' configs/xray/config.json 2>/dev/null | sed 's/@moav$//' | sort -u)
+    fi
+    if [[ -f configs/trusttunnel/credentials.toml ]]; then
+        while read -r u; do add_pair trusttunnel "$u"; done < <(grep -E '^username = ' configs/trusttunnel/credentials.toml 2>/dev/null | sed -E 's/^username = "([^"]*)".*/\1/' | sort -u)
+    fi
+    if [[ -f configs/telemt/config.toml ]]; then
+        while read -r u; do add_pair telemt "$u"; done < <(awk '/^\[access\.users\]/ { flag=1; next } /^\[/ { flag=0 } flag && /^[A-Za-z0-9_-]+ *= */ { print $1 }' configs/telemt/config.toml 2>/dev/null | sort -u)
+    fi
+    if [[ -d outputs/bundles ]]; then
+        for bundle in outputs/bundles/*/; do
+            [[ -d "$bundle" ]] || continue
+            u=$(basename "$bundle")
+            [[ "$u" == *-configs || "$u" == *-moav-configs ]] && continue
+            add_pair bundle "$u"
+        done
+    fi
+    # Usernames are validated on creation ([A-Za-z0-9_-]) so they never need
+    # escaping; a foreign name in a config is dropped rather than emitted raw.
+    printf '%s' "$pairs" | sort -u | awk -F'\t' '
+        BEGIN { printf "[" }
+        $1 !~ /^[A-Za-z0-9_-]+$/ { next }
+        $1 != cur {
+            if (cur != "") flush()
+            cur = $1; svcs = ""; bundle = "false"
+        }
+        $2 == "bundle" { bundle = "true"; next }
+        { svcs = svcs (svcs == "" ? "" : ", ") "\"" $2 "\"" }
+        END { if (cur != "") flush(); printf "\n]\n" }
+        function flush() {
+            printf "%s\n  {\"user\": \"%s\", \"services\": [%s], \"bundle\": %s}", (n++ ? "," : ""), cur, svcs, bundle
+        }'
+    exit 0
+fi
+
 echo "========================================"
 echo "         MoaV User List"
 echo "========================================"

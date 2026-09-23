@@ -59,6 +59,24 @@ _keys_openssl_pubkey() {
     printf '%s' "$pub"
 }
 
+# XDNS VLESS Encryption keypair. Xray >= 26.9 refuses a VLESS outbound that has
+# no TLS/encryption when it dials a public IP, and xdns dials a public resolver /
+# server over mKCP — so the VLESS layer must carry its own encryption. Xray's
+# compact "mlkem768x25519plus" variant IS an X25519 keypair: the private half is
+# the server's `decryption`, the public half the client's `encryption`. openssl
+# mints it with no xray/sing-box binary (works on host, admin, and bootstrap).
+# Emits two lines: XDNS_VLESS_DECRYPTION=... then XDNS_VLESS_ENCRYPTION=...
+keys_xdns_vless_pair() {
+    local pair priv pub
+    pair=$(_keys_openssl_keypair) || return 1
+    # base64 -> base64url, unpadded (43 chars) as Xray emits.
+    priv=$(printf '%s' "$pair" | sed -n 1p | tr '+/' '-_' | tr -d '=')
+    pub=$(printf '%s' "$pair" | sed -n 2p | tr '+/' '-_' | tr -d '=')
+    [[ ${#priv} -eq 43 && ${#pub} -eq 43 ]] || return 1
+    printf 'XDNS_VLESS_DECRYPTION=mlkem768x25519plus.native.600s.%s\n' "$priv"
+    printf 'XDNS_VLESS_ENCRYPTION=mlkem768x25519plus.native.0rtt.%s\n' "$pub"
+}
+
 # Resolve a working wg/awg generator once and cache it. Preference:
 #   1. a local `wg`/`awg` binary — present in the bootstrap container and on any
 #      host with wireguard-tools (also sidesteps the container-exec hang class);
