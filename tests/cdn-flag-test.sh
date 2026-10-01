@@ -7,9 +7,10 @@
 # generated CDN links by default and handed users a config that could not
 # connect unless they had separately set up Cloudflare.
 #
-# The flag defaults to false for new servers. When it is ABSENT the legacy rule
-# applies (on if CDN_SUBDOMAIN is set), so an existing server with a working
-# Cloudflare setup does not silently lose its CDN on upgrade.
+# The flag ships UNSET (commented) now: cdn_enabled() then turns CDN on exactly
+# when CDN_SUBDOMAIN is set, so a configured server needs no second toggle and an
+# unconfigured one stays off. An explicit true/false still wins. Shipping it
+# unset also means `moav update` never appends it onto an upgrading server.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -19,10 +20,14 @@ bad() { printf '  FAIL  %s\n' "$1"; fail=$((fail+1)); }
 
 echo "ENABLE_CDN flag"
 
-# --- the flag ships, and ships off -------------------------------------------
-val=$(grep -E '^ENABLE_CDN=' "$ROOT/.env.example" | cut -d= -f2)
-[ "$val" = "false" ] && ok "'.env.example' ships ENABLE_CDN=false" \
-                     || bad "ENABLE_CDN in .env.example is '${val:-missing}', expected false"
+# --- the flag ships commented (unset), so "on when configured" governs --------
+if grep -qE '^#\s*ENABLE_CDN=\s*$' "$ROOT/.env.example"; then
+    ok "'.env.example' ships ENABLE_CDN commented (unset)"
+elif grep -qE '^ENABLE_CDN=' "$ROOT/.env.example"; then
+    bad "ENABLE_CDN is set in .env.example ('$(grep -E '^ENABLE_CDN=' "$ROOT/.env.example")') — ship it commented so 'on when configured' governs"
+else
+    bad "ENABLE_CDN line missing from .env.example"
+fi
 
 # --- cdn_enabled() truth table ----------------------------------------------
 # Run from a directory with no .env so only the environment decides.
