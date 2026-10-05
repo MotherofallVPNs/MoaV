@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install sing-box for key generation (download binary directly to avoid
 # pulling the full container image, which hangs in censored networks)
-ARG SINGBOX_VERSION=1.13.19
+ARG SINGBOX_VERSION=1.14.0
 RUN ARCH=$(case "$(uname -m)" in x86_64) echo amd64;; aarch64) echo arm64;; armv7l) echo armv7;; *) echo amd64;; esac) && \
     curl -fsSL "https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-${ARCH}.tar.gz" \
       -o /tmp/sing-box.tar.gz && \

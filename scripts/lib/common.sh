@@ -358,13 +358,13 @@ donate_allows() {
 
 # Is the Cloudflare-fronted CDN inbound in use?
 #
-# ENABLE_CDN is the flag; .env.example ships it false, because a CDN link only
-# works once the subdomain is proxied through Cloudflare, and an unconfigured
-# one hands users a config that cannot connect.
-#
-# When the flag is ABSENT the legacy rule applies -- CDN is on if CDN_SUBDOMAIN
-# is set. Servers built before the flag existed keep their working CDN instead
-# of silently losing it on upgrade.
+# ENABLE_CDN is the flag, but .env.example ships it UNSET (commented), so the
+# rule below governs: CDN is on when CDN_SUBDOMAIN/CDN_DOMAIN is set. A CDN link
+# only works once the subdomain is proxied through Cloudflare, so an unconfigured
+# server stays off (no config that cannot connect) while a configured one needs
+# no second toggle. An explicit true/false still wins. Leaving the flag unset
+# also means `moav update` never appends it onto an upgrading server, which is
+# how a pre-flag server (and any server that never set it) keeps its CDN.
 cdn_enabled() {
     local flag="${ENABLE_CDN:-}"
     [[ -z "$flag" && -f .env ]] && flag="$(get_env_val "ENABLE_CDN" ".env" "")"

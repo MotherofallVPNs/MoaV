@@ -57,14 +57,74 @@ show_versions() {
     echo ""
 }
 
+# `docker compose ps --format json` is a JSON array on some compose versions and
+# NDJSON on others; normalise to one top-level object per line. The split is
+# brace-depth aware (strings skipped): the old `s/},{/}\n{/` also cut inside a
+# container's Publishers array, so a service with two published ports lost its
+# ports and broke the row after it. Field access stays grep-based (no jq
+# dependency on the status path) and is shared by the table and --json views.
+status_ps_lines() {
+    local raw_status
+    raw_status=$(docker compose --profile all ps -a --format json 2>/dev/null)
+    [[ -n "$raw_status" && "$raw_status" != "[]" ]] || return 0
+    printf '%s\n' "$raw_status" | awk '
+        BEGIN { depth = 0; instr = 0; esc = 0; buf = "" }
+        {
+            n = length($0)
+            for (i = 1; i <= n; i++) {
+                c = substr($0, i, 1)
+                if (instr) {
+                    buf = buf c
+                    if (esc) esc = 0
+                    else if (c == "\\") esc = 1
+                    else if (c == "\"") instr = 0
+                    continue
+                }
+                if (c == "\"") { instr = 1; buf = buf c; continue }
+                if (c == "{") depth++
+                if (depth > 0) buf = buf c
+                if (c == "}") { depth--; if (depth == 0) { print buf; buf = "" } }
+            }
+        }'
+}
+
+# status_field <json-line> <Key> — string value (handles "K":"v" and "K": "v").
+# Empty (not fatal) when the key is absent: pipefail + set -e would otherwise
+# abort `moav status` on a line that lacks it.
+status_field() {
+    echo "$1" | grep -oE "\"$2\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | head -1 | sed 's/.*"\([^"]*\)"$/\1/' || true
+}
+
+# status_ports <json-line> — published host ports, comma-separated, deduped.
+status_ports() {
+    echo "$1" | grep -o '"Publishers":\[[^]]*\]' | grep -o '"PublishedPort":[0-9]*' | cut -d':' -f2 | sort -u | grep -v '^0$' | tr '\n' ',' | sed 's/,$//' || true
+}
+
+# status_uptime <state> <Status> — "2 hours" from "Up 2 hours (healthy)"; "-" otherwise.
+status_uptime() {
+    local state="$1" status_str="$2" uptime="-"
+    if [[ "$state" == "running" ]] && [[ "$status_str" =~ ^Up[[:space:]]+(.*) ]]; then
+        uptime="${BASH_REMATCH[1]}"
+        uptime="${uptime%% (*}"
+        uptime="${uptime/About an /~1 }"
+        uptime="${uptime/About a /~1 }"
+        uptime="${uptime/Less than a /< 1 }"
+    fi
+    echo "$uptime"
+}
+
+# Service names that are one-shot jobs (fill a volume and exit) and read as a
+# fault in a status listing. Shared by the table and --json views.
+STATUS_HIDE_SERVICES=" geoip-updater tor-geoip-updater bootstrap "
+
 show_status() {
     # Get all defined services from docker-compose
     local all_services
     all_services=$(docker compose --profile all config --services 2>/dev/null | sort)
 
     # Get service status from docker compose (including stopped with -a)
-    local raw_status json_lines
-    raw_status=$(docker compose --profile all ps -a --format json 2>/dev/null)
+    local json_lines
+    json_lines=$(status_ps_lines)
 
     # Read ENABLE_* settings to determine which services are disabled
     local env_file="$SCRIPT_DIR/.env"
@@ -107,34 +167,24 @@ show_status() {
     # Track which services we've displayed
     declare -A displayed_services
 
-    # One-shot jobs that fill a volume and exit; "exited" reads as a fault here.
-    local status_hide=" geoip-updater tor-geoip-updater bootstrap "
+    local status_hide="$STATUS_HIDE_SERVICES"
     # Shown last: certbot exits after issuing, which is not a fault.
     local status_defer=" certbot "
     local -a deferred_rows=()
 
-    # Handle both JSON array format and NDJSON (one object per line)
-    if [[ -n "$raw_status" ]] && [[ "$raw_status" != "[]" ]]; then
-        if [[ "$raw_status" == "["* ]]; then
-            # Convert JSON array to one object per line (split on },{ )
-            json_lines=$(echo "$raw_status" | sed 's/^\[//;s/\]$//;s/},{/}\n{/g')
-        else
-            json_lines="$raw_status"
-        fi
-
+    if [[ -n "$json_lines" ]]; then
         # Parse JSON and display each service (using here-string to avoid subshell)
         while IFS= read -r line; do
             [[ -z "$line" ]] && continue
 
             local name service state ports health status_str created_at uptime last_run finished_at
-            # Parse JSON fields (handle both "Key":"value" and "Key": "value" formats)
-            name=$(echo "$line" | grep -oE '"Name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-            service=$(echo "$line" | grep -oE '"Service"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-            state=$(echo "$line" | grep -oE '"State"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-            health=$(echo "$line" | grep -oE '"Health"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-            status_str=$(echo "$line" | grep -oE '"Status"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-            created_at=$(echo "$line" | grep -oE '"CreatedAt"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-            ports=$(echo "$line" | grep -o '"Publishers":\[[^]]*\]' | grep -o '"PublishedPort":[0-9]*' | cut -d':' -f2 | sort -u | grep -v '^0$' | tr '\n' ',' | sed 's/,$//' || true)
+            name=$(status_field "$line" Name)
+            service=$(status_field "$line" Service)
+            state=$(status_field "$line" State)
+            health=$(status_field "$line" Health)
+            status_str=$(status_field "$line" Status)
+            created_at=$(status_field "$line" CreatedAt)
+            ports=$(status_ports "$line")
 
             [[ -z "$name" ]] && continue
 
@@ -172,15 +222,7 @@ show_status() {
                 fi
             fi
 
-            # Parse uptime from Status field
-            uptime="-"
-            if [[ "$state" == "running" ]] && [[ "$status_str" =~ ^Up[[:space:]]+(.*) ]]; then
-                uptime="${BASH_REMATCH[1]}"
-                uptime="${uptime%% (*}"
-                uptime="${uptime/About an /~1 }"
-                uptime="${uptime/About a /~1 }"
-                uptime="${uptime/Less than a /< 1 }"
-            fi
+            uptime=$(status_uptime "$state" "$status_str")
 
             local status_display status_color
             if [[ "$state" == "running" ]]; then
@@ -605,13 +647,14 @@ profile_enabled() {
     local profile="$1" env_file="${2:-$SCRIPT_DIR/.env}"
     case "$profile" in
         proxy)
-            local _r _t _a _h _s
+            local _r _t _a _h _s _sn
             _r=$(get_env_val "ENABLE_REALITY"   "$env_file" "true")
             _t=$(get_env_val "ENABLE_TROJAN"    "$env_file" "true")
             _a=$(get_env_val "ENABLE_ANYTLS"    "$env_file" "false")
             _h=$(get_env_val "ENABLE_HYSTERIA2" "$env_file" "true")
             _s=$(get_env_val "ENABLE_SS"        "$env_file" "true")
-            [[ "$_r" == "true" || "$_t" == "true" || "$_a" == "true" || "$_h" == "true" || "$_s" == "true" ]] \
+            _sn=$(get_env_val "ENABLE_SNELL"    "$env_file" "true")
+            [[ "$_r" == "true" || "$_t" == "true" || "$_a" == "true" || "$_h" == "true" || "$_s" == "true" || "$_sn" == "true" ]] \
                 && echo true || echo false ;;
         wireguard)   [[ "$(get_env_val "ENABLE_WIREGUARD"   "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
         amneziawg)   [[ "$(get_env_val "ENABLE_AMNEZIAWG"   "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
@@ -1498,6 +1541,7 @@ resolve_service() {
         conduit|psiphon)              echo "psiphon-conduit" ;;
         singbox|sing|proxy|reality)   echo "sing-box" ;;
         ss|shadowsocks|outline)       echo "sing-box" ;;
+        snell)                        echo "sing-box" ;;
         wg)                           echo "wireguard" ;;
         ws|tunnel)                    echo "wstunnel" ;;
         dns)                          echo "dnstt" ;;
@@ -1642,7 +1686,93 @@ cmd_restart() {
     fi
 }
 
+# `moav status --json` — machine-readable status, secret-free by construction:
+# only service name / state / uptime / published ports, the MoaV version, and
+# the dashboard URLs — and those only when DOMAIN is set (a SERVER_IP-based URL
+# would put the server address in a stream the mobile app may log). Ports come
+# alongside so a client that already knows the host can compose the URL itself.
+# Nothing else writes to stdout on this path.
+status_json() {
+    local all_services json_lines line
+    all_services=$(docker compose --profile all config --services 2>/dev/null | sort)
+    json_lines=$(status_ps_lines)
+
+    local -A seen
+    local services_out="" first=true
+    local name service state health status_str ports uptime jstate short_name
+
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        name=$(status_field "$line" Name)
+        [[ -z "$name" ]] && continue
+        service=$(status_field "$line" Service)
+        state=$(status_field "$line" State)
+        health=$(status_field "$line" Health)
+        status_str=$(status_field "$line" Status)
+        ports=$(status_ports "$line")
+        short_name="${service:-${name#moav-}}"
+        [[ "$STATUS_HIDE_SERVICES" == *" $short_name "* ]] && continue
+        seen["$short_name"]=1
+
+        # One word the app can switch on; mirrors the table's colouring.
+        if [[ "$state" == "running" ]]; then
+            case "$health" in
+                ""|healthy) jstate="running" ;;
+                unhealthy)  jstate="unhealthy" ;;
+                *)          jstate="starting" ;;
+            esac
+        else
+            jstate="${state:-unknown}"
+        fi
+        uptime=$(status_uptime "$state" "$status_str")
+        [[ "$uptime" == "-" ]] && uptime=""
+
+        [[ "$first" == "true" ]] || services_out+=","
+        first=false
+        services_out+=$'\n'"    {\"name\": $(json_str "$short_name"), \"state\": $(json_str "$jstate"), \"uptime\": $(json_str "$uptime"), \"ports\": [${ports}]}"
+    done <<< "$json_lines"
+
+    # Defined in compose but never created.
+    while IFS= read -r service; do
+        [[ -z "$service" ]] && continue
+        [[ -n "${seen[$service]:-}" ]] && continue
+        [[ "$STATUS_HIDE_SERVICES" == *" $service "* ]] && continue
+        [[ "$first" == "true" ]] || services_out+=","
+        first=false
+        services_out+=$'\n'"    {\"name\": $(json_str "$service"), \"state\": \"never\", \"uptime\": \"\", \"ports\": []}"
+    done <<< "$all_services"
+
+    local domain admin_url="null" grafana_url="null" running admin_port grafana_port
+    domain=$(get_env_val "DOMAIN" "$SCRIPT_DIR/.env" "")
+    admin_port=$(get_env_val "PORT_ADMIN" "$SCRIPT_DIR/.env" "9443")
+    grafana_port=$(get_env_val "PORT_GRAFANA" "$SCRIPT_DIR/.env" "9444")
+    [[ "$admin_port" =~ ^[0-9]+$ ]] || admin_port=9443       # keep the document valid
+    [[ "$grafana_port" =~ ^[0-9]+$ ]] || grafana_port=9444
+    running=$(get_running_services)
+    if [[ -n "$domain" ]]; then
+        echo "$running" | grep -q "admin"   && admin_url=$(json_str "$(get_admin_url)")
+        echo "$running" | grep -q "grafana" && grafana_url=$(json_str "$(get_grafana_url)")
+    fi
+
+    printf '{\n'
+    printf '  "version": %s,\n' "$(json_str "$VERSION")"
+    printf '  "admin_url": %s,\n' "$admin_url"
+    printf '  "grafana_url": %s,\n' "$grafana_url"
+    printf '  "admin_port": %s,\n' "$admin_port"
+    printf '  "grafana_port": %s,\n' "$grafana_port"
+    printf '  "default_profiles": %s,\n' "$(json_str_array $(get_default_profiles))"
+    printf '  "services": [%s\n  ]\n}\n' "$services_out"
+}
+
 cmd_status() {
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            --json) status_json; return $? ;;
+            *) error "Unknown status option: $arg"; echo "Usage: moav status [--json]"; return 1 ;;
+        esac
+    done
+
     # Simple header without clearing terminal
     local singbox_ver wstunnel_ver conduit_ver branch
     singbox_ver=$(get_component_version "SINGBOX_VERSION" "1.13.19")

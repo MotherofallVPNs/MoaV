@@ -80,9 +80,15 @@ _moav() {
             else
                 case "$subcmd" in
                     add)
-                        COMPREPLY=($(compgen -W "--batch --prefix --package -p $(_moav_users)" -- "$cur"))
+                        COMPREPLY=($(compgen -W "--batch --prefix --package -p --json $(_moav_users)" -- "$cur"))
                         ;;
-                    revoke|rm|remove|delete|package|pkg)
+                    revoke|rm|remove|delete)
+                        COMPREPLY=($(compgen -W "$(_moav_users) --json" -- "$cur"))
+                        ;;
+                    list|ls)
+                        COMPREPLY=($(compgen -W "--json" -- "$cur"))
+                        ;;
+                    package|pkg)
                         COMPREPLY=($(compgen -W "$(_moav_users)" -- "$cur"))
                         ;;
                 esac
@@ -105,6 +111,9 @@ _moav() {
             ;;
         test)
             COMPREPLY=($(compgen -W "$(_moav_users) --json -v --verbose" -- "$cur"))
+            ;;
+        status|users)
+            COMPREPLY=($(compgen -W "--json" -- "$cur"))
             ;;
         client)
             local subcmd="${COMP_WORDS[2]:-}"

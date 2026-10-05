@@ -4,12 +4,13 @@
 # From a user report: "all the other configs work, only CDN doesn't, and it used
 # to work a few versions ago". Two ways an upgrade does that, both silent:
 #
-# 1. ENABLE_CDN arrived in 2.1.0 defaulting to false. cdn_enabled() treats an
-#    ABSENT flag as "on if CDN_SUBDOMAIN is set", which is what keeps existing
-#    servers working -- but `moav update` offers to append every new variable
-#    from .env.example with its default, the prompt defaults to yes, and the
-#    appended `ENABLE_CDN=false` then beats that inference. The CDN survives
-#    until the next bootstrap and then the inbound disappears.
+# 1. cdn_enabled() treats an ABSENT flag as "on if CDN_SUBDOMAIN is set", which
+#    is what keeps existing servers working. The trap was that `moav update`
+#    offers to append every new .env.example variable with its default (prompt
+#    defaults to yes), and an appended `ENABLE_CDN=false` then beat that
+#    inference -- the CDN survived until the next bootstrap, then vanished.
+#    Fix: .env.example ships ENABLE_CDN commented, so update never appends it and
+#    the subdomain inference stays in charge. This test pins that.
 #
 # 2. bootstrap rotates CDN_WS_PATH when it is empty or the old "/ws" default.
 #    CDN is the only protocol whose share link carries a path, so every other
@@ -27,15 +28,17 @@ echo "CDN across an upgrade: flag inference and path rotation"
 
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 
-# --- 1. the appended flag must preserve the running behaviour ----------------
-# Drive the real function: a pre-2.1.0 .env (CDN in use, no ENABLE_CDN) against
-# an .env.example that has ENABLE_CDN=false.
+# --- 1. moav update must never append ENABLE_CDN onto an upgrading server -----
+# .env.example ships ENABLE_CDN commented, so check_env_additions (which copies
+# only uncommented vars) must not add it. Appending `=false` is exactly what
+# used to switch a configured CDN off at the next bootstrap; leaving the flag
+# unset keeps cdn_enabled()'s subdomain inference in charge.
 # check_env_additions takes no arguments: it reads $SCRIPT_DIR/.env against
 # $SCRIPT_DIR/.env.example, so the fixture is a directory holding both.
 append_for() {   # <env-contents-file> -> the resulting .env
     local work; work=$(mktemp -d)
     cp "$1" "$work/.env"
-    printf 'DOMAIN=example.com\nENABLE_CDN=false\nCDN_SUBDOMAIN=cdn\n' > "$work/.env.example"
+    cp "$ROOT/.env.example" "$work/.env.example"   # the real, shipped example
     (
         GREEN=''; YELLOW=''; RED=''; DIM=''; NC=''; WHITE=''; CYAN=''; BLUE=''
         SCRIPT_DIR="$work"
@@ -52,24 +55,33 @@ append_for() {   # <env-contents-file> -> the resulting .env
     rm -rf "$work"
 }
 
+# A pre-flag server with CDN in use (CDN_SUBDOMAIN set, no ENABLE_CDN).
 printf 'DOMAIN=example.com\nCDN_SUBDOMAIN=cdn\n' > "$TMP/pre210.env"
 out=$(append_for "$TMP/pre210.env")
-
-if printf '%s' "$out" | grep -qE '^ENABLE_CDN=true'; then
-    ok "a server already using CDN keeps it: ENABLE_CDN=true is written"
-elif printf '%s' "$out" | grep -qE '^ENABLE_CDN=false'; then
-    bad "wrote ENABLE_CDN=false onto a server with CDN_SUBDOMAIN set — CDN dies at the next bootstrap"
+if printf '%s' "$out" | grep -qE '^ENABLE_CDN=false'; then
+    bad "appended ENABLE_CDN=false onto a server with CDN_SUBDOMAIN set — CDN dies at the next bootstrap"
+elif printf '%s' "$out" | grep -qE '^ENABLE_CDN='; then
+    bad "appended an explicit ENABLE_CDN onto an upgrading server (should stay unset): $(printf '%s' "$out" | grep -E '^ENABLE_CDN=')"
 else
-    bad "ENABLE_CDN was not added at all: $(printf '%s' "$out" | tr '\n' '|')"
+    ok "a CDN-using server keeps its CDN: ENABLE_CDN is left unset (inference stays on)"
 fi
 
-# A server NOT using CDN must still get the safe default.
+# The inference must actually resolve to ON for that resulting .env.
+on=$( cd "$(mktemp -d)" && printf '%s\n' "$out" > .env && \
+      ( source "$ROOT/scripts/lib/common.sh" >/dev/null 2>&1
+        unset ENABLE_CDN CDN_SUBDOMAIN CDN_DOMAIN
+        cdn_enabled && echo on || echo off ) )
+[ "$on" = "on" ] \
+    && ok "cdn_enabled() stays on for the upgraded CDN server" \
+    || bad "CDN resolved off after upgrade ($on) — the server lost CDN"
+
+# A server that never used CDN must not get a surprise flag either.
 printf 'DOMAIN=example.com\n' > "$TMP/nocdn.env"
 out_nocdn=$(append_for "$TMP/nocdn.env")
-if printf '%s' "$out_nocdn" | grep -qE '^ENABLE_CDN=false'; then
-    ok "a server without a CDN subdomain gets the opt-in default (false)"
+if printf '%s' "$out_nocdn" | grep -qE '^ENABLE_CDN='; then
+    bad "appended ENABLE_CDN onto a server that never had CDN: $(printf '%s' "$out_nocdn" | grep -E '^ENABLE_CDN=')"
 else
-    bad "turned CDN on for a server that never had it: $(printf '%s' "$out_nocdn" | tr '\n' '|')"
+    ok "a server without a CDN subdomain gets no ENABLE_CDN line"
 fi
 
 # --- 2. cdn_enabled must still honour an explicit false ----------------------

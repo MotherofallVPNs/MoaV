@@ -15,7 +15,7 @@ ARG TARGETARCH
 
 # Version - read from .env via docker-compose build args, with fallback default.
 # Matches the MasterDNS build bundled in MahsaNG v16.
-ARG MASTERDNS_VERSION=v2026.05.10.180256-27c7e11
+ARG MASTERDNS_VERSION=v2026.06.13.234407-7de2476
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \

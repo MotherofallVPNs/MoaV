@@ -115,6 +115,31 @@ migration_menu() {
 }
 
 list_users() {
+    if [[ "${1:-}" == "--json" ]]; then
+        if [[ -x "./scripts/user-list.sh" ]]; then
+            ./scripts/user-list.sh --json
+        else
+            # Fallback: bundle dirs only (the script is what knows the services).
+            local -a _names=()
+            local _d
+            for _d in outputs/bundles/*/; do
+                [[ -d "$_d" ]] || continue
+                _d="$(basename "$_d")"
+                [[ "$_d" == *-configs || "$_d" == *-moav-configs ]] && continue
+                _names+=("$_d")
+            done
+            printf '[\n'
+            local _first=true
+            for _d in ${_names[@]+"${_names[@]}"}; do
+                [[ "$_first" == "true" ]] || printf ',\n'
+                _first=false
+                printf '  {"user": %s, "services": [], "bundle": true}' "$(json_str "$_d")"
+            done
+            printf '\n]\n'
+        fi
+        return
+    fi
+
     print_section "User List"
 
     if [[ -x "./scripts/user-list.sh" ]]; then
@@ -253,7 +278,149 @@ package_user() {
 }
 
 cmd_users() {
-    list_users
+    list_users "$@"
+}
+
+# JSON result for `moav user add|remove NAME... --json`. The provisioning
+# scripts keep printing their normal log on stderr; stdout carries exactly one
+# document: {ok, action, users: [{user, ok, error?, bundle_dir?}]}.
+# Secret-free: usernames and paths only — never a link, key or bundle content.
+# Entries are US-separated (\x1f): a tab is IFS whitespace, so an empty middle
+# field would collapse and shift the columns.
+US=$'\x1f'
+user_result_json() {
+    local action="$1"; shift
+    local all_ok=true first=true entry user ok err extra
+    local body=""
+    for entry in "$@"; do
+        IFS="$US" read -r user ok err extra <<< "$entry"
+        [[ "$ok" == "true" ]] || all_ok=false
+        [[ "$first" == "true" ]] || body+=","
+        first=false
+        body+=$'\n'"    {\"user\": $(json_str "$user"), \"ok\": $(json_bool "$ok")"
+        [[ -n "$err" ]]   && body+=", \"error\": $(json_str "$err")"
+        [[ -n "$extra" ]] && body+=", \"bundle_dir\": $(json_str "$extra")"
+        body+="}"
+    done
+    printf '{\n  "ok": %s,\n  "action": %s,\n  "users": [%s\n  ]\n}\n' \
+        "$(json_bool "$all_ok")" "$(json_str "$action")" "$body"
+    [[ "$all_ok" == "true" ]]
+}
+
+# One-line JSON error for a request that never reached the scripts.
+user_error_json() {
+    printf '{"ok": false, "action": %s, "error": %s}\n' "$(json_str "$1")" "$(json_str "$2")"
+}
+
+# `moav user add NAME [NAME...] [--package] --json`
+# One script run per user so the per-user exit code is exact (the batch path
+# reports a single rc for all names). `--batch N --json` keeps the single run
+# and reports the names that appeared.
+user_add_json() {
+    local -a usernames=() flags=()
+    local batch=false arg
+    for arg in "$@"; do
+        case "$arg" in
+            --json) ;;
+            --batch|-b) batch=true; flags+=("$arg") ;;
+            --*|-*) flags+=("$arg") ;;
+            *)
+                if [[ "$batch" == "true" && "${flags[${#flags[@]}-1]}" =~ ^(--batch|-b|--prefix)$ ]]; then
+                    flags+=("$arg")     # the N / prefix value
+                elif [[ ! "$arg" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+                    user_error_json add "Invalid username '$arg'. Use only letters, numbers, underscores, and hyphens"
+                    exit 1
+                else
+                    usernames+=("$arg")
+                fi
+                ;;
+        esac
+    done
+    if [[ ! -x "./scripts/user-add.sh" ]]; then
+        user_error_json add "User add script not found"
+        exit 1
+    fi
+    local -a results=()
+    local u rc
+    if [[ "$batch" == "true" ]]; then
+        local before after
+        before=$(ls -1 outputs/bundles/ 2>/dev/null | sort)
+        rc=0
+        ./scripts/user-add.sh ${flags[@]+"${flags[@]}"} >&2 || rc=$?
+        after=$(ls -1 outputs/bundles/ 2>/dev/null | sort)
+        while IFS= read -r u; do
+            [[ -n "$u" ]] || continue
+            [[ "$u" == *-configs.zip || "$u" == *-configs ]] && continue
+            if [[ "$rc" -eq 0 ]]; then
+                results+=("$u"$US"true"$US""$US"outputs/bundles/$u")
+            else
+                results+=("$u"$US"false"$US"user-add.sh exited $rc"$US"")
+            fi
+        done < <(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after"))
+        if [[ ${#results[@]} -eq 0 ]]; then
+            user_error_json add "batch created no users (user-add.sh exited $rc)"
+            exit 1
+        fi
+    else
+        if [[ ${#usernames[@]} -eq 0 ]]; then
+            user_error_json add "Usage: moav user add USERNAME [USERNAME2...] [--package] --json"
+            exit 1
+        fi
+        for u in "${usernames[@]}"; do
+            if [[ -d "outputs/bundles/$u" ]]; then
+                results+=("$u"$US"false"$US"already exists"$US"")
+                continue
+            fi
+            rc=0
+            ./scripts/user-add.sh "$u" ${flags[@]+"${flags[@]}"} >&2 || rc=$?
+            if [[ "$rc" -eq 0 ]]; then
+                results+=("$u"$US"true"$US""$US"outputs/bundles/$u")
+            else
+                results+=("$u"$US"false"$US"user-add.sh exited $rc"$US"")
+            fi
+        done
+    fi
+    user_result_json add "${results[@]}"
+}
+
+# `moav user revoke|remove NAME [NAME...] --json` — per-user exit codes, one
+# proxy reload at the end (same as the text path), single JSON document.
+user_revoke_json() {
+    local -a targets=() results=()
+    local arg u rc
+    for arg in "$@"; do
+        case "$arg" in
+            --json) ;;
+            --all|--yes|-y)
+                user_error_json remove "'$arg' is not supported with --json; pass explicit usernames"
+                exit 1 ;;
+            --*|-*) ;;   # ignored; user-revoke.sh has no other flags here
+            *) targets+=("$arg") ;;
+        esac
+    done
+    if [[ ${#targets[@]} -eq 0 ]]; then
+        user_error_json remove "Usage: moav user remove USERNAME [USERNAME2...] --json"
+        exit 1
+    fi
+    if [[ ! -x "./scripts/user-revoke.sh" ]]; then
+        user_error_json remove "User revoke script not found"
+        exit 1
+    fi
+    for u in "${targets[@]}"; do
+        if [[ ! "$u" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+            results+=("$u"$US"false"$US"invalid username"$US"")
+            continue
+        fi
+        rc=0
+        ./scripts/user-revoke.sh "$u" --no-reload >&2 || rc=$?
+        if [[ "$rc" -eq 0 ]]; then
+            results+=("$u"$US"true"$US""$US"")
+        else
+            results+=("$u"$US"false"$US"not found or revoke failed (exit $rc)"$US"")
+        fi
+    done
+    [[ -x ./scripts/reload-proxy.sh ]] && { ./scripts/reload-proxy.sh >&2 || true; }
+    user_result_json remove "${results[@]}"
 }
 
 cmd_user() {
@@ -261,11 +428,19 @@ cmd_user() {
     shift 1 2>/dev/null || shift $# # Shift past action to get remaining args
     local username="${1:-}"
 
+    # `--json` anywhere after the action switches to the machine-readable path.
+    local _json=false _a
+    for _a in "$@"; do [[ "$_a" == "--json" ]] && _json=true; done
+
     case "$action" in
         list|ls)
-            list_users
+            if [[ "$_json" == "true" ]]; then list_users --json; else list_users; fi
             ;;
         add)
+            if [[ "$_json" == "true" ]]; then
+                user_add_json "$@"
+                exit $?
+            fi
             # Check for batch mode or multiple usernames
             if [[ "${1:-}" == "--batch" ]] || [[ "${1:-}" == "-b" ]]; then
                 # Batch mode - pass all args to script
@@ -307,6 +482,10 @@ cmd_user() {
             fi
             ;;
         revoke|rm|remove|delete)
+            if [[ "$_json" == "true" ]]; then
+                user_revoke_json "$@"
+                exit $?
+            fi
             if [[ -z "${1:-}" ]]; then
                 error "Usage: moav user revoke USERNAME [USERNAME2...] | --all [--yes]"
                 exit 1
@@ -367,7 +546,7 @@ cmd_user() {
             cmd_user_base64 "$username"
             ;;
         *)
-            error "Usage: moav user [list|add|revoke|package|sub|base64] [USERNAME]"
+            error "Usage: moav user [list|add|revoke|package|sub|base64] [USERNAME] [--json]"
             exit 1
             ;;
     esac

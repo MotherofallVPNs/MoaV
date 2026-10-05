@@ -7,7 +7,7 @@
 
 FROM alpine:3.21
 
-ARG GRAFANA_VERSION=13.2.0
+ARG GRAFANA_VERSION=13.2.1
 ARG TARGETARCH=amd64
 
 RUN apk add --no-cache ca-certificates tzdata bash wget

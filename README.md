@@ -58,7 +58,7 @@ for the longer argument.
 
 ## Features
 
-- **Multiple protocols** — 16+ circumvention transports and fallback paths, plus optional Psiphon, Tor and MahsaNet donation integrations:
+- **Multiple protocols** — 18+ circumvention transports and fallback paths, plus optional Psiphon, Tor and MahsaNet donation integrations:
   - **High-stealth proxy** — Reality (VLESS), Trojan, Hysteria2, XHTTP (VLESS+XHTTP+Reality), CDN (VLESS+WS via Cloudflare)
   - **Full VPN** — WireGuard (direct & wstunnel), AmneziaWG
   - **Specialty** — TrustTunnel (HTTP/2+QUIC), Telegram MTProxy (fake-TLS), Shadowsocks-2022, GooseRelay (SOCKS5 via Google Apps Script)
@@ -118,6 +118,19 @@ This will:
 - Prompt for domain, email, and admin password
 - Offer to install `moav` command globally
 - Launch the interactive setup
+
+**Non-interactive install** (automation, cloud-init, the deploy app): answers
+come from the environment or from a `KEY=VALUE` file that must be mode `0600`.
+The admin password is never accepted on the command line, and a missing
+required value aborts the install instead of falling back to a default:
+
+```bash
+MOAV_NONINTERACTIVE=1 MOAV_DOMAIN=vpn.example.com MOAV_EMAIL=you@example.com \
+MOAV_ADMIN_PASSWORD='...' ENABLE_TROJAN=false bash install.sh
+#   or: bash install.sh --answers /root/moav-answers.env   (0600; same keys)
+#   MOAV_DOMAINLESS=1 opts into domainless mode; MOAV_BOOTSTRAP=1 also runs
+#   'moav bootstrap --yes' (which now honours the saved DEFAULT_PROFILES).
+```
 
 **Manual install** (alternative):
 
@@ -188,6 +201,7 @@ Then use `moav` from anywhere. See the [Setup Guide](https://moav.sh/docs/SETUP)
 | Trojan | 8443/tcp | Yes | ★★★★☆ | ★★★★☆ | ✅ | Backup, uses your domain |
 | AnyTLS | 8445/tcp | Yes | ★★★★★ | ★★★★☆ | ⬜ | Defeats TLS-in-TLS fingerprinting |
 | Shadowsocks-2022 | 8388/tcp+udp | No | ★★★★☆ | ★★★★☆ | ✅ | AEAD-2022 anti-probing; Outline-app compatible |
+| Snell | 8389/tcp | No | ★★★★☆ | ★★★★☆ | ✅ | Lightweight TCP proxy, HTTP obfs, shared-key; Surge/Stash/Mihomo (not v2rayNG/Hiddify) |
 | CDN (VLESS+WS) | 2082/tcp² | via CDN² | ★★★★★ | ★★★☆☆ | ⬜ | When the server IP is blocked; needs a CDN in front |
 | TrustTunnel | 4443/tcp+udp | Yes | ★★★★★ | ★★★★☆ | ✅ | HTTP/2 & QUIC, looks like HTTPS |
 | WireGuard (Direct) | 51820/udp | No | ★★★☆☆ | ★★★★★ | ✅ | Full VPN, simple setup |
@@ -227,6 +241,9 @@ moav test alice               # prove alice's configs actually pass traffic
 moav start proxy admin        # start specific profiles
 moav restart sing-box         # apply an .env change to one service
 moav donate                   # donate configs/bandwidth (MahsaNet, Psiphon, Snowflake)
+
+moav status --json            # machine-readable, secret-free: also doctor, user list,
+moav user add alice --json    #   user add/remove and test (no keys, links or server IPs)
 ```
 
 Each user gets `outputs/bundles/<username>/` with config files, QR codes and a

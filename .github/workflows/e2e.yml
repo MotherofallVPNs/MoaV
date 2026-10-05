@@ -152,6 +152,9 @@ jobs:
           # We add a named 'e2e-test' user after start (also exercises `user add`).
           grep -q '^INITIAL_USERS=' .env && sed -i "s|^INITIAL_USERS=.*|INITIAL_USERS=1|" .env || echo "INITIAL_USERS=1" >> .env
           grep -q '^DEFAULT_PROFILES=' .env && sed -i "s|^DEFAULT_PROFILES=.*|DEFAULT_PROFILES=all|" .env || echo "DEFAULT_PROFILES=all" >> .env
+          # Snell is off by default; enable it so e2e exercises the inbound,
+          # provisioning, bundle, and the client-test reachability check.
+          sed -i "s|^ENABLE_SNELL=.*|ENABLE_SNELL=true|" .env
 
       - name: Build images
         run: ./moav.sh build
@@ -401,7 +404,7 @@ jobs:
 
           # flag:artifact pairs, checked in whichever direction the config implies
           PAIRS="REALITY:reality.txt TROJAN:trojan.txt HYSTERIA2:hysteria2.txt \
-                 SS:shadowsocks.txt XHTTP:xhttp-vless.txt TRUSTTUNNEL:trusttunnel.toml \
+                 SS:shadowsocks.txt SNELL:snell.txt XHTTP:xhttp-vless.txt TRUSTTUNNEL:trusttunnel.toml \
                  TELEMT:telegram-proxy-link.txt"
 
           # --- 1. a normal add matches the configuration, both ways -------------
@@ -724,6 +727,9 @@ jobs:
           done
           grep -q '^INITIAL_USERS=' .env && sed -i "s|^INITIAL_USERS=.*|INITIAL_USERS=1|" .env || echo "INITIAL_USERS=1" >> .env
           grep -q '^DEFAULT_PROFILES=' .env && sed -i "s|^DEFAULT_PROFILES=.*|DEFAULT_PROFILES=all|" .env || echo "DEFAULT_PROFILES=all" >> .env
+          # Snell is off by default; enable it so e2e exercises the inbound,
+          # provisioning, bundle, and the client-test reachability check.
+          sed -i "s|^ENABLE_SNELL=.*|ENABLE_SNELL=true|" .env
 
           echo "== domainless: bootstrap -> start -> user add -> test =="
           ./moav.sh bootstrap --yes

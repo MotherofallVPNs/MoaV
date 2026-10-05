@@ -1141,7 +1141,47 @@ DOCTOR_CHECKS=(
     "updates:Check for MoaV updates"
 )
 
+# `moav doctor [check] --json` — one object per check: {id, status, detail}.
+# status: pass (rc 0) | warn (rc 2 = skipped / not applicable) | fail (other).
+# The check functions are unchanged: their human output is captured, colour-
+# stripped and redacted (server IPs, links, key-shaped tokens) into `detail`, so
+# nothing the app may log can carry an address or a secret. Runs with stdin
+# closed and MOAV_NONINTERACTIVE=1 so no check can stop on a prompt.
+doctor_json() {
+    local -a selected=("$@")
+    local check_spec check_name out rc status detail
+    local first=true failed=0
+
+    printf '[\n'
+    for check_spec in "${selected[@]}"; do
+        check_name="${check_spec%%:*}"
+        rc=0
+        out=$(MOAV_NONINTERACTIVE=1 "doctor_check_${check_name}" 2>&1 < /dev/null) || rc=$?
+        case "$rc" in
+            0) status="pass" ;;
+            2) status="warn" ;;
+            *) status="fail"; failed=$((failed + 1)) ;;
+        esac
+        detail=$(printf '%s\n' "$out" | json_detail)
+        [[ "$first" == "true" ]] || printf ',\n'
+        first=false
+        printf '  {"id": %s, "status": "%s", "detail": "%s"}' "$(json_str "$check_name")" "$status" "$detail"
+    done
+    printf '\n]\n'
+    [[ "$failed" -eq 0 ]]
+}
+
 cmd_doctor() {
+    local json_mode=false
+    local -a _args=()
+    local _a
+    for _a in "$@"; do
+        case "$_a" in
+            --json) json_mode=true ;;
+            *) _args+=("$_a") ;;
+        esac
+    done
+    set -- ${_args[@]+"${_args[@]}"}
     local requested_check="${1:-}"
     # `moav doctor peers --fix [--yes]` — the only check that can repair what
     # it finds. Deliberately not a blanket `doctor --fix`: the repair rotates
@@ -1164,7 +1204,7 @@ cmd_doctor() {
 
     case "$requested_check" in
         help|--help|-h)
-            echo "Usage: moav doctor [check]"
+            echo "Usage: moav doctor [check] [--json]"
             echo ""
             echo "Run MoaV diagnostic checks."
             echo ""
@@ -1178,6 +1218,7 @@ cmd_doctor() {
             echo "Examples:"
             echo "  moav doctor"
             echo "  moav doctor dns"
+            echo "  moav doctor --json        # [{id, status: pass|warn|fail, detail}]"
             return 0
             ;;
     esac
@@ -1193,10 +1234,15 @@ cmd_doctor() {
     done
 
     if [[ -n "$requested_check" && "$requested_check" != "all" && "$found" != "true" ]]; then
-        error "Unknown doctor check: ${requested_check}"
-        echo ""
-        cmd_doctor --help
+        error "Unknown doctor check: ${requested_check}" >&2
+        echo "" >&2
+        cmd_doctor --help >&2
         return 1
+    fi
+
+    if [[ "$json_mode" == "true" ]]; then
+        doctor_json "${selected_checks[@]}"
+        return $?
     fi
 
     print_section "MoaV Doctor"
