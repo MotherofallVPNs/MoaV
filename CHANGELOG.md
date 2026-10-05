@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+- **A configured CDN no longer needs a second toggle, and an upgrade no longer
+  turns it off.** `ENABLE_CDN` now ships **unset** (commented) in `.env.example`
+  instead of `=false`, so `cdn_enabled()`'s rule governs everywhere: CDN is on
+  exactly when `CDN_SUBDOMAIN` is set and proxied through Cloudflare, and off
+  otherwise. Because the flag is unset, `moav update` no longer appends
+  `ENABLE_CDN=false` onto an upgrading server — the append that could silently
+  drop a working CDN at the next bootstrap. The compact `moav://` bundle builder
+  now gates on `cdn_enabled` as well, matching every other CDN path (it was the
+  lone reader of the raw flag). An explicit `ENABLE_CDN=true`/`false` still wins.
 
 ## [2.3.0] - 2026-09-12
 
