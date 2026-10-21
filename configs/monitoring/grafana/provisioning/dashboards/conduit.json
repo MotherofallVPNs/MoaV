@@ -217,7 +217,9 @@
           "refId": "B"
         }
       ],
-      "type": "stat"
+      "type": "stat",
+      "title": "Limits",
+      "description": "Configured ceilings for this station: max concurrent common clients and the bandwidth cap (bit/s)."
     },
     {
       "datasource": {
