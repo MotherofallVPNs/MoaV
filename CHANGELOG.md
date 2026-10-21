@@ -7,20 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- **A configured CDN no longer needs a second toggle, and an upgrade no longer
-  turns it off.** `ENABLE_CDN` now ships **unset** (commented) in `.env.example`
-  instead of `=false`, so `cdn_enabled()`'s rule governs everywhere: CDN is on
-  exactly when `CDN_SUBDOMAIN` is set and proxied through Cloudflare, and off
-  otherwise. Because the flag is unset, `moav update` no longer appends
-  `ENABLE_CDN=false` onto an upgrading server — the append that could silently
-  drop a working CDN at the next bootstrap. The compact `moav://` bundle builder
-  now gates on `cdn_enabled` as well, matching every other CDN path (it was the
-  lone reader of the raw flag). An explicit `ENABLE_CDN=true`/`false` still wins.
+## [2.3.0] - 2026-10-21
 
-## [2.3.0] - 2026-09-12
-
-sing-box 1.14, the new **Snell** protocol (on by default), opt-in Hysteria2 gecko obfuscation, component version bumps (incl. a Grafana security patch), and a fix so `moav update` cleanly discards staged local changes. No breaking changes; keys, users, and certificates are untouched.
+sing-box 1.14, the new **Snell** protocol (on by default), opt-in Hysteria2 gecko obfuscation, component version bumps (incl. a Grafana security patch), a CDN flag fix so an upgrade no longer silently turns off a configured CDN, and a fix so `moav update` cleanly discards staged local changes. No breaking changes; keys, users, and certificates are untouched.
 
 ### Added
 - **Snell protocol (new sing-box inbound), on by default.** A lightweight TCP
@@ -89,6 +78,15 @@ sing-box 1.14, the new **Snell** protocol (on by default), opt-in Hysteria2 geck
   when `MOAV_NONINTERACTIVE=1`.
 
 ### Fixed
+- **A configured CDN no longer needs a second toggle, and an upgrade no longer
+  turns it off.** `ENABLE_CDN` now ships **unset** (commented) in `.env.example`
+  instead of `=false`, so `cdn_enabled()`'s rule governs everywhere: CDN is on
+  exactly when `CDN_SUBDOMAIN` is set and proxied through Cloudflare, and off
+  otherwise. Because the flag is unset, `moav update` no longer appends
+  `ENABLE_CDN=false` onto an upgrading server — the append that could silently
+  drop a working CDN at the next bootstrap. The compact `moav://` bundle builder
+  now gates on `cdn_enabled` as well, matching every other CDN path (it was the
+  lone reader of the raw flag). An explicit `ENABLE_CDN=true`/`false` still wins.
 - **`moav update` "Discard changes" now fully resets.** The Discard option used
   `git checkout -- .`, which only clears *unstaged* edits; staged changes (git
   status `MM` / `A`, e.g. a hand-edited `docker-compose.yml` or added exporter
