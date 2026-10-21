@@ -70,11 +70,8 @@ else
     printf '  SKIP  openssl unavailable for the functional keygen check\n'
 fi
 
-# 5. Finalmask schema tracks Xray >= v26.9.30 (XTLS/Xray-core#6718, #7090):
-#    client = {"domains":[{"names","types"}],"resolvers":[{"addrs"}]}, server =
-#    {"domains":[{"names"}]}. The pre-v26.9.30 "domain+udp://ip:port" resolver
-#    strings (and bare-string server domains) make v26.10.x refuse to start —
-#    verified against the real v26.9.9 and v26.10.21 binaries in the 2026-10 bump.
+# 5. Finalmask must use the Xray >= v26.9.30 object schema; the legacy
+#    "domain+udp://ip:port" resolver strings make v26.10.x refuse to start.
 if grep -vE '^\s*#' "$XRAY" | grep -q '+udp://'; then
     bad "xdns client finalmask still emits the pre-v26.9.30 'domain+udp://ip:port' resolver strings"
 else
