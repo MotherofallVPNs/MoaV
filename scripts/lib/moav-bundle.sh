@@ -50,7 +50,9 @@ moav_bundle_link() {
         local _xt="${XHTTP_REALITY_TARGET:-${REALITY_TARGET:-dl.google.com:443}}"
         precords+=("p=vless-xhttp,${PORT_XHTTP:-2096},sni=$(_moav_urlencode "${_xt%%:*}"),fp=chrome")
     fi
-    if [[ "${ENABLE_CDN:-false}" == "true" && -n "${CDN_ADDRESS:-}" ]]; then
+    # cdn_enabled() (common.sh) is the single source of truth: explicit flag, else
+    # on when a CDN subdomain is configured. Falls closed if it is not sourced.
+    if cdn_enabled && [[ -n "${CDN_ADDRESS:-}" ]]; then
         local _cdn="vless-httpupgrade"
         [[ "${CDN_TRANSPORT:-httpupgrade}" == "ws" ]] && _cdn="vless-ws"
         precords+=("p=${_cdn},443,host=$(_moav_urlencode "$CDN_ADDRESS"),path=$(_moav_urlencode "${CDN_WS_PATH:-/ws}"),sni=$(_moav_urlencode "${CDN_SNI:-}"),alpn=http/1.1")

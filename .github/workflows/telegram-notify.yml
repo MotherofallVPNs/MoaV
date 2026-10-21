@@ -67,6 +67,17 @@ jobs:
           fi
           python3 .github/scripts/telegram_format.py > message.txt
 
+          # Pin the link preview to OUR page (release/issue), never an external
+          # link that happens to appear first in the notes body — Telegram
+          # previews the first URL otherwise, so an App Store link in the client
+          # table was winning the card. Empty = the plain test, no preview.
+          PREVIEW_URL=""
+          case "$EVENT" in
+            release) PREVIEW_URL="$REL_URL" ;;
+            issues)  [ -s message.txt ] && PREVIEW_URL="$ISSUE_URL" ;;
+          esac
+          printf '%s' "$PREVIEW_URL" > preview_url.txt
+
       - name: Send to Telegram
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -82,12 +93,20 @@ jobs:
           # Optional: target a specific forum-supergroup topic (e.g. "github logs").
           EXTRA=()
           if [ -n "${TOPIC_ID}" ]; then EXTRA=(--data-urlencode "message_thread_id=${TOPIC_ID}"); fi
+          # Force the preview to our own page (release/issue). Falls back to no
+          # preview for the plain test. link_preview_options needs Bot API >= 7.0.
+          PREVIEW_URL="$(cat preview_url.txt 2>/dev/null || true)"
+          if [ -n "$PREVIEW_URL" ]; then
+            LPO="$(jq -cn --arg u "$PREVIEW_URL" '{url:$u, prefer_large_media:false}')"
+          else
+            LPO='{"is_disabled":true}'
+          fi
           echo "Sending $(wc -c < message.txt) bytes to Telegram${TOPIC_ID:+ (topic $TOPIC_ID)}…"
           curl -fsS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${CHAT_ID}" \
             "${EXTRA[@]}" \
             --data-urlencode "text@message.txt" \
             -d parse_mode=HTML \
-            -d disable_web_page_preview=false \
+            --data-urlencode "link_preview_options=${LPO}" \
             -o /dev/null
           echo "Sent."
