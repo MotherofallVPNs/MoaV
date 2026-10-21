@@ -943,14 +943,8 @@ if [[ "${ENABLE_XHTTP:-true}" == "true" ]]; then
     if [[ "${ENABLE_XDNS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
         xdns_domain="${XDNS_SUBDOMAIN:-x}.${DOMAIN}"
         xdns_mtu="${XDNS_MTU:-35}"
-        # Server-side (return path) mKCP MTU. Xray >= v26.9.30 no longer splits a
-        # server packet across several records: each packet must fit in ONE DNS
-        # reply, and anything bigger is dropped ("xdns: err size N"). With the
-        # default edns0=0 the reply is capped at 512 bytes, so the per-record
-        # payload is ~215 (TXT) / ~117 (AAAA, CNAME) / ~39 (A) bytes — see the
-        # Xray finalmask docs. The old 900 worked only on <= v26.9.9 (which
-        # fragmented) and silently passes ZERO traffic on v26.10.x. The pre-#342
-        # value lives on in tests/xdns-xray-compat-test.sh as the forbidden one.
+        # Server-side mKCP MTU: Xray >= v26.9.30 drops any packet exceeding one DNS
+        # reply, so cap it per method (rationale/history in PR #342).
         case "${XDNS_METHOD:-txt}" in
             aaaa|cname) xdns_server_mtu=110 ;;
             a)          xdns_server_mtu=35 ;;
