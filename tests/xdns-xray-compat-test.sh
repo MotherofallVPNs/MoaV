@@ -115,6 +115,36 @@ else
     printf '  SKIP  python3 unavailable for the finalmask render check\n'
 fi
 
+# 6. Server-side (return path) mKCP MTU must fit ONE DNS reply. Xray >= v26.9.30
+#    no longer fragments a server packet across records; with edns0=0 the reply is
+#    512 bytes, so the payload cap is ~215 (TXT) / ~117 (AAAA, CNAME) / ~39 (A).
+#    The old 'mtu': 900 config-checks fine on v26.10.21 but passes ZERO traffic
+#    (every packet is dropped with "xdns: err size 900") — found on loopback with
+#    the real v26.10.21 binary in the 2026-10 bump; <= v26.9.9 moved 100 KB in 3s
+#    on the same 900, v26.10.21 moved nothing until the MTU was lowered.
+if grep -qE "^\s*'mtu': *900," "$BOOT"; then
+    bad "server xdns inbound still hardcodes kcp mtu 900 (drops every reply on Xray >= v26.9.30)"
+else
+    ok "server xdns inbound no longer hardcodes kcp mtu 900"
+fi
+if grep -q "'mtu': \$xdns_server_mtu," "$BOOT"; then
+    ok "server xdns inbound takes its kcp mtu from xdns_server_mtu"
+else
+    bad "server xdns inbound does not render \$xdns_server_mtu"
+fi
+# Replay the method -> server-mtu table from bootstrap.sh and bound every value
+# by the Xray finalmask per-reply capacity for that record type.
+mtu_block=$(awk '/case "\$\{XDNS_METHOD:-txt\}" in/,/esac/' "$BOOT")
+for pair in txt:215 aaaa:117 cname:117 a:39; do
+    m=${pair%%:*}; cap=${pair##*:}
+    v=$(XDNS_METHOD="$m" bash -c "$mtu_block; printf '%s' \"\$xdns_server_mtu\"" 2>/dev/null)
+    if [ -n "$v" ] && [ "$v" -ge 17 ] && [ "$v" -le "$cap" ]; then
+        ok "server xdns mtu for method=$m is $v (<= per-reply cap $cap)"
+    else
+        bad "server xdns mtu for method=$m is '$v' (must be 17..$cap)"
+    fi
+done
+
 echo ""
 if [ "$fail" -gt 0 ]; then echo "FAILED ($fail failed, $pass passed)"; exit 1; fi
 echo "PASSED ($pass checks)"

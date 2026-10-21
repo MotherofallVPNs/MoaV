@@ -943,7 +943,20 @@ if [[ "${ENABLE_XHTTP:-true}" == "true" ]]; then
     if [[ "${ENABLE_XDNS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
         xdns_domain="${XDNS_SUBDOMAIN:-x}.${DOMAIN}"
         xdns_mtu="${XDNS_MTU:-35}"
-        log_info "Adding XDNS inbound (domain: $xdns_domain, mtu: $xdns_mtu)..."
+        # Server-side (return path) mKCP MTU. Xray >= v26.9.30 no longer splits a
+        # server packet across several records: each packet must fit in ONE DNS
+        # reply, and anything bigger is dropped ("xdns: err size N"). With the
+        # default edns0=0 the reply is capped at 512 bytes, so the per-record
+        # payload is ~215 (TXT) / ~117 (AAAA, CNAME) / ~39 (A) bytes — see the
+        # Xray finalmask docs. The old 900 worked only on <= v26.9.9 (which
+        # fragmented) and silently passes ZERO traffic on v26.10.x. The pre-#342
+        # value lives on in tests/xdns-xray-compat-test.sh as the forbidden one.
+        case "${XDNS_METHOD:-txt}" in
+            aaaa|cname) xdns_server_mtu=110 ;;
+            a)          xdns_server_mtu=35 ;;
+            *)          xdns_server_mtu=200 ;;
+        esac
+        log_info "Adding XDNS inbound (domain: $xdns_domain, client mtu: $xdns_mtu, server mtu: $xdns_server_mtu)..."
 
         # Insert XDNS inbound into the inbounds array using python (jq alternative for complex JSON)
         python3 -c "
@@ -962,7 +975,7 @@ xdns_inbound = {
     'streamSettings': {
         'network': 'kcp',
         'kcpSettings': {
-            'mtu': 900,
+            'mtu': $xdns_server_mtu,
             'tti': 100,
             'uplinkCapacity': 0,
             'downlinkCapacity': 0,
