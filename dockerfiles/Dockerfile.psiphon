@@ -3,7 +3,7 @@
 FROM debian:bookworm-slim
 
 ARG TARGETARCH
-ARG CONDUIT_VERSION=2.0.0
+ARG CONDUIT_VERSION=2.1.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \

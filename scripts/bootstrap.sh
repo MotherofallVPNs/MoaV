@@ -943,7 +943,14 @@ if [[ "${ENABLE_XHTTP:-true}" == "true" ]]; then
     if [[ "${ENABLE_XDNS:-false}" == "true" ]] && [[ -n "${DOMAIN:-}" ]]; then
         xdns_domain="${XDNS_SUBDOMAIN:-x}.${DOMAIN}"
         xdns_mtu="${XDNS_MTU:-35}"
-        log_info "Adding XDNS inbound (domain: $xdns_domain, mtu: $xdns_mtu)..."
+        # Server-side mKCP MTU: Xray >= v26.9.30 drops any packet exceeding one DNS
+        # reply, so cap it per method (rationale/history in PR #342).
+        case "${XDNS_METHOD:-txt}" in
+            aaaa|cname) xdns_server_mtu=110 ;;
+            a)          xdns_server_mtu=35 ;;
+            *)          xdns_server_mtu=200 ;;
+        esac
+        log_info "Adding XDNS inbound (domain: $xdns_domain, client mtu: $xdns_mtu, server mtu: $xdns_server_mtu)..."
 
         # Insert XDNS inbound into the inbounds array using python (jq alternative for complex JSON)
         python3 -c "
@@ -962,17 +969,18 @@ xdns_inbound = {
     'streamSettings': {
         'network': 'kcp',
         'kcpSettings': {
-            'mtu': 900,
+            'mtu': $xdns_server_mtu,
             'tti': 100,
             'uplinkCapacity': 0,
             'downlinkCapacity': 0,
             'congestion': True
         },
         'finalmask': {
-            # Xray v26.x finalmask: server side uses 'domains' (array). The old
-            # singular 'domain' field was removed (split into domains=server /
-            # resolvers=client) — using it makes xray refuse to start.
-            'udp': [{'type': 'xdns', 'settings': {'domains': ['$xdns_domain']}}]
+            # Xray >= v26.9.30 finalmask: server side uses 'domains' as an
+            # array of {'names': [...]} objects (XTLS/Xray-core#6718, #7090).
+            # The older bare-string form ['x.example.com'] makes xray refuse to
+            # start on v26.9.30+ (and this object form fails on <= v26.9.9).
+            'udp': [{'type': 'xdns', 'settings': {'domains': [{'names': ['$xdns_domain']}]}}]
         }
     }
 }
