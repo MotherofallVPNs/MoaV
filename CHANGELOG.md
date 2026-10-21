@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 sing-box 1.14, the new **Snell** protocol (on by default), opt-in Hysteria2 gecko obfuscation, component version bumps (incl. a Grafana security patch), a CDN flag fix so an upgrade no longer silently turns off a configured CDN, and a fix so `moav update` cleanly discards staged local changes. No breaking changes; keys, users, and certificates are untouched.
 
+> **Upgrade note (XDNS operators):** 2.3.0 adds VLESS encryption to XDNS. `moav update` does not re-render server configs, so after updating run `moav bootstrap` (idempotent, keeps your keys and user UUIDs) to generate the XDNS encryption keypair and re-render the server inbound, then re-issue bundles with `moav regenerate-users`. XDNS stays mis-keyed until you bootstrap.
+
 ### Added
 - **Snell protocol (new sing-box inbound), on by default.** A lightweight TCP
   proxy with HTTP obfuscation, no TLS/domain required (`ENABLE_SNELL=true`,
