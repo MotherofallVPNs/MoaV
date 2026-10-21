@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-10-21
+
+Security-focused patch release. Xray-core and Prometheus drop the compromised eMudhra/emSign CA roots (Go 1.27.3), Grafana picks up ten CVE fixes, and every bundled component moves to its latest stable. No breaking config changes; keys, users, and certificates are untouched.
+
+> **Upgrade note (XDNS operators):** Xray v26.9.30+ changed the XDNS finalmask schema. After `moav update`, run `moav bootstrap` (idempotent, keeps your keys and user UUIDs) to re-render the server inbound, then `moav regenerate-users`; XDNS clients must run a core at or above v26.9.30 and re-download their bundle.
+
 ### Changed
 - **Component version bumps** (audit 2026-10-21):
   - **sing-box 1.14.0 → [1.14.3](https://github.com/SagerNet/sing-box/releases/tag/v1.14.3)** — patch train: `tls_fragment` no longer treats an empty write as the first packet, early handshake now sent through outbound groups, gRPC/HTTP-2 half-close and stream-error fixes, read loops no longer spin on persistent errors, DNS resolver-discovery queries rejected, Go 1.26.8. Config unchanged; the real-binary `sing-box check` / `format` CI gate re-validated against 1.14.3.
