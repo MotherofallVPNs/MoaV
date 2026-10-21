@@ -9,12 +9,12 @@
 # not a requirement.
 
 # Build stage (golang base so the source-compile fallback is available)
-FROM golang:1.26-alpine AS builder
+FROM golang:1.27-alpine AS builder
 
 RUN apk add --no-cache git wget unzip ca-certificates
 
 ARG XRAY_REPO=https://github.com/XTLS/Xray-core.git
-ARG XRAY_VERSION=v26.9.9
+ARG XRAY_VERSION=v26.10.21
 ARG TARGETARCH
 
 # Go module fetch resilience — used ONLY by the source-compile fallback below.

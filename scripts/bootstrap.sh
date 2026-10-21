@@ -969,10 +969,11 @@ xdns_inbound = {
             'congestion': True
         },
         'finalmask': {
-            # Xray v26.x finalmask: server side uses 'domains' (array). The old
-            # singular 'domain' field was removed (split into domains=server /
-            # resolvers=client) — using it makes xray refuse to start.
-            'udp': [{'type': 'xdns', 'settings': {'domains': ['$xdns_domain']}}]
+            # Xray >= v26.9.30 finalmask: server side uses 'domains' as an
+            # array of {'names': [...]} objects (XTLS/Xray-core#6718, #7090).
+            # The older bare-string form ['x.example.com'] makes xray refuse to
+            # start on v26.9.30+ (and this object form fails on <= v26.9.9).
+            'udp': [{'type': 'xdns', 'settings': {'domains': [{'names': ['$xdns_domain']}]}}]
         }
     }
 }
