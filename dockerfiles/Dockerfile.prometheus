@@ -7,7 +7,7 @@
 
 FROM alpine:3.21
 
-ARG PROMETHEUS_VERSION=3.13.2
+ARG PROMETHEUS_VERSION=3.14.0
 ARG TARGETARCH=amd64
 
 RUN apk add --no-cache ca-certificates tzdata wget

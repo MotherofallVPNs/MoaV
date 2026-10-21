@@ -58,21 +58,24 @@ for the longer argument.
 
 ## Features
 
-- **Multiple protocols** — 16+ circumvention transports and fallback paths, plus optional Psiphon, Tor and MahsaNet donation integrations:
+- **Multiple protocols** — 18+ circumvention transports and fallback paths, plus optional Psiphon, Tor and MahsaNet donation integrations:
   - **High-stealth proxy** — Reality (VLESS), Trojan, Hysteria2, XHTTP (VLESS+XHTTP+Reality), CDN (VLESS+WS via Cloudflare)
   - **Full VPN** — WireGuard (direct & wstunnel), AmneziaWG
   - **Specialty** — TrustTunnel (HTTP/2+QUIC), Telegram MTProxy (fake-TLS), Shadowsocks-2022, GooseRelay (SOCKS5 via Google Apps Script)
   - **DNS tunnels** — dnstt, Slipstream, MasterDNS, and XDNS — all four run simultaneously on port 53 via `dns-router`
-- **Stealth-first** - All traffic looks like normal HTTPS, WebSocket, DNS, or IMAPS
+- **Stealth-first** - All traffic looks like normal or garbled HTTPS, WebSocket, DNS, or IMAPS
 - **Per-user credentials** - Create, revoke, and manage users independently
 - **Easy deployment** - Docker Compose based, single command setup
-- **Mobile-friendly** - QR codes and links for easy client import
-- **Decoy website** - Serves innocent content to unauthenticated visitors
+- **Cross-platform** - Popular clients on iOS, Android, macOS, Windows, and Linux; QR codes and links for easy import
+- **Compact `moav://` subscription** - one line encodes the whole enabled proxy surface ([docs](https://moav.sh/docs/moav-bundle))
+- **[Decoy website](https://moav.sh/docs/decoy)** - Serves innocent content to unauthenticated visitors
 - **Home server ready** - Run on Raspberry Pi or any ARM64/x64 Linux as a personal VPN
 - **[Psiphon Conduit](https://github.com/Psiphon-Inc/conduit)** - Optional bandwidth donation to help others bypass censorship
 - **[Tor Snowflake](https://snowflake.torproject.org/)** - Optional bandwidth donation to help Tor users bypass censorship
-- **[MahsaNet](https://www.mahsaserver.com/)** - Donate VPN configs to help Mahsa VPN users (2M+ users in Iran)
+- **[MahsaNet](https://www.mahsaserver.com/)** - Donate VPN configs to help Mahsa VPN users (12M+ users in Iran)
 - **Monitoring** - Optional Grafana + Prometheus observability stack
+- **Open source & self-hosted** - Run your own, audit the code, contribute back
+- **Forever free** - No subscriptions, no accounts, no paywalls; MIT licensed
 
 > **[Read the full documentation](https://moav.sh/docs/)** — setup guides, CLI reference, client apps, monitoring, OPSEC, and more.
 
@@ -115,6 +118,19 @@ This will:
 - Prompt for domain, email, and admin password
 - Offer to install `moav` command globally
 - Launch the interactive setup
+
+**Non-interactive install** (automation, cloud-init, the deploy app): answers
+come from the environment or from a `KEY=VALUE` file that must be mode `0600`.
+The admin password is never accepted on the command line, and a missing
+required value aborts the install instead of falling back to a default:
+
+```bash
+MOAV_NONINTERACTIVE=1 MOAV_DOMAIN=vpn.example.com MOAV_EMAIL=you@example.com \
+MOAV_ADMIN_PASSWORD='...' ENABLE_TROJAN=false bash install.sh
+#   or: bash install.sh --answers /root/moav-answers.env   (0600; same keys)
+#   MOAV_DOMAINLESS=1 opts into domainless mode; MOAV_BOOTSTRAP=1 also runs
+#   'moav bootstrap --yes' (which now honours the saved DEFAULT_PROFILES).
+```
 
 **Manual install** (alternative):
 
@@ -185,6 +201,7 @@ Then use `moav` from anywhere. See the [Setup Guide](https://moav.sh/docs/SETUP)
 | Trojan | 8443/tcp | Yes | ★★★★☆ | ★★★★☆ | ✅ | Backup, uses your domain |
 | AnyTLS | 8445/tcp | Yes | ★★★★★ | ★★★★☆ | ⬜ | Defeats TLS-in-TLS fingerprinting |
 | Shadowsocks-2022 | 8388/tcp+udp | No | ★★★★☆ | ★★★★☆ | ✅ | AEAD-2022 anti-probing; Outline-app compatible |
+| Snell | 8389/tcp | No | ★★★★☆ | ★★★★☆ | ✅ | Lightweight TCP proxy, HTTP obfs, shared-key; Surge/Stash/Mihomo (not v2rayNG/Hiddify) |
 | CDN (VLESS+WS) | 2082/tcp² | via CDN² | ★★★★★ | ★★★☆☆ | ⬜ | When the server IP is blocked; needs a CDN in front |
 | TrustTunnel | 4443/tcp+udp | Yes | ★★★★★ | ★★★★☆ | ✅ | HTTP/2 & QUIC, looks like HTTPS |
 | WireGuard (Direct) | 51820/udp | No | ★★★☆☆ | ★★★★★ | ✅ | Full VPN, simple setup |
@@ -224,6 +241,9 @@ moav test alice               # prove alice's configs actually pass traffic
 moav start proxy admin        # start specific profiles
 moav restart sing-box         # apply an .env change to one service
 moav donate                   # donate configs/bandwidth (MahsaNet, Psiphon, Snowflake)
+
+moav status --json            # machine-readable, secret-free: also doctor, user list,
+moav user add alice --json    #   user add/remove and test (no keys, links or server IPs)
 ```
 
 Each user gets `outputs/bundles/<username>/` with config files, QR codes and a
@@ -269,9 +289,9 @@ See the [Client Setup guide](https://moav.sh/docs/CLIENTS) for the complete list
 
 Full docs: **[moav.sh/docs](https://moav.sh/docs/)**
 
-**Deploy** — [Quick Start](https://moav.sh/docs/quick-start) · [Setup Guide](https://moav.sh/docs/SETUP) · [VPS Deployment](https://moav.sh/docs/DEPLOY) · [DNS Configuration](https://moav.sh/docs/DNS)
+**Deploy** — [Quick Start](https://moav.sh/docs/quick-start) · [Setup Guide](https://moav.sh/docs/SETUP) · [VPS Deployment](https://moav.sh/docs/DEPLOY) · [DNS Configuration](https://moav.sh/docs/DNS) · [Video Tutorials](https://moav.sh/docs/video-tutorials)
 
-**Understand** — [Supported Protocols](https://moav.sh/docs/protocols) · [Architecture](https://moav.sh/docs/architecture) · [Threat Model](https://moav.sh/docs/threat-model) · [Mission](https://moav.sh/docs/mission) · [Philosophy](https://moav.sh/docs/philosophy)
+**Understand** — [Supported Protocols](https://moav.sh/docs/protocols) · [Architecture](https://moav.sh/docs/architecture) · [Threat Model](https://moav.sh/docs/threat-model) · [Mission](https://moav.sh/docs/mission) · [Impact](https://moav.sh/docs/impact) · [Philosophy](https://moav.sh/docs/philosophy)
 
 **Connect users** — [Client Apps](https://moav.sh/docs/CLIENTS) · [MahsaNG Import](https://moav.sh/docs/mahsanet) · [MoaV Client](https://moav.sh/docs/client)
 
@@ -279,7 +299,7 @@ Full docs: **[moav.sh/docs](https://moav.sh/docs/)**
 
 **Contribute** — [Development & Testing](https://moav.sh/docs/development) · [Translating the Docs](https://moav.sh/docs/TRANSLATING) · [Support MoaV](https://moav.sh/docs/support)
 
-**For AI agents** — [AGENTS.md](AGENTS.md) for working in this repo, [llms.txt](https://moav.sh/llms.txt) as a compact index, [llms-full.txt](https://moav.sh/llms-full.txt) for the whole corpus.
+**For AI agents** — [Run MoaV with an agent](https://moav.sh/docs/ai-agent) to set up from a bare VPS, [AGENTS.md](AGENTS.md) for working in this repo, [llms.txt](https://moav.sh/llms.txt) as a compact index, [llms-full.txt](https://moav.sh/llms-full.txt) for the whole corpus.
 
 ## Requirements
 

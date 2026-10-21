@@ -110,13 +110,32 @@ run_bootstrap() {
     echo "  Each bundle contains configuration files and QR codes"
     echo "  for connecting to your server."
 
-    # Service selection
+    # Service selection. `moav bootstrap --yes` with DEFAULT_PROFILES already in
+    # .env (non-interactive install, or a re-run) takes the saved set instead of
+    # prompting — without a TTY the prompt used to fall through to "select
+    # later", leaving a fresh install with nothing built or started.
     echo ""
     print_section "Service Selection"
-    echo "Select which services to build and set as default for 'moav start'."
-    echo ""
+    local saved_profiles="" selected_rc=0
+    if [[ "${BOOTSTRAP_ASSUME_YES:-false}" == "true" ]]; then
+        saved_profiles=$(filter_disabled_profiles "$(get_default_profiles)")
+    fi
+    if [[ -n "$saved_profiles" ]]; then
+        info "Using saved DEFAULT_PROFILES (--yes): $saved_profiles"
+        SELECTED_PROFILES=()
+        SELECTED_PROFILE_STRING=""
+        local _sp
+        for _sp in $saved_profiles; do
+            SELECTED_PROFILES+=("$_sp")
+            SELECTED_PROFILE_STRING+="--profile $_sp "
+        done
+    else
+        echo "Select which services to build and set as default for 'moav start'."
+        echo ""
+        select_profiles "save" || selected_rc=$?
+    fi
 
-    if select_profiles "save"; then
+    if [[ $selected_rc -eq 0 ]]; then
         # Check DNS setup if DNS tunnels are selected
         check_dns_for_dnstunnel
 
@@ -277,6 +296,7 @@ cmd_bootstrap() {
         esac
         shift
     done
+    BOOTSTRAP_ASSUME_YES="$assume_yes"   # read by run_bootstrap (service selection)
 
     print_header
     check_prerequisites

@@ -11,6 +11,9 @@ bad() { printf '  FAIL  %s\n' "$1"; fail=$((fail+1)); }
 has()  { case "$1" in *"$2"*) ok "$3";; *) bad "$3 (missing: $2)";; esac; }
 lacks(){ case "$1" in *"$2"*) bad "$3 (unexpected: $2)";; *) ok "$3";; esac; }
 
+# shellcheck source=/dev/null
+source "$ROOT/scripts/lib/common.sh"   # cdn_enabled() — the CDN gate moav-bundle.sh uses
+# Stub the label prefix AFTER common.sh so the test value wins over the real one.
 moav_name_prefix() { echo "MoaV-test-"; }
 # shellcheck source=/dev/null
 source "$ROOT/scripts/lib/moav-bundle.sh"
@@ -57,6 +60,20 @@ has   "$url" "p=trojan,8443" "trojan present"
 lacks "$url" "p=hy2"         "hy2 omitted when disabled"
 lacks "$url" "p=ss,"         "ss omitted when disabled"
 lacks "$url" "p=vless-xhttp" "xhttp omitted when disabled"
+
+# --- CDN auto-on when configured but the flag is unset (the shipped default) ---
+# .env.example leaves ENABLE_CDN commented; cdn_enabled() then infers CDN from
+# CDN_SUBDOMAIN, so configuring a subdomain gets the link with no second toggle.
+# Run in a .env-free dir so cdn_enabled() reads only the exported env.
+setup_creds; disable_all; unset ENABLE_CDN
+export ENABLE_REALITY=true CDN_SUBDOMAIN=cdn CDN_ADDRESS="cdn.example.com" CDN_TRANSPORT=httpupgrade CDN_WS_PATH="/ws" CDN_SNI="cdn.example.com"
+url=$( cd "$(mktemp -d)" && moav_bundle_link "carol" "203.0.113.9" )
+has "$url" "p=vless-httpupgrade,443,host=cdn.example.com" "CDN inferred from subdomain when flag unset"
+# unset flag + no subdomain -> omitted (no broken link on an unconfigured server)
+unset CDN_SUBDOMAIN CDN_ADDRESS CDN_DOMAIN
+url=$( cd "$(mktemp -d)" && moav_bundle_link "carol" "203.0.113.9" )
+lacks "$url" "p=vless-httpupgrade" "CDN omitted when flag unset and no subdomain"
+lacks "$url" "p=vless-ws"          "CDN omitted (ws) when flag unset and no subdomain"
 
 # --- no proxies enabled -> empty ---
 setup_creds; disable_all

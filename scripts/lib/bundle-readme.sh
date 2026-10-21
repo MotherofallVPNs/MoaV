@@ -43,6 +43,7 @@ render_bundle_readme() {
     RB_SERVER_IP="${SERVER_IP:-YOUR_SERVER_IP}" \
     RB_DOMAIN="${DOMAIN:-YOUR_DOMAIN}" \
     RB_PORT_SS="${PORT_SS:-8388}" \
+    RB_PORT_SNELL="${PORT_SNELL:-8389}" \
     RB_WSTUNNEL_CMD="$wstunnel_cmd" \
     RB_GENERATED_DATE="$generated_date" \
     RB_DNSTT_DOMAIN="${DNSTT_SUBDOMAIN:-t}.${DOMAIN:-}" \

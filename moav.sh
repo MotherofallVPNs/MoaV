@@ -1002,14 +1002,16 @@ main() {
             cmd_restart "$@"
             ;;
         status)
-            cmd_status
+            shift
+            cmd_status "$@"
             ;;
         logs)
             shift
             cmd_logs "$@"
             ;;
         users)
-            cmd_users
+            shift
+            cmd_users "$@"
             ;;
         user)
             shift

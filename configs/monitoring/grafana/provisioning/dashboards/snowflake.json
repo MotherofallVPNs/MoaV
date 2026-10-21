@@ -69,7 +69,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(max_over_time(tor_snowflake_proxy_connections_total[$__range]))",
+          "expr": "sum(moav_snowflake_completed_connections_total)",
+          "instant": true,
           "refId": "A"
         }
       ],
@@ -289,12 +290,13 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(tor_snowflake_proxy_traffic_inbound_bytes_total[14d])) * 1024",
+          "expr": "sum(moav_snowflake_relayed_bytes_window{direction=\"inbound\",window=\"14d\"})",
+          "instant": true,
           "refId": "A"
         }
       ],
       "title": "Downloaded (14 days)",
-      "description": "Relayed to clients over the last 14 days, which is how long Prometheus keeps data. Fixed window: it ignores the time picker. snowflake's counters restart with the container, so this is an increase() over the window rather than the raw counter, which would drop to zero on every restart.",
+      "description": "Relayed to clients over the last 14 days. Fixed window: it ignores the time picker. Summed by the exporter from the proxy log's own timestamps, so it is accurate immediately and after any restart (a backfilled counter's increase() would read zero).",
       "type": "stat"
     },
     {
@@ -331,7 +333,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(tor_snowflake_proxy_traffic_inbound_bytes_total[$__range])) * 1024",
+          "expr": "sum(moav_snowflake_relayed_bytes_total{direction=\"inbound\"})",
           "refId": "A",
           "instant": true,
           "datasource": {
@@ -400,12 +402,13 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(tor_snowflake_proxy_traffic_outbound_bytes_total[14d])) * 1024",
+          "expr": "sum(moav_snowflake_relayed_bytes_window{direction=\"outbound\",window=\"14d\"})",
+          "instant": true,
           "refId": "A"
         }
       ],
       "title": "Uploaded (14 days)",
-      "description": "Relayed from clients over the last 14 days. Fixed window: it ignores the time picker. snowflake's counters restart with the container, so this is an increase() over the window rather than the raw counter, which would drop to zero on every restart.",
+      "description": "Relayed from clients over the last 14 days. Fixed window: it ignores the time picker. Summed by the exporter from the proxy log's own timestamps, so it is accurate immediately and after any restart (a backfilled counter's increase() would read zero).",
       "type": "stat"
     },
     {
@@ -442,7 +445,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(tor_snowflake_proxy_traffic_outbound_bytes_total[$__range])) * 1024",
+          "expr": "sum(moav_snowflake_relayed_bytes_total{direction=\"outbound\"})",
           "refId": "A",
           "instant": true,
           "datasource": {
@@ -676,7 +679,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(max_over_time(tor_snowflake_proxy_connections_total[$__rate_interval]))",
+          "expr": "sum(moav_snowflake_completed_connections_total)",
           "legendFormat": "connections/hour",
           "refId": "A"
         }
@@ -1364,7 +1367,7 @@
       ],
       "title": "Bandwidth Donated (per hour)",
       "type": "timeseries",
-      "description": "Relayed each hour, both directions. Was a running total, which fell off a cliff every time the container restarted."
+      "description": "Bytes relayed each hour, both directions, from the proxy's live metrics. Zero when the proxy is idle; it fills in as traffic flows. Hours before the current proxy session are not retained here — the lifetime and 14-day tiles above carry the totals."
     }
   ],
   "refresh": "30s",

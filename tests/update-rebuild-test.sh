@@ -81,12 +81,13 @@ must_not_queue "bind-mounted lib/ change"    "lib/update.sh"
 must_not_queue "bind-mounted grafana entry"  "scripts/grafana-entrypoint.sh"
 must_not_queue "a docs change"               "README.md" "CHANGELOG.md"
 
-# A deleted service must not be suggested. Removing exporters/snowflake left its
-# files in the diff, so the prompt said `moav build snowflake-exporter` for a
-# service that no longer exists in compose.
-must_not_queue "a deleted exporter"          "exporters/snowflake/main.py"
-# ...but the mapping itself must still work for the exporters that remain.
-must_queue "a live exporter change"  singbox-exporter  "exporters/singbox/main.py"
+# A change to an exporter that IS in compose queues its rebuild.
+must_queue "the snowflake exporter"  snowflake-exporter  "exporters/snowflake/main.py"
+must_queue "a live exporter change"  singbox-exporter    "exporters/singbox/main.py"
+# But a path whose service is NOT in compose (deleted/unknown) must not be
+# suggested -- a needless build can OOM a 1 GB VPS. Regression: #295 deleted an
+# exporter yet the deletion diff still prompted `moav build <it>`.
+must_not_queue "an unknown/deleted exporter" "exporters/removed-legacy/main.py"
 
 # --- bind-mounted single files need a RECREATE, not a restart ----------------
 # A single-file mount follows the inode; git replaces the file, so the container

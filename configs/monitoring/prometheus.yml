@@ -62,11 +62,11 @@ scrape_configs:
       - targets: ['psiphon-conduit:9090']
     scrape_timeout: 10s
 
-  # Snowflake Exporter - parses snowflake proxy logs for metrics
+  # Snowflake native metrics - the proxy's own /internal/metrics endpoint.
   # NOTE: Only available when running with --profile snowflake
-  # The proxy's own Prometheus endpoint. This replaced a 213-line log-parsing
-  # exporter of ours: it carries the same connection and traffic counters, plus a
-  # per-country breakdown and a failure counter we never had.
+  # Authoritative for per-country connections and connection failures. Its byte
+  # and connection counters are IN-MEMORY and reset to zero on every proxy
+  # restart, so the cumulative totals come from snowflake-exporter (below).
   - job_name: 'snowflake-proxy'
     metrics_path: /internal/metrics
     # snowflake runs with network_mode: host (it needs the host's NAT behaviour),
@@ -74,6 +74,14 @@ scrape_configs:
     # declares host.docker.internal:host-gateway for exactly this case.
     static_configs:
       - targets: ['host.docker.internal:9998']
+    scrape_timeout: 10s
+
+  # Snowflake cumulative exporter - lifetime bytes relayed + connections served,
+  # parsed from the proxy's persistent summary log so they survive restarts (the
+  # native counters above do not). On moav_net, scraped by service DNS name.
+  - job_name: 'snowflake-cumulative'
+    static_configs:
+      - targets: ['snowflake-exporter:9105']
     scrape_timeout: 10s
 
   # telemt - Telegram MTProxy native Prometheus metrics

@@ -67,16 +67,32 @@ is_wgkey "$hk" && ok "HeaderProtectionKey is a base64 wg key" || bad "HeaderProt
 before=$(wc -l < "$env_file"); amneziawg_ensure_v3_params; after=$(wc -l < "$env_file")
 [ "$before" = "$after" ] && ok "ensure_v3_params is idempotent" || bad "ensure_v3_params duplicated ($before->$after)"
 
-# --- 2. server awg0.conf carries every v3 key ---------------------------------
+# --- 2. server awg0.conf: always-on obf params, gated header protection --------
 export STATE_DIR="$WORK/s2"; AWG_CONFIG_DIR="$WORK/s2/cfg"
 mkdir -p "$STATE_DIR/keys" "$AWG_CONFIG_DIR"
 export SERVER_IP="203.0.113.10"
-generate_amneziawg_config >/dev/null 2>&1
+generate_amneziawg_config >/dev/null 2>&1   # default: header protection OFF
 conf="$AWG_CONFIG_DIR/awg0.conf"
-for key in "S3 =" "S4 =" "HeaderProtectionKey =" "ContentPaddingAddition =" \
-           "RekeyAfterTime =" "RekeyTimeout =" "RejectAfterTime =" \
-           "KeepaliveTimeout =" "MaxHandshakeAttempts =" "RandomTrailers ="; do
+# S3/S4 + randomized timings are supported by every client, always emitted.
+for key in "S3 =" "S4 =" "RekeyAfterTime =" "RekeyTimeout =" "RejectAfterTime =" \
+           "KeepaliveTimeout =" "MaxHandshakeAttempts ="; do
     grep -q "^${key}" "$conf" && ok "awg0.conf has ${key%% *}" || bad "awg0.conf missing ${key%% *}"
+done
+# The AWG 1.5 header-protection block is OFF by default: the AmneziaVPN app's
+# .conf importer drops these keys, so emitting them makes that client connect
+# but relay nothing. Regression net for that bug.
+for key in "HeaderProtectionKey =" "ContentPaddingAddition =" "RandomTrailers ="; do
+    grep -q "^${key}" "$conf" && bad "awg0.conf emits ${key%% *} by default (breaks AmneziaVPN import)" \
+        || ok "awg0.conf omits ${key%% *} by default"
+done
+
+# --- 2c. AMNEZIAWG_HEADER_PROTECTION=true opts back into the block -------------
+export STATE_DIR="$WORK/s2h"; AWG_CONFIG_DIR="$WORK/s2h/cfg"
+mkdir -p "$STATE_DIR/keys" "$AWG_CONFIG_DIR"
+AMNEZIAWG_HEADER_PROTECTION=true generate_amneziawg_config >/dev/null 2>&1
+hconf="$AWG_CONFIG_DIR/awg0.conf"
+for key in "HeaderProtectionKey =" "ContentPaddingAddition =" "RandomTrailers ="; do
+    grep -q "^${key}" "$hconf" && ok "opt-in emits ${key%% *}" || bad "opt-in missing ${key%% *}"
 done
 
 # --- 2b. DisableCookies toggle: absent by default, present when opted in -------
@@ -90,27 +106,53 @@ grep -q "^DisableCookies = on" "$AWG_CONFIG_DIR/awg0.conf" \
 # restore the default-config path for section 3
 export STATE_DIR="$WORK/s2"; AWG_CONFIG_DIR="$WORK/s2/cfg"; conf="$AWG_CONFIG_DIR/awg0.conf"
 
-# --- 3. client config carries the v3 keys + a keepalive range -----------------
+# --- 3. compat-mode client mirrors the compat server (no header protection) ----
+# STATE_DIR/AWG_CONFIG_DIR are the default (compat) server from section 2.
 user="tester"
-mkdir -p "$STATE_DIR/users/$user"
-cat > "$STATE_DIR/users/$user/amneziawg.env" <<EOF
+mk_user_env() {   # $1 = STATE_DIR
+    mkdir -p "$1/users/$user"
+    cat > "$1/users/$user/amneziawg.env" <<EOF
 AWG_PRIVATE_KEY=$(wg genkey)
 AWG_PUBLIC_KEY=$(wg genkey)
 AWG_CLIENT_IP=10.67.67.2
 EOF
+}
+mk_user_env "$STATE_DIR"
 out="$WORK/out"; mkdir -p "$out"
 amneziawg_generate_client_config "$user" "$out" >/dev/null 2>&1
 cconf=$(ls "$out"/*awg*.conf 2>/dev/null | head -1)
 if [ -z "$cconf" ]; then
     bad "no client config produced"
 else
-    for key in "HeaderProtectionKey =" "S3 =" "S4 =" "ContentPaddingAddition ="; do
+    for key in "S3 =" "S4 ="; do
         grep -q "^${key}" "$cconf" && ok "client conf has ${key%% *}" || bad "client conf missing ${key%% *}"
+    done
+    # Mirrors the compat server: the header-protection keys the AmneziaVPN
+    # importer drops must NOT be in the bundle either, or client and server
+    # disagree on the wire format and the tunnel connects with no traffic.
+    for key in "HeaderProtectionKey =" "ContentPaddingAddition =" "RandomTrailers ="; do
+        grep -q "^${key}" "$cconf" && bad "compat client conf has ${key%% *} (server omits it)" \
+            || ok "compat client conf omits ${key%% *}"
     done
     grep -qE '^PersistentKeepalive = [0-9]+-[0-9]+$' "$cconf" \
         && ok "client conf keepalive is a range" || bad "client conf keepalive not a range"
-    skey=$(awk '/^HeaderProtectionKey/{print $3; exit}' "$conf")
-    ckey=$(awk '/^HeaderProtectionKey/{print $3; exit}' "$cconf")
+fi
+
+# --- 3b. header-protection client mirrors the opt-in server, keys match --------
+export STATE_DIR="$WORK/s2h"; AWG_CONFIG_DIR="$WORK/s2h/cfg"
+mk_user_env "$STATE_DIR"
+outh="$WORK/outh"; mkdir -p "$outh"
+amneziawg_generate_client_config "$user" "$outh" >/dev/null 2>&1
+hcconf=$(ls "$outh"/*awg*.conf 2>/dev/null | head -1)
+if [ -z "$hcconf" ]; then
+    bad "no header-protection client config produced"
+else
+    for key in "HeaderProtectionKey =" "ContentPaddingAddition =" "RandomTrailers ="; do
+        grep -q "^${key}" "$hcconf" && ok "hdrprot client conf has ${key%% *}" \
+            || bad "hdrprot client conf missing ${key%% *}"
+    done
+    skey=$(awk '/^HeaderProtectionKey/{print $3; exit}' "$hconf")
+    ckey=$(awk '/^HeaderProtectionKey/{print $3; exit}' "$hcconf")
     [ -n "$skey" ] && [ "$skey" = "$ckey" ] \
         && ok "client HeaderProtectionKey matches server" || bad "client/server HeaderProtectionKey differ"
 fi

@@ -11,7 +11,7 @@ FROM debian:bookworm-slim
 ARG TARGETARCH
 
 # Version - read from .env via docker-compose build args, with fallback default
-ARG SLIPSTREAM_VERSION=2026.02.22.1
+ARG SLIPSTREAM_VERSION=2026.04.22.1
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \

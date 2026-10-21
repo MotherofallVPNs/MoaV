@@ -2,7 +2,7 @@
 # Uses userspace Go implementation (amneziawg-go) for Docker compatibility
 FROM golang:1.25-alpine AS builder
 
-ARG AMNEZIAWG_GO_VERSION=v3.1.20260814
+ARG AMNEZIAWG_GO_VERSION=v3.1.20260828
 ARG AWGTOOLS_VERSION=3.1.20260812
 
 # Go module fetch resilience (pipe = fall through on ANY error incl. 403).
