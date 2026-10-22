@@ -7,11 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.3.1] - 2026-10-21
+## [2.3.1] - 2026-10-22
 
-Security-focused patch release. Xray-core and Prometheus drop the compromised eMudhra/emSign CA roots (Go 1.27.3), Grafana picks up ten CVE fixes, and every bundled component moves to its latest stable. No breaking config changes; keys, users, and certificates are untouched.
+Security-focused patch release. Xray-core and Prometheus drop the compromised eMudhra/emSign CA roots (Go 1.27.3), Grafana picks up ten CVE fixes, and every bundled component moves to its latest stable. Also ships community Conduit monitoring from @jSFBay. No breaking config changes; keys, users, and certificates are untouched.
 
 > **Upgrade note (XDNS operators):** Xray v26.9.30+ changed the XDNS finalmask schema. After `moav update`, run `moav bootstrap` (idempotent, keeps your keys and user UUIDs) to re-render the server inbound, then `moav regenerate-users`; XDNS clients must run a core at or above v26.9.30 and re-download their bundle.
+
+### Added
+- **Conduit monitoring, contributed by @jSFBay** (#317, consolidating #305 + #314). An expanded Grafana dashboard for Psiphon Conduit stations (new Announcing / Uptime / Window Max / Session High / Top-5-Regions panels, templated client-state variables, no extra exporter required), plus two opt-in `contrib/` ops scripts: `conduit-monitor` (health-checks and restarts a native Conduit CLI station) and `rotate-log` (weekly rotation for an append-only log). `contrib/` is opt-in and not wired into the core stack; see `contrib/README.md`.
 
 ### Changed
 - **Component version bumps** (audit 2026-10-21):
