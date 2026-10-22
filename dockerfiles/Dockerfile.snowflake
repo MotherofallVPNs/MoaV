@@ -14,7 +14,7 @@
 #   moav build:   SNOWFLAKE_BINARY=source moav build snowflake
 #   docker build: --build-arg SNOWFLAKE_BINARY=source
 
-ARG SNOWFLAKE_VERSION=2.14.1
+ARG SNOWFLAKE_VERSION=2.15.2
 # Selects which stage provides the binary: prebuilt (default) or source. Must be
 # a *global* ARG (declared before the first FROM) so it can be used in the FROM
 # selector below — a mid-file ARG is out of scope for FROM and resolves blank.
@@ -42,7 +42,7 @@ RUN set -eux; \
 # --- Fallback: compile from source via the Go module proxy --------------------
 # Uses the Go module proxy instead of git clone from gitlab.torproject.org
 # (blocked in Russia and elsewhere). See Dockerfile.xray for the GOPROXY notes.
-FROM golang:1.23-alpine AS source
+FROM golang:1.26-alpine AS source
 ARG SNOWFLAKE_VERSION
 ARG GOPROXY="https://proxy.golang.org|https://goproxy.cn|direct"
 ARG GOSUMDB=off

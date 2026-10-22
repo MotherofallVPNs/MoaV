@@ -64,9 +64,10 @@ xray_write_xhttp_bundle() {
 
 # xray_xdns_finalmask <mode> — emit the finalmask "settings" JSON. mode=dns uses
 # the public resolver CSV (XDNS_RESOLVERS); mode=direct targets the server XDNS
-# port (SERVER_IP:PORT_XDNS). Each resolver is "domain[:method]+udp://ip:port";
-# XDNS_METHOD=txt (default) is expressed by omitting the suffix (aaaa needs Xray
-# >= v26.6.1). Reads XDNS_DOMAIN-equivalents from the caller's locals via args.
+# port (SERVER_IP:PORT_XDNS). Emits the Xray >= v26.9.30 object schema:
+# {"domains":[{"names":[...],"types":[N]}],"resolvers":[{"addrs":[...]}]} where
+# XDNS_METHOD maps to the DNS record type (txt=16 default, aaaa=28, a=1,
+# cname=5). Reads XDNS_DOMAIN-equivalents from the caller's locals via args.
 xray_xdns_finalmask() {
     local mode="$1" domain="$2" resolvers_csv="$3" method="$4" direct_target="$5"
     if [[ "$mode" == "direct" ]]; then
@@ -75,10 +76,13 @@ import os, json
 domain = os.environ["XDNS_DOMAIN"]
 target = os.environ["XDNS_DIRECT_TARGET"]
 method = os.environ.get("XDNS_METHOD", "txt").strip().lower()
-suffix = "" if method in ("", "txt") else ":" + method
+types = {"txt": 16, "aaaa": 28, "a": 1, "cname": 5}.get(method or "txt", 16)
 # Direct mode: send xdns-encoded queries straight to the server XDNS port
 # (host PORT_XDNS -> xray:5355), with no public recursive resolver in between.
-print(json.dumps({"resolvers": [domain + suffix + "+udp://" + target]}))
+# Xray >= v26.9.30 finalmask schema: "domains" (names + record types) and
+# "resolvers" (addrs) are separate objects; "addrs" without a scheme is udp.
+print(json.dumps({"domains": [{"names": [domain], "types": [types]}],
+                  "resolvers": [{"addrs": [target]}]}))
 '
     else
         XDNS_DOMAIN="$domain" XDNS_RESOLVERS_CSV="$resolvers_csv" XDNS_METHOD="$method" python3 -c '
@@ -86,15 +90,17 @@ import os, json
 domain = os.environ["XDNS_DOMAIN"]
 csv = os.environ.get("XDNS_RESOLVERS_CSV", "").strip()
 method = os.environ.get("XDNS_METHOD", "txt").strip().lower()
-suffix = "" if method in ("", "txt") else ":" + method
+types = {"txt": 16, "aaaa": 28, "a": 1, "cname": 5}.get(method or "txt", 16)
 ips = [x.strip() for x in csv.split(",") if x.strip()] if csv else []
 if not ips:
     ips = ["1.1.1.1"]
-# Xray v26.x finalmask: the client side uses "resolvers", each formatted as
-# "domain[:method]+udp://server:port". The old singular "domain" field was
-# removed; "domains" is server-side only.
-resolvers = [domain + suffix + "+udp://" + (ip if ":" in ip else ip + ":53") for ip in ips]
-print(json.dumps({"resolvers": resolvers}))
+# Xray >= v26.9.30 finalmask schema (XTLS/Xray-core#6718, #7090): the client
+# carries "domains" [{names, types}] plus "resolvers" [{addrs}] as objects. The
+# pre-v26.9.30 "domain[:method]+udp://ip:port" resolver strings are rejected
+# by newer cores, and the object form is rejected by older ones (<= v26.9.9).
+addrs = [ip if ":" in ip else ip + ":53" for ip in ips]
+print(json.dumps({"domains": [{"names": [domain], "types": [types]}],
+                  "resolvers": [{"addrs": addrs}]}))
 '
     fi
 }
