@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Non-interactive `moav update`** (`--yes` / `-y`, or `MOAV_NONINTERACTIVE=1`
+  in the environment — the same switch `install.sh`, `bootstrap --yes` and the
+  `--json` commands honour). `update` used bare `read` prompts for the
+  "Stash / Discard / Abort" menu on local changes and the two `[Y/n]` `.env`
+  questions, so an unattended caller with no TTY (the MoaV Deploy app runs it
+  over SSH) hung on the first prompt or limped through on empty-read defaults.
+  Unattended it now takes the interactive defaults and says so: local changes
+  are **stashed** (never discarded), `.env` version pins are updated to the
+  release's, new `.env.example` variables are appended, and nothing reads
+  stdin or `/dev/tty`. `--yes` is exported so the `_post-update` re-exec after a
+  pull stays silent too. Interactive behaviour is unchanged, and `update` still
+  never restarts services — follow with `moav build && moav start` as before.
+  Bash completion offers the flag. Regression test:
+  `tests/update-noninteractive-test.sh`.
+
 ### Changed
 - **Component version bumps** (audit 2026-10-21):
   - **sing-box 1.14.0 → [1.14.3](https://github.com/SagerNet/sing-box/releases/tag/v1.14.3)** — patch train: `tls_fragment` no longer treats an empty write as the first packet, early handshake now sent through outbound groups, gRPC/HTTP-2 half-close and stream-error fixes, read loops no longer spin on persistent errors, DNS resolver-discovery queries rejected, Go 1.26.8. Config unchanged; the real-binary `sing-box check` / `format` CI gate re-validated against 1.14.3.
