@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+### Added
+- **Non-interactive `moav update`** (`--yes` / `-y`, or `MOAV_NONINTERACTIVE=1`
+  in the environment — the same switch `install.sh`, `bootstrap --yes` and the
+  `--json` commands honour). `update` used bare `read` prompts for the
+  "Stash / Discard / Abort" menu on local changes and the two `[Y/n]` `.env`
+  questions, so an unattended caller with no TTY (the MoaV Deploy app runs it
+  over SSH) hung on the first prompt or limped through on empty-read defaults.
+  Unattended it now takes the interactive defaults and says so: local changes
+  are **stashed** (never discarded), `.env` version pins are updated to the
+  release's, new `.env.example` variables are appended, and nothing reads
+  stdin or `/dev/tty`. `--yes` is exported so the `_post-update` re-exec after a
+  pull stays silent too. Interactive behaviour is unchanged, and `update` still
+  never restarts services — follow with `moav build && moav start` as before.
+  Bash completion offers the flag. Regression test:
+  `tests/update-noninteractive-test.sh`.
+
 ## [2.3.1] - 2026-10-22
 
 Security-focused patch release. Xray-core and Prometheus drop the compromised eMudhra/emSign CA roots (Go 1.27.3), Grafana picks up ten CVE fixes, and every bundled component moves to its latest stable. Also ships community Conduit monitoring from @jSFBay. No breaking config changes; keys, users, and certificates are untouched.
@@ -15,6 +32,7 @@ Security-focused patch release. Xray-core and Prometheus drop the compromised eM
 
 ### Added
 - **Conduit monitoring, contributed by @jSFBay** (#317, consolidating #305 + #314). An expanded Grafana dashboard for Psiphon Conduit stations (new Announcing / Uptime / Window Max / Session High / Top-5-Regions panels, templated client-state variables, no extra exporter required), plus two opt-in `contrib/` ops scripts: `conduit-monitor` (health-checks and restarts a native Conduit CLI station) and `rotate-log` (weekly rotation for an append-only log). `contrib/` is opt-in and not wired into the core stack; see `contrib/README.md`.
+
 
 ### Changed
 - **Component version bumps** (audit 2026-10-21):

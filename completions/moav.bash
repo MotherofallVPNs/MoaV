@@ -138,7 +138,7 @@ _moav() {
             fi
             ;;
         update)
-            COMPREPLY=($(compgen -W "-b --branch" -- "$cur"))
+            COMPREPLY=($(compgen -W "-b --branch -y --yes" -- "$cur"))
             ;;
         doctor)
             COMPREPLY=($(compgen -W "docker memory disk dns services config ports env updates all" -- "$cur"))
