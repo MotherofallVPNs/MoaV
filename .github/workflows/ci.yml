@@ -171,6 +171,8 @@ jobs:
         run: bash tests/cert-test.sh
       - name: moav update -b accepts a tag (release candidate)
         run: bash tests/update-tag-test.sh
+      - name: moav update non-interactive (--yes / MOAV_NONINTERACTIVE)
+        run: bash tests/update-noninteractive-test.sh
       - name: .env has no inline comments on variable lines
         run: bash tests/env-no-inline-comment-test.sh
       - name: xdns VLESS address is Xray >= 26.9 compliant

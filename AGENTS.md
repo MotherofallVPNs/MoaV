@@ -79,7 +79,7 @@ with none they act on the whole stack.
 | `moav cert` | Certificate status / renewal (Let's Encrypt) |
 | `moav admin password` | Generate/reset the admin **and** Grafana password (`ADMIN_PASSWORD`) |
 | `moav export` / `moav import` | Full backup / restore (keys, users, configs) — used for server migration |
-| `moav update` | Pull new code (follow with `moav build && moav start`) |
+| `moav update [--yes]` | Pull new code (follow with `moav build && moav start`). `--yes` (or `MOAV_NONINTERACTIVE=1`) never prompts: stashes local changes, applies `.env` version pins and new variables, does not restart services |
 
 Full reference: [moav.sh/docs/CLI](https://moav.sh/docs/CLI/). Debugging flow when
 a user reports "it stopped working": `moav status` → `moav doctor` →

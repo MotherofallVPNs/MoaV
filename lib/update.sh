@@ -25,19 +25,31 @@ cmd_update() {
                 target_branch="$2"
                 shift 2
                 ;;
+            -y|--yes)
+                # Same switch `confirm` and the --json commands honour. Exported
+                # (not a local) because a successful pull re-execs into
+                # `moav.sh _post-update`, whose prompts must stay silent too.
+                export MOAV_NONINTERACTIVE=1
+                shift
+                ;;
             -h|--help)
-                echo "Usage: moav update [-b BRANCH]"
+                echo "Usage: moav update [-b BRANCH] [-y]"
                 echo ""
                 echo "Update MoaV to the latest version"
                 echo ""
                 echo "Options:"
                 echo "  -b, --branch BRANCH   Switch to and pull specified branch"
                 echo "                        Examples: main, dev, paqet"
+                echo "  -y, --yes             Non-interactive: never prompt (same as"
+                echo "                        MOAV_NONINTERACTIVE=1). Local changes are"
+                echo "                        stashed; .env version pins and new variables"
+                echo "                        are applied. Services are not restarted."
                 echo ""
                 echo "Examples:"
                 echo "  moav update              # Update current branch"
                 echo "  moav update -b main      # Switch to main and update"
                 echo "  moav update -b dev       # Switch to dev branch"
+                echo "  moav update --yes        # Unattended (cron, SSH without a TTY)"
                 return 0
                 ;;
             *)
@@ -113,7 +125,17 @@ cmd_update() {
         echo -e "  ${WHITE}2)${NC} Discard changes (reset to clean state - ${RED}LOSES YOUR CHANGES${NC})"
         echo -e "  ${WHITE}3)${NC} Abort (handle manually)"
         echo ""
-        read -rp "Choice [1/2/3]: " choice
+        local choice
+        if [[ "${MOAV_NONINTERACTIVE:-0}" == "1" ]]; then
+            # Unattended (--yes / MOAV_NONINTERACTIVE=1): take the interactive
+            # default, Stash, without touching stdin — a caller with no TTY
+            # (the MoaV Deploy app over SSH) must never hang here, and Discard
+            # is not a choice to make on someone's behalf.
+            choice=1
+            info "Non-interactive: choosing 1 (stash) for the local changes"
+        else
+            read -rp "Choice [1/2/3]: " choice
+        fi
 
         case "$choice" in
             1|"")
@@ -338,10 +360,9 @@ check_component_versions() {
     echo ""
     # Defaults to yes: these are the versions this release was tested against,
     # so staying on the old pin is the unusual choice. Matches the [Y/n] on the
-    # equivalent question in check_env_additions.
-    read -r -p "Update component versions in .env? [Y/n] " update_versions
-
-    if [[ ! "$update_versions" =~ ^[Nn]$ ]]; then
+    # equivalent question in check_env_additions. `confirm` takes that default
+    # without prompting under --yes / MOAV_NONINTERACTIVE=1.
+    if confirm "Update component versions in .env?" "y"; then
         for update in "${updates_available[@]}"; do
             local var new
             var=$(echo "$update" | cut -d: -f1)
@@ -727,9 +748,8 @@ check_env_additions() {
     echo ""
     echo -e "$display_lines"
 
-    read -r -p "Add these to your .env with default values? [Y/n] " add_vars
-
-    if [[ ! "$add_vars" =~ ^[Nn]$ ]]; then
+    # Default yes; silent (and yes) under --yes / MOAV_NONINTERACTIVE=1.
+    if confirm "Add these to your .env with default values?" "y"; then
         {
             echo ""
             echo "# ── Added by moav update ($(date +%Y-%m-%d)) ──"
