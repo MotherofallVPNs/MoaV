@@ -41,6 +41,7 @@ Enough to deploy and find your way around. Everything else is linked below.
 - [Quick Start](https://moav.sh/docs/quick-start/): one-command install through to a first user, about ten minutes
 - [Setup Guide](https://moav.sh/docs/SETUP/): every option — domain, DNS, certbot, ports, firewall, bootstrap, domainless and CDN modes
 - [VPS Deployment](https://moav.sh/docs/DEPLOY/): provider-by-provider server setup
+- [MoaV Deploy](https://moav.sh/docs/deploy/): the Android/iOS app that installs, manages and monitors a server over SSH (admin tool, not a VPN client)
 - [DNS Configuration](https://moav.sh/docs/DNS/): which protocols need a domain, NS delegations for the DNS tunnels, dns-router fan-out, freeing port 53
 - [CLI Reference](https://moav.sh/docs/CLI/): every `moav` command, profile filtering, environment variables
 - [Architecture](https://moav.sh/docs/architecture/): container topology, bundle generation flow, monitoring stack
