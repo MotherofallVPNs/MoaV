@@ -20,7 +20,11 @@ Minor release: `moav update` can now run unattended (`--yes` / `MOAV_NONINTERACT
 > - Source: https://github.com/MotherofallVPNs/moav-deploy-app
 > - Docs: https://moav.sh/docs/deploy/
 
-Bundled component versions are unchanged from 2.3.1, which already carried the 2026-10 audit (sing-box 1.14.3, Xray-core v26.10.21, wstunnel 11.1.0, Psiphon Conduit CLI 2.1.0, Snowflake 2.15.2, telemt 3.5.14, Grafana 13.2.4, Prometheus 3.15.1, cAdvisor 0.60.6, docker-socket-proxy v0.5.0) and the XDNS server-side mKCP MTU fix. The security details (Xray-core and Prometheus CA-root purge, Grafana CVE fixes) are in the [2.3.1] notes below.
+Component refresh on top of the 2.3.1 audit: sing-box 1.14.3 -> 1.14.4 and Grafana 13.2.4 -> 13.3.0. Everything else stays at its 2.3.1 version (Xray-core v26.10.21, wstunnel 11.1.0, Psiphon Conduit CLI 2.1.0, Snowflake 2.15.2, telemt 3.5.14, Prometheus 3.15.1, cAdvisor 0.60.6, docker-socket-proxy v0.5.0) plus the XDNS server-side mKCP MTU fix. The 2.3.1 security details (Xray-core and Prometheus CA-root purge, Grafana CVE fixes) are in the [2.3.1] notes below.
+
+### Changed
+- **Component bumps:** sing-box 1.14.3 -> 1.14.4 and Grafana 13.2.4 -> 13.3.0.
+  Validated by the e2e suite on the test server.
 
 ### Added
 - **Non-interactive `moav update`** (`--yes` / `-y`, or `MOAV_NONINTERACTIVE=1`
