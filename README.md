@@ -16,6 +16,8 @@
 
 📱 **[MoaV Deploy](https://github.com/MotherofallVPNs/moav-deploy-app)**: install and manage a MoaV server from your phone (Android and iOS, [docs](https://moav.sh/docs/deploy/)).
 
+[![Google Play](https://img.shields.io/badge/Google_Play-beta-34A853.svg?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=org.motherofallvpns.moavdeploy) [![TestFlight](https://img.shields.io/badge/iOS-TestFlight-0D96F6.svg?logo=apple&logoColor=white)](https://testflight.apple.com/join/7S972Bwk)
+
 Built and maintained by the **[MoaV](https://github.com/MotherofallVPNs)** community.
 
 </div>
