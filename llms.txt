@@ -44,6 +44,7 @@ Enough to deploy and find your way around. Everything else is linked below.
 - [DNS Configuration](https://moav.sh/docs/DNS/): which protocols need a domain, NS delegations for the DNS tunnels, dns-router fan-out, freeing port 53
 - [CLI Reference](https://moav.sh/docs/CLI/): every `moav` command, profile filtering, environment variables
 - [Architecture](https://moav.sh/docs/architecture/): container topology, bundle generation flow, monitoring stack
+- [MoaV Deploy app](https://moav.sh/docs/deploy/): install and manage a server from an Android or iOS phone, no command line
 
 ## Protocols and clients
 
