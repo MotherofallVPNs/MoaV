@@ -7,10 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-10-29
+
+Minor release: `moav update` can now run unattended (`--yes` / `MOAV_NONINTERACTIVE=1`), which is what the MoaV Deploy mobile app needs to update a server over SSH. No breaking changes; keys, users, and certificates are untouched.
+
+MoaV Deploy, the Android/iOS app to install and manage a MoaV server from your phone, is now in public beta: https://github.com/MotherofallVPNs/moav-deploy-app (docs: https://moav.sh/docs/deploy/).
+
+Bundled component versions are unchanged from 2.3.1, which already carried the 2026-10 audit (sing-box 1.14.3, Xray-core v26.10.21, wstunnel 11.1.0, Psiphon Conduit CLI 2.1.0, Snowflake 2.15.2, telemt 3.5.14, Grafana 13.2.4, Prometheus 3.15.1, cAdvisor 0.60.6, docker-socket-proxy v0.5.0) and the XDNS server-side mKCP MTU fix. The security details (Xray-core and Prometheus CA-root purge, Grafana CVE fixes) are in the [2.3.1] notes below.
 
 ### Added
 - **Non-interactive `moav update`** (`--yes` / `-y`, or `MOAV_NONINTERACTIVE=1`
-  in the environment — the same switch `install.sh`, `bootstrap --yes` and the
+  in the environment, the same switch `install.sh`, `bootstrap --yes` and the
   `--json` commands honour). `update` used bare `read` prompts for the
   "Stash / Discard / Abort" menu on local changes and the two `[Y/n]` `.env`
   questions, so an unattended caller with no TTY (the MoaV Deploy app runs it
@@ -20,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   release's, new `.env.example` variables are appended, and nothing reads
   stdin or `/dev/tty`. `--yes` is exported so the `_post-update` re-exec after a
   pull stays silent too. Interactive behaviour is unchanged, and `update` still
-  never restarts services — follow with `moav build && moav start` as before.
+  never restarts services. Follow with `moav build && moav start` as before.
   Bash completion offers the flag. Regression test:
   `tests/update-noninteractive-test.sh`.
 
@@ -2285,7 +2292,9 @@ TrustTunnel config validity.
 - uTLS fingerprint spoofing (Chrome)
 - Automatic short ID generation for Reality
 
-[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/MotherofallVPNs/moav/compare/v2.3.1...v2.4.0
+[2.3.1]: https://github.com/MotherofallVPNs/moav/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/MotherofallVPNs/moav/compare/v2.2.4...v2.3.0
 [2.2.4]: https://github.com/MotherofallVPNs/moav/compare/v2.2.3...v2.2.4
 [2.2.3]: https://github.com/MotherofallVPNs/moav/compare/v2.2.2...v2.2.3
