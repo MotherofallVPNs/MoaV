@@ -59,7 +59,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.sing-box
       args:
-        SINGBOX_VERSION: ${SINGBOX_VERSION:-1.14.3}
+        SINGBOX_VERSION: ${SINGBOX_VERSION:-1.14.4}
     container_name: moav-sing-box
     restart: unless-stopped
     logging: *default-logging
@@ -1344,7 +1344,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.bootstrap
       args:
-        SINGBOX_VERSION: ${SINGBOX_VERSION:-1.14.3}
+        SINGBOX_VERSION: ${SINGBOX_VERSION:-1.14.4}
     container_name: moav-bootstrap
     volumes:
       - ./configs:/configs
@@ -1424,7 +1424,7 @@ services:
       args:
         GOPROXY: "${GOPROXY:-https://proxy.golang.org|https://goproxy.cn|direct}"
         GOSUMDB: "${GOSUMDB:-off}"
-        SINGBOX_VERSION: ${SINGBOX_VERSION:-1.14.3}
+        SINGBOX_VERSION: ${SINGBOX_VERSION:-1.14.4}
         WSTUNNEL_VERSION: ${WSTUNNEL_VERSION:-11.1.0}
         TRUSTTUNNEL_CLIENT_VERSION: ${TRUSTTUNNEL_CLIENT_VERSION:-1.0.49}
         AWGTOOLS_VERSION: ${AWGTOOLS_VERSION:-3.1.20260812}

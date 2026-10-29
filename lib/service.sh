@@ -18,7 +18,7 @@ get_running_services() {
 show_versions() {
     local singbox_ver wstunnel_ver conduit_ver snowflake_ver slipstream_ver telemt_ver
     local trusttunnel_ver trusttunnel_client_ver awgtools_ver xray_ver dnstt_ver
-    singbox_ver=$(get_component_version "SINGBOX_VERSION" "1.14.3")
+    singbox_ver=$(get_component_version "SINGBOX_VERSION" "1.14.4")
     wstunnel_ver=$(get_component_version "WSTUNNEL_VERSION" "11.1.0")
     conduit_ver=$(get_component_version "CONDUIT_VERSION" "2.1.0")
     snowflake_ver=$(get_component_version "SNOWFLAKE_VERSION" "latest")
@@ -1775,7 +1775,7 @@ cmd_status() {
 
     # Simple header without clearing terminal
     local singbox_ver wstunnel_ver conduit_ver branch
-    singbox_ver=$(get_component_version "SINGBOX_VERSION" "1.14.3")
+    singbox_ver=$(get_component_version "SINGBOX_VERSION" "1.14.4")
     wstunnel_ver=$(get_component_version "WSTUNNEL_VERSION" "11.1.0")
     conduit_ver=$(get_component_version "CONDUIT_VERSION" "2.1.0")
     branch=$(git -C "$SCRIPT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
