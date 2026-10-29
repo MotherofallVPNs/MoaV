@@ -11,7 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Minor release: `moav update` can now run unattended (`--yes` / `MOAV_NONINTERACTIVE=1`), which is what the MoaV Deploy mobile app needs to update a server over SSH. No breaking changes; keys, users, and certificates are untouched.
 
-MoaV Deploy, the Android/iOS app to install and manage a MoaV server from your phone, is now in public beta: https://github.com/MotherofallVPNs/moav-deploy-app (docs: https://moav.sh/docs/deploy/).
+> [!TIP]
+> ### MoaV Deploy is now in public beta
+> **Mother of all VPNs, in your pocket.** Install, run and manage your own MoaV server from your phone over SSH. No command line needed.
+>
+> - Android (Google Play): https://play.google.com/store/apps/details?id=org.motherofallvpns.moavdeploy
+> - iOS (TestFlight): https://testflight.apple.com/join/7S972Bwk
+> - Source: https://github.com/MotherofallVPNs/moav-deploy-app
+> - Docs: https://moav.sh/docs/deploy/
 
 Bundled component versions are unchanged from 2.3.1, which already carried the 2026-10 audit (sing-box 1.14.3, Xray-core v26.10.21, wstunnel 11.1.0, Psiphon Conduit CLI 2.1.0, Snowflake 2.15.2, telemt 3.5.14, Grafana 13.2.4, Prometheus 3.15.1, cAdvisor 0.60.6, docker-socket-proxy v0.5.0) and the XDNS server-side mKCP MTU fix. The security details (Xray-core and Prometheus CA-root purge, Grafana CVE fixes) are in the [2.3.1] notes below.
 
