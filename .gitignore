@@ -98,6 +98,10 @@ configs/gooserelay/*
 # Materialized from the committed .template on first monitoring start.
 configs/monitoring/conduit_lifetime.rules.yml
 
+# node-exporter textfile collector: moav_cert.prom written by scripts/cert-renew.sh
+# and `moav start`, read by the monitoring stack.
+configs/monitoring/textfile/
+
 # DNS router
 configs/dns-router/
 

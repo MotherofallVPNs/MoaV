@@ -536,6 +536,51 @@
       ],
       "title": "Disk I/O",
       "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Days until the Let's Encrypt certificate expires (moav_cert_expiry_days, refreshed by the daily renewal job and by moav start). certbot renews at 30 days; under 21 means renewal is failing: run moav doctor cert.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "noValue": "n/a (no DOMAIN)",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 7 },
+              { "color": "green", "value": 21 }
+            ]
+          },
+          "unit": "d"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 22 },
+      "id": 9,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "moav_cert_expiry_days",
+          "refId": "A"
+        }
+      ],
+      "title": "TLS cert: days left",
+      "type": "stat"
     }
   ],
   "refresh": "30s",

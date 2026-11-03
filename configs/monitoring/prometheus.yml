@@ -11,6 +11,9 @@ rule_files:
   # Update configs/monitoring/conduit_lifetime.rules.yml after each restart
   # by running: ./scripts/update-conduit-offsets.sh
   - /etc/prometheus/conduit_lifetime.rules.yml
+  # TLS certificate expiry / renewal alerts (moav_cert_* from node-exporter's
+  # textfile collector, written by scripts/cert-renew.sh and `moav start`).
+  - /etc/prometheus/cert_expiry.rules.yml
 
 scrape_configs:
   # Prometheus self-monitoring

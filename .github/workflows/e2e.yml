@@ -227,9 +227,17 @@ jobs:
           python3 -c 'import yaml; d=yaml.safe_load(open("docker-compose.yml"))["services"]; print("\n".join("moav-"+n for n,v in sorted(d.items()) if v.get("restart") is None))' > /tmp/oneshot.txt
           echo "::group::one-shot services (exiting is correct)"; cat /tmp/oneshot.txt; echo "::endgroup::"
 
-          bad=0
-          while IFS=$'\t' read -r name state status exitcode; do
+          # `docker ps --format` has no .ExitCode field. The old template used
+          # one, so docker printed a template error instead of rows, the loop
+          # read nothing, and a crash-looping Prometheus passed this step for
+          # weeks. The exit code lives in .Status ("Exited (1) ...",
+          # "Restarting (2) ..."), so parse it from there and refuse to pass
+          # when no container was inspected at all.
+          bad=0; seen=0
+          while IFS=$'\t' read -r name state status; do
             [ -n "$name" ] || continue
+            seen=$((seen+1))
+            exitcode=$(printf '%s' "$status" | sed -nE 's/^(Exited|Restarting) \(([0-9]+)\).*/\2/p')
             if grep -qxF "$name" /tmp/oneshot.txt; then
               # Exiting is correct, but exiting NON-ZERO never is.
               if [ "$state" != "running" ] && [ "${exitcode:-0}" != "0" ]; then
@@ -242,11 +250,12 @@ jobs:
               restarting) echo "::error::$name is RESTARTING ($status) — crash loop"; bad=1 ;;
               *)          echo "::error::$name is $state ($status) — expected running"; bad=1 ;;
             esac
-          done < <(docker ps -a --filter 'name=^moav-' --format '{{.Names}}\t{{.State}}\t{{.Status}}\t{{.ExitCode}}')
+          done < <(docker ps -a --filter 'name=^moav-' --format '{{.Names}}\t{{.State}}\t{{.Status}}')
+          [ "$seen" -gt 0 ] || { echo "::error::docker ps listed no moav-* containers (format/template error?)"; exit 1; }
           if [ "$bad" -ne 0 ]; then
             echo "--- logs from the failed container(s) ---"
-            docker ps -a --filter 'name=^moav-' --format '{{.Names}}\t{{.State}}\t{{.ExitCode}}' \
-              | awk -F'\t' '$2!="running" && $3!="0"{print $1}' \
+            docker ps -a --filter 'name=^moav-' --format '{{.Names}}\t{{.State}}\t{{.Status}}' \
+              | awk -F'\t' '$2!="running" && $3!~/^Exited \(0\)/{print $1}' \
               | while read -r c; do echo "::group::$c"; docker logs --tail 30 "$c" 2>&1; echo "::endgroup::"; done
             exit 1
           fi
@@ -703,6 +712,39 @@ jobs:
 
       - name: CLI smoke test
         run: bash tests/cli-smoke-test.sh
+
+      - name: Cert health (doctor cert, textfile metric scraped, alert rules loaded, renewal run)
+        # Domain mode only: domainless has no Let's Encrypt cert. Runs AFTER the
+        # protocol matrix because `moav cert renew` is a real certbot renew: a
+        # no-op while the preserved cert is not due, a legitimate renewal (one
+        # LE issuance) plus consumer restarts once it is. Either way it must
+        # exit 0; a non-zero here is the yorkschool failure class surfacing.
+        if: env.E2E_DOMAINLESS_ONLY != 'true'
+        run: |
+          ./moav.sh doctor cert
+          f=configs/monitoring/textfile/moav_cert.prom
+          test -s "$f" || { echo "::error::$f missing: moav start did not write the cert metric"; exit 1; }
+          grep -E '^moav_cert_expiry_days -?[0-9]+$' "$f" \
+            || { echo "::error::no moav_cert_expiry_days in $f"; cat "$f"; exit 1; }
+          # Prometheus must see it through node-exporter's textfile collector.
+          r=""
+          for _ in $(seq 1 12); do
+            r=$(docker compose exec -T prometheus wget -qO- 'http://localhost:9091/api/v1/query?query=moav_cert_expiry_days' 2>/dev/null || true)
+            echo "$r" | grep -q '"value"' && break
+            sleep 10
+          done
+          if ! echo "$r" | grep -q '"value"'; then
+            echo "::error::moav_cert_expiry_days not scraped by Prometheus"; echo "$r"
+            # Say which layer broke: the exporter, the scrape, or Prometheus itself.
+            docker ps -a --filter 'name=moav-prometheus' --filter 'name=moav-node-exporter' --format '{{.Names}}\t{{.State}}\t{{.Status}}'
+            docker compose exec -T node-exporter wget -qO- http://localhost:9100/metrics 2>/dev/null | grep '^moav_cert' || echo "node-exporter serves no moav_cert_*"
+            docker logs --tail 5 moav-prometheus 2>&1 | cut -c1-300
+            exit 1
+          fi
+          echo "$r"
+          docker compose exec -T prometheus wget -qO- 'http://localhost:9091/api/v1/rules' | grep -q 'MoaVCertExpiringSoon' \
+            || { echo "::error::cert_expiry.rules.yml not loaded by Prometheus"; exit 1; }
+          ./moav.sh cert renew
 
       - name: Full/Mega — domainless pass (after the domain run)
         # full + mega run domain THEN domainless. Skip if the primary run is
