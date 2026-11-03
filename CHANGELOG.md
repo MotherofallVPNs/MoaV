@@ -7,11 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Documentation
-- **Security policy** ([SECURITY.md](SECURITY.md)): supported versions, private
-  reporting through GitHub Private Vulnerability Reporting with an email
-  fallback, response targets, scope, safe harbor and reporter credit. Linked
-  from the README and the issue chooser.
+### Added
+- **Cert-expiry monitoring** (monitoring profile only): `moav_cert_expiry_seconds`,
+  `moav_cert_expiry_days`, `moav_cert_check_timestamp_seconds`,
+  `moav_cert_renew_failed` and `moav_cert_managed`, served by node-exporter's
+  textfile collector from `configs/monitoring/textfile/moav_cert.prom` (written
+  atomically by the renewal job and by `moav start`). Alert rules in
+  `configs/monitoring/cert_expiry.rules.yml`: warning under 14 days, critical
+  under 5, renew-failed, metric stale (no write for 48h) or absent, expiry
+  unreadable. A "TLS cert: days left" tile on the System dashboard.
+- `CERT_RENEW_WARN_DAYS` in `.env` (default 21): the "renewal is overdue"
+  threshold shared by the renewal job, doctor and the start line.
+
 ### Changed
 - **amneziawg-go v3.1.20260828 -> [v3.1.20261116](https://github.com/amnezia-vpn/amneziawg-go/releases/tag/v3.1.20261116)**:
   hardening of the AWG 3.1 obfuscation parameters (`Jmin > Jmax` rejected
@@ -78,6 +85,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GET /` would have answered 500 while `/api/health` stayed green. The call
   now passes the request first, and `tests/admin-dashboard-render-test.py`
   renders the dashboard against the pinned dependencies in CI.
+- **Silent TLS-certificate expiry** (the yorkschool outage: an expired Let's Encrypt
+  cert took every TLS protocol, and the MahsaNet-donated configs with it, down).
+  Three gaps, three layers:
+  - `scripts/cert-renew.sh` could not tell "not due yet" from "renewal failed": it
+    compared the cert's mtime before/after `certbot renew --quiet` and exited 0
+    either way, so the daily timer never recorded a failure. It now captures
+    certbot's exit code, reads the live cert's expiry through the certbot
+    container, and exits non-zero (the systemd timer / cron job records a
+    FAILURE) when certbot fails, when the cert is unreadable, or when it is still
+    within `CERT_RENEW_WARN_DAYS` (default 21) of expiry after the attempt. One
+    outcome per run: RENEWED, HEALTHY, FAILED, NEAR-EXPIRY, UNKNOWN. The
+    renewed-then-restart-consumers path is unchanged.
+  - Nothing checked expiry. New `moav doctor cert` (also part of the full
+    `moav doctor` run): days left (OK above 21, warn 7 to 21, fail under 7 or
+    expired) plus whether the daily renewal is really scheduled for this
+    checkout. `moav start` and `moav cert status` print the same one-liner.
+  - Upgraded boxes could carry a renewal unit that was disabled or pointed at a
+    previous install directory, and `moav start` took the unit file's existence
+    as "installed". It now reinstalls the timer whenever it is missing, inactive,
+    or points elsewhere (idempotent; nothing changes when it is healthy).
+  Regression tests: `tests/cert-renew-test.sh` (fake certbot: every outcome and
+  exit code) and `tests/cert-test.sh` (reinstall on stale/inactive unit, start
+  line, metric). The e2e run asserts doctor, the scraped metric, the loaded rules
+  and a real `moav cert renew`.
 
 ### Security
 - **Admin dashboard Python dependencies refreshed.** `admin/requirements.txt`
@@ -87,7 +118,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   uvicorn 0.27.0 -> 0.54.0, httpx 0.26.0 -> 0.28.1, jinja2 3.1.3 -> 3.1.6, and
   `python-multipart` is dropped because nothing imports it. Rebuild the admin
   image to pick it up: `moav build admin && moav start admin`.
-### Security
 - **MPTCP listener hardening (CVE-2026-98432, CVSS 9.8).** Go 1.24+ enables
   MPTCP on TCP listeners by default, and the public exploit for this Linux
   kernel bug needs an MPTCP listener to reach remote root.
@@ -110,6 +140,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dependency updates with security fixes, plus the 2.15.3 fix for a deadlock
   in fixed-capacity proxies (MoaV always passes `-capacity`).
 - **Default-on egress isolation: tunneled client traffic can no longer reach private or infrastructure networks.** A MoaV exit forwarded whatever destination a client asked for, so any user could reach other containers on the Docker network (the sing-box Clash API, Prometheus, Grafana), services on the host and its LAN, and the cloud metadata endpoint. Blocked destinations: RFC1918 (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), CGNAT (`100.64.0.0/10`), link-local (`169.254.0.0/16`), loopback (`127.0.0.0/8`, plus its `0.0.0.0/8` alias), IPv6 ULA/link-local/loopback (`fc00::/7`, `fe80::/10`, `::1`, `::`), and DappNode's core networks (`172.33.0.0/16`, `10.20.0.0/24`). Enforced in every layer that can originate client traffic: **sing-box** (a `reject` route rule after a `resolve`, so a name that points at a private IP is caught too, plus a UDP-only `OUTPUT` filter in the container, because sing-box routes a UDP session once and later packets may name any destination), **Xray** (a routing rule to a blackhole outbound, plus freedom `finalRules`, which check the address actually dialed and every UDP packet), and **WireGuard / AmneziaWG** (a `MOAV-EGRESS` chain hooked at the top of `FORWARD`, IPv4 and IPv6, installed before the interface comes up). dnstt, Slipstream, MasterDNS and GooseRelay egress through sing-box and are covered by it; wstunnel can only reach the WireGuard endpoint. The rules are applied at container start from one list (`scripts/lib/egress-isolation.sh`), so existing installs get them from `moav update && moav build && moav start` with no re-bootstrap. New `.env` toggle `EGRESS_ISOLATION` (default `on`); set it to `off` only for a trusted LAN relay, then `moav restart` to apply it (either direction). **Behavior changes:** WireGuard/AmneziaWG peers can no longer reach each other through the tunnel (their addresses are RFC1918), and on dual-stack servers sing-box now resolves client-requested names with its public resolvers instead of Docker's DNS, as IPv4-only servers already did. Trojan's fallback to the decoy keeps working, and works again on IPv4-only servers, where the `prefer_ipv4` resolve rule had been sending the name `decoy` to public DNS.
+
+### Documentation
+- **Security policy** ([SECURITY.md](SECURITY.md)): supported versions, private
+  reporting through GitHub Private Vulnerability Reporting with an email
+  fallback, response targets, scope, safe harbor and reporter credit. Linked
+  from the README and the issue chooser.
 
 ## [2.4.0] - 2026-10-29
 
