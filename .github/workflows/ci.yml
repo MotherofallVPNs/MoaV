@@ -169,6 +169,8 @@ jobs:
         run: bash tests/tls-note-test.sh
       - name: moav cert (domainless no-op + install idempotency)
         run: bash tests/cert-test.sh
+      - name: cert-renew outcome test
+        run: bash tests/cert-renew-test.sh
       - name: moav update -b accepts a tag (release candidate)
         run: bash tests/update-tag-test.sh
       - name: moav update non-interactive (--yes / MOAV_NONINTERACTIVE)

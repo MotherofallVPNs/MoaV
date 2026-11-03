@@ -874,8 +874,10 @@ ensure_clash_api_secret() {
     fi
 
     # Make sure Prometheus has its Conduit rules file to mount (gitignored +
-    # runtime-generated, so it may be absent on a fresh checkout).
+    # runtime-generated, so it may be absent on a fresh checkout), and that the
+    # node-exporter textfile dir exists before Docker would create it root-owned.
     ensure_conduit_lifetime_rules
+    cert_metric_dir_ensure
 
     # Check if ENABLE_MONITORING is explicitly set to false
     local enable_monitoring

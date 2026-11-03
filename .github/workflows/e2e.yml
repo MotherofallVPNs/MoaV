@@ -704,6 +704,32 @@ jobs:
       - name: CLI smoke test
         run: bash tests/cli-smoke-test.sh
 
+      - name: Cert health (doctor cert, textfile metric scraped, alert rules loaded, renewal run)
+        # Domain mode only: domainless has no Let's Encrypt cert. Runs AFTER the
+        # protocol matrix because `moav cert renew` is a real certbot renew: a
+        # no-op while the preserved cert is not due, a legitimate renewal (one
+        # LE issuance) plus consumer restarts once it is. Either way it must
+        # exit 0; a non-zero here is the yorkschool failure class surfacing.
+        if: env.E2E_DOMAINLESS_ONLY != 'true'
+        run: |
+          ./moav.sh doctor cert
+          f=configs/monitoring/textfile/moav_cert.prom
+          test -s "$f" || { echo "::error::$f missing: moav start did not write the cert metric"; exit 1; }
+          grep -E '^moav_cert_expiry_days -?[0-9]+$' "$f" \
+            || { echo "::error::no moav_cert_expiry_days in $f"; cat "$f"; exit 1; }
+          # Prometheus must see it through node-exporter's textfile collector.
+          r=""
+          for _ in $(seq 1 12); do
+            r=$(docker compose exec -T prometheus wget -qO- 'http://localhost:9091/api/v1/query?query=moav_cert_expiry_days' 2>/dev/null || true)
+            echo "$r" | grep -q '"value"' && break
+            sleep 10
+          done
+          echo "$r" | grep -q '"value"' || { echo "::error::moav_cert_expiry_days not scraped by Prometheus"; echo "$r"; exit 1; }
+          echo "$r"
+          docker compose exec -T prometheus wget -qO- 'http://localhost:9091/api/v1/rules' | grep -q 'MoaVCertExpiringSoon' \
+            || { echo "::error::cert_expiry.rules.yml not loaded by Prometheus"; exit 1; }
+          ./moav.sh cert renew
+
       - name: Full/Mega — domainless pass (after the domain run)
         # full + mega run domain THEN domainless. Skip if the primary run is
         # already domainless-only (would just repeat it).

@@ -74,7 +74,7 @@ with none they act on the whole stack.
 | `moav user revoke <name>` | **Destructive** — remove a user and their access. Confirm with the owner first |
 | `moav regenerate-users` | Rebuild every bundle from stored state (keys unchanged); users just re-download |
 | `moav logs [svc]` | Tail container logs — **first stop for debugging** |
-| `moav doctor` | Diagnostics: DNS, ports, certs, service health. Run this when something's off |
+| `moav doctor` | Diagnostics: DNS, ports, certs, service health. Run this when something's off. `moav doctor cert` = TLS cert days-left + renewal timer |
 | `moav test <name>` | End-to-end protocol validation for a user (proves the tunnels actually pass traffic) |
 | `moav cert` | Certificate status / renewal (Let's Encrypt) |
 | `moav admin password` | Generate/reset the admin **and** Grafana password (`ADMIN_PASSWORD`) |

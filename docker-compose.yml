@@ -870,6 +870,7 @@ services:
     volumes:
       - ./configs/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./configs/monitoring/conduit_lifetime.rules.yml:/etc/prometheus/conduit_lifetime.rules.yml:ro
+      - ./configs/monitoring/cert_expiry.rules.yml:/etc/prometheus/cert_expiry.rules.yml:ro
       - moav_prometheus:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -1017,10 +1018,14 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/rootfs:ro
+      # moav_cert_* (expiry, last check, renew result) from scripts/cert-renew.sh
+      # and `moav start`; the host side owns the directory (lib/cert.sh).
+      - ./configs/monitoring/textfile:/textfile:ro
     command:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
       - '--path.rootfs=/rootfs'
+      - '--collector.textfile.directory=/textfile'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
     environment:
       - TZ=${TZ:-UTC}

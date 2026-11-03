@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Silent TLS-certificate expiry** (the yorkschool outage: an expired Let's Encrypt
+  cert took every TLS protocol, and the MahsaNet-donated configs with it, down).
+  Three gaps, three layers:
+  - `scripts/cert-renew.sh` could not tell "not due yet" from "renewal failed": it
+    compared the cert's mtime before/after `certbot renew --quiet` and exited 0
+    either way, so the daily timer never recorded a failure. It now captures
+    certbot's exit code, reads the live cert's expiry through the certbot
+    container, and exits non-zero (the systemd timer / cron job records a
+    FAILURE) when certbot fails, when the cert is unreadable, or when it is still
+    within `CERT_RENEW_WARN_DAYS` (default 21) of expiry after the attempt. One
+    outcome per run: RENEWED, HEALTHY, FAILED, NEAR-EXPIRY, UNKNOWN. The
+    renewed-then-restart-consumers path is unchanged.
+  - Nothing checked expiry. New `moav doctor cert` (also part of the full
+    `moav doctor` run): days left (OK above 21, warn 7 to 21, fail under 7 or
+    expired) plus whether the daily renewal is really scheduled for this
+    checkout. `moav start` and `moav cert status` print the same one-liner.
+  - Upgraded boxes could carry a renewal unit that was disabled or pointed at a
+    previous install directory, and `moav start` took the unit file's existence
+    as "installed". It now reinstalls the timer whenever it is missing, inactive,
+    or points elsewhere (idempotent; nothing changes when it is healthy).
+  Regression tests: `tests/cert-renew-test.sh` (fake certbot: every outcome and
+  exit code) and `tests/cert-test.sh` (reinstall on stale/inactive unit, start
+  line, metric). The e2e run asserts doctor, the scraped metric, the loaded rules
+  and a real `moav cert renew`.
+
+### Added
+- **Cert-expiry monitoring** (monitoring profile only): `moav_cert_expiry_seconds`,
+  `moav_cert_expiry_days`, `moav_cert_check_timestamp_seconds`,
+  `moav_cert_renew_failed` and `moav_cert_managed`, served by node-exporter's
+  textfile collector from `configs/monitoring/textfile/moav_cert.prom` (written
+  atomically by the renewal job and by `moav start`). Alert rules in
+  `configs/monitoring/cert_expiry.rules.yml`: warning under 14 days, critical
+  under 5, renew-failed, metric stale (no write for 48h) or absent, expiry
+  unreadable. A "TLS cert: days left" tile on the System dashboard.
+- `CERT_RENEW_WARN_DAYS` in `.env` (default 21): the "renewal is overdue"
+  threshold shared by the renewal job, doctor and the start line.
+
 ## [2.4.0] - 2026-10-29
 
 Minor release: `moav update` can now run unattended (`--yes` / `MOAV_NONINTERACTIVE=1`), which is what the MoaV Deploy mobile app needs to update a server over SSH. No breaking changes; keys, users, and certificates are untouched.
