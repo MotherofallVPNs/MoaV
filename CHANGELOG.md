@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Prometheus crash-looped on every e2e run, unnoticed.** `conduit_lifetime.rules.yml`
+  is gitignored and copied from its template at monitoring start; when the copy
+  failed (root-owned `configs/monitoring/` after a container wrote it) nothing
+  said so, Docker then created a root-owned *directory* in the file's place, and
+  Prometheus exited 2 on "is a directory" forever. The e2e "every service is
+  RUNNING" check never caught it because `docker ps --format` has no `.ExitCode`
+  field: the template errored, the loop inspected zero containers and passed.
+  `ensure_conduit_lifetime_rules` (lib/service.sh) now replaces a directory
+  stand-in, retries the copy as root, and reports failure loudly; the e2e step
+  parses the exit code from `.Status` and fails if it inspected no containers.
+  The cert textfile directory is also forced to 755 so node-exporter (`nobody`)
+  can read it regardless of umask. Regression test:
+  `tests/conduit-rules-materialize-test.sh`.
 - **Silent TLS-certificate expiry** (the yorkschool outage: an expired Let's Encrypt
   cert took every TLS protocol, and the MahsaNet-donated configs with it, down).
   Three gaps, three layers:

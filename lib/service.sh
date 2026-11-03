@@ -785,12 +785,31 @@ confirm_disabled_profile() {
 # repo ships a committed `.template` (offsets at 0) and we copy it into place on
 # first monitoring start. Never clobber an existing file — it holds the
 # operator's banked offsets.
+#
+# If the file is missing when compose mounts it, Docker creates a root-owned
+# DIRECTORY in its place and Prometheus crash-loops forever on "read ...: is a
+# directory" (nothing else in the stack notices). That happened on the e2e
+# runner: configs/monitoring/ was root-owned after a container wrote it, the
+# plain cp failed, and every later run mounted the stand-in. So: replace a
+# stand-in, retry the copy with root, and fail loudly instead of silently.
 ensure_conduit_lifetime_rules() {
     local rules="$SCRIPT_DIR/configs/monitoring/conduit_lifetime.rules.yml"
     local template="${rules}.template"
-    if [[ ! -f "$rules" && -f "$template" ]]; then
-        cp "$template" "$rules"
+    local sudo_prefix; sudo_prefix=$(_root_prefix)
+    if [[ -d "$rules" ]]; then
+        warn "$rules is a directory (Docker stand-in for a missing file); replacing it"
+        rm -rf "$rules" 2>/dev/null || $sudo_prefix rm -rf "$rules" 2>/dev/null || true
     fi
+    [[ -f "$rules" ]] && return 0
+    [[ -f "$template" ]] || return 0
+    if ! cp "$template" "$rules" 2>/dev/null; then
+        $sudo_prefix cp "$template" "$rules" 2>/dev/null || {
+            error "Cannot write $rules (parent not writable); Prometheus will not start"
+            return 1
+        }
+    fi
+    chmod 644 "$rules" 2>/dev/null || $sudo_prefix chmod 644 "$rules" 2>/dev/null || true
+    return 0
 }
 
 # Same reachability story for the bind-mounted bundle tree: the admin
@@ -876,7 +895,8 @@ ensure_clash_api_secret() {
     # Make sure Prometheus has its Conduit rules file to mount (gitignored +
     # runtime-generated, so it may be absent on a fresh checkout), and that the
     # node-exporter textfile dir exists before Docker would create it root-owned.
-    ensure_conduit_lifetime_rules
+    # A failure is reported, not fatal: the rest of the stack still starts.
+    ensure_conduit_lifetime_rules || true
     cert_metric_dir_ensure
 
     # Check if ENABLE_MONITORING is explicitly set to false
