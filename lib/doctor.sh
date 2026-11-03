@@ -1121,6 +1121,60 @@ doctor_check_updates() {
     fi
 }
 
+# TLS certificate health for domain installs: days until the live Let's Encrypt
+# cert expires (OK > warn threshold, WARN down to 7 days, FAIL under 7 or
+# expired) and whether the daily renewal is really scheduled for this checkout.
+# Domainless mode skips. Pure read: never triggers a renewal.
+doctor_check_cert() {
+    local env_file="$SCRIPT_DIR/.env" domain
+    domain=$(get_env_val "DOMAIN" "$env_file" "")
+    if [[ -z "$domain" ]]; then
+        echo -e "    ${YELLOW}○${NC} Domainless mode: no Let's Encrypt certificate to check"
+        return 2
+    fi
+
+    local rc=0 epoch="" days warn_days
+    warn_days=$(cert_renew_warn_days)
+    if epoch=$(cert_expiry_epoch "$domain"); then
+        days=$(cert_days_left "$epoch")
+        if [[ "$days" -lt 0 ]]; then
+            echo -e "    ${RED}✗${NC} Certificate for ${domain} EXPIRED $(( -days )) day(s) ago"
+            echo -e "      ${DIM}Run: moav cert renew   (TLS protocols and the admin panel are down until then)${NC}"
+            rc=1
+        elif [[ "$days" -lt "$CERT_RENEW_CRIT_DAYS" ]]; then
+            echo -e "    ${RED}✗${NC} Certificate for ${domain} expires in ${days} day(s)"
+            echo -e "      ${DIM}Run: moav cert renew, then check: journalctl -u moav-cert-renew${NC}"
+            rc=1
+        elif [[ "$days" -le "$warn_days" ]]; then
+            echo -e "    ${YELLOW}○${NC} Certificate for ${domain} expires in ${days} day(s); renewal is overdue (certbot renews at 30)"
+            echo -e "      ${DIM}Run: moav cert renew, then check: journalctl -u moav-cert-renew${NC}"
+            rc=2
+        else
+            echo -e "    ${GREEN}✓${NC} Certificate for ${domain} valid for ${days} more days"
+        fi
+    else
+        echo -e "    ${RED}✗${NC} Could not read the certificate expiry for ${domain}"
+        echo -e "      ${DIM}Is Docker running and the cert issued? Check: moav logs certbot${NC}"
+        rc=1
+    fi
+
+    if cert_renew_scheduled; then
+        if _has_systemd; then
+            echo -e "    ${GREEN}✓${NC} Daily renewal scheduled (${CERT_RENEW_UNIT}.timer active)"
+        else
+            echo -e "    ${GREEN}✓${NC} Daily renewal scheduled (${CERT_RENEW_CRON_PATH})"
+        fi
+    elif [[ "$(get_env_val "CERT_AUTORENEW" "$env_file" "true")" != "true" ]]; then
+        echo -e "    ${YELLOW}○${NC} Auto-renewal disabled (CERT_AUTORENEW=false); renew before expiry yourself"
+        [[ "$rc" -eq 0 ]] && rc=2
+    else
+        echo -e "    ${RED}✗${NC} Daily renewal is NOT scheduled (timer missing, inactive, or pointing at another install dir)"
+        echo -e "      ${DIM}Run: moav cert install   (moav start also reinstalls it)${NC}"
+        rc=1
+    fi
+    return "$rc"
+}
+
 # Registry of diagnostic checks: "<name>:<description>" -> doctor_check_<name>.
 # Lives with cmd_doctor (it was briefly carried along by the nettune extraction).
 DOCTOR_CHECKS=(
@@ -1134,6 +1188,7 @@ DOCTOR_CHECKS=(
     "ports:Check required ports are available"
     "conflicts:Check for conflicting services (e.g. DNS tunnels on port 53)"
     "reality:Check Reality fallback targets resolve and are reachable"
+    "cert:Check TLS certificate expiry and the daily renewal timer"
     "net:Check BBR/sysctl tuning + packet drops + PMTU + CGNAT + MTU"
     "host:Check CPU load, swap pressure and zombie processes"
     "peers:Check for duplicate WireGuard/AmneziaWG peer addresses (--fix repairs)"
