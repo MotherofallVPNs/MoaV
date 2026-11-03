@@ -103,8 +103,11 @@ cert_metric_write() {
 
 # Create the textfile dir before compose bind-mounts it, so it is owned by the
 # operator rather than created root-owned by Docker (non-root CLI must write it).
+# World-searchable regardless of umask: node-exporter reads it as `nobody`.
 cert_metric_dir_ensure() {
-    mkdir -p "$SCRIPT_DIR/$CERT_METRIC_DIR_REL" 2>/dev/null || true
+    local dir="$SCRIPT_DIR/$CERT_METRIC_DIR_REL"
+    mkdir -p "$dir" 2>/dev/null || true
+    chmod 755 "$dir" 2>/dev/null || true
 }
 
 cert_renew_install() {
