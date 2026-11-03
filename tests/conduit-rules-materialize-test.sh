@@ -89,7 +89,9 @@ grep -qE '^\s*ensure_conduit_lifetime_rules \|\| true' "$ROOT/lib/service.sh" \
     && ok "start path reports a rules failure without aborting the stack" \
     || bad "ensure_clash_api_secret no longer calls ensure_conduit_lifetime_rules || true"
 cert_metric_dir_ensure
-mode=$(stat -f '%Lp' "$WORK/configs/monitoring/textfile" 2>/dev/null || stat -c '%a' "$WORK/configs/monitoring/textfile")
+# GNU stat first: on Linux `stat -f` is filesystem status and would succeed
+# with the wrong output. macOS stat rejects -c, so the BSD form is the fallback.
+mode=$(stat -c '%a' "$WORK/configs/monitoring/textfile" 2>/dev/null || stat -f '%Lp' "$WORK/configs/monitoring/textfile")
 [ "$mode" = "755" ] \
     && ok "cert textfile dir is 755 (readable by node-exporter's nobody)" \
     || bad "cert textfile dir mode is $mode, expected 755"
