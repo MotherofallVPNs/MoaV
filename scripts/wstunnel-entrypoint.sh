@@ -26,6 +26,8 @@ WSTUNNEL_LISTEN="${WSTUNNEL_LISTEN:-0.0.0.0:8080}"
 WSTUNNEL_RESTRICT="${WSTUNNEL_RESTRICT:-moav-wireguard:51820}"
 DOMAIN="${DOMAIN:-}"
 
+# --restrict-to is this hop's egress isolation: the only reachable target is the
+# WireGuard endpoint, whose FORWARD rules then filter the tunneled traffic.
 set -- server --restrict-to "$WSTUNNEL_RESTRICT"
 
 # Path-prefix hardening (shared secret with client bundles)

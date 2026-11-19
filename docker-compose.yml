@@ -81,6 +81,8 @@ services:
       - moav_logs:/var/log/sing-box
     environment:
       - TZ=${TZ:-UTC}
+      # Default on: tunneled traffic may not reach private/infra ranges.
+      - EGRESS_ISOLATION=${EGRESS_ISOLATION:-on}
     cap_drop:
       - ALL
     cap_add:
@@ -173,6 +175,8 @@ services:
       - /lib/modules:/lib/modules:ro
     environment:
       - TZ=${TZ:-UTC}
+      # Default on: tunneled traffic may not reach private/infra ranges.
+      - EGRESS_ISOLATION=${EGRESS_ISOLATION:-on}
     cap_drop:
       - ALL
     cap_add:
@@ -638,6 +642,8 @@ services:
       - /lib/modules:/lib/modules:ro
     environment:
       - TZ=${TZ:-UTC}
+      # Default on: tunneled traffic may not reach private/infra ranges.
+      - EGRESS_ISOLATION=${EGRESS_ISOLATION:-on}
     cap_drop:
       - ALL
     cap_add:
@@ -737,6 +743,8 @@ services:
       - moav_state:/state:ro
     environment:
       - TZ=${TZ:-UTC}
+      # Default on: tunneled traffic may not reach private/infra ranges.
+      - EGRESS_ISOLATION=${EGRESS_ISOLATION:-on}
     healthcheck:
       # `xray run -test` parses config and exits 0; `xray test` does not exist (#117).
       test: ["CMD", "/usr/local/bin/xray", "run", "-test", "-c", "/etc/xray/config.json"]
