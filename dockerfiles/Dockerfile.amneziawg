@@ -44,6 +44,7 @@ COPY --from=builder /usr/bin/awg /usr/bin/awg
 RUN mkdir -p /etc/amneziawg
 
 COPY scripts/amneziawg-entrypoint.sh /entrypoint.sh
+COPY scripts/lib/egress-isolation.sh /egress-isolation.sh
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]

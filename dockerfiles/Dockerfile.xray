@@ -53,7 +53,7 @@ RUN set -eux; \
 # Runtime stage
 FROM alpine:3.24
 
-RUN apk add --no-cache bash ca-certificates tzdata
+RUN apk add --no-cache bash ca-certificates jq tzdata
 
 COPY --from=builder /xray /usr/local/bin/xray
 RUN chmod +x /usr/local/bin/xray
@@ -71,7 +71,10 @@ RUN mkdir -p /etc/xray /state /var/lib/moav-metrics \
     && chown -R moav:moav /etc/xray /state /var/lib/moav-metrics
 
 COPY scripts/xray-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY scripts/lib/egress-isolation.sh /egress-isolation.sh
+# Explicit modes: xray runs as `moav`, which must be able to read both files
+# whatever umask the checkout was made under.
+RUN chmod 755 /entrypoint.sh && chmod 644 /egress-isolation.sh
 
 EXPOSE 2096/tcp 5355/udp
 

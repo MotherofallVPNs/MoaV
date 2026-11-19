@@ -466,16 +466,20 @@ check_source_rebuilds() {
             scripts/conduit-entrypoint.sh)  svc="psiphon-conduit" ;;   # name mismatch
             dockerfiles/Dockerfile.psiphon) svc="psiphon-conduit" ;;   # name mismatch
             scripts/client-*.sh)            svc="client" ;;
+            # COPY'd into every image that enforces egress isolation.
+            scripts/lib/egress-isolation.sh) svc="sing-box xray wireguard amneziawg" ;;
             scripts/*-entrypoint.sh)        svc="${f#scripts/}"; svc="${svc%-entrypoint.sh}" ;;
             dockerfiles/Dockerfile.*)       svc="${f#dockerfiles/Dockerfile.}" ;;
         esac
-        [[ -z "$svc" ]] && continue
-        # Drop anything not in the allowlist: bind-mounted entrypoints (grafana),
-        # infra images, unknown name mappings.
-        [[ "$valid" == *" $svc "* ]] || continue
-        # Drop services no longer in compose: a deleted one still shows in the diff.
-        grep -qE "^  ${svc}:" "$SCRIPT_DIR/docker-compose.yml" 2>/dev/null || continue
-        [[ " $queued " == *" $svc "* ]] || queued="${queued:+$queued }$svc"
+        # One file can feed several images, so svc may be a list.
+        for svc in $svc; do
+            # Drop anything not in the allowlist: bind-mounted entrypoints (grafana),
+            # infra images, unknown name mappings.
+            [[ "$valid" == *" $svc "* ]] || continue
+            # Drop services no longer in compose: a deleted one still shows in the diff.
+            grep -qE "^  ${svc}:" "$SCRIPT_DIR/docker-compose.yml" 2>/dev/null || continue
+            [[ " $queued " == *" $svc "* ]] || queued="${queued:+$queued }$svc"
+        done
     done <<< "$changed"
 
     # Setup-profile one-shots never run on upgrade, so a new volume stays empty.
