@@ -12,6 +12,16 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
     exit 1
 fi
 
+# Egress isolation is applied to a runtime copy: /etc/xray is read-only, and
+# this way the toggle takes effect on restart without a re-bootstrap.
+RUNTIME_CONFIG="/tmp/xray-config.json"
+. /egress-isolation.sh
+# umask in a subshell: the copy holds the Reality key; the logs below stay 644.
+if ! ( umask 077; egress_xray "$CONFIG_FILE" "$RUNTIME_CONFIG" ); then
+    echo "[Xray] ERROR: could not apply egress isolation (EGRESS_ISOLATION=off bypasses)"
+    exit 1
+fi
+
 echo "[Xray] Configuration:"
 echo "  - Config: $CONFIG_FILE"
 # `|| true`: `xray version | head -1` raises SIGPIPE (141) once head closes the
@@ -81,4 +91,4 @@ else
 fi
 
 # Start Xray
-exec xray run -c "$CONFIG_FILE"
+exec xray run -c "$RUNTIME_CONFIG"

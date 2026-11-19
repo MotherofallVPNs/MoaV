@@ -81,6 +81,8 @@ services:
       - moav_logs:/var/log/sing-box
     environment:
       - TZ=${TZ:-UTC}
+      # Default on: tunneled traffic may not reach private/infra ranges.
+      - EGRESS_ISOLATION=${EGRESS_ISOLATION:-on}
     cap_drop:
       - ALL
     cap_add:
@@ -173,6 +175,8 @@ services:
       - /lib/modules:/lib/modules:ro
     environment:
       - TZ=${TZ:-UTC}
+      # Default on: tunneled traffic may not reach private/infra ranges.
+      - EGRESS_ISOLATION=${EGRESS_ISOLATION:-on}
     cap_drop:
       - ALL
     cap_add:
@@ -645,6 +649,8 @@ services:
     environment:
       - TZ=${TZ:-UTC}
       - GODEBUG=multipathtcp=0
+      # Default on: tunneled traffic may not reach private/infra ranges.
+      - EGRESS_ISOLATION=${EGRESS_ISOLATION:-on}
     cap_drop:
       - ALL
     cap_add:
@@ -747,6 +753,8 @@ services:
       # Go >= 1.24 listens with MPTCP by default; keep it off on every Go
       # service in this file (CVE-2026-98432 exploit path).
       - GODEBUG=multipathtcp=0
+      # Default on: tunneled traffic may not reach private/infra ranges.
+      - EGRESS_ISOLATION=${EGRESS_ISOLATION:-on}
     healthcheck:
       # `xray run -test` parses config and exits 0; `xray test` does not exist (#117).
       test: ["CMD", "/usr/local/bin/xray", "run", "-test", "-c", "/etc/xray/config.json"]
