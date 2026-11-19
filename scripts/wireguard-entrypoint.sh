@@ -114,6 +114,11 @@ if [ -n "$PEER_PUBKEY" ] && [ -n "$PEER_ALLOWED" ]; then
     wg set "$INTERFACE" peer "$PEER_PUBKEY" allowed-ips "$PEER_ALLOWED"
 fi
 
+# Egress isolation goes in while the interface is still down, ahead of the
+# ACCEPT below. A failure is fatal: an exit must not come up unfiltered.
+. /egress-isolation.sh
+egress_firewall "$INTERFACE" || { echo "[wireguard] ERROR: egress isolation rules failed (EGRESS_ISOLATION=off bypasses)"; exit 1; }
+
 # Set interface address and bring up
 echo "[wireguard] Setting address $ADDRESS..."
 ip addr add "$ADDRESS" dev "$INTERFACE"
@@ -139,6 +144,7 @@ cleanup() {
     iptables -D FORWARD -i "$INTERFACE" -j ACCEPT 2>/dev/null || true
     iptables -D FORWARD -o "$INTERFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
     iptables -t nat -D POSTROUTING -o eth+ -j MASQUERADE 2>/dev/null || true
+    egress_firewall_clear "$INTERFACE"
     ip link del "$INTERFACE" 2>/dev/null || true
     exit 0
 }

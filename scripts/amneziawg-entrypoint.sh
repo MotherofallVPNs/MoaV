@@ -97,6 +97,11 @@ rm -f "$STRIPPED"
 
 # Peers were loaded by `awg setconf` above (it reads every [Peer] block).
 
+# Egress isolation goes in while the interface is still down, ahead of the
+# ACCEPT below. A failure is fatal: an exit must not come up unfiltered.
+. /egress-isolation.sh
+egress_firewall "$INTERFACE" || { echo "[amneziawg] ERROR: egress isolation rules failed (EGRESS_ISOLATION=off bypasses)"; exit 1; }
+
 # Set interface address and MTU, then bring up
 echo "[amneziawg] Setting address $ADDRESS..."
 ip addr add "$ADDRESS" dev "$INTERFACE"
@@ -123,6 +128,7 @@ cleanup() {
     iptables -D FORWARD -i "$INTERFACE" -j ACCEPT 2>/dev/null || true
     iptables -D FORWARD -o "$INTERFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
     iptables -t nat -D POSTROUTING -o eth+ -j MASQUERADE 2>/dev/null || true
+    egress_firewall_clear "$INTERFACE"
     ip link del "$INTERFACE" 2>/dev/null || true
     kill $AWG_PID 2>/dev/null || true
     exit 0

@@ -11,6 +11,7 @@ RUN apk add --no-cache \
 RUN mkdir -p /etc/wireguard
 
 COPY scripts/wireguard-entrypoint.sh /entrypoint.sh
+COPY scripts/lib/egress-isolation.sh /egress-isolation.sh
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
