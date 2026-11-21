@@ -23,7 +23,7 @@ show_versions() {
     conduit_ver=$(get_component_version "CONDUIT_VERSION" "2.1.0")
     snowflake_ver=$(get_component_version "SNOWFLAKE_VERSION" "latest")
     slipstream_ver=$(get_component_version "SLIPSTREAM_VERSION" "2026.04.22.1")
-    telemt_ver=$(get_component_version "TELEMT_VERSION" "3.5.14")
+    telemt_ver=$(get_component_version "TELEMT_VERSION" "3.5.17")
     trusttunnel_ver=$(get_component_version "TRUSTTUNNEL_VERSION" "")
     trusttunnel_client_ver=$(get_component_version "TRUSTTUNNEL_CLIENT_VERSION" "")
     awgtools_ver=$(get_component_version "AWGTOOLS_VERSION" "")
