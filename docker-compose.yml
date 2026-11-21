@@ -316,7 +316,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.masterdns
       args:
-        MASTERDNS_VERSION: ${MASTERDNS_VERSION:-v2026.06.13.234407-7de2476}
+        MASTERDNS_VERSION: ${MASTERDNS_VERSION:-v2026.11.18.210322-7198b45}
     container_name: moav-masterdns
     restart: unless-stopped
     logging: *default-logging
@@ -621,7 +621,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.amneziawg
       args:
-        AMNEZIAWG_GO_VERSION: ${AMNEZIAWG_GO_VERSION:-v3.1.20260828}
+        AMNEZIAWG_GO_VERSION: ${AMNEZIAWG_GO_VERSION:-v3.1.20261116}
         AWGTOOLS_VERSION: ${AWGTOOLS_VERSION:-3.1.20260812}
         GOPROXY: "${GOPROXY:-https://proxy.golang.org|https://goproxy.cn|direct}"
         GOSUMDB: "${GOSUMDB:-off}"
