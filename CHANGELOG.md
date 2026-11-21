@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **Admin dashboard Python dependencies refreshed.** `admin/requirements.txt`
+  still carried the January 2024 pins, which collect about 20 known advisories
+  (none reachable through the routes the dashboard ships, but several were
+  high severity). fastapi 0.109.0 -> 0.165.0 (Starlette 0.35.1 -> 1.10.0),
+  uvicorn 0.27.0 -> 0.54.0, httpx 0.26.0 -> 0.28.1, jinja2 3.1.3 -> 3.1.6, and
+  `python-multipart` is dropped because nothing imports it. Rebuild the admin
+  image to pick it up: `moav build admin && moav start admin`.
+
+### Fixed
+- **Dashboard page on Starlette 1.x.** The refresh crosses the Starlette 1.0
+  line, which removed the legacy `TemplateResponse(name, context)` signature;
+  `GET /` would have answered 500 while `/api/health` stayed green. The call
+  now passes the request first, and `tests/admin-dashboard-render-test.py`
+  renders the dashboard against the pinned dependencies in CI.
+
 ## [2.4.0] - 2026-10-29
 
 Minor release: `moav update` can now run unattended (`--yes` / `MOAV_NONINTERACTIVE=1`), which is what the MoaV Deploy mobile app needs to update a server over SSH. No breaking changes; keys, users, and certificates are untouched.
