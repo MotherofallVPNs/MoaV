@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **MPTCP listener hardening (CVE-2026-98432, CVSS 9.8).** Go 1.24+ enables
+  MPTCP on TCP listeners by default, and the public exploit for this Linux
+  kernel bug needs an MPTCP listener to reach remote root.
+  - **Xray-core v26.10.21 -> [v26.11.9](https://github.com/XTLS/Xray-core/releases/tag/v26.11.9)**
+    on the server image and the `moav test` client image. v26.10.31 is the
+    upstream emergency release that turns MPTCP off in Xray's listener; the
+    XHTTP inbound (`PORT_XHTTP`) was an MPTCP listener before it. Also brings
+    the Chrome 155 uTLS fingerprint as the default `chrome` fingerprint.
+  - **`GODEBUG=multipathtcp=0` on every Go service** in `docker-compose.yml`
+    (xray, grafana, gooserelay, prometheus, node-exporter, cadvisor,
+    psiphon-conduit, snowflake, dns-router, dnstt, masterdns, amneziawg).
+    sing-box needs no change: its official builds already link with
+    `multipathtcp=0`. Takes effect when the containers are recreated.
+  - This removes the known exploit path only. **Update the host kernel** for
+    the root fix.
+- **Grafana 13.3.0 -> [13.3.1](https://github.com/grafana/grafana/releases/tag/v13.3.1)**
+  (`moav build --local` pin): six CVEs, including CVE-2026-102589 and
+  CVE-2026-111024 (both high).
+- **Snowflake proxy 2.15.2 -> [2.15.4](https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/snowflake/-/releases/v2.15.4)**:
+  dependency updates with security fixes, plus the 2.15.3 fix for a deadlock
+  in fixed-capacity proxies (MoaV always passes `-capacity`).
+
 ## [2.4.0] - 2026-10-29
 
 Minor release: `moav update` can now run unattended (`--yes` / `MOAV_NONINTERACTIVE=1`), which is what the MoaV Deploy mobile app needs to update a server over SSH. No breaking changes; keys, users, and certificates are untouched.

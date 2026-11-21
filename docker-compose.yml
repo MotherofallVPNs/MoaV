@@ -225,6 +225,7 @@ services:
       - ENABLE_XDNS=${ENABLE_XDNS:-true}
       - XDNS_BACKEND=xray:5355
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     cap_drop:
       - ALL
     security_opt:
@@ -262,6 +263,7 @@ services:
       - DNSTT_DOMAIN=${DNSTT_SUBDOMAIN:-t}.${DOMAIN}
       - DNSTT_UPSTREAM=sing-box:1080
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     cap_drop:
       - ALL
     security_opt:
@@ -333,6 +335,7 @@ services:
       - MASTERDNS_SUBDOMAIN=${MASTERDNS_SUBDOMAIN:-m}
       - MASTERDNS_PUBLIC_SUBDOMAIN=${MASTERDNS_PUBLIC_SUBDOMAIN:-}
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     cap_drop:
       - ALL
     security_opt:
@@ -504,6 +507,7 @@ services:
       - moav_conduit:/data
     environment:
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
       - CONDUIT_BANDWIDTH=${CONDUIT_BANDWIDTH:-200}
       - CONDUIT_MAX_COMMON_CLIENTS=${CONDUIT_MAX_COMMON_CLIENTS:-100}
     expose:
@@ -534,7 +538,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.snowflake
       args:
-        SNOWFLAKE_VERSION: ${SNOWFLAKE_VERSION:-2.15.2}
+        SNOWFLAKE_VERSION: ${SNOWFLAKE_VERSION:-2.15.4}
         # prebuilt (default) = pull the official thetorproject/snowflake-proxy
         # binary; source = compile from source (set SNOWFLAKE_BINARY=source if
         # Docker Hub is unreachable for the prebuilt image).
@@ -554,6 +558,7 @@ services:
       - moav_tor_geoip:/usr/share/tor:ro
     environment:
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
       - SNOWFLAKE_BANDWIDTH=${SNOWFLAKE_BANDWIDTH:-50}
       - SNOWFLAKE_CAPACITY=${SNOWFLAKE_CAPACITY:-20}
     cap_drop:
@@ -600,6 +605,7 @@ services:
     environment:
       - ENABLE_GOOSERELAY=${ENABLE_GOOSERELAY:-false}
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     cap_drop:
       - ALL
     security_opt:
@@ -638,6 +644,7 @@ services:
       - /lib/modules:/lib/modules:ro
     environment:
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     cap_drop:
       - ALL
     cap_add:
@@ -720,7 +727,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.xray
       args:
-        XRAY_VERSION: ${XRAY_VERSION:-v26.10.21}
+        XRAY_VERSION: ${XRAY_VERSION:-v26.11.9}
         GOPROXY: "${GOPROXY:-https://proxy.golang.org|https://goproxy.cn|direct}"
         GOSUMDB: "${GOSUMDB:-off}"
     container_name: moav-xray
@@ -737,6 +744,9 @@ services:
       - moav_state:/state:ro
     environment:
       - TZ=${TZ:-UTC}
+      # Go >= 1.24 listens with MPTCP by default; keep it off on every Go
+      # service in this file (CVE-2026-98432 exploit path).
+      - GODEBUG=multipathtcp=0
     healthcheck:
       # `xray run -test` parses config and exits 0; `xray test` does not exist (#117).
       test: ["CMD", "/usr/local/bin/xray", "run", "-test", "-c", "/etc/xray/config.json"]
@@ -882,6 +892,7 @@ services:
       - '--web.enable-lifecycle'
     environment:
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     cap_drop:
       - ALL
     security_opt:
@@ -943,6 +954,7 @@ services:
       - GRAFANA_SUBDOMAIN=${GRAFANA_SUBDOMAIN:-}
       - GRAFANA_APP_TITLE=${GRAFANA_APP_TITLE:-}
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     # Note: read_only not set - grafana entrypoint writes branding files to container filesystem
     # user:"0" and the writable FS above are load-bearing (the entrypoint
     # patches branding into /usr/share/grafana/public, which uid 472 cannot
@@ -1024,6 +1036,7 @@ services:
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
     environment:
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     cap_drop:
       - ALL
     security_opt:
@@ -1077,6 +1090,7 @@ services:
       - '-v=0'
     environment:
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     mem_limit: 256m
     cpus: 0.5
     profiles:
