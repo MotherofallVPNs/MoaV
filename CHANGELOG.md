@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+- **Security policy** ([SECURITY.md](SECURITY.md)): supported versions, private
+  reporting through GitHub Private Vulnerability Reporting with an email
+  fallback, response targets, scope, safe harbor and reporter credit. Linked
+  from the README and the issue chooser.
+
 ## [2.4.0] - 2026-10-29
 
 Minor release: `moav update` can now run unattended (`--yes` / `MOAV_NONINTERACTIVE=1`), which is what the MoaV Deploy mobile app needs to update a server over SSH. No breaking changes; keys, users, and certificates are untouched.

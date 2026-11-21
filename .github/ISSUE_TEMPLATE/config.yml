@@ -1,5 +1,8 @@
 blank_issues_enabled: true
 contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/MotherofallVPNs/MoaV/security/policy
+    about: Do not open a public issue for security bugs. Report privately, see the security policy
   - name: Documentation
     url: https://github.com/MotherofallVPNs/moav/tree/main/docs
     about: Check the docs before opening an issue

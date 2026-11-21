@@ -359,6 +359,8 @@ mode. If that trade-off is not acceptable, run without the monitoring profile.
 
 See the [OPSEC guide](https://moav.sh/docs/OPSEC) for security guidelines.
 
+**Found a vulnerability?** Report it privately, not in a public issue. See [SECURITY.md](SECURITY.md).
+
 ## Support the project
 
 **Run a server.** The highest-leverage thing you can do. Every MoaV server is capacity
