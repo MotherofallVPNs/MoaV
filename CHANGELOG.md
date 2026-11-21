@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+- **Dependency audit 2026-11** (`docs/maintenance/dependency-audit-2026-11.md`):
+  inventory of every pinned component against upstream, with a prioritized
+  update plan. Planning only; no version is changed.
+
 ## [2.4.0] - 2026-10-29
 
 Minor release: `moav update` can now run unattended (`--yes` / `MOAV_NONINTERACTIVE=1`), which is what the MoaV Deploy mobile app needs to update a server over SSH. No breaking changes; keys, users, and certificates are untouched.
