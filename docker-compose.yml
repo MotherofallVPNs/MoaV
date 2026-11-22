@@ -762,7 +762,9 @@ services:
   # ADMIN: Stats dashboard + User management API
   # ===========================================================================
   docker-proxy:
-    image: tecnativa/docker-socket-proxy:v0.5.0
+    # Upstream retired :vX.Y.Z tags; 3.4 is rebuilt weekly, so pin the digest
+    # (multi-arch index) and refresh it on each dependency audit.
+    image: tecnativa/docker-socket-proxy:3.4@sha256:027f9fa5ee70be5836eeaa10ce889d7a83f34a8db16a7f412818b92997e0beab
     container_name: moav-docker-proxy
     restart: unless-stopped
     logging: *default-logging
