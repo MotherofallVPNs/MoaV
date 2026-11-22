@@ -51,7 +51,7 @@ RUN set -eux; \
     /xray version
 
 # Runtime stage
-FROM alpine:3.21
+FROM alpine:3.24
 
 RUN apk add --no-cache bash ca-certificates tzdata
 

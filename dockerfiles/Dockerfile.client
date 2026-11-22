@@ -10,7 +10,7 @@
 # =============================================================================
 # Builder stage - compile dnstt
 # =============================================================================
-FROM --platform=$BUILDPLATFORM golang:1.22-alpine AS dnstt-builder
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS dnstt-builder
 
 # For cross-compilation
 ARG TARGETARCH

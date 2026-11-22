@@ -28,9 +28,9 @@
 
 - [ ] Create multi-stage build if compiling from source:
   ```
-  FROM golang:1.23-alpine AS builder
+  FROM golang:1.27-alpine AS builder
   ...
-  FROM alpine:3.20
+  FROM alpine:3.24
   ```
 - [ ] Or single-stage with pre-built binary download
 - [ ] Add runtime dependencies (bash, curl, jq at minimum)
@@ -277,7 +277,7 @@
 
 - [ ] If building from source: add builder stage
   ```dockerfile
-  FROM golang:1.23-alpine AS newproto-builder
+  FROM golang:1.27-alpine AS newproto-builder
   RUN go install github.com/org/newproto@latest
   ```
 - [ ] If downloading pre-built binary: add ARG + RUN download block (~line 108):

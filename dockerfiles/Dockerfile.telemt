@@ -6,7 +6,7 @@
 # Uses pre-built musl static binaries (no glibc needed).
 # =============================================================================
 
-FROM alpine:3.21
+FROM alpine:3.24
 
 ARG TARGETARCH
 
