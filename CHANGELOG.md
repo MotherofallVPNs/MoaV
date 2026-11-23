@@ -98,6 +98,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `actions/checkout` v4 -> v7.0.1, `actions/setup-go` v5 -> v7.1.0,
   `actions/upload-artifact` v4 -> v7.0.2. These run on Node 24, so a
   self-hosted e2e runner must be at Actions Runner 2.327.1 or newer.
+- **TrustTunnel endpoint 1.1.0 -> [1.3.1](https://github.com/TrustTunnel/TrustTunnel/releases/tag/v1.3.1)**:
+  `Content-Length: 0` on HTTP/1.1, HTTP/2 and HTTP/3 error responses, plus the
+  optional subscription URL and key-derived `client_random` auth (neither is
+  enabled by MoaV). Same wire protocol: the pinned test client (1.0.49) and
+  upstream's matching client 1.3.0 both connect over HTTP/2 and HTTP/3. The
+  release tarball no longer ships a separate `setup_wizard` binary, which the
+  image build expected, so `Dockerfile.trusttunnel` stops naming it. No config
+  changes; rebuild to pick it up (`moav build && moav start`).
+- **`moav test` checks TrustTunnel over HTTP/2 and HTTP/3 separately.** Each
+  transport gets its own pass with the other one firewalled off, because the
+  client quietly switches transport when its preferred one is down. A single
+  run used to prove only whichever came up first.
 
 ### Deprecated
 - **Slipstream (phase 1 of removal).** Upstream slipstream-rust is archived
@@ -188,6 +200,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flags `dns-router` routes. Slipstream no longer counts: a Slipstream-only
   `.env` skips the profile instead of starting a router with no routes, which
   exited and restart-looped. Covered by `tests/dns-tunnel-startup-test.sh`.
+- **`moav test` no longer passes TrustTunnel when the client was refused.** Any
+  early client exit (a rejected login, an unreachable endpoint) was read as
+  "no TUN device here" and reported as a pass on plain port reachability. The
+  check matched the word `tun`, which is in the client's name on every log
+  line. It now matches the client's actual TUN error.
 
 ### Security
 - **Admin dashboard Python dependencies refreshed.** `admin/requirements.txt`
