@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-11-23
+
+Security and stability release. Tunneled client traffic is now kept away from private and infrastructure networks by default (egress isolation), every Go service is closed off from the MPTCP remote-root exploit for CVE-2026-98432, TrustTunnel moves to 1.3.1 with HTTP/2 and HTTP/3 tested separately, Slipstream starts its removal in favour of MasterDNS and dnstt, and `moav regenerate-users` no longer rotates the AmneziaWG server key. Base images move off end-of-life Alpine and Go releases, every runtime image is pinned by digest, and Renovate now tracks dependencies. Keys, users and certificates are untouched, but some operators have to act: read the section below before updating.
+
+### Breaking / action required for operators
+- **Slipstream clients stop connecting after this update.** `dns-router` no longer routes the Slipstream subdomain, `ENABLE_SLIPSTREAM` defaults to `false`, and a leftover `ENABLE_SLIPSTREAM=true` is ignored with a warning. Move those users to MasterDNS and/or dnstt: keep `ENABLE_MASTERDNS=true` / `ENABLE_DNSTT=true` with their NS records (`moav doctor dns`), run `moav switch-dns dnstt+masterdns+xdns`, then `moav regenerate-users` and hand out the new bundles. Details under Deprecated.
+- **TrustTunnel: rebuild its image.** The endpoint moves to 1.3.1, and its egress filter now follows `EGRESS_ISOLATION` and blocks DappNode's `172.33.0.0/16` and `10.20.0.0/24` too. The filter needs `iptables`, which only the new image has; with isolation on, the container refuses to start if it cannot install the filter. Run `moav build && moav start` (at least `moav build trusttunnel`). Note that `172.33.0.0/16` is public address space outside DappNode and is now unreachable through TrustTunnel on every server.
+- **cAdvisor moved registries** (monitoring profile). The default image is now `ghcr.io/google/cadvisor:v0.61.1`, pinned by digest; `gcr.io/cadvisor/cadvisor` stopped publishing at v0.55.1. If `.env` sets `IMAGE_CADVISOR` to the old `gcr.io` path, update or remove it, and allow `ghcr.io` if your host pulls through a registry allowlist or mirror.
+- **CVE-2026-98432 (Linux MPTCP, CVSS 9.8): recreate the containers and patch the kernel.** Xray v26.11.9 no longer opens an MPTCP listener on the XHTTP inbound, and every Go service now runs with `GODEBUG=multipathtcp=0`. Both only take effect once the containers are rebuilt and recreated (`moav update && moav build && moav start`). This removes the known exploit path; the root fix is a patched host kernel.
+- **Egress isolation is on by default.** Client traffic can no longer reach RFC1918, CGNAT, link-local, loopback, IPv6 ULA/link-local or DappNode ranges through any protocol, and WireGuard/AmneziaWG peers can no longer reach each other through the tunnel. For a trusted LAN relay that needs the old behaviour, set `EGRESS_ISOLATION=off` in `.env` and run `moav restart`; `moav restart` now applies `.env` changes, in either direction.
+- Also: rebuild the admin dashboard for its dependency refresh (`moav build admin && moav start admin`). Self-hosted Actions runners used for the e2e workflow need v2.327.1 or newer (the pinned actions run on Node 24).
+
+**Upgrade:** `moav update && moav build && moav start`. No re-bootstrap is needed.
+
+### Security
+- **Admin dashboard Python dependencies refreshed.** `admin/requirements.txt`
+  still carried the January 2024 pins, which collect about 20 known advisories
+  (none reachable through the routes the dashboard ships, but several were
+  high severity). fastapi 0.109.0 -> 0.165.0 (Starlette 0.35.1 -> 1.10.0),
+  uvicorn 0.27.0 -> 0.54.0, httpx 0.26.0 -> 0.28.1, jinja2 3.1.3 -> 3.1.6, and
+  `python-multipart` is dropped because nothing imports it. Rebuild the admin
+  image to pick it up: `moav build admin && moav start admin`.
+- **MPTCP listener hardening (CVE-2026-98432, CVSS 9.8).** Go 1.24+ enables
+  MPTCP on TCP listeners by default, and the public exploit for this Linux
+  kernel bug needs an MPTCP listener to reach remote root.
+  - **Xray-core v26.10.21 -> [v26.11.9](https://github.com/XTLS/Xray-core/releases/tag/v26.11.9)**
+    on the server image and the `moav test` client image. v26.10.31 is the
+    upstream emergency release that turns MPTCP off in Xray's listener; the
+    XHTTP inbound (`PORT_XHTTP`) was an MPTCP listener before it. Also brings
+    the Chrome 155 uTLS fingerprint as the default `chrome` fingerprint.
+  - **`GODEBUG=multipathtcp=0` on every Go service** in `docker-compose.yml`
+    (xray, grafana, gooserelay, prometheus, node-exporter, cadvisor,
+    psiphon-conduit, snowflake, dns-router, dnstt, masterdns, amneziawg).
+    sing-box needs no change: its official builds already link with
+    `multipathtcp=0`. Takes effect when the containers are recreated.
+  - This removes the known exploit path only. **Update the host kernel** for
+    the root fix.
+- **Grafana 13.3.0 -> [13.3.1](https://github.com/grafana/grafana/releases/tag/v13.3.1)**
+  (`moav build --local` pin): six CVEs, including CVE-2026-102589 and
+  CVE-2026-111024 (both high).
+- **Snowflake proxy 2.15.2 -> [2.15.4](https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/snowflake/-/releases/v2.15.4)**:
+  dependency updates with security fixes, plus the 2.15.3 fix for a deadlock
+  in fixed-capacity proxies (MoaV always passes `-capacity`).
+- **Default-on egress isolation: tunneled client traffic can no longer reach private or infrastructure networks.** A MoaV exit forwarded whatever destination a client asked for, so any user could reach other containers on the Docker network (the sing-box Clash API, Prometheus, Grafana), services on the host and its LAN, and the cloud metadata endpoint. Blocked destinations: RFC1918 (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), CGNAT (`100.64.0.0/10`), link-local (`169.254.0.0/16`), loopback (`127.0.0.0/8`, plus its `0.0.0.0/8` alias), IPv6 ULA/link-local/loopback (`fc00::/7`, `fe80::/10`, `::1`, `::`), and DappNode's core networks (`172.33.0.0/16`, `10.20.0.0/24`). Enforced in every layer that can originate client traffic: **sing-box** (a `reject` route rule after a `resolve`, so a name that points at a private IP is caught too, plus a UDP-only `OUTPUT` filter in the container, because sing-box routes a UDP session once and later packets may name any destination), **Xray** (a routing rule to a blackhole outbound, plus freedom `finalRules`, which check the address actually dialed and every UDP packet), and **WireGuard / AmneziaWG** (a `MOAV-EGRESS` chain hooked at the top of `FORWARD`, IPv4 and IPv6, installed before the interface comes up). dnstt, Slipstream, MasterDNS and GooseRelay egress through sing-box and are covered by it; wstunnel can only reach the WireGuard endpoint. The rules are applied at container start from one list (`scripts/lib/egress-isolation.sh`), so existing installs get them from `moav update && moav build && moav start` with no re-bootstrap. New `.env` toggle `EGRESS_ISOLATION` (default `on`); set it to `off` only for a trusted LAN relay, then `moav restart` to apply it (either direction). **Behavior changes:** WireGuard/AmneziaWG peers can no longer reach each other through the tunnel (their addresses are RFC1918), and on dual-stack servers sing-box now resolves client-requested names with its public resolvers instead of Docker's DNS, as IPv4-only servers already did. Trojan's fallback to the decoy keeps working, and works again on IPv4-only servers, where the `prefer_ipv4` resolve rule had been sending the name `decoy` to public DNS.
+- **Slipstream binaries are SHA256-verified at build.** `Dockerfile.slipstream`
+  (server) and `Dockerfile.client` (`moav test` client) downloaded the
+  net2share/slipstream-rust-build assets unchecked. The default version's
+  digests are now pinned in-tree, and any other `SLIPSTREAM_VERSION` is checked
+  against that release's `SHA256SUMS`; a mismatch fails the build.
+- **TrustTunnel egress filtering follows `EGRESS_ISOLATION` and covers
+  DappNode's networks.** TrustTunnel relied only on its own
+  `allow_private_network_connections = false` check. That check ignored the
+  `EGRESS_ISOLATION` toggle, and it treats `172.33.0.0/16` (DappNode's dncore
+  network) as public, so a client could reach it over HTTP/2 and HTTP/3. The
+  entrypoint now applies the toggle to the runtime `vpn.toml` (no
+  re-bootstrap). With isolation on, the default, the endpoint's own check stays
+  on and a `MOAV-EGRESS-OUT` filter on the container's `OUTPUT` drops the shared
+  block list: RFC1918, CGNAT, link-local, loopback, IPv6 ULA/link-local, plus
+  `172.33.0.0/16` and `10.20.0.0/24`. Replies to clients and the container's DNS
+  still pass. With isolation off, both are lifted, as in the other layers. If
+  the filter cannot be installed while isolation is on, the container refuses
+  to start. On a normal VPS the toggle-on behavior is unchanged, except that
+  `172.33.0.0/16` (public space outside DappNode) is now unreachable through
+  TrustTunnel, per the shared block list. The image gains `iptables`, so
+  rebuild to pick it up (`moav build && moav start`).
+
 ### Added
 - **Cert-expiry monitoring** (monitoring profile only): `moav_cert_expiry_seconds`,
   `moav_cert_expiry_days`, `moav_cert_check_timestamp_seconds`,
@@ -126,26 +192,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that predate the gate), on a pinned shellcheck 0.11.0. The parse check also
   covers the `#!/bin/sh` entrypoints it used to skip.
 
-### Deprecated
-- **Slipstream (phase 1 of removal).** Upstream slipstream-rust is archived
-  and points users to MasterDNS; MasterDNS and dnstt already cover the
-  DNS-tunnel use case.
-  - `ENABLE_SLIPSTREAM` now defaults to `false` (`.env.example`, compose and
-    script fallbacks). An explicit value already in your `.env` is left alone,
-    and `moav update` still pins the running state for sparse `.env` files.
-  - `dns-router` no longer routes the Slipstream subdomain (`s.`). A leftover
-    `ENABLE_SLIPSTREAM=true` is ignored with a warning (router, `moav doctor`,
-    `moav switch-dns`), so **existing Slipstream clients stop connecting after
-    this update**. A commented placeholder in `buildRoutes()` marks where a
-    future DNS-tunnel backend can plug in.
-  - `data/protocols.json` keeps the entry as a tombstone (`status: "removed"`,
-    `removed_on: "2026-11-23"`, migration note). The service, image and code
-    are removed in a later release.
-  - **Migrate:** keep `ENABLE_MASTERDNS=true` and/or `ENABLE_DNSTT=true` with
-    their NS records (`moav doctor dns`), run
-    `moav switch-dns dnstt+masterdns+xdns` (or set `ENABLE_SLIPSTREAM=false`),
-    then `moav regenerate-users` and hand out the new bundles.
-
 ### Fixed
 - **WireGuard/AmneziaWG now say "permission denied" when they cannot read their
   config**, instead of "Config file not found ... run bootstrap first". These
@@ -247,63 +293,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   check matched the word `tun`, which is in the client's name on every log
   line. It now matches the client's actual TUN error.
 
-### Security
-- **Admin dashboard Python dependencies refreshed.** `admin/requirements.txt`
-  still carried the January 2024 pins, which collect about 20 known advisories
-  (none reachable through the routes the dashboard ships, but several were
-  high severity). fastapi 0.109.0 -> 0.165.0 (Starlette 0.35.1 -> 1.10.0),
-  uvicorn 0.27.0 -> 0.54.0, httpx 0.26.0 -> 0.28.1, jinja2 3.1.3 -> 3.1.6, and
-  `python-multipart` is dropped because nothing imports it. Rebuild the admin
-  image to pick it up: `moav build admin && moav start admin`.
-- **MPTCP listener hardening (CVE-2026-98432, CVSS 9.8).** Go 1.24+ enables
-  MPTCP on TCP listeners by default, and the public exploit for this Linux
-  kernel bug needs an MPTCP listener to reach remote root.
-  - **Xray-core v26.10.21 -> [v26.11.9](https://github.com/XTLS/Xray-core/releases/tag/v26.11.9)**
-    on the server image and the `moav test` client image. v26.10.31 is the
-    upstream emergency release that turns MPTCP off in Xray's listener; the
-    XHTTP inbound (`PORT_XHTTP`) was an MPTCP listener before it. Also brings
-    the Chrome 155 uTLS fingerprint as the default `chrome` fingerprint.
-  - **`GODEBUG=multipathtcp=0` on every Go service** in `docker-compose.yml`
-    (xray, grafana, gooserelay, prometheus, node-exporter, cadvisor,
-    psiphon-conduit, snowflake, dns-router, dnstt, masterdns, amneziawg).
-    sing-box needs no change: its official builds already link with
-    `multipathtcp=0`. Takes effect when the containers are recreated.
-  - This removes the known exploit path only. **Update the host kernel** for
-    the root fix.
-- **Grafana 13.3.0 -> [13.3.1](https://github.com/grafana/grafana/releases/tag/v13.3.1)**
-  (`moav build --local` pin): six CVEs, including CVE-2026-102589 and
-  CVE-2026-111024 (both high).
-- **Snowflake proxy 2.15.2 -> [2.15.4](https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/snowflake/-/releases/v2.15.4)**:
-  dependency updates with security fixes, plus the 2.15.3 fix for a deadlock
-  in fixed-capacity proxies (MoaV always passes `-capacity`).
-- **Default-on egress isolation: tunneled client traffic can no longer reach private or infrastructure networks.** A MoaV exit forwarded whatever destination a client asked for, so any user could reach other containers on the Docker network (the sing-box Clash API, Prometheus, Grafana), services on the host and its LAN, and the cloud metadata endpoint. Blocked destinations: RFC1918 (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), CGNAT (`100.64.0.0/10`), link-local (`169.254.0.0/16`), loopback (`127.0.0.0/8`, plus its `0.0.0.0/8` alias), IPv6 ULA/link-local/loopback (`fc00::/7`, `fe80::/10`, `::1`, `::`), and DappNode's core networks (`172.33.0.0/16`, `10.20.0.0/24`). Enforced in every layer that can originate client traffic: **sing-box** (a `reject` route rule after a `resolve`, so a name that points at a private IP is caught too, plus a UDP-only `OUTPUT` filter in the container, because sing-box routes a UDP session once and later packets may name any destination), **Xray** (a routing rule to a blackhole outbound, plus freedom `finalRules`, which check the address actually dialed and every UDP packet), and **WireGuard / AmneziaWG** (a `MOAV-EGRESS` chain hooked at the top of `FORWARD`, IPv4 and IPv6, installed before the interface comes up). dnstt, Slipstream, MasterDNS and GooseRelay egress through sing-box and are covered by it; wstunnel can only reach the WireGuard endpoint. The rules are applied at container start from one list (`scripts/lib/egress-isolation.sh`), so existing installs get them from `moav update && moav build && moav start` with no re-bootstrap. New `.env` toggle `EGRESS_ISOLATION` (default `on`); set it to `off` only for a trusted LAN relay, then `moav restart` to apply it (either direction). **Behavior changes:** WireGuard/AmneziaWG peers can no longer reach each other through the tunnel (their addresses are RFC1918), and on dual-stack servers sing-box now resolves client-requested names with its public resolvers instead of Docker's DNS, as IPv4-only servers already did. Trojan's fallback to the decoy keeps working, and works again on IPv4-only servers, where the `prefer_ipv4` resolve rule had been sending the name `decoy` to public DNS.
-- **Slipstream binaries are SHA256-verified at build.** `Dockerfile.slipstream`
-  (server) and `Dockerfile.client` (`moav test` client) downloaded the
-  net2share/slipstream-rust-build assets unchecked. The default version's
-  digests are now pinned in-tree, and any other `SLIPSTREAM_VERSION` is checked
-  against that release's `SHA256SUMS`; a mismatch fails the build.
-- **TrustTunnel egress filtering follows `EGRESS_ISOLATION` and covers
-  DappNode's networks.** TrustTunnel relied only on its own
-  `allow_private_network_connections = false` check. That check ignored the
-  `EGRESS_ISOLATION` toggle, and it treats `172.33.0.0/16` (DappNode's dncore
-  network) as public, so a client could reach it over HTTP/2 and HTTP/3. The
-  entrypoint now applies the toggle to the runtime `vpn.toml` (no
-  re-bootstrap). With isolation on, the default, the endpoint's own check stays
-  on and a `MOAV-EGRESS-OUT` filter on the container's `OUTPUT` drops the shared
-  block list: RFC1918, CGNAT, link-local, loopback, IPv6 ULA/link-local, plus
-  `172.33.0.0/16` and `10.20.0.0/24`. Replies to clients and the container's DNS
-  still pass. With isolation off, both are lifted, as in the other layers. If
-  the filter cannot be installed while isolation is on, the container refuses
-  to start. On a normal VPS the toggle-on behavior is unchanged, except that
-  `172.33.0.0/16` (public space outside DappNode) is now unreachable through
-  TrustTunnel, per the shared block list. The image gains `iptables`, so
-  rebuild to pick it up (`moav build && moav start`).
+### Deprecated
+- **Slipstream (phase 1 of removal).** Upstream slipstream-rust is archived
+  and points users to MasterDNS; MasterDNS and dnstt already cover the
+  DNS-tunnel use case.
+  - `ENABLE_SLIPSTREAM` now defaults to `false` (`.env.example`, compose and
+    script fallbacks). An explicit value already in your `.env` is left alone,
+    and `moav update` still pins the running state for sparse `.env` files.
+  - `dns-router` no longer routes the Slipstream subdomain (`s.`). A leftover
+    `ENABLE_SLIPSTREAM=true` is ignored with a warning (router, `moav doctor`,
+    `moav switch-dns`), so **existing Slipstream clients stop connecting after
+    this update**. A commented placeholder in `buildRoutes()` marks where a
+    future DNS-tunnel backend can plug in.
+  - `data/protocols.json` keeps the entry as a tombstone (`status: "removed"`,
+    `removed_on: "2026-11-23"`, migration note). The service, image and code
+    are removed in a later release.
+  - **Migrate:** keep `ENABLE_MASTERDNS=true` and/or `ENABLE_DNSTT=true` with
+    their NS records (`moav doctor dns`), run
+    `moav switch-dns dnstt+masterdns+xdns` (or set `ENABLE_SLIPSTREAM=false`),
+    then `moav regenerate-users` and hand out the new bundles.
 
 ### Documentation
 - **Security policy** ([SECURITY.md](SECURITY.md)): supported versions, private
   reporting through GitHub Private Vulnerability Reporting with an email
   fallback, response targets, scope, safe harbor and reporter credit. Linked
   from the README and the issue chooser.
+- Fixed the XDNS anchor in the protocol docs links (`xdns-vlesmkcpdns` -> `xdns-vlessmkcpdns`).
 
 ## [2.4.0] - 2026-10-29
 
@@ -2601,7 +2616,8 @@ TrustTunnel config validity.
 - uTLS fingerprint spoofing (Chrome)
 - Automatic short ID generation for Reality
 
-[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v2.4.0...HEAD
+[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/MotherofallVPNs/moav/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/MotherofallVPNs/moav/compare/v2.3.1...v2.4.0
 [2.3.1]: https://github.com/MotherofallVPNs/moav/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/MotherofallVPNs/moav/compare/v2.2.4...v2.3.0
