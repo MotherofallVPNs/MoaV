@@ -318,7 +318,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.masterdns
       args:
-        MASTERDNS_VERSION: ${MASTERDNS_VERSION:-v2026.06.13.234407-7de2476}
+        MASTERDNS_VERSION: ${MASTERDNS_VERSION:-v2026.11.18.210322-7198b45}
     container_name: moav-masterdns
     restart: unless-stopped
     logging: *default-logging
@@ -448,7 +448,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.telemt
       args:
-        TELEMT_VERSION: ${TELEMT_VERSION:-3.5.14}
+        TELEMT_VERSION: ${TELEMT_VERSION:-3.5.17}
     container_name: moav-telemt
     restart: unless-stopped
     logging: *default-logging
@@ -627,7 +627,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.amneziawg
       args:
-        AMNEZIAWG_GO_VERSION: ${AMNEZIAWG_GO_VERSION:-v3.1.20260828}
+        AMNEZIAWG_GO_VERSION: ${AMNEZIAWG_GO_VERSION:-v3.1.20261116}
         AWGTOOLS_VERSION: ${AWGTOOLS_VERSION:-3.1.20260812}
         GOPROXY: "${GOPROXY:-https://proxy.golang.org|https://goproxy.cn|direct}"
         GOSUMDB: "${GOSUMDB:-off}"
@@ -772,7 +772,9 @@ services:
   # ADMIN: Stats dashboard + User management API
   # ===========================================================================
   docker-proxy:
-    image: tecnativa/docker-socket-proxy:v0.5.0
+    # Upstream retired :vX.Y.Z tags; 3.4 is rebuilt weekly, so pin the digest
+    # (multi-arch index) and refresh it on each dependency audit.
+    image: tecnativa/docker-socket-proxy:3.4@sha256:027f9fa5ee70be5836eeaa10ce889d7a83f34a8db16a7f412818b92997e0beab
     container_name: moav-docker-proxy
     restart: unless-stopped
     logging: *default-logging

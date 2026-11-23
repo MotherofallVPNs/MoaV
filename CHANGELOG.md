@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **amneziawg-go v3.1.20260828 -> [v3.1.20261116](https://github.com/amnezia-vpn/amneziawg-go/releases/tag/v3.1.20261116)**:
+  hardening of the AWG 3.1 obfuscation parameters (`Jmin > Jmax` rejected
+  instead of underflowing the junk packet size, negative lengths in
+  `<r>/<rc>/<rd>/<dz>` tags rejected, I1-I5 and S4 safe to change at runtime, a
+  timer race fixed). Same wire format; existing client configs keep working.
+- **MasterDNS v2026.06.13 -> [v2026.11.18](https://github.com/masterking32/MasterDnsVPN/releases/tag/v2026.11.18.210322-7198b45)**:
+  NXDOMAIN for non-tunnel DNS queries, fallback handling for non-DNS UDP,
+  a server data-race fix on duplicate `SESSION_INIT`, and `golang.org/x/crypto`
+  0.49.0 -> 0.52.0. Release SHA256SUMS still verified at build. Clients on
+  v2026.06.13 keep working against the new server.
+- **Routine component bumps** from the 2026-11 dependency audit:
+  - **telemt 3.5.14 -> [3.5.17](https://github.com/telemt/telemt/releases/tag/3.5.17)**:
+    stalled ME relay fix, buffered relay writes flushed when the source stalls,
+    SOCKS BND family validation, IPv4 metrics allowlists on dual-stack
+    listeners. The 3.5.17 management-API rework leaves every endpoint the MoaV
+    exporter reads unchanged.
+  - **Prometheus 3.15.1 -> [3.16.0](https://github.com/prometheus/prometheus/releases/tag/v3.16.0)**,
+    **node_exporter 1.12.1 -> [1.13.1](https://github.com/prometheus/node_exporter/releases/tag/v1.13.1)**,
+    **cAdvisor 0.60.6 -> [0.61.1](https://github.com/google/cadvisor/releases/tag/v0.61.1)**
+    (`moav build --local` pins; default installs pull the upstream images).
+- **Base images off end-of-life releases.** No component version changes;
+  rebuild to pick it up (`moav build && moav start`).
+  - **Alpine 3.21 -> 3.24** as the runtime base of 13 images (amneziawg,
+    cadvisor, dns-router, dnstt, gooserelay, grafana, nginx, node-exporter,
+    prometheus, snowflake, telemt, wireguard, xray). Alpine 3.21 stopped
+    receiving fixes on 2026-11-01, which froze every `apk add` package in
+    those images (openssl, busybox, iptables, wireguard-tools, nginx).
+    3.24 is supported until 2028-06.
+  - **Go builders -> 1.27** for dns-router, gooserelay and the client's dnstt
+    stage (were 1.22, EOL since 2025-02), dnstt (1.24) and amneziawg (1.25),
+    plus the CI `go test` job. `dns-router/go.mod` stays at `go 1.22` on
+    purpose: that line is the language baseline, and keeping it preserves the
+    Go 1.22 runtime defaults in the binary.
+  - The `moav test` client image keeps its Alpine 3.21 runtime stage for now:
+    its sgerrand glibc package does not install under Alpine 3.24's apk on
+    arm64. Moving it is tracked with the glibc removal.
+- **docker-socket-proxy v0.5.0 -> `3.4@sha256:027f9fa5...`** (upstream
+  [v0.6.0](https://github.com/Tecnativa/docker-socket-proxy/releases/tag/v0.6.0)).
+  Upstream retired the `:vX.Y.Z` tags, so `v0.5.0` is never rebuilt and its
+  HAProxy and Alpine layers have aged since July. The `3.4` tag is rebuilt
+  weekly; it is pinned by digest so the container that fronts the Docker
+  socket stays reproducible. Same filter config and entrypoint, HAProxy
+  3.4.2 -> 3.4.7. Picked up on the next `moav start` (the image is pulled).
+- **CI actions moved to current majors, pinned by commit SHA:**
+  `actions/checkout` v4 -> v7.0.1, `actions/setup-go` v5 -> v7.1.0,
+  `actions/upload-artifact` v4 -> v7.0.2. These run on Node 24, so a
+  self-hosted e2e runner must be at Actions Runner 2.327.1 or newer.
+
+### Fixed
+- **`moav update` now tracks the AmneziaWG pins.** `AMNEZIAWG_GO_VERSION` and
+  `AWGTOOLS_VERSION` were missing from the component-version check, so an
+  existing `.env` never picked up a new amneziawg-go build.
+- **Dashboard page on Starlette 1.x.** The refresh crosses the Starlette 1.0
+  line, which removed the legacy `TemplateResponse(name, context)` signature;
+  `GET /` would have answered 500 while `/api/health` stayed green. The call
+  now passes the request first, and `tests/admin-dashboard-render-test.py`
+  renders the dashboard against the pinned dependencies in CI.
+
+### Security
+- **Admin dashboard Python dependencies refreshed.** `admin/requirements.txt`
+  still carried the January 2024 pins, which collect about 20 known advisories
+  (none reachable through the routes the dashboard ships, but several were
+  high severity). fastapi 0.109.0 -> 0.165.0 (Starlette 0.35.1 -> 1.10.0),
+  uvicorn 0.27.0 -> 0.54.0, httpx 0.26.0 -> 0.28.1, jinja2 3.1.3 -> 3.1.6, and
+  `python-multipart` is dropped because nothing imports it. Rebuild the admin
+  image to pick it up: `moav build admin && moav start admin`.
 ### Security
 - **MPTCP listener hardening (CVE-2026-98432, CVSS 9.8).** Go 1.24+ enables
   MPTCP on TCP listeners by default, and the public exploit for this Linux

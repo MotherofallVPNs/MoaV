@@ -6,12 +6,12 @@
 # Uses pre-built musl static binaries (no glibc needed).
 # =============================================================================
 
-FROM alpine:3.21
+FROM alpine:3.24
 
 ARG TARGETARCH
 
 # Version - read from .env via docker-compose build args
-ARG TELEMT_VERSION=3.5.14
+ARG TELEMT_VERSION=3.5.17
 
 # Install runtime dependencies
 RUN apk add --no-cache \
