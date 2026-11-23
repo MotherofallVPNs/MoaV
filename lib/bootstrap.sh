@@ -20,6 +20,10 @@ check_bootstrap() {
         # Quick check - just see if volume exists and has data
         # Use timeout to prevent hanging
         local has_keys
+        # Pull outside the 3s probe: a first-time pull of the pinned tag would
+        # time out and misreport the volume as empty.
+        docker image inspect alpine:3.24 >/dev/null 2>&1 \
+            || timeout 120 docker pull -q alpine:3.24 >/dev/null 2>&1 || true
         has_keys=$(timeout 3 docker run --rm -v moav_moav_state:/state alpine:3.24 sh -c "ls /state/keys 2>/dev/null | head -1" 2>/dev/null || echo "")
         if [[ -n "$has_keys" ]]; then
             return 0  # Bootstrap has been run

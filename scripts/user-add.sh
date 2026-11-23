@@ -499,6 +499,9 @@ fi
         else
             _tmo=""
             command -v timeout >/dev/null 2>&1 && _tmo="timeout 15"
+            # Pull outside the 15s deadline so a first-time pull can't eat it.
+            docker image inspect alpine:3.24 >/dev/null 2>&1 \
+                || ${_tmo:+timeout 120} docker pull -q alpine:3.24 >/dev/null 2>&1 || true
             $_tmo docker run --rm \
                 -v moav_moav_state:/state \
                 -v "$(pwd)/state/users/$USERNAME:/host-user:ro" \
