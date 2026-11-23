@@ -631,7 +631,7 @@
                 <li style="{{WIREGUARD_DISPLAY}}"><a href="#en" onclick="scrollToSection('wireguard-en')">6. WireGuard <span class="toc-badge badge-secondary">Full VPN</span></a></li>
                 <li style="{{TRUSTTUNNEL_DISPLAY}}"><a href="#en" onclick="scrollToSection('trusttunnel-en')">7. TrustTunnel <span class="toc-badge badge-secondary">Stealth VPN</span></a></li>
                 <li style="{{DNSTT_DISPLAY}}"><a href="#en" onclick="scrollToSection('dns-tunnel-en')">8. DNS Tunnel <span class="toc-badge badge-fallback">Last Resort</span></a></li>
-                <li><a href="#en" onclick="scrollToSection('slipstream-en')">8b. Slipstream <span class="toc-badge badge-fallback">Fast DNS</span></a></li>
+                <li><a href="#en" onclick="scrollToSection('slipstream-en')">8b. Slipstream <span class="toc-badge badge-fallback">Deprecated</span></a></li>
                 <li><a href="#en" onclick="scrollToSection('xdns-en')">8c. XDNS <span class="toc-badge badge-fallback">mKCP DNS</span></a></li>
                 <li style="{{MASTERDNS_DISPLAY}}"><a href="#en" onclick="scrollToSection('masterdns-en')">8d. MasterDNS <span class="toc-badge badge-fallback">DNS · MahsaNG</span></a></li>
                 <li style="{{GOOSERELAY_DISPLAY}}"><a href="#en" onclick="scrollToSection('gooserelay-en')">8e. GooseRelay <span class="toc-badge badge-standalone">via Google</span></a></li>
@@ -674,7 +674,7 @@
                     <h4>Subscription (click to copy → paste into the app)</h4>
                     <div class="config-value" onclick="copyConfig(this)">{{MAHSANET_SUB}}</div>
                 </div>
-                <p class="protocol-desc" style="margin-top: 14px;">This brings in all V2Ray-compatible proxies. The other protocols — <strong>WireGuard</strong>, <strong>AmneziaWG</strong>, <strong>TrustTunnel</strong>, <strong>Telegram MTProxy</strong>, the DNS tunnels (<strong>MasterDNS</strong>, dnstt, Slipstream, XDNS) and <strong>GooseRelay</strong> — are configured separately in their own apps (or MahsaNG's MasterDNS / GooseRelay tabs); each has its own section below. <strong>MasterDNS</strong> is the most reliable DNS tunnel during heavy shutdowns.</p>
+                <p class="protocol-desc" style="margin-top: 14px;">This brings in all V2Ray-compatible proxies. The other protocols — <strong>WireGuard</strong>, <strong>AmneziaWG</strong>, <strong>TrustTunnel</strong>, <strong>Telegram MTProxy</strong>, the DNS tunnels (<strong>MasterDNS</strong>, dnstt, XDNS, and the deprecated Slipstream) and <strong>GooseRelay</strong> — are configured separately in their own apps (or MahsaNG's MasterDNS / GooseRelay tabs); each has its own section below. <strong>MasterDNS</strong> is the most reliable DNS tunnel during heavy shutdowns.</p>
             </div>
         </div>
 
@@ -1173,23 +1173,24 @@
             <div class="protocol-header">
                 <div class="protocol-title">
                     <h2>8b. Slipstream</h2>
-                    <span class="protocol-badge badge-fallback">DNS Tunnel (Faster)</span>
+                    <span class="protocol-badge badge-fallback">Deprecated</span>
                 </div>
                 <span class="protocol-port">Port 53/udp</span>
             </div>
             <div class="protocol-content">
-                <p class="protocol-desc">QUIC-over-DNS tunnel — 1.5-5x faster than dnstt. Use when other methods are blocked. Requires the Slipstream client and certificate file from this bundle.</p>
+                <div class="warning">Slipstream is deprecated and is being removed from MoaV (its upstream project is archived). It may stop working on this server. Use <strong>MasterDNS</strong> (section 8d) or <strong>dnstt</strong> (section 8) instead.</div>
+                <p class="protocol-desc">QUIC-over-DNS tunnel. Requires the Slipstream client and the certificate file from this bundle.</p>
 
                 <div class="extra-section">
-                    <h4>Desktop Setup (Windows/macOS/Linux)</h4>
+                    <h4>Desktop Setup (Linux)</h4>
                     <ol>
-                        <li>Download <a href="https://github.com/net2share/slipstream-rust-build/releases" target="_blank">slipstream-client</a> for your OS</li>
+                        <li>Download <a href="https://github.com/net2share/slipstream-rust-build/releases" target="_blank">slipstream-client</a> (Linux amd64/arm64 builds only; there are no Windows or macOS binaries)</li>
                         <li>Copy the <code>slipstream-cert.pem</code> file from this bundle to the same directory</li>
-                        <li>Open Terminal/Command Prompt</li>
+                        <li>Open a terminal</li>
                         <li>Run this command to create a local SOCKS5 proxy on port 1080:</li>
                     </ol>
                     <div class="config-box" style="margin-top: 10px;">
-                        <div class="config-value" onclick="copyConfig(this)">slipstream-client --domain {{SLIPSTREAM_DOMAIN}} --cert slipstream-cert.pem --dns-server 1.1.1.1:53 --socks-listen 127.0.0.1:1080</div>
+                        <div class="config-value" onclick="copyConfig(this)">slipstream-client --domain {{SLIPSTREAM_DOMAIN}} --cert slipstream-cert.pem --resolver 1.1.1.1:53 --tcp-listen-host 127.0.0.1 --tcp-listen-port 1080</div>
                     </div>
                     <p style="margin-top: 10px;">Then configure your browser to use SOCKS5 proxy: <code>127.0.0.1:1080</code></p>
                 </div>
@@ -1197,7 +1198,7 @@
                 <div class="extra-section">
                     <h4>Speed Modes</h4>
                     <p><strong>Resolver mode</strong> (default, stealthier): ~60 KB/s — good for chat, email, light browsing</p>
-                    <p><strong>Authoritative mode</strong> (faster): ~3-4 MB/s — add <code>--authoritative SERVER_IP:53</code> instead of <code>--dns-server</code></p>
+                    <p><strong>Authoritative mode</strong> (faster): ~3-4 MB/s — add <code>--authoritative SERVER_IP:53</code> instead of <code>--resolver</code></p>
                     <p style="color: var(--text-muted); font-size: 12px;">Authoritative mode is faster but reveals the server IP to network observers.</p>
                 </div>
 
@@ -1260,7 +1261,7 @@
                 <span class="protocol-port">Port 53/udp</span>
             </div>
             <div class="protocol-content">
-                <p class="protocol-desc">Advanced DNS tunnel (ARQ + resolver load-balancing) bundled natively in the MahsaNG v16 app — typically faster and more resilient than dnstt/Slipstream during heavy shutdowns. Works when almost everything except DNS is blocked. Best for Telegram and light chat.</p>
+                <p class="protocol-desc">Advanced DNS tunnel (ARQ + resolver load-balancing) bundled natively in the MahsaNG v16 app — typically faster and more resilient than dnstt during heavy shutdowns, and the replacement for the deprecated Slipstream. Works when almost everything except DNS is blocked. Best for Telegram and light chat.</p>
                 <div class="config-box">
                     <h4>MasterDNS Config (also in <code>masterdns-client_config.toml</code>)</h4>
                     <div class="config-value multiline" onclick="copyConfig(this)" style="font-size: 11px; max-height: 220px; overflow-y: auto; white-space: pre-wrap;">{{CONFIG_MASTERDNS}}</div>
@@ -1592,7 +1593,7 @@
                 <li style="{{WIREGUARD_DISPLAY}}"><a href="#fa" onclick="scrollToSection('wireguard-fa')">۶. WireGuard <span class="toc-badge badge-secondary">VPN کامل</span></a></li>
                 <li style="{{TRUSTTUNNEL_DISPLAY}}"><a href="#fa" onclick="scrollToSection('trusttunnel-fa')">۷. TrustTunnel <span class="toc-badge badge-secondary">VPN مخفی</span></a></li>
                 <li style="{{DNSTT_DISPLAY}}"><a href="#fa" onclick="scrollToSection('dns-tunnel-fa')">۸. تونل DNS <span class="toc-badge badge-fallback">آخرین راه‌حل</span></a></li>
-                <li><a href="#fa" onclick="scrollToSection('slipstream-fa')">۸ب. Slipstream <span class="toc-badge badge-fallback">DNS سریع</span></a></li>
+                <li><a href="#fa" onclick="scrollToSection('slipstream-fa')">۸ب. Slipstream <span class="toc-badge badge-fallback">منسوخ</span></a></li>
                 <li><a href="#fa" onclick="scrollToSection('xdns-fa')">۸پ. XDNS <span class="toc-badge badge-fallback">DNS با mKCP</span></a></li>
                 <li style="{{MASTERDNS_DISPLAY}}"><a href="#fa" onclick="scrollToSection('masterdns-fa')">۸ت. MasterDNS <span class="toc-badge badge-fallback">DNS Tunnel</span></a></li>
                 <li style="{{GOOSERELAY_DISPLAY}}"><a href="#fa" onclick="scrollToSection('gooserelay-fa')">۸ث. GooseRelay <span class="toc-badge badge-standalone">از طریق گوگل</span></a></li>
@@ -1635,7 +1636,7 @@
                     <h4>اشتراک (کلیک کنید تا کپی شود ← در مهسا‌ان‌جی پیست کنید)</h4>
                     <div class="config-value" onclick="copyConfig(this)">{{MAHSANET_SUB}}</div>
                 </div>
-                <p class="protocol-desc" style="margin-top: 14px;">این کار همهٔ پروکسی‌های سازگار با V2Ray را وارد می‌کند. بقیهٔ پروتکل‌ها — <strong>WireGuard</strong>، <strong>AmneziaWG</strong>، <strong>TrustTunnel</strong>، <strong>پروکسی تلگرام (MTProxy)</strong>، تونل‌های DNS (<strong>MasterDNS</strong>، dnstt، Slipstream، XDNS) و <strong>GooseRelay</strong> — جداگانه در اپ‌های خودشان (یا در تب‌های MasterDNS / GooseRelay مهسا‌ان‌جی) تنظیم می‌شوند؛ هر کدام بخش جداگانه‌ای در پایین دارند. <strong>MasterDNS</strong> در قطعی‌های شدید پایدارترین تونل DNS است.</p>
+                <p class="protocol-desc" style="margin-top: 14px;">این کار همهٔ پروکسی‌های سازگار با V2Ray را وارد می‌کند. بقیهٔ پروتکل‌ها — <strong>WireGuard</strong>، <strong>AmneziaWG</strong>، <strong>TrustTunnel</strong>، <strong>پروکسی تلگرام (MTProxy)</strong>، تونل‌های DNS (<strong>MasterDNS</strong>، dnstt، XDNS و Slipstream منسوخ‌شده) و <strong>GooseRelay</strong> — جداگانه در اپ‌های خودشان (یا در تب‌های MasterDNS / GooseRelay مهسا‌ان‌جی) تنظیم می‌شوند؛ هر کدام بخش جداگانه‌ای در پایین دارند. <strong>MasterDNS</strong> در قطعی‌های شدید پایدارترین تونل DNS است.</p>
             </div>
         </div>
 
@@ -2132,23 +2133,24 @@
             <div class="protocol-header">
                 <div class="protocol-title">
                     <h2>۸ب. Slipstream</h2>
-                    <span class="protocol-badge badge-fallback">تونل DNS (سریع‌تر)</span>
+                    <span class="protocol-badge badge-fallback">منسوخ</span>
                 </div>
                 <span class="protocol-port">پورت 53/udp</span>
             </div>
             <div class="protocol-content">
-                <p class="protocol-desc">تونل QUIC-over-DNS — ۱.۵ تا ۵ برابر سریع‌تر از dnstt. وقتی روش‌های دیگر مسدود هستند استفاده کنید. نیاز به کلاینت Slipstream و فایل گواهی از این بسته دارد.</p>
+                <div class="warning">Slipstream منسوخ شده و از MoaV حذف می‌شود (پروژهٔ اصلی آن بایگانی شده است). ممکن است روی این سرور دیگر کار نکند. به‌جای آن از <strong>MasterDNS</strong> (بخش ۸ت) یا <strong>dnstt</strong> (بخش ۸) استفاده کنید.</div>
+                <p class="protocol-desc">تونل QUIC-over-DNS. به کلاینت Slipstream و فایل گواهی همین بسته نیاز دارد.</p>
 
                 <div class="extra-section">
-                    <h4>راه‌اندازی دسکتاپ (Windows/macOS/Linux)</h4>
+                    <h4>راه‌اندازی دسکتاپ (Linux)</h4>
                     <ol>
-                        <li><a href="https://github.com/net2share/slipstream-rust-build/releases" target="_blank">slipstream-client</a> را برای سیستم عامل خود دانلود کنید</li>
+                        <li><a href="https://github.com/net2share/slipstream-rust-build/releases" target="_blank">slipstream-client</a> را دانلود کنید (فقط نسخهٔ لینوکس amd64/arm64 موجود است؛ نسخهٔ ویندوز یا مک وجود ندارد)</li>
                         <li>فایل <code>slipstream-cert.pem</code> را از این بسته در همان پوشه قرار دهید</li>
-                        <li>Terminal یا Command Prompt را باز کنید</li>
+                        <li>ترمینال را باز کنید</li>
                         <li>این دستور را اجرا کنید:</li>
                     </ol>
                     <div class="config-box" style="margin-top: 10px;">
-                        <div class="config-value" onclick="copyConfig(this)">slipstream-client --domain {{SLIPSTREAM_DOMAIN}} --cert slipstream-cert.pem --dns-server 1.1.1.1:53 --socks-listen 127.0.0.1:1080</div>
+                        <div class="config-value" onclick="copyConfig(this)">slipstream-client --domain {{SLIPSTREAM_DOMAIN}} --cert slipstream-cert.pem --resolver 1.1.1.1:53 --tcp-listen-host 127.0.0.1 --tcp-listen-port 1080</div>
                     </div>
                     <p style="margin-top: 10px;">سپس مرورگر را برای استفاده از پروکسی SOCKS5 تنظیم کنید: <code>127.0.0.1:1080</code></p>
                 </div>
@@ -2156,7 +2158,7 @@
                 <div class="extra-section">
                     <h4>حالت‌های سرعت</h4>
                     <p><strong>حالت Resolver</strong> (پیش‌فرض، مخفی‌تر): ~۶۰ کیلوبایت/ثانیه — مناسب برای چت، ایمیل</p>
-                    <p><strong>حالت Authoritative</strong> (سریع‌تر): ~۳-۴ مگابایت/ثانیه — به جای <code>--dns-server</code> از <code>--authoritative SERVER_IP:53</code> استفاده کنید</p>
+                    <p><strong>حالت Authoritative</strong> (سریع‌تر): ~۳-۴ مگابایت/ثانیه — به‌جای <code>--resolver</code> از <code>--authoritative SERVER_IP:53</code> استفاده کنید</p>
                 </div>
 
                 <div class="config-box">
@@ -2218,7 +2220,7 @@
                 <span class="protocol-port">پورت ۵۳/udp</span>
             </div>
             <div class="protocol-content">
-                <p class="protocol-desc">تونل DNS پیشرفته (با ARQ و توزیع بار روی چند resolver) که به‌صورت داخلی در اپ MahsaNG نسخه ۱۶ هست — معمولاً سریع‌تر و پایدارتر از dnstt/Slipstream در قطعی‌های شدید. وقتی همه‌چیز جز DNS بسته شده کار می‌کنه. مناسب تلگرام و چت سبک.</p>
+                <p class="protocol-desc">تونل DNS پیشرفته (با ARQ و توزیع بار روی چند resolver) که به‌صورت داخلی در اپ MahsaNG نسخه ۱۶ هست — معمولاً سریع‌تر و پایدارتر از dnstt در قطعی‌های شدید، و جایگزین Slipstream منسوخ‌شده. وقتی همه‌چیز جز DNS بسته شده کار می‌کنه. مناسب تلگرام و چت سبک.</p>
                 <div class="config-box">
                     <h4>کانفیگ MasterDNS (در فایل <code>masterdns-client_config.toml</code> هم هست)</h4>
                     <div class="config-value multiline" onclick="copyConfig(this)" style="font-size: 11px; max-height: 220px; overflow-y: auto; white-space: pre-wrap;">{{CONFIG_MASTERDNS}}</div>

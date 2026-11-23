@@ -38,7 +38,7 @@ subscription entry:
 
 **Never donated**, forced off regardless of `.env`:
 
-WireGuard · AmneziaWG · TrustTunnel · GooseRelay · dnstt · Slipstream ·
+WireGuard · AmneziaWG · TrustTunnel · GooseRelay · dnstt · Slipstream (deprecated) ·
 MasterDNS · XDNS
 
 The reason is the same for all of them: each needs something the recipient

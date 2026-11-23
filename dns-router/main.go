@@ -1,5 +1,6 @@
-// DNS Router for MoaV - Routes DNS queries to dnstt or Slipstream backends
-// based on domain suffix matching. Lightweight UDP forwarder with connection pooling.
+// DNS Router for MoaV - Routes DNS queries to the dnstt, MasterDNS and XDNS
+// backends based on domain suffix matching. Lightweight UDP forwarder with
+// connection pooling.
 package main
 
 import (
@@ -107,7 +108,6 @@ func buildRoutes() ([]Route, error) {
 	var routes []Route
 
 	enableDnstt := strings.ToLower(envOr("ENABLE_DNSTT", "true"))
-	enableSlipstream := strings.ToLower(envOr("ENABLE_SLIPSTREAM", "true"))
 
 	if enableDnstt == "true" {
 		domain := os.Getenv("DNSTT_DOMAIN")
@@ -119,14 +119,10 @@ func buildRoutes() ([]Route, error) {
 		log.Printf("[dns-router] Route: *.%s -> %s (dnstt)", domain, backend)
 	}
 
-	if enableSlipstream == "true" {
-		domain := os.Getenv("SLIPSTREAM_DOMAIN")
-		if domain == "" {
-			return nil, fmt.Errorf("SLIPSTREAM_DOMAIN required when ENABLE_SLIPSTREAM=true")
-		}
-		backend := envOr("SLIPSTREAM_BACKEND", "slipstream:5354")
-		routes = append(routes, Route{Domain: strings.ToLower(domain), Backend: backend})
-		log.Printf("[dns-router] Route: *.%s -> %s (slipstream)", domain, backend)
+	// Reserved slot (was Slipstream, removed 2026-11-23): a future DNS-tunnel backend
+	// plugs in here, shaped like dnstt (ENABLE_*, *_DOMAIN, *_BACKEND, unique suffix).
+	if strings.ToLower(os.Getenv("ENABLE_SLIPSTREAM")) == "true" {
+		log.Printf("[dns-router] WARNING: ENABLE_SLIPSTREAM=true is ignored: Slipstream is deprecated and no longer routed. Move clients to MasterDNS or dnstt.")
 	}
 
 	enableMasterdns := strings.ToLower(envOr("ENABLE_MASTERDNS", "true"))

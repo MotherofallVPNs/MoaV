@@ -250,7 +250,7 @@ Add `-v` to `moav test` for per-protocol debug output when a protocol fails.
   isn't present. Does not fail CI.
 - **fail** — a protocol that should work didn't. **Fails CI.**
 
-If a DNS-tunnel protocol (dnstt/Slipstream/MasterDNS/XDNS) warns or fails,
+If a DNS-tunnel protocol (dnstt/MasterDNS/XDNS) warns or fails,
 first check the NS delegation for its subdomain (`moav doctor dns`) and that the
 resolver in the bundle is reachable from the runner — DNS tunnels are the most
 environment-sensitive transports.
@@ -266,7 +266,8 @@ connects and fetches an exit IP through the tunnel.
 |---|---|
 | **Live exit-IP** | reality, trojan, hysteria2, ss, xhttp |
 | Live, warn-gated | cdn (operator Cloudflare), xdns (resolver-sensitive) |
-| Live if binary present, else warn | dnstt, slipstream, trusttunnel |
+| Live if binary present, else warn | dnstt, trusttunnel |
+| Expected `skip` (deprecated) | slipstream: off by default since 2026-11-23 and no longer routed by dns-router, so e2e bundles carry no Slipstream config. Do not re-enable it in e2e; the test is removed with the service in a later release. |
 
 > **`skip` is not a pass, and it is not a failure either.** dnstt sat at `skip`
 > for months after its per-user instruction file was retired — the test globbed

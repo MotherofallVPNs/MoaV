@@ -669,7 +669,7 @@ cmd_regenerate_users() {
     local enable_amneziawg=$(get_env_val "ENABLE_AMNEZIAWG" .env "true")
     local awg_disable_cookies=$(get_env_val "AWG_DISABLE_COOKIES" .env "false")
     local enable_dnstt=$(get_env_val "ENABLE_DNSTT" .env "true")
-    local enable_slipstream=$(get_env_val "ENABLE_SLIPSTREAM" .env "true")
+    local enable_slipstream=$(get_env_val "ENABLE_SLIPSTREAM" .env "false")
     local slipstream_subdomain=$(get_env_val "SLIPSTREAM_SUBDOMAIN" .env "s")
     local enable_masterdns=$(get_env_val "ENABLE_MASTERDNS" .env "true")
     local masterdns_subdomain=$(get_env_val "MASTERDNS_SUBDOMAIN" .env "m")

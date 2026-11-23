@@ -146,13 +146,11 @@ show_status() {
             disabled_services["decoy"]=1
         fi
         [[ "$enable_wireguard" != "true" ]] && disabled_services["wireguard"]=1 && disabled_services["wstunnel"]=1
-        local enable_slipstream=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
+        local enable_slipstream=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "false")
         [[ "$enable_dnstt" != "true" ]] && disabled_services["dnstt"]=1
         [[ "$enable_slipstream" != "true" ]] && disabled_services["slipstream"]=1
-        # dns-router is disabled if both dnstt and slipstream are disabled
-        if [[ "$enable_dnstt" != "true" ]] && [[ "$enable_slipstream" != "true" ]]; then
-            disabled_services["dns-router"]=1
-        fi
+        [[ "$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")" != "true" ]] && disabled_services["masterdns"]=1
+        [[ "$(dns_tunnel_enabled "$env_file")" != "true" ]] && disabled_services["dns-router"]=1
         [[ "$enable_admin" != "true" ]] && disabled_services["admin"]=1
         local enable_telemt=$(get_env_val "ENABLE_TELEMT" "$env_file" "true")
         [[ "$enable_telemt" != "true" ]] && disabled_services["telemt"]=1
@@ -341,8 +339,6 @@ select_profiles() {
         local enable_hysteria2=$(get_env_val "ENABLE_HYSTERIA2" "$env_file" "true")
         local enable_wireguard=$(get_env_val "ENABLE_WIREGUARD" "$env_file" "true")
         local enable_amneziawg=$(get_env_val "ENABLE_AMNEZIAWG" "$env_file" "true")
-        local enable_dnstt=$(get_env_val "ENABLE_DNSTT" "$env_file" "true")
-        local enable_slipstream=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
         local enable_trusttunnel=$(get_env_val "ENABLE_TRUSTTUNNEL" "$env_file" "true")
         local enable_telemt=$(get_env_val "ENABLE_TELEMT" "$env_file" "true")
         local enable_admin=$(get_env_val "ENABLE_ADMIN_UI" "$env_file" "true")
@@ -354,10 +350,7 @@ select_profiles() {
         fi
         [[ "$enable_wireguard" != "true" ]] && wg_enabled=false
         [[ "$enable_amneziawg" != "true" ]] && amneziawg_enabled=false
-        # dnstunnel is disabled if both dnstt and slipstream are disabled
-        if [[ "$enable_dnstt" != "true" ]] && [[ "$enable_slipstream" != "true" ]]; then
-            dnstunnel_enabled=false
-        fi
+        [[ "$(dns_tunnel_enabled "$env_file")" != "true" ]] && dnstunnel_enabled=false
         [[ "$enable_trusttunnel" != "true" ]] && trusttunnel_enabled=false
         [[ "$enable_xhttp" == "true" ]] && xhttp_enabled=true
         [[ "$enable_telemt" != "true" ]] && telegram_enabled=false
@@ -461,8 +454,6 @@ select_profiles() {
         local enable_hysteria2=$(get_env_val "ENABLE_HYSTERIA2" "$env_file" "true")
         local enable_wireguard=$(get_env_val "ENABLE_WIREGUARD" "$env_file" "true")
         local enable_amneziawg=$(get_env_val "ENABLE_AMNEZIAWG" "$env_file" "true")
-        local enable_dnstt=$(get_env_val "ENABLE_DNSTT" "$env_file" "true")
-        local enable_slipstream=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
         local enable_trusttunnel=$(get_env_val "ENABLE_TRUSTTUNNEL" "$env_file" "true")
         local enable_telemt=$(get_env_val "ENABLE_TELEMT" "$env_file" "true")
         local enable_admin=$(get_env_val "ENABLE_ADMIN_UI" "$env_file" "true")
@@ -486,8 +477,8 @@ select_profiles() {
             SELECTED_PROFILES+=("amneziawg")
         fi
 
-        # dnstunnel profile (dnstt + Slipstream)
-        if [[ "$enable_dnstt" == "true" ]] || [[ "$enable_slipstream" == "true" ]]; then
+        # dnstunnel profile (dnstt, MasterDNS, XDNS)
+        if [[ "$(dns_tunnel_enabled "$env_file")" == "true" ]]; then
             SELECTED_PROFILES+=("dnstunnel")
         fi
 
@@ -642,6 +633,17 @@ get_default_profiles() {
 # Profile ↔ ENABLE_* mapping (issue #106) — Compose profiles don't know
 # about MoaV's ENABLE_* flags. These helpers are the bridge.
 
+# Does any routed DNS tunnel need dns-router? Mirrors the router entrypoint's
+# check; Slipstream is unrouted, so counting it would crash-loop the router.
+dns_tunnel_enabled() {
+    local env_file="${1:-$SCRIPT_DIR/.env}"
+    local _d _m _x
+    _d=$(get_env_val "ENABLE_DNSTT"     "$env_file" "true")
+    _m=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
+    _x=$(get_env_val "ENABLE_XDNS"      "$env_file" "true")
+    [[ "$_d" == "true" || "$_m" == "true" || "$_x" == "true" ]] && echo true || echo false
+}
+
 # Is <profile> enabled in .env? Multi-flag profiles survive if any flag is on.
 profile_enabled() {
     local profile="$1" env_file="${2:-$SCRIPT_DIR/.env}"
@@ -658,14 +660,7 @@ profile_enabled() {
                 && echo true || echo false ;;
         wireguard)   [[ "$(get_env_val "ENABLE_WIREGUARD"   "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
         amneziawg)   [[ "$(get_env_val "ENABLE_AMNEZIAWG"   "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
-        dnstunnel)
-            local _d _s _m _x
-            _d=$(get_env_val "ENABLE_DNSTT"     "$env_file" "true")
-            _s=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
-            _m=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
-            _x=$(get_env_val "ENABLE_XDNS"      "$env_file" "true")
-            [[ "$_d" == "true" || "$_s" == "true" || "$_m" == "true" || "$_x" == "true" ]] \
-                && echo true || echo false ;;
+        dnstunnel)   dns_tunnel_enabled "$env_file" ;;
         trusttunnel) [[ "$(get_env_val "ENABLE_TRUSTTUNNEL" "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
         xhttp)       [[ "$(get_env_val "ENABLE_XHTTP"       "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
         telegram)    [[ "$(get_env_val "ENABLE_TELEMT"      "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
@@ -729,7 +724,7 @@ confirm_disabled_profile() {
         gooserelay)  enable_var="ENABLE_GOOSERELAY" ;;
         monitoring)  enable_var="ENABLE_MONITORING" ;;
         proxy)       multi_flag_hint="ENABLE_REALITY, ENABLE_TROJAN, ENABLE_ANYTLS, ENABLE_HYSTERIA2, ENABLE_SS" ;;
-        dnstunnel)   multi_flag_hint="ENABLE_DNSTT, ENABLE_SLIPSTREAM, ENABLE_MASTERDNS, ENABLE_XDNS" ;;
+        dnstunnel)   multi_flag_hint="ENABLE_DNSTT, ENABLE_MASTERDNS, ENABLE_XDNS" ;;
     esac
 
     echo "" >&2
@@ -1474,21 +1469,10 @@ cmd_start() {
         done
     fi
 
-    # Check port 53 conflicts for DNS tunnels
-    local dnstt_enabled
-    dnstt_enabled=$(get_env_val "ENABLE_DNSTT" "$SCRIPT_DIR/.env" "true")
-    local slipstream_enabled
-    slipstream_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$SCRIPT_DIR/.env" "true")
-    local xdns_start_enabled
-    xdns_start_enabled=$(get_env_val "ENABLE_XDNS" "$SCRIPT_DIR/.env" "true")
-
-    # Check if any DNS tunnel needs port 53 (all go through dns-router now)
+    # Port 53 conflict check: every routed DNS tunnel goes through dns-router
     local needs_port53=false
-    local masterdns_start_enabled
-    masterdns_start_enabled=$(get_env_val "ENABLE_MASTERDNS" "$SCRIPT_DIR/.env" "true")
     if echo "$profiles" | grep -qE "dnstunnel|all" && \
-       [[ "$dnstt_enabled" == "true" || "$slipstream_enabled" == "true" || \
-          "$masterdns_start_enabled" == "true" || "$xdns_start_enabled" == "true" ]]; then
+       [[ "$(dns_tunnel_enabled "$SCRIPT_DIR/.env")" == "true" ]]; then
         needs_port53=true
     fi
 

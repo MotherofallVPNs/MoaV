@@ -1,7 +1,8 @@
 # =============================================================================
 # MoaV Slipstream - QUIC-over-DNS tunnel server
 # =============================================================================
-# Slipstream provides faster DNS tunneling than dnstt (1.5-5x speedup).
+# DEPRECATED: Slipstream is disabled by default and is being removed (upstream
+# slipstream-rust is archived). Use MasterDNS or dnstt for DNS tunneling.
 # Uses pre-built Rust binaries from net2share/slipstream-rust-build.
 # Uses debian:bookworm-slim (glibc) — the Rust binaries are dynamically linked.
 # =============================================================================
@@ -25,15 +26,33 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN groupadd -r moav && useradd -r -g moav moav
 
-# Architecture mapping and binary download
+# Architecture mapping, binary download and SHA256 verification.
 # slipstream-rust-build uses: linux-amd64, linux-arm64
-RUN ARCH="${TARGETARCH:-amd64}" && \
-    echo "Downloading slipstream-server v${SLIPSTREAM_VERSION} for ${ARCH}..." && \
-    wget -qO /usr/local/bin/slipstream-server \
-    "https://github.com/net2share/slipstream-rust-build/releases/download/v${SLIPSTREAM_VERSION}/slipstream-server-linux-${ARCH}" && \
-    chmod +x /usr/local/bin/slipstream-server && \
-    echo "slipstream-server v${SLIPSTREAM_VERSION} installed (${ARCH})" || \
-    { echo "slipstream-server: download failed"; exit 1; }
+# Default version's digests are pinned (upstream archived, release frozen);
+# any other version is checked against that release's SHA256SUMS.
+RUN set -eu; \
+    ARCH="${TARGETARCH:-amd64}"; \
+    case "${ARCH}" in amd64|arm64) ;; *) echo "Unsupported TARGETARCH=${ARCH}" >&2; exit 1 ;; esac; \
+    ASSET="slipstream-server-linux-${ARCH}"; \
+    BASE="https://github.com/net2share/slipstream-rust-build/releases/download/v${SLIPSTREAM_VERSION}"; \
+    echo "Downloading slipstream-server v${SLIPSTREAM_VERSION} for ${ARCH}..."; \
+    wget -qO /usr/local/bin/slipstream-server "${BASE}/${ASSET}"; \
+    case "${SLIPSTREAM_VERSION}/${ASSET}" in \
+      2026.04.22.1/slipstream-server-linux-amd64) EXPECTED=5f5dbbecd4737a0eddbfe8fb2bbb0d13226b34f9f49bf8893666d245a8337738 ;; \
+      2026.04.22.1/slipstream-server-linux-arm64) EXPECTED=7c8071067c335b8503f9626fbda2cdf5f728b9b84254b8634eea0185d58ee411 ;; \
+      *) wget -qO /tmp/SHA256SUMS "${BASE}/SHA256SUMS"; \
+         EXPECTED="$(awk -v a="${ASSET}" '$2 == a || $2 == "*" a {print $1; exit}' /tmp/SHA256SUMS)"; \
+         rm -f /tmp/SHA256SUMS ;; \
+    esac; \
+    if [ -z "${EXPECTED}" ]; then echo "No SHA256 for ${ASSET} v${SLIPSTREAM_VERSION}" >&2; exit 1; fi; \
+    ACTUAL="$(sha256sum /usr/local/bin/slipstream-server | cut -d' ' -f1)"; \
+    if [ "${EXPECTED}" != "${ACTUAL}" ]; then \
+      echo "SHA256 mismatch for ${ASSET}: expected ${EXPECTED}, got ${ACTUAL}" >&2; \
+      rm -f /usr/local/bin/slipstream-server; exit 1; \
+    fi; \
+    echo "SHA256 OK (${ACTUAL})"; \
+    chmod +x /usr/local/bin/slipstream-server; \
+    echo "slipstream-server v${SLIPSTREAM_VERSION} installed (${ARCH})"
 
 # Create directories
 RUN mkdir -p /app /state/keys /etc/slipstream && \
