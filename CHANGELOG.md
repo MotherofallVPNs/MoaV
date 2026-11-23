@@ -84,9 +84,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     plus the CI `go test` job. `dns-router/go.mod` stays at `go 1.22` on
     purpose: that line is the language baseline, and keeping it preserves the
     Go 1.22 runtime defaults in the binary.
-  - The `moav test` client image keeps its Alpine 3.21 runtime stage for now:
-    its sgerrand glibc package does not install under Alpine 3.24's apk on
-    arm64. Moving it is tracked with the glibc removal.
+  - The `moav test` client image (`Dockerfile.client`) moves to Alpine 3.24
+    too, and drops the sgerrand `alpine-pkg-glibc` 2.35 shim. sing-box was the
+    only binary that needed it: the image now downloads the upstream
+    `sing-box-<ver>-linux-<arch>-musl` asset (same version and build tags,
+    `with_musl` instead of `with_purego`), which runs natively on musl. Xray,
+    wstunnel, dnstt and trusttunnel_client are static, awg-tools is a musl
+    build, and slipstream keeps its own bundled glibc loader, so nothing else
+    changes. The shim was x86_64-only and was the reason the image could not
+    move to 3.24 on arm64; it was also installed with `--allow-untrusted`.
 - **docker-socket-proxy v0.5.0 -> `3.4@sha256:027f9fa5...`** (upstream
   [v0.6.0](https://github.com/Tecnativa/docker-socket-proxy/releases/tag/v0.6.0)).
   Upstream retired the `:vX.Y.Z` tags, so `v0.5.0` is never rebuilt and its
