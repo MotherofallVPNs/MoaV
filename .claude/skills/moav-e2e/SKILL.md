@@ -94,7 +94,7 @@ Fix the repo, don't paper over it in the test. Each of these was a real bug.
 
 | Symptom in the log | Cause | Fix |
 |---|---|---|
-| `sing-box: cannot execute: required file not found` | Prebuilt sing-box is glibc-dynamic (`/lib64/ld-linux-x86-64.so.2`); client image is Alpine/musl | `Dockerfile.client` installs real glibc + the `/lib64` loader symlink. Verify: `docker run --rm moav-client sing-box version` |
+| `sing-box: cannot execute: required file not found` | The plain `linux-<arch>` sing-box asset is glibc-dynamic (`/lib64/ld-linux-x86-64.so.2`); client image is Alpine/musl | `Dockerfile.client` must download the `-linux-<arch>-musl` asset (no glibc shim since Alpine 3.24). Verify: `docker run --rm moav-client sing-box version` |
 | Protocol error unchanged after a client fix | `moav test` reused a **stale** `moav-client` image | `moav test` always rebuilds now; if editing older code, `docker rmi moav-client` first |
 | `too many certificates … retry after <date>` | LE 5/week per-domain limit — a run re-issued the cert | Domain runs reuse the `moav_certs` volume; only `full` wipes it. Blocked? use `-f domainless=true`. |
 | `certbot … exit 1` on first issue | Apex A record missing / port 80 closed / Cloudflare-proxied (HTTP-01 needs DNS-only) | Fix DNS; diagnostics step dumps the certbot log |
