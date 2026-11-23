@@ -76,6 +76,19 @@ grep -qE 'chown -R "0:\$ADMIN_GID" /configs/' "$ROOT/scripts/bootstrap.sh" \
     && ok "bootstrap keeps configs owner root" \
     || bad "bootstrap no longer chowns configs to 0:\$ADMIN_GID — DAC-less container roots lose read"
 
+# The e2e used to `chown -R runner configs` after start, so every later WG/AWG
+# restart crash-looped. Runner access must go through tests/e2e-runner-access.sh.
+if grep -qE '^[^#]*chown -R [^#]*configs' "$ROOT/.github/workflows/e2e.yml"; then
+    bad "e2e.yml chowns configs/ to the runner again — WG/AWG crash-loop on the next restart"
+else
+    ok "e2e.yml leaves configs/{wireguard,amneziawg} owned by root"
+fi
+for ep in wireguard amneziawg; do
+    grep -q 'permission denied reading' "$ROOT/scripts/$ep-entrypoint.sh" \
+        && ok "$ep entrypoint reports EACCES as permission denied, not 'not found'" \
+        || bad "$ep entrypoint reports an unreadable config as 'Config file not found'"
+done
+
 # --- the world-read split -------------------------------------------------
 # wireguard/amneziawg configs (server private keys) are consumed by
 # container-root: fully locked. sing-box/xray/telemt/trusttunnel run their

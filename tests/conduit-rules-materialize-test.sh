@@ -100,10 +100,12 @@ mode=$(stat -c '%a' "$WORK/configs/monitoring/textfile" 2>/dev/null || stat -f '
 # 6. e2e RUNNING check: no .ExitCode template (docker has none; the step then
 #    inspects nothing), and it must refuse to pass with zero rows.
 E2E="$ROOT/.github/workflows/e2e.yml"
-grep -q '{{.ExitCode}}' "$E2E" \
+# The check lives in tests/e2e-assert-running.sh, which e2e.yml calls (start + post-test).
+E2E_CHECK=("$E2E" "$ROOT/tests/e2e-assert-running.sh")
+grep -q '{{.ExitCode}}' "${E2E_CHECK[@]}" \
     && bad "e2e uses {{.ExitCode}}, which docker ps rejects: the RUNNING check inspects nothing" \
     || ok "e2e RUNNING check does not use the nonexistent .ExitCode field"
-grep -q 'listed no moav-\* containers' "$E2E" \
+grep -q 'listed no moav-\* containers' "${E2E_CHECK[@]}" \
     && ok "e2e RUNNING check fails when it inspected no containers" \
     || bad "e2e RUNNING check can pass having inspected zero containers"
 # The exit-code parser must read both Exited and Restarting statuses.
@@ -112,7 +114,7 @@ parse() { printf '%s' "$1" | sed -nE 's/^(Exited|Restarting) \(([0-9]+)\).*/\2/p
    && [ "$(parse 'Exited (137) 1 minute ago')" = "137" ] && [ -z "$(parse 'Up 2 minutes (healthy)')" ] \
     && ok "exit code is parsed from .Status for Exited and Restarting" \
     || bad "exit-code parser: $(parse 'Exited (0) x')/$(parse 'Restarting (2) x')/$(parse 'Up 2m')"
-grep -qF "sed -nE 's/^(Exited|Restarting) \\(([0-9]+)\\).*/\\2/p'" "$E2E" \
+grep -qF "sed -nE 's/^(Exited|Restarting) \\(([0-9]+)\\).*/\\2/p'" "${E2E_CHECK[@]}" \
     && ok "e2e uses that parser" \
     || bad "e2e parser drifted from the one tested here"
 

@@ -20,8 +20,20 @@ echo "[wireguard] Starting WireGuard..."
 
 # Check if config exists
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo "[wireguard] ERROR: Config file not found at $CONFIG_FILE"
-    echo "[wireguard] Run bootstrap first to generate WireGuard configuration"
+    # [ -f ] is also false on EACCES; tell the two apart so nobody re-bootstraps a perms bug.
+    _read_err=$(cat "$CONFIG_FILE" 2>&1 >/dev/null || true)
+    case "$_read_err" in
+        *[Pp]ermission\ denied*)
+            echo "[wireguard] ERROR: permission denied reading $CONFIG_FILE"
+            echo "[wireguard] $(ls -ldn "$(dirname "$CONFIG_FILE")" 2>&1)"
+            echo "[wireguard] This container has no DAC override, so root must OWN the config."
+            echo "[wireguard] Run 'moav start' to repair permissions (do not re-run bootstrap)."
+            ;;
+        *)
+            echo "[wireguard] ERROR: Config file not found at $CONFIG_FILE"
+            echo "[wireguard] Run bootstrap first to generate WireGuard configuration"
+            ;;
+    esac
     exit 1
 fi
 

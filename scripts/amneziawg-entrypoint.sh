@@ -20,8 +20,20 @@ echo "[amneziawg] Starting AmneziaWG..."
 
 # Check if config exists
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo "[amneziawg] ERROR: Config file not found at $CONFIG_FILE"
-    echo "[amneziawg] Run bootstrap first to generate AmneziaWG configuration"
+    # [ -f ] is also false on EACCES; tell the two apart so nobody re-bootstraps a perms bug.
+    _read_err=$(cat "$CONFIG_FILE" 2>&1 >/dev/null || true)
+    case "$_read_err" in
+        *[Pp]ermission\ denied*)
+            echo "[amneziawg] ERROR: permission denied reading $CONFIG_FILE"
+            echo "[amneziawg] $(ls -ldn "$(dirname "$CONFIG_FILE")" 2>&1)"
+            echo "[amneziawg] This container has no DAC override, so root must OWN the config."
+            echo "[amneziawg] Run 'moav start' to repair permissions (do not re-run bootstrap)."
+            ;;
+        *)
+            echo "[amneziawg] ERROR: Config file not found at $CONFIG_FILE"
+            echo "[amneziawg] Run bootstrap first to generate AmneziaWG configuration"
+            ;;
+    esac
     exit 1
 fi
 
