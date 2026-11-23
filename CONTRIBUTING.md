@@ -48,7 +48,13 @@ generation), you can work locally — much of the logic is pure and unit-tested
 
 Every PR to `dev`/`main` runs the CI gate (`.github/workflows/ci.yml`):
 
-- `shellcheck --severity=error` + `bash -n` across all shell scripts,
+- `shellcheck --severity=error` + `bash -n` / `sh -n` across all shell scripts,
+- `shellcheck --severity=warning` with **no new findings**: the warnings that
+  predate the gate are recorded in `tests/shellcheck-baseline.txt` and may only
+  go down. Fix a new warning, or silence it in place with
+  `# shellcheck disable=SCxxxx` and a reason; never add a baseline line for it.
+  If you fix an old one, run `scripts/lint-shell.sh --update` and commit the
+  smaller baseline.
 - `go test -race` for `dns-router`,
 - `docker compose config` validation.
 
@@ -56,6 +62,7 @@ Run these locally before pushing:
 
 ```bash
 git ls-files '*.sh' 'moav.sh' | xargs shellcheck --severity=error
+bash scripts/lint-shell.sh                # warning level, needs the pinned shellcheck
 ( cd dns-router && go test ./... )
 bash tests/singbox-links-test.sh          # share-link golden test
 python3 scripts/gen-protocol-docs.py --check     # protocol-roster drift gate

@@ -110,6 +110,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   transport gets its own pass with the other one firewalled off, because the
   client quietly switches transport when its preferred one is down. A single
   run used to prove only whichever came up first.
+- **Shell lint now blocks at warning level.** CI ran `shellcheck
+  --severity=error` only, so warnings never failed a PR. `scripts/lint-shell.sh`
+  fails on any warning that is not in `tests/shellcheck-baseline.txt` (the 393
+  that predate the gate), on a pinned shellcheck 0.11.0. The parse check also
+  covers the `#!/bin/sh` entrypoints it used to skip.
 
 ### Deprecated
 - **Slipstream (phase 1 of removal).** Upstream slipstream-rust is archived
