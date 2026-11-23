@@ -44,6 +44,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The `moav test` client image keeps its Alpine 3.21 runtime stage for now:
     its sgerrand glibc package does not install under Alpine 3.24's apk on
     arm64. Moving it is tracked with the glibc removal.
+- **docker-socket-proxy v0.5.0 -> `3.4@sha256:027f9fa5...`** (upstream
+  [v0.6.0](https://github.com/Tecnativa/docker-socket-proxy/releases/tag/v0.6.0)).
+  Upstream retired the `:vX.Y.Z` tags, so `v0.5.0` is never rebuilt and its
+  HAProxy and Alpine layers have aged since July. The `3.4` tag is rebuilt
+  weekly; it is pinned by digest so the container that fronts the Docker
+  socket stays reproducible. Same filter config and entrypoint, HAProxy
+  3.4.2 -> 3.4.7. Picked up on the next `moav start` (the image is pulled).
+- **CI actions moved to current majors, pinned by commit SHA:**
+  `actions/checkout` v4 -> v7.0.1, `actions/setup-go` v5 -> v7.1.0,
+  `actions/upload-artifact` v4 -> v7.0.2. These run on Node 24, so a
+  self-hosted e2e runner must be at Actions Runner 2.327.1 or newer.
 
 ### Fixed
 - **`moav update` now tracks the AmneziaWG pins.** `AMNEZIAWG_GO_VERSION` and
