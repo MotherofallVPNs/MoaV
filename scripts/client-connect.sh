@@ -19,6 +19,8 @@ CONFIG_DIR="${CONFIG_DIR:-/config}"
 PROTOCOL="${PROTOCOL:-auto}"
 SOCKS_PORT="${SOCKS_PORT:-1080}"
 HTTP_PORT="${HTTP_PORT:-8080}"
+# curl -4: curl 8.23 (Alpine 3.24) hands the SOCKS proxy an IPv6 literal when
+# --socks5 resolves locally; servers without IPv6 egress then fail every probe.
 TEST_URL="${TEST_URL:-https://www.google.com/generate_204}"
 TEST_TIMEOUT="${TEST_TIMEOUT:-10}"
 
@@ -501,10 +503,10 @@ connect_singbox() {
 
     # Test connection
     sleep 1
-    if curl -sf --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         # Get exit IP for display
-        EXIT_IP=$(curl -sf --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || echo "")
+        EXIT_IP=$(curl -sf -4 --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf -4 --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || echo "")
         return 0
     else
         log_warn "Connection test failed for $protocol"
@@ -536,9 +538,9 @@ connect_wireguard() {
     fi
 
     # Test connection
-    if curl -sf --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
-        EXIT_IP=$(curl -sf --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || echo "")
+    if curl -sf -4 --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+        EXIT_IP=$(curl -sf -4 --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf -4 --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || echo "")
         return 0
     else
         log_warn "Connection test failed for wireguard"
@@ -644,9 +646,9 @@ EOF
     fi
 
     # Test connection
-    if curl -sf --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
-        EXIT_IP=$(curl -sf --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || echo "")
+    if curl -sf -4 --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+        EXIT_IP=$(curl -sf -4 --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf -4 --socks5 127.0.0.1:$SOCKS_PORT --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || echo "")
         return 0
     else
         log_warn "Connection test failed for xhttp"
@@ -766,7 +768,7 @@ connect_dnstt() {
 
     # Test connectivity (with longer timeout for DNS tunnel)
     log_info "Testing tunnel connectivity..."
-    if curl -sf --socks5 127.0.0.1:$SOCKS_PORT --max-time 30 "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:$SOCKS_PORT --max-time 30 "$TEST_URL" >/dev/null 2>&1; then
         log_success "dnstt tunnel established and working"
         return 0
     else
@@ -831,7 +833,7 @@ connect_slipstream() {
 
     # Test connectivity (with longer timeout for DNS tunnel)
     log_info "Testing tunnel connectivity..."
-    if curl -sf --socks5 127.0.0.1:$SOCKS_PORT --max-time 30 "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:$SOCKS_PORT --max-time 30 "$TEST_URL" >/dev/null 2>&1; then
         log_success "Slipstream tunnel established and working"
         return 0
     else
@@ -1027,7 +1029,7 @@ EOF
     # Wait for bootstrap
     local attempts=0
     while [[ $attempts -lt 30 ]]; do
-        if curl -sf --socks5 127.0.0.1:$SOCKS_PORT --max-time 5 "$TEST_URL" >/dev/null 2>&1; then
+        if curl -sf -4 --socks5 127.0.0.1:$SOCKS_PORT --max-time 5 "$TEST_URL" >/dev/null 2>&1; then
             return 0
         fi
         sleep 2
