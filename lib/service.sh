@@ -850,7 +850,7 @@ repair_state_key_perms() {
     # a cap_drop-ALL container root cannot read once 0600. The three keys read
     # directly by non-root daemons (dnstt/masterdns/slipstream run USER moav)
     # stay 644 — inside the volume, the mount boundary is the control.
-    docker run --rm -v moav_moav_state:/state alpine sh -c '
+    docker run --rm -v moav_moav_state:/state alpine:3.24 sh -c '
         [ -d /state/keys ] || exit 0
         chown 0:0 /state/keys 2>/dev/null || true
         cd /state/keys 2>/dev/null || exit 0
@@ -916,7 +916,7 @@ ensure_clash_api_secret() {
 
     # Get the authoritative secret from state volume (source of truth from bootstrap)
     local state_secret
-    state_secret=$(docker run --rm -v moav_moav_state:/state alpine cat /state/keys/clash-api.env 2>/dev/null | grep "^CLASH_API_SECRET=" | cut -d'=' -f2 || true)
+    state_secret=$(docker run --rm -v moav_moav_state:/state alpine:3.24 cat /state/keys/clash-api.env 2>/dev/null | grep "^CLASH_API_SECRET=" | cut -d'=' -f2 || true)
 
     # If .env matches state, we're good
     if [[ -n "$current_secret" ]] && [[ "$current_secret" == "$state_secret" ]]; then

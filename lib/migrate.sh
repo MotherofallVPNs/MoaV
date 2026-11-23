@@ -47,7 +47,7 @@ cmd_export() {
         docker run --rm \
             -v moav_moav_state:/state:ro \
             -v "$export_dir/state:/backup" \
-            alpine sh -c "cp -a /state/. /backup/ 2>/dev/null || true"
+            alpine:3.24 sh -c "cp -a /state/. /backup/ 2>/dev/null || true"
 
         # Verify key files were exported
         if [[ -f "$export_dir/state/keys/reality.env" ]]; then
@@ -88,7 +88,7 @@ cmd_export() {
         docker run --rm \
             -v moav_moav_conduit:/data:ro \
             -v "$export_dir/conduit:/backup" \
-            alpine sh -c "cp -a /data/. /backup/ 2>/dev/null || true"
+            alpine:3.24 sh -c "cp -a /data/. /backup/ 2>/dev/null || true"
         success "    Conduit data exported"
     fi
 
@@ -99,7 +99,7 @@ cmd_export() {
         docker run --rm \
             -v moav_moav_certs:/certs:ro \
             -v "$export_dir/certs:/backup" \
-            alpine sh -c "cp -a /certs/. /backup/ 2>/dev/null || true"
+            alpine:3.24 sh -c "cp -a /certs/. /backup/ 2>/dev/null || true"
         success "    TLS certificates exported"
     fi
 
@@ -149,7 +149,7 @@ EOF
     # ("Permission denied" on keys/conduit datastore). Hand the staged copy back
     # to the invoking user via a root container so the tar can read everything.
     if [[ "$(id -u)" -ne 0 ]]; then
-        docker run --rm -v "$temp_dir:/export" alpine \
+        docker run --rm -v "$temp_dir:/export" alpine:3.24 \
             chown -R "$(id -u):$(id -g)" /export 2>/dev/null || true
     fi
 
@@ -263,7 +263,7 @@ cmd_import() {
         docker run --rm \
             -v moav_moav_state:/state \
             -v "$export_dir/state:/backup:ro" \
-            alpine sh -c "rm -rf /state/* && cp -a /backup/. /state/"
+            alpine:3.24 sh -c "rm -rf /state/* && cp -a /backup/. /state/"
 
         success "    State imported to Docker volume"
     fi
@@ -275,7 +275,7 @@ cmd_import() {
         docker run --rm \
             -v moav_moav_conduit:/data \
             -v "$export_dir/conduit:/backup:ro" \
-            alpine sh -c "rm -rf /data/* && cp -a /backup/. /data/"
+            alpine:3.24 sh -c "rm -rf /data/* && cp -a /backup/. /data/"
         success "    Conduit data imported"
     fi
 
@@ -286,7 +286,7 @@ cmd_import() {
         docker run --rm \
             -v moav_moav_certs:/certs \
             -v "$export_dir/certs:/backup:ro" \
-            alpine sh -c "rm -rf /certs/* && cp -a /backup/. /certs/"
+            alpine:3.24 sh -c "rm -rf /certs/* && cp -a /backup/. /certs/"
         success "    TLS certificates imported"
     fi
 

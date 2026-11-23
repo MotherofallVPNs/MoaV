@@ -93,6 +93,10 @@ If any component versions were bumped in this release, verify they are consisten
 
 Pattern: `.env.example` is the source, `docker-compose.yml` passes as build arg with fallback default, `Dockerfile` has `ARG` with same fallback default.
 
+Renovate (`.github/renovate.json`) opens grouped PRs against `dev` that update all three places together, plus the
+pinned `image:tag@sha256` defaults in `docker-compose.yml`. Review the upstream notes before merging. New components
+need a matching `customManagers` entry there, or Renovate won't see them.
+
 ---
 
 ## 5. Commit and Tag

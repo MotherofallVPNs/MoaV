@@ -351,7 +351,7 @@ cmd_switch_dns() {
         esac
         [[ -z "$key_paths" ]] && continue
         for p in $key_paths; do
-            if ! docker run --rm -v moav_moav_state:/state alpine test -f "$p" 2>/dev/null; then
+            if ! docker run --rm -v moav_moav_state:/state alpine:3.24 test -f "$p" 2>/dev/null; then
                 warn "$t is missing key file: ${p##*/}"
                 needs_bootstrap=true
             fi

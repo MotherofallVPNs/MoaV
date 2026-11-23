@@ -162,7 +162,7 @@ peers_clear_state_env() {
     local envf="${STATE_DIR:-state}/users/$user/${svc}.env"
     [[ -f "$envf" ]] && { rm -f "$envf" 2>/dev/null && gone=0; }
     # Same volume name and image as scripts/user-revoke.sh uses for its cleanup.
-    if docker run --rm -v moav_moav_state:/state alpine \
+    if docker run --rm -v moav_moav_state:/state alpine:3.24 \
         sh -c "[ -f /state/users/$user/${svc}.env ] && rm -f /state/users/$user/${svc}.env" 2>/dev/null
     then
         gone=0

@@ -358,7 +358,7 @@ services:
   # CERTBOT: TLS certificate management
   # ===========================================================================
   certbot:
-    image: ${IMAGE_CERTBOT:-certbot/certbot:latest}
+    image: ${IMAGE_CERTBOT:-certbot/certbot:v5.10.0@sha256:c5698da859429ccee0fcc299a8000368198222d1f9e789ab6e388b491e8ce06d}
     container_name: moav-certbot
     depends_on:
       - decoy
@@ -404,7 +404,7 @@ services:
   # DECOY: Static website (served by sing-box fallback)
   # ===========================================================================
   decoy:
-    image: ${IMAGE_NGINX:-nginx:alpine}
+    image: ${IMAGE_NGINX:-nginx:1.31.9-alpine@sha256:fb4658584bd9a916ffb6f6e365f97c25cfdb2923801f551ea08356e695f14ff7}
     container_name: moav-decoy
     restart: unless-stopped
     logging: *default-logging
@@ -880,7 +880,7 @@ services:
   # MONITORING: Prometheus + Grafana observability stack
   # ===========================================================================
   prometheus:
-    image: ${IMAGE_PROMETHEUS:-prom/prometheus:latest}
+    image: ${IMAGE_PROMETHEUS:-prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06}
     container_name: moav-prometheus
     restart: unless-stopped
     logging: *default-logging
@@ -921,7 +921,7 @@ services:
       - all
 
   grafana:
-    image: ${IMAGE_GRAFANA:-grafana/grafana:latest}
+    image: ${IMAGE_GRAFANA:-grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf}
     container_name: moav-grafana
     restart: unless-stopped
     # Same reason as admin: the entrypoint execs grafana, so PID 1 does not reap.
@@ -991,7 +991,7 @@ services:
   # Uses port 2083 (Cloudflare-supported HTTPS port)
   # Setup: Add DNS record grafana.yourdomain.xyz -> server IP (Cloudflare proxied, orange cloud)
   grafana-proxy:
-    image: ${IMAGE_NGINX:-nginx:alpine}
+    image: ${IMAGE_NGINX:-nginx:1.31.9-alpine@sha256:fb4658584bd9a916ffb6f6e365f97c25cfdb2923801f551ea08356e695f14ff7}
     container_name: moav-grafana-proxy
     restart: unless-stopped
     logging: *default-logging
@@ -1029,7 +1029,7 @@ services:
       - all
 
   node-exporter:
-    image: ${IMAGE_NODE_EXPORTER:-prom/node-exporter:latest}
+    image: ${IMAGE_NODE_EXPORTER:-prom/node-exporter:v1.13.1@sha256:7296504d4ada44b7d7ab4431e27e9f9900d8488f8d55842f4b12ae2704e16dfe}
     container_name: moav-node-exporter
     restart: unless-stopped
     logging: *default-logging
@@ -1073,8 +1073,9 @@ services:
     # deployment mode. Scope limits: every mount is :ro, its API is read-only
     # metrics on an internal port, and the whole service only exists under the
     # opt-in `monitoring` profile — disable monitoring and it is gone.
+    # gcr.io/cadvisor is frozen at v0.55.1; upstream publishes to ghcr.io now.
     # Use IMAGE_CADVISOR env var, or build locally with: moav build --local
-    image: ${IMAGE_CADVISOR:-gcr.io/cadvisor/cadvisor:latest}
+    image: ${IMAGE_CADVISOR:-ghcr.io/google/cadvisor:v0.61.1@sha256:4929b70e82079d001d0028b85d6a4dd25ad4666b719455c9542b983489963916}
     container_name: moav-cadvisor
     restart: unless-stopped
     logging: *default-logging
@@ -1310,7 +1311,7 @@ services:
   # Uses curlimages/curl (~9 MB) instead of python:3.11-alpine (~50 MB).
   # curl + ca-certs + gunzip (busybox) all pre-installed; no apk needed.
   geoip-updater:
-    image: curlimages/curl:latest
+    image: curlimages/curl:8.23.0@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93
     container_name: moav-geoip-updater
     user: "0:0"  # curlimages/curl defaults to UID 100; need root to write mounted volume
     volumes:
@@ -1337,7 +1338,7 @@ services:
   # NOT the same as the db-ip mmdb above: that one is binary MaxMind format for
   # our Python exporters, and the two are not interchangeable.
   tor-geoip-updater:
-    image: curlimages/curl:latest
+    image: curlimages/curl:8.23.0@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93
     container_name: moav-tor-geoip-updater
     user: "0:0"  # same reason as geoip-updater: curlimages/curl is UID 100 and cannot write the volume
     entrypoint: ["/bin/sh"]

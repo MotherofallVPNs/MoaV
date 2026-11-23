@@ -1,0 +1,417 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    ":semanticCommitTypeAll(chore)",
+    ":semanticCommitScope(deps)"
+  ],
+  "baseBranchPatterns": [
+    "dev"
+  ],
+  "enabledManagers": [
+    "dockerfile",
+    "docker-compose",
+    "github-actions",
+    "custom.regex"
+  ],
+  "dependencyDashboard": {
+    "enabled": false
+  },
+  "timezone": "UTC",
+  "schedule": [
+    "* 0-5 * * 1"
+  ],
+  "prConcurrentLimit": 4,
+  "prHourlyLimit": 2,
+  "automerge": false,
+  "rebaseWhen": "conflicted",
+  "labels": [
+    "dependencies"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])SINGBOX_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "SagerNet/sing-box",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])WSTUNNEL_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "erebe/wstunnel",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])CONDUIT_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "Psiphon-Inc/conduit",
+      "extractVersionTemplate": "^release-cli-(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])SNOWFLAKE_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "thetorproject/snowflake-proxy",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])TRUSTTUNNEL_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "TrustTunnel/TrustTunnel",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])TRUSTTUNNEL_CLIENT_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "TrustTunnel/TrustTunnelClient",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])AMNEZIAWG_GO_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "amnezia-vpn/amneziawg-go"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])AWGTOOLS_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "amnezia-vpn/amneziawg-tools",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])SLIPSTREAM_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "net2share/slipstream-rust-build",
+      "extractVersionTemplate": "^v(?<version>.+)$",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])TELEMT_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "telemt/telemt"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])DNSTT_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "git-tags",
+      "depNameTemplate": "https://www.bamsoftware.com/git/dnstt.git"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])MASTERDNS_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "masterking32/MasterDnsVPN",
+      "versioningTemplate": "regex:^v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\.(?<build>\\d+)(?:-[0-9a-f]+)?$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])GOOSERELAY_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "kianmhz/GooseRelayVPN"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])XRAY_VERSION(?:=|:-)(?<currentValue>v[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "XTLS/Xray-core"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])XRAY_VERSION(?:=|:-)(?<currentValue>\\d[^\\s}\"\\']*)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "XTLS/Xray-core",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])PROMETHEUS_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "prometheus/prometheus",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])GRAFANA_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "grafana/grafana",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])NODE_EXPORTER_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "prometheus/node_exporter",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.env\\.example$/",
+        "/^docker-compose\\.yml$/",
+        "/^dockerfiles/Dockerfile\\.[^/]+$/"
+      ],
+      "matchStrings": [
+        "(?:^|[\\s{])CADVISOR_VERSION(?:=|:-)(?<currentValue>[^\\s}\"\\']+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "google/cadvisor",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/\\.sh$/",
+        "/^\\.github/workflows/[^/]+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "(?:^|\\s)(?<depName>alpine|python):(?<currentValue>\\d[\\w.-]*)\\s"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Snowflake upstream image is versioned via SNOWFLAKE_VERSION (protocol components); don't track the FROM line separately",
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchDepNames": [
+        "thetorproject/snowflake-proxy"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Protocol components (.env.example + compose build args + Dockerfile ARGs move together)",
+      "matchDepNames": [
+        "Psiphon-Inc/conduit",
+        "SagerNet/sing-box",
+        "TrustTunnel/TrustTunnel",
+        "TrustTunnel/TrustTunnelClient",
+        "XTLS/Xray-core",
+        "amnezia-vpn/amneziawg-go",
+        "amnezia-vpn/amneziawg-tools",
+        "erebe/wstunnel",
+        "https://www.bamsoftware.com/git/dnstt.git",
+        "kianmhz/GooseRelayVPN",
+        "masterking32/MasterDnsVPN",
+        "net2share/slipstream-rust-build",
+        "telemt/telemt",
+        "thetorproject/snowflake-proxy"
+      ],
+      "groupName": "protocol components"
+    },
+    {
+      "description": "Monitoring stack: release versions for local builds and the compose runtime images",
+      "matchDepNames": [
+        "prometheus/prometheus",
+        "grafana/grafana",
+        "prometheus/node_exporter",
+        "google/cadvisor",
+        "prom/prometheus",
+        "prom/node-exporter",
+        "ghcr.io/google/cadvisor"
+      ],
+      "groupName": "monitoring stack"
+    },
+    {
+      "description": "Other compose runtime images",
+      "matchManagers": [
+        "docker-compose"
+      ],
+      "matchDepNames": [
+        "!prom/prometheus",
+        "!grafana/grafana",
+        "!prom/node-exporter",
+        "!ghcr.io/google/cadvisor"
+      ],
+      "groupName": "runtime images"
+    },
+    {
+      "description": "Dockerfile base/builder images and the alpine/python helper images used by scripts",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchManagers": [
+        "dockerfile",
+        "custom.regex"
+      ],
+      "matchDepNames": [
+        "!thetorproject/snowflake-proxy"
+      ],
+      "groupName": "base images"
+    },
+    {
+      "description": "GitHub Actions (kept SHA-pinned with a version comment)",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github actions",
+      "schedule": [
+        "* 0-5 1 * *"
+      ]
+    },
+    {
+      "description": "Digest-only refreshes (same tag, rebuilt upstream): one batch a month",
+      "matchUpdateTypes": [
+        "digest",
+        "pinDigest"
+      ],
+      "groupName": "image digest refresh",
+      "schedule": [
+        "* 0-5 1 * *"
+      ]
+    },
+    {
+      "description": "Majors never ride along with a batch",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "groupName": null,
+      "addLabels": [
+        "major"
+      ]
+    },
+    {
+      "description": "Never automerge",
+      "matchPackageNames": [
+        "*"
+      ],
+      "automerge": false
+    }
+  ]
+}

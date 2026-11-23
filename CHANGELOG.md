@@ -20,6 +20,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   threshold shared by the renewal job, doctor and the start line.
 
 ### Changed
+- **Floating images pinned.** Every default runtime image in
+  `docker-compose.yml` is now an explicit tag plus a multi-arch digest
+  (`image:tag@sha256:...`) instead of `:latest` / `nginx:alpine`. Each digest is
+  the one `:latest` pointed at on 2026-11-23, so nothing changes at runtime,
+  apart from cAdvisor below. Overriding through `IMAGE_*` in `.env` works as
+  before.
+  - certbot `v5.10.0`, nginx `1.31.9-alpine` (decoy + grafana-proxy),
+    Prometheus `v3.16.0`, Grafana `13.3.1`, node_exporter `v1.13.1`,
+    curl `8.23.0` (both GeoIP updaters).
+  - **cAdvisor moves to `ghcr.io/google/cadvisor:v0.61.1`.** The old
+    `gcr.io/cadvisor/cadvisor:latest` stopped at v0.55.1 and upstream only
+    publishes to ghcr.io now. This also matches `CADVISOR_VERSION` for
+    `moav build --local`.
+  - The one-shot `docker run ... alpine` helpers in `lib/` and `scripts/`
+    (state reads, migrate export/import, doctor checks) use `alpine:3.24`,
+    the same base as the built images, instead of an implicit `alpine:latest`.
+  - `anthropics/claude-code-action` is SHA-pinned like every other action.
+  - `moav uninstall --remove-images` removes external images by ID, because
+    digest-pinned pulls are listed as `repo:<none>`. The match list now also
+    covers the ghcr.io cAdvisor image, the pinned nginx tag and curl.
+- **Renovate** ([`.github/renovate.json`](.github/renovate.json)) watches the
+  component versions (`.env.example`, the compose build-arg defaults and the
+  Dockerfile `ARG` defaults move together in one PR), the Docker base and
+  runtime images, and the GitHub Actions SHA pins. Updates arrive as a few
+  grouped PRs against `dev` (protocol components, monitoring stack, runtime
+  images, base images, actions, a monthly digest refresh). Majors always get
+  their own PR. Weekly schedule, at most 4 open at a time, no automerge, no
+  Dependency Dashboard issue.
 - **amneziawg-go v3.1.20260828 -> [v3.1.20261116](https://github.com/amnezia-vpn/amneziawg-go/releases/tag/v3.1.20261116)**:
   hardening of the AWG 3.1 obfuscation parameters (`Jmin > Jmax` rejected
   instead of underflowing the junk packet size, negative lengths in

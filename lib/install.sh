@@ -347,7 +347,7 @@ do_uninstall() {
         echo ""
 
         # External images used by MoaV (from docker-compose.yml)
-        local external_image_patterns="prom/prometheus|grafana/grafana|prom/node-exporter|gcr.io/cadvisor|certbot/certbot|nginx:alpine"
+        local external_image_patterns="prom/prometheus|grafana/grafana|prom/node-exporter|gcr.io/cadvisor|ghcr.io/google/cadvisor|certbot/certbot|curlimages/curl|nginx:(([0-9.]+-)?alpine|<none>)"
 
         # Find MoaV-built images (moav-* prefix)
         local moav_images
@@ -388,7 +388,8 @@ do_uninstall() {
                 # Remove moav-* images (include tag for images like moav-nginx:local)
                 docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep -E "^moav-" | xargs -r docker rmi -f 2>/dev/null || true
                 # Remove external images
-                docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep -E "^($external_image_patterns)" | xargs -r docker rmi -f 2>/dev/null || true
+                # By ID: digest-pinned pulls list as repo:<none>, which rmi rejects.
+                docker images --format "{{.Repository}}:{{.Tag}} {{.ID}}" 2>/dev/null | grep -E "^($external_image_patterns)" | awk '{print $2}' | sort -u | xargs -r docker rmi -f 2>/dev/null || true
                 success "Docker images removed"
             else
                 echo "  Docker images kept"

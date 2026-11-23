@@ -750,7 +750,7 @@ doctor_check_config() {
 
     # Check bootstrap has been run
     local bootstrapped=false
-    docker run --rm -v moav_moav_state:/state alpine test -f /state/.bootstrapped 2>/dev/null && bootstrapped=true
+    docker run --rm -v moav_moav_state:/state alpine:3.24 test -f /state/.bootstrapped 2>/dev/null && bootstrapped=true
 
     if [[ "$bootstrapped" != "true" ]]; then
         echo -e "    ${RED}✗${NC} Bootstrap has not been run"
@@ -788,7 +788,7 @@ doctor_check_config() {
 
     # Check state keys
     local keys_exist=false
-    docker run --rm -v moav_moav_state:/state alpine test -d /state/keys 2>/dev/null && keys_exist=true
+    docker run --rm -v moav_moav_state:/state alpine:3.24 test -d /state/keys 2>/dev/null && keys_exist=true
     if [[ "$keys_exist" == "true" ]]; then
         echo -e "    ${GREEN}✓${NC} State keys directory exists"
     else
@@ -819,7 +819,7 @@ doctor_check_config() {
         local missing=""
         IFS=',' read -ra path_list <<< "$paths"
         for p in "${path_list[@]}"; do
-            if ! docker run --rm -v moav_moav_state:/state alpine test -f "$p" 2>/dev/null; then
+            if ! docker run --rm -v moav_moav_state:/state alpine:3.24 test -f "$p" 2>/dev/null; then
                 missing+="${p##*/} "
             fi
         done
@@ -1009,7 +1009,7 @@ EOF
     # anywhere (PR #152 class). Compare the rendered config against state.
     if [[ "$enable_reality" == "true" ]]; then
         local rcfg="$SCRIPT_DIR/configs/sing-box/config.json" state_sid=""
-        state_sid=$(docker run --rm -v moav_moav_state:/state alpine sh -c \
+        state_sid=$(docker run --rm -v moav_moav_state:/state alpine:3.24 sh -c \
             'grep "^REALITY_SHORT_ID=" /state/keys/reality.env 2>/dev/null | cut -d= -f2-' 2>/dev/null | tr -d '\r\n ')
         if [[ -n "$state_sid" && -f "$rcfg" ]]; then
             if grep -qF -- "$state_sid" "$rcfg"; then
