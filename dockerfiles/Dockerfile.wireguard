@@ -1,5 +1,5 @@
 # Minimal WireGuard container - uses config directly without auto-generation
-FROM alpine:3.21
+FROM alpine:3.24
 
 RUN apk add --no-cache \
     wireguard-tools \

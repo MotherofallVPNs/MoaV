@@ -6,7 +6,7 @@
 # ARM64: docker build --build-arg TARGETARCH=arm64 -f dockerfiles/Dockerfile.cadvisor -t moav-cadvisor:local .
 # =============================================================================
 
-FROM alpine:3.21
+FROM alpine:3.24
 
 ARG CADVISOR_VERSION=0.61.1
 ARG TARGETARCH

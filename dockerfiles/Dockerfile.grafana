@@ -5,7 +5,7 @@
 # Build: docker build -f dockerfiles/Dockerfile.grafana -t moav-grafana:local .
 # =============================================================================
 
-FROM alpine:3.21
+FROM alpine:3.24
 
 ARG GRAFANA_VERSION=13.3.0
 ARG TARGETARCH=amd64

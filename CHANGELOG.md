@@ -28,6 +28,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     **node_exporter 1.12.1 -> [1.13.1](https://github.com/prometheus/node_exporter/releases/tag/v1.13.1)**,
     **cAdvisor 0.60.6 -> [0.61.1](https://github.com/google/cadvisor/releases/tag/v0.61.1)**
     (`moav build --local` pins; default installs pull the upstream images).
+- **Base images off end-of-life releases.** No component version changes;
+  rebuild to pick it up (`moav build && moav start`).
+  - **Alpine 3.21 -> 3.24** as the runtime base of 13 images (amneziawg,
+    cadvisor, dns-router, dnstt, gooserelay, grafana, nginx, node-exporter,
+    prometheus, snowflake, telemt, wireguard, xray). Alpine 3.21 stopped
+    receiving fixes on 2026-11-01, which froze every `apk add` package in
+    those images (openssl, busybox, iptables, wireguard-tools, nginx).
+    3.24 is supported until 2028-06.
+  - **Go builders -> 1.27** for dns-router, gooserelay and the client's dnstt
+    stage (were 1.22, EOL since 2025-02), dnstt (1.24) and amneziawg (1.25),
+    plus the CI `go test` job. `dns-router/go.mod` stays at `go 1.22` on
+    purpose: that line is the language baseline, and keeping it preserves the
+    Go 1.22 runtime defaults in the binary.
+  - The `moav test` client image keeps its Alpine 3.21 runtime stage for now:
+    its sgerrand glibc package does not install under Alpine 3.24's apk on
+    arm64. Moving it is tracked with the glibc removal.
 
 ### Fixed
 - **`moav update` now tracks the AmneziaWG pins.** `AMNEZIAWG_GO_VERSION` and
