@@ -1616,6 +1616,60 @@ test_slipstream() {
     wait $pid 2>/dev/null || true
 }
 
+# Run trusttunnel_client on ONE transport and fetch through the tunnel. Sets
+# TT_PASS_RESULT (ok|notun|fail), TT_PASS_DETAIL, TT_PASS_EXIT_IP, TT_PASS_ISOLATED.
+trusttunnel_transport_pass() {
+    local proto="$1" base_config="$2" server_ip="$3" port="$4"
+    local config="$TEMP_DIR/trusttunnel-$proto.toml" log="$TEMP_DIR/trusttunnel-$proto.log"
+    TT_PASS_RESULT="fail"; TT_PASS_DETAIL=""; TT_PASS_EXIT_IP=""; TT_PASS_ISOLATED=false
+
+    sed -e "s|^upstream_protocol[[:space:]]*=.*|upstream_protocol = \"$proto\"|" \
+        -e 's|^upstream_fallback_protocol[[:space:]]*=.*|upstream_fallback_protocol = ""|' \
+        "$base_config" > "$config"
+
+    # The client falls back to the other transport on its own even with no
+    # fallback configured, so an "http3" pass could succeed over TCP. Block it.
+    local rule=()
+    case "$proto" in
+        http2) rule=(OUTPUT -d "$server_ip" -p udp --dport "$port" -j DROP) ;;
+        http3) rule=(OUTPUT -d "$server_ip" -p tcp --dport "$port" -j REJECT) ;;
+    esac
+    if iptables -I "${rule[@]}" 2>/dev/null; then TT_PASS_ISOLATED=true; fi
+
+    # TrustTunnel client creates TUN interface (full VPN)
+    trusttunnel_client --config "$config" >"$log" 2>&1 &
+    local pid=$!
+    sleep 8
+
+    if ! kill -0 "$pid" 2>/dev/null; then
+        # Match the client's TUN error exactly. A bare "tun" matched its own name
+        # on every log line, so ANY early exit (bad auth too) read as "no TUN".
+        if grep -q "Failed to initialize tunnel\|TUNSETIFF failed" "$log" 2>/dev/null; then
+            TT_PASS_RESULT="notun"
+        else
+            local reason
+            reason=$(grep -E 'ERROR|fatal|Failed to ping' "$log" 2>/dev/null | tail -2 | sed -E 's/^[0-9.: ]+//' | tr '\n"' '  ' || true)
+            TT_PASS_DETAIL="client exited before connecting${reason:+: $reason}"
+        fi
+    elif curl -sf --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1 && kill -0 "$pid" 2>/dev/null; then
+        # Must still be running: a dead client drops its routes and the fetch goes direct.
+        TT_PASS_RESULT="ok"
+        TT_PASS_EXIT_IP=$(curl -sf --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                          curl -sf --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+    else
+        TT_PASS_DETAIL="no traffic through the tunnel"
+        local error_msg
+        error_msg=$(grep -i "error\|fail\|unreachable\|timeout\|refused" "$log" 2>/dev/null | tail -3 | tr '\n"' '  ' || true)
+        [[ -n "$error_msg" ]] && TT_PASS_DETAIL="$error_msg"
+    fi
+
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    if [[ "$TT_PASS_ISOLATED" == "true" ]]; then iptables -D "${rule[@]}" 2>/dev/null || true; fi
+    rm -f "$config"
+    return 0
+}
+
 # Test TrustTunnel
 # Note: TrustTunnel CLI uses TUN interface (full VPN), not SOCKS proxy
 test_trusttunnel() {
@@ -1735,7 +1789,6 @@ test_trusttunnel() {
     fi
 
     # Full test with trusttunnel_client
-    local error_log="$TEMP_DIR/trusttunnel-error.log"
     local test_config="$TEMP_DIR/trusttunnel-test.toml"
 
     # Use TOML config if available, otherwise generate one
@@ -1766,73 +1819,60 @@ mtu_size = 1280
 EOF
     fi
 
-    log_debug "Starting trusttunnel_client with config..."
-    # TrustTunnel client creates TUN interface (full VPN)
-    trusttunnel_client --config "$test_config" >"$error_log" 2>&1 &
-    local pid=$!
-    sleep 8
-
-    if ! kill -0 $pid 2>/dev/null; then
-        # Check if it's a TUN/listener creation failure
-        if grep -qi "Failed to create listener\|tun\|permission" "$error_log" 2>/dev/null; then
-            log_debug "TUN interface creation failed, falling back to endpoint reachability test..."
-            rm -f "$test_config"
-
-            # Fall back to endpoint reachability test
-            if nc -z -w 3 "$server_ip" "$port" 2>/dev/null || curl -sf --max-time 3 "https://${host}:${port}" -o /dev/null 2>/dev/null; then
-                log_success "TrustTunnel config valid, endpoint reachable: ${host}:${port}"
-                RESULTS[trusttunnel]="pass"
-                DETAILS[trusttunnel]="Config valid, endpoint ${server_ip}:${port} reachable (TUN unavailable for full VPN test)"
-            else
-                log_warn "TrustTunnel config valid, endpoint may not be reachable: ${host}:${port}"
-                RESULTS[trusttunnel]="warn"
-                DETAILS[trusttunnel]="Config valid, endpoint ${server_ip}:${port} not reachable (may be blocked)"
-            fi
-            return
-        fi
-
-        detail="trusttunnel_client failed to start"
-        if [[ -s "$error_log" ]]; then
-            local error_msg=$(tail -5 "$error_log" 2>/dev/null | tr '\n' ' ' || true)
-            detail="TrustTunnel error: $error_msg"
-        fi
-        log_error "$detail"
-        RESULTS[trusttunnel]="fail"
-        DETAILS[trusttunnel]="$detail"
-        rm -f "$test_config"
-        return
-    fi
-
-    log_debug "trusttunnel_client running (PID $pid), testing connectivity..."
-
-    # Test connectivity directly (traffic goes through TUN interface)
-    if curl -sf --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
-        local exit_ip=""
-        exit_ip=$(curl -sf --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
-        if [[ -n "$exit_ip" ]]; then
-            log_success "TrustTunnel VPN connection successful (exit IP: $exit_ip)"
-            RESULTS[trusttunnel]="pass"
-            DETAILS[trusttunnel]="Connected via TrustTunnel VPN, exit IP: $exit_ip"
-        else
-            log_success "TrustTunnel VPN connection successful"
-            RESULTS[trusttunnel]="pass"
-            DETAILS[trusttunnel]="Connected via TrustTunnel VPN"
-        fi
-    else
-        detail="VPN connection test failed"
-        if [[ -s "$error_log" ]]; then
-            local error_msg=$(grep -i "error\|fail\|unreachable\|timeout\|refused" "$error_log" 2>/dev/null | tail -3 | tr '\n' ' ' || true)
-            [[ -n "$error_msg" ]] && detail="$error_msg"
-        fi
-        log_error "$detail"
-        RESULTS[trusttunnel]="fail"
-        DETAILS[trusttunnel]="$detail"
-    fi
-
-    kill $pid 2>/dev/null || true
-    wait $pid 2>/dev/null || true
+    # One pass per transport. The bundle prefers HTTP/2 and falls back to HTTP/3,
+    # so a single run only ever proved whichever transport came up first.
+    local proto label passed="" failed="" exit_ip="" isolated=true
+    for proto in http2 http3; do
+        label="HTTP/2"; [[ "$proto" == "http3" ]] && label="HTTP/3"
+        log_debug "Starting trusttunnel_client over $label..."
+        trusttunnel_transport_pass "$proto" "$test_config" "$server_ip" "$port"
+        [[ "$TT_PASS_ISOLATED" == "true" ]] || isolated=false
+        case "$TT_PASS_RESULT" in
+            ok)
+                passed="${passed:+$passed and }$label"
+                [[ -n "$TT_PASS_EXIT_IP" ]] && exit_ip="$TT_PASS_EXIT_IP"
+                ;;
+            notun)
+                # TUN worked for the previous transport, so this is a real failure.
+                if [[ -n "$passed" ]]; then
+                    failed="${failed:+$failed; }$label: client could not create its TUN listener"
+                    continue
+                fi
+                log_debug "TUN interface creation failed, falling back to endpoint reachability test..."
+                rm -f "$test_config"
+                if nc -z -w 3 "$server_ip" "$port" 2>/dev/null || curl -sf --max-time 3 "https://${host}:${port}" -o /dev/null 2>/dev/null; then
+                    log_success "TrustTunnel config valid, endpoint reachable: ${host}:${port}"
+                    RESULTS[trusttunnel]="pass"
+                    DETAILS[trusttunnel]="Config valid, endpoint ${server_ip}:${port} reachable (TUN unavailable for full VPN test)"
+                else
+                    log_warn "TrustTunnel config valid, endpoint may not be reachable: ${host}:${port}"
+                    RESULTS[trusttunnel]="warn"
+                    DETAILS[trusttunnel]="Config valid, endpoint ${server_ip}:${port} not reachable (may be blocked)"
+                fi
+                return
+                ;;
+            *)
+                failed="${failed:+$failed; }$label: $TT_PASS_DETAIL"
+                ;;
+        esac
+    done
     rm -f "$test_config"
+
+    # Without the firewall the client may have switched transport: say so.
+    local note=""
+    [[ "$isolated" == "true" ]] || note=" (transports not isolated: iptables unavailable)"
+
+    if [[ -z "$failed" ]]; then
+        detail="Connected via TrustTunnel VPN over $passed${exit_ip:+, exit IP: $exit_ip}$note"
+        log_success "$detail"
+        RESULTS[trusttunnel]="pass"
+        DETAILS[trusttunnel]="$detail"
+    else
+        detail="${passed:+$passed ok; }$failed$note"
+        log_error "TrustTunnel: $detail"
+        RESULTS[trusttunnel]="fail"
+        DETAILS[trusttunnel]="$detail"
+    fi
 }
 
 # Test XHTTP (VLESS+XHTTP+Reality via Xray-core)

@@ -266,7 +266,8 @@ connects and fetches an exit IP through the tunnel.
 |---|---|
 | **Live exit-IP** | reality, trojan, hysteria2, ss, xhttp |
 | Live, warn-gated | cdn (operator Cloudflare), xdns (resolver-sensitive) |
-| Live if binary present, else warn | dnstt, trusttunnel |
+| **Live exit-IP, once per transport** | trusttunnel: an HTTP/2 pass and an HTTP/3 pass, each with the other transport firewalled off (the client switches transport on its own otherwise). Either one failing is a `fail`. Without `/dev/net/tun` it degrades to a port-reachability pass |
+| Live if binary present, else warn | dnstt |
 | Expected `skip` (deprecated) | slipstream: off by default since 2026-11-23 and no longer routed by dns-router, so e2e bundles carry no Slipstream config. Do not re-enable it in e2e; the test is removed with the service in a later release. |
 
 > **`skip` is not a pass, and it is not a failure either.** dnstt sat at `skip`

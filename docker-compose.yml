@@ -684,7 +684,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.trusttunnel
       args:
-        TRUSTTUNNEL_VERSION: ${TRUSTTUNNEL_VERSION:-1.1.0}
+        TRUSTTUNNEL_VERSION: ${TRUSTTUNNEL_VERSION:-1.3.1}
     container_name: moav-trusttunnel
     restart: unless-stopped
     logging: *default-logging

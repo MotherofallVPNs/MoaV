@@ -199,6 +199,14 @@ jobs:
       - name: llms.txt links resolve (network)
         run: LLMS_CHECK_URLS=1 bash tests/llms-links-test.sh
 
+  trusttunnel-interop:
+    name: TrustTunnel endpoint (H2 + H3 interop)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: pinned endpoint <-> pinned client over HTTP/2 and HTTP/3
+        run: bash tests/trusttunnel-interop-test.sh
+
   go-test:
     name: go test dns-router
     runs-on: ubuntu-latest
