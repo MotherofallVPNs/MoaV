@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+- **Security policy** ([SECURITY.md](SECURITY.md)): supported versions, private
+  reporting through GitHub Private Vulnerability Reporting with an email
+  fallback, response targets, scope, safe harbor and reporter credit. Linked
+  from the README and the issue chooser.
 ### Changed
 - **amneziawg-go v3.1.20260828 -> [v3.1.20261116](https://github.com/amnezia-vpn/amneziawg-go/releases/tag/v3.1.20261116)**:
   hardening of the AWG 3.1 obfuscation parameters (`Jmin > Jmax` rejected
