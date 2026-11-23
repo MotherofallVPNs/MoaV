@@ -279,7 +279,8 @@ connects and fetches an exit IP through the tunnel.
 | Live **only where a WG kernel module exists** | wireguard, amneziawg (see below) |
 | Handshake probe only | telemt (Fake-TLS handshake, no MTProto session) |
 | Never runs in CI yet | anytls (test exists; blocked on a provisioning bug — enabling it breaks bootstrap; tracked on the board) |
-| Untestable from harness, always skip | masterdns (no standalone client), gooserelay (needs deployed Apps Script) |
+| Config + DNS path, no tunnel | masterdns: validates `masterdns-client_config.toml` (domain, generated key, method) and that the `m` subdomain has an NS delegation in public DNS (`warn` if not). No standalone client, so no traffic is carried. (It used to look for `masterdns-instructions.txt`, which bundles stopped shipping, so it always skipped.) |
+| Untestable from harness, always skip | gooserelay (needs deployed Apps Script; reads `gooserelay-client_config.json`) |
 
 **WireGuard / AmneziaWG — read this before trusting a green.** The live test
 runs inside the `moav-client` container (`moav test` grants it `NET_ADMIN` +

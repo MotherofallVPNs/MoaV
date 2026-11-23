@@ -2271,25 +2271,51 @@ test_wstunnel() {
 }
 
 # Test MasterDNS. No standalone MasterDNS client ships in this harness (it's a
-# MahsaNG v16 component), so this validates the bundle rather than tunnelling.
-# Honest skip with what to check manually.
+# MahsaNG v16 component), so this validates the bundled client config and that
+# the tunnel domain is delegated through public DNS. It carries no traffic.
 test_masterdns() {
     log_info "Testing MasterDNS..."
-    local f="$CONFIG_DIR/masterdns-instructions.txt"
+    local f="$CONFIG_DIR/masterdns-client_config.toml"
     if [[ ! -f "$f" ]]; then
         log_warn "No MasterDNS config in bundle"
         RESULTS[masterdns]="skip"; DETAILS[masterdns]="No MasterDNS config in bundle"; return
     fi
-    local detail="Bundle present; no standalone MasterDNS client in this harness — verify with a MahsaNG v16 client and check the 'm' subdomain NS delegation (moav doctor dns)"
-    log_warn "  $detail"
-    RESULTS[masterdns]="skip"; DETAILS[masterdns]="$detail"
+    local domain key method
+    domain=$(sed -nE 's/^DOMAINS[[:space:]]*=[[:space:]]*\["([^"]+)".*/\1/p' "$f" | head -1)
+    key=$(sed -nE 's/^ENCRYPTION_KEY[[:space:]]*=[[:space:]]*"([^"]*)".*/\1/p' "$f" | head -1)
+    method=$(sed -nE 's/^DATA_ENCRYPTION_METHOD[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$f" | head -1)
+    local problems=""
+    [[ -n "$domain" && "$domain" == *.* ]] || problems+="DOMAINS missing; "
+    [[ -n "$key" && "$key" != "KEY_NOT_GENERATED" ]] || problems+="ENCRYPTION_KEY not generated; "
+    [[ -n "$method" ]] || problems+="DATA_ENCRYPTION_METHOD missing; "
+    if [[ -n "$problems" ]]; then
+        log_error "  MasterDNS config invalid: $problems"
+        RESULTS[masterdns]="fail"; DETAILS[masterdns]="Bundle config invalid: ${problems%; }"; return
+    fi
+
+    # The tunnel needs the domain delegated to this server. Arbitrary names under
+    # it SERVFAIL through public resolvers (masterdns only answers its own
+    # protocol), so check the NS delegation instead.
+    local ns=""
+    if command -v dig >/dev/null 2>&1; then
+        ns=$(dig +short +tries=2 +time=5 @1.1.1.1 "$domain" NS 2>/dev/null | head -1)
+    fi
+    if [[ -n "$ns" ]]; then
+        local detail="Config valid; $domain is delegated (NS ${ns%.}) via public DNS. Tunnel itself needs a MahsaNG v16 client"
+        log_success "  $detail"
+        RESULTS[masterdns]="pass"; DETAILS[masterdns]="$detail"
+    else
+        local detail="Config valid for $domain, but public DNS has no NS delegation for it (or dig/resolver unavailable). Check: moav doctor dns"
+        log_warn "  $detail"
+        RESULTS[masterdns]="warn"; DETAILS[masterdns]="$detail"
+    fi
 }
 
 # Test GooseRelay. The exit server is only reachable via a Google Apps Script the
 # user deploys, so it can't be exercised from the harness. Honest skip.
 test_gooserelay() {
     log_info "Testing GooseRelay..."
-    local f="$CONFIG_DIR/gooserelay-instructions.txt"
+    local f="$CONFIG_DIR/gooserelay-client_config.json"
     if [[ ! -f "$f" ]]; then
         log_warn "No GooseRelay config in bundle (off by default)"
         RESULTS[gooserelay]="skip"; DETAILS[gooserelay]="No GooseRelay config in bundle"; return
