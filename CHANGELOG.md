@@ -241,6 +241,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   net2share/slipstream-rust-build assets unchecked. The default version's
   digests are now pinned in-tree, and any other `SLIPSTREAM_VERSION` is checked
   against that release's `SHA256SUMS`; a mismatch fails the build.
+- **TrustTunnel egress filtering follows `EGRESS_ISOLATION` and covers
+  DappNode's networks.** TrustTunnel relied only on its own
+  `allow_private_network_connections = false` check. That check ignored the
+  `EGRESS_ISOLATION` toggle, and it treats `172.33.0.0/16` (DappNode's dncore
+  network) as public, so a client could reach it over HTTP/2 and HTTP/3. The
+  entrypoint now applies the toggle to the runtime `vpn.toml` (no
+  re-bootstrap). With isolation on, the default, the endpoint's own check stays
+  on and a `MOAV-EGRESS-OUT` filter on the container's `OUTPUT` drops the shared
+  block list: RFC1918, CGNAT, link-local, loopback, IPv6 ULA/link-local, plus
+  `172.33.0.0/16` and `10.20.0.0/24`. Replies to clients and the container's DNS
+  still pass. With isolation off, both are lifted, as in the other layers. If
+  the filter cannot be installed while isolation is on, the container refuses
+  to start. On a normal VPS the toggle-on behavior is unchanged, except that
+  `172.33.0.0/16` (public space outside DappNode) is now unreachable through
+  TrustTunnel, per the shared block list. The image gains `iptables`, so
+  rebuild to pick it up (`moav build && moav start`).
 
 ### Documentation
 - **Security policy** ([SECURITY.md](SECURITY.md)): supported versions, private

@@ -702,6 +702,8 @@ services:
       - DOMAIN=${DOMAIN}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - TZ=${TZ:-UTC}
+      # Default on: tunneled traffic may not reach private/infra ranges.
+      - EGRESS_ISOLATION=${EGRESS_ISOLATION:-on}
     cap_drop:
       - ALL
     cap_add:
