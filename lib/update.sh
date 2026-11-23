@@ -303,6 +303,8 @@ check_component_versions() {
         "DNSTT_VERSION"
         "MASTERDNS_VERSION"
         "GOOSERELAY_VERSION"
+        "AMNEZIAWG_GO_VERSION"
+        "AWGTOOLS_VERSION"
     )
 
     local updates_available=()
@@ -338,6 +340,11 @@ check_component_versions() {
                 DNSTT_VERSION) services_to_rebuild+=("dnstt") ;;
                 MASTERDNS_VERSION) services_to_rebuild+=("masterdns") ;;
                 GOOSERELAY_VERSION) services_to_rebuild+=("gooserelay") ;;
+                AMNEZIAWG_GO_VERSION|AWGTOOLS_VERSION)
+                    if [[ ! " ${services_to_rebuild[*]} " =~ " amneziawg " ]]; then
+                        services_to_rebuild+=("amneziawg")
+                    fi
+                    ;;
             esac
         fi
     done

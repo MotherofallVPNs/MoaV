@@ -14,7 +14,7 @@ jobs:
     name: shellcheck + bash -n
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: List shell scripts
         id: files
         run: |
@@ -141,6 +141,11 @@ jobs:
         run: bash tests/admin-tls-test.sh
       - name: admin IP whitelist (CIDR) unit test
         run: python3 tests/admin-ip-whitelist-test.py
+      - name: admin dashboard renders on the pinned Python deps
+        run: |
+          python3 -m venv /tmp/admin-venv
+          /tmp/admin-venv/bin/pip install -q -r admin/requirements.txt
+          /tmp/admin-venv/bin/python tests/admin-dashboard-render-test.py
       - name: MahsaNet donate protocols validation
         run: python3 tests/mahsanet-protocols-test.py
       - name: refactor verification (static)
@@ -188,10 +193,10 @@ jobs:
     name: go test dns-router
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
-          go-version: '1.22'
+          go-version: '1.27'
           cache: false   # dns-router is stdlib-only (no go.sum to hash)
       - name: go vet
         working-directory: dns-router
@@ -204,7 +209,7 @@ jobs:
     name: docker compose config
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Validate compose file
         run: |
           cp .env.example .env
