@@ -84,7 +84,7 @@ if [ "$(metric moav_cert_managed)" = "1" ] && [ "$(metric moav_cert_renew_failed
 else
     bad "metric after healthy run: $(cat "$PROM" 2>/dev/null)"
 fi
-if [ -z "$(ls -A "$WORK/configs/monitoring/textfile" | grep -v '^moav_cert.prom$')" ]; then
+if [ -z "$(find "$WORK/configs/monitoring/textfile" -mindepth 1 -maxdepth 1 ! -name moav_cert.prom)" ]; then
     ok "metric write is atomic (no temp file left beside the .prom)"
 else
     bad "leftover files in textfile dir: $(ls -A "$WORK/configs/monitoring/textfile")"
