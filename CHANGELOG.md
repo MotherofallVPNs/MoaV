@@ -145,6 +145,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   container, which recreates exactly the ones whose config or image changed,
   and then restarts the rest as before. It still never brings up a service
   that was not there; `moav start` is unchanged.
+- **`moav regenerate-users` silently rotated the AmneziaWG server key and
+  obfuscation params.** Its provisioning run never set `STATE_DIR`, so
+  `generate_amneziawg_config` looked for `/keys/awg-server.key`, found nothing,
+  and wrote a throwaway key plus fresh H1-H4/S1-S4 into `awg0.conf`. Existing
+  AWG clients stopped connecting after the restart, and the next `moav update`
+  or bootstrap put the real key back, breaking the regenerated bundles instead.
+  The run now uses `/state`, as bootstrap does.
 - **`moav update` now tracks the AmneziaWG pins.** `AMNEZIAWG_GO_VERSION` and
   `AWGTOOLS_VERSION` were missing from the component-version check, so an
   existing `.env` never picked up a new amneziawg-go build.

@@ -752,7 +752,7 @@ cmd_regenerate_users() {
             -e "PORT_DNS=${port_dns:-53}" \
             -e "PORT_XDNS=${port_xdns:-53}" \
         --entrypoint /bin/bash \
-        bootstrap -c 'source /app/lib/common.sh; source /app/lib/sing-box.sh; source /app/lib/xray.sh; source /app/lib/sync.sh; source /app/lib/provision.sh; source /app/lib/amneziawg.sh; if [ "${ENABLE_AMNEZIAWG:-true}" = true ]; then generate_amneziawg_config; fi; provision_all_users force'; then
+        bootstrap -c 'export STATE_DIR=/state; source /app/lib/common.sh; source /app/lib/sing-box.sh; source /app/lib/xray.sh; source /app/lib/sync.sh; source /app/lib/provision.sh; source /app/lib/amneziawg.sh; if [ "${ENABLE_AMNEZIAWG:-true}" = true ]; then generate_amneziawg_config; fi; provision_all_users force'; then
         user_count=$(echo "$users_found" | wc -w | tr -d ' ')
         echo -e "  ${GREEN}✓${NC} provisioning run finished"
     else
