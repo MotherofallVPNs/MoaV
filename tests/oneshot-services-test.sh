@@ -43,16 +43,21 @@ done
 
 # --- e2e must derive the list, not carry one ---------------------------------
 E2E="$ROOT/.github/workflows/e2e.yml"
-grep -q 'oneshot.txt' "$E2E" \
+# The health check lives in a script the workflow calls (twice: start + after the mid-run steps).
+E2E_CHECK=("$E2E" "$ROOT/tests/e2e-assert-running.sh")
+grep -q 'tests/e2e-assert-running.sh' "$E2E" \
+    && ok "e2e runs the container health check" \
+    || bad "e2e no longer runs tests/e2e-assert-running.sh"
+grep -q 'oneshot.txt' "${E2E_CHECK[@]}" \
     && ok "e2e derives the one-shot set from docker-compose.yml" \
     || bad "e2e is back to a hand-written list, which is what drifted"
-grep -qE 'moav-certbot\|moav-bootstrap' "$E2E" \
+grep -qE 'moav-certbot\|moav-bootstrap' "${E2E_CHECK[@]}" \
     && bad "the old hand-written allowlist is still in e2e" \
     || ok "the old hand-written allowlist is gone"
 
 # A one-shot that FAILS must still fail the build; skipping by name alone would
 # have hidden a broken bootstrap.
-grep -q 'one-shot job that failed' "$E2E" \
+grep -q 'one-shot job that failed' "${E2E_CHECK[@]}" \
     && ok "a one-shot exiting non-zero still fails e2e" \
     || bad "one-shot jobs are skipped unconditionally, so a failing bootstrap passes"
 
