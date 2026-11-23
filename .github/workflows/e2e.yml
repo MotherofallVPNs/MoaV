@@ -366,9 +366,39 @@ jobs:
           # The sprint's worst bug lived exactly here (every user FAILED when
           # ENABLE_REALITY=false) and the command itself had never been run by
           # any test — only bootstrap's internal reconcile was exercised.
+          #
+          # #365: it also rotated the AWG server key + obfuscation params on every
+          # run, cutting off every existing AmneziaWG client. Snapshot both sides.
+          AWG=no; grep -qE '^ENABLE_AMNEZIAWG=true' .env && AWG=yes
+          awg_srv() { sudo grep -E '^(PrivateKey|Jc|Jmin|Jmax|S[1-4]|H[1-4]|I[1-5]) =' configs/amneziawg/awg0.conf | sha256sum; }
+          awg_cli_file() { compgen -G 'outputs/bundles/e2e-test/moav-*awg.conf' | head -1; }
+          awg_cli() { grep -E '^(PrivateKey|PublicKey|Jc|Jmin|Jmax|S[1-4]|H[1-4]|I[1-5]) =' "$(awg_cli_file)" | sha256sum; }
+          if [ "$AWG" = yes ]; then
+            [ -n "$(awg_cli_file)" ] || { echo "::error::e2e-test has no AmneziaWG config to compare"; exit 1; }
+            srv_before=$(awg_srv); cli_before=$(awg_cli)
+          fi
           ./moav.sh regenerate-users
           sudo chown -R "$USER" configs state outputs 2>/dev/null || true
           bash tests/assert-users-reconciled.sh
+          if [ "$AWG" = yes ]; then
+            [ "$(awg_srv)" = "$srv_before" ] \
+              || { echo "::error::regenerate-users changed the AmneziaWG server key or obfuscation params (#365)"; exit 1; }
+            [ "$(awg_cli)" = "$cli_before" ] \
+              || { echo "::error::regenerate-users changed e2e-test's AmneziaWG keys/params; the existing client would break"; exit 1; }
+            want=$(sed -n 's/^PublicKey = //p' "$(awg_cli_file)" | head -1)
+            live=""
+            for _ in $(seq 1 15); do
+              live=$(docker exec moav-amneziawg awg show awg0 public-key 2>/dev/null) && [ -n "$live" ] && break
+              sleep 2
+            done
+            if [ -z "$live" ]; then
+              echo "::warning::moav-amneziawg did not answer after regenerate-users (liveness is asserted after the connectivity tests)"
+            elif [ "$live" != "$want" ]; then
+              echo "::error::running AmneziaWG server key ($live) does not match the client bundle ($want)"; exit 1
+            else
+              echo "AmneziaWG server key + params unchanged across regenerate-users; live server matches the client ($live)"
+            fi
+          fi
           # Every regenerated guide must come back fully rendered.
           bad=0
           for b in outputs/bundles/*/README.html; do
