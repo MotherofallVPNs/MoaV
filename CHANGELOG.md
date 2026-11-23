@@ -86,6 +86,12 @@ Security and stability release. Tunneled client traffic is now kept away from pr
   threshold shared by the renewal job, doctor and the start line.
 
 ### Changed
+- **`moav test` uses TrustTunnel client 1.3.0** (was 1.0.49), so the e2e and
+  the CI interop job exercise the client release that ships in moav-client
+  v1.5.0 against endpoint 1.3.1 over HTTP/2 and HTTP/3. The test image now runs
+  `trusttunnel_client --version` at build time, so a broken asset no longer
+  passes as installed. `TRUSTTUNNEL_CLIENT_VERSION` in `.env` only affects the
+  test client image: `moav build client` picks it up.
 - **Floating images pinned.** Every default runtime image in
   `docker-compose.yml` is now an explicit tag plus a multi-arch digest
   (`image:tag@sha256:...`) instead of `:latest` / `nginx:alpine`. Each digest is
@@ -193,6 +199,23 @@ Security and stability release. Tunneled client traffic is now kept away from pr
   covers the `#!/bin/sh` entrypoints it used to skip.
 
 ### Fixed
+- **`moav start` no longer launches disabled DNS-tunnel containers.** The
+  `dnstunnel` profile groups dnstt, MasterDNS and Slipstream, so starting it
+  started all three regardless of their `ENABLE_*` flags. On a fresh install
+  Slipstream (off by default and unrouted) had no certificate, exited, and
+  restart-looped under `restart: unless-stopped`. `moav start`, `start all`,
+  the first-run start after bootstrap, the interactive menu and
+  `moav switch-dns` now leave out `slipstream` unless `ENABLE_SLIPSTREAM=true`,
+  and `dnstt` / `masterdns` when their flag is off. An upgraded install's
+  leftover Slipstream container is removed on the next start. `--force` and the
+  "start once" prompt answer still start everything asked for.
+- **e2e: the MasterDNS check runs again.** `moav test` looked for
+  `masterdns-instructions.txt`, which bundles stopped shipping, so MasterDNS was
+  always `skip`. It now reads `masterdns-client_config.toml`, validates the
+  domain, key and method, and checks the tunnel domain's NS delegation in
+  public DNS (`pass`, or `warn` when it is missing). It still carries no traffic (no standalone client). The GooseRelay
+  check had the same stale filename and now reads
+  `gooserelay-client_config.json`.
 - **WireGuard/AmneziaWG now say "permission denied" when they cannot read their
   config**, instead of "Config file not found ... run bootstrap first". These
   containers run without DAC capabilities, so a `configs/wireguard` or
