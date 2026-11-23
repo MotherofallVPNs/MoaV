@@ -13,7 +13,7 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 fi
 
 # Egress isolation is applied to a runtime copy: /etc/xray is read-only, and
-# this way the toggle takes effect on restart without a re-bootstrap.
+# this way a toggle change applies on `moav restart` without a re-bootstrap.
 RUNTIME_CONFIG="/tmp/xray-config.json"
 . /egress-isolation.sh
 # umask in a subshell: the copy holds the Reality key; the logs below stay 644.

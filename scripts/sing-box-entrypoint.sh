@@ -33,8 +33,9 @@ fi
 RUNTIME_CONFIG="/tmp/sing-box-config.json"
 cp "$CONFIG_FILE" "$RUNTIME_CONFIG"
 
-# Egress isolation is applied to the runtime copy (before validation), so the
-# toggle takes effect on restart and existing installs need no re-bootstrap.
+# Egress isolation is applied to the runtime copy (before validation), so a
+# toggle change applies when `moav restart` recreates the container, and
+# existing installs need no re-bootstrap.
 . /egress-isolation.sh
 if ! egress_singbox "$RUNTIME_CONFIG"; then
     echo "[sing-box] ERROR: could not apply egress isolation (EGRESS_ISOLATION=off bypasses)"

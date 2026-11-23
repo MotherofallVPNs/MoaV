@@ -1104,11 +1104,7 @@ restart_services() {
     echo ""
     info "Restarting services..."
 
-    if [[ "$profiles" == "--profile all" ]]; then
-        docker compose --profile all restart
-    else
-        docker compose $profiles restart
-    fi
+    compose_restart "$profiles" || { error "Restart failed"; return 1; }
 
     success "Services restarted!"
 }
@@ -1271,7 +1267,7 @@ show_log_help() {
     echo -e "${CYAN}Useful Commands:${NC}"
     echo "  • Check status:       docker compose ps"
     echo "  • Stop all:           docker compose --profile all stop"
-    echo "  • Restart service:    docker compose restart sing-box"
+    echo "  • Restart service:    moav restart sing-box"
 }
 
 cmd_profiles() {
@@ -1636,6 +1632,63 @@ cmd_stop() {
     fi
 }
 
+# `docker compose restart` keeps a container's old env and image, so an .env
+# edit (EGRESS_ISOLATION, ports, ...) never applied. `up -d` recreates exactly
+# the containers whose config or image changed; the rest are then restarted.
+# Only services that already have a container are touched, as before.
+# Usage: compose_restart "<--profile args>" [service...]  (none = whole profile)
+compose_restart() {
+    local profile_args="$1"; shift
+    local candidates
+    if [[ $# -gt 0 ]]; then
+        candidates="$*"
+    else
+        # shellcheck disable=SC2086
+        candidates=$(docker compose $profile_args config --services 2>/dev/null | tr '\n' ' ')
+    fi
+
+    local -A before=() after=() was_running=()
+    local svc id state
+    while read -r svc id state; do
+        [[ -n "$svc" ]] || continue
+        before[$svc]=$id
+        if [[ "$state" == "running" ]]; then was_running[$svc]=1; fi
+    done < <(docker compose --profile all ps -a --format '{{.Service}} {{.ID}} {{.State}}' 2>/dev/null)
+
+    local targets=()
+    for svc in $candidates; do
+        if [[ -n "${before[$svc]:-}" ]]; then targets+=("$svc"); fi
+    done
+    if [[ ${#targets[@]} -eq 0 ]]; then
+        warn "No containers to restart (bring services up with: moav start)"
+        return 0
+    fi
+
+    # --no-deps: like `restart`, never brings up a dependency that is down.
+    docker compose --profile all up -d --no-deps "${targets[@]}" || return 1
+
+    while read -r svc id; do
+        if [[ -n "$svc" ]]; then after[$svc]=$id; fi
+    done < <(docker compose --profile all ps -a --format '{{.Service}} {{.ID}}' 2>/dev/null)
+
+    local recreated=() bounce=()
+    for svc in "${targets[@]}"; do
+        if [[ "${after[$svc]:-}" != "${before[$svc]}" ]]; then
+            recreated+=("$svc")
+        elif [[ -n "${was_running[$svc]:-}" ]]; then
+            # Unchanged and was already up (a stopped one was just started).
+            bounce+=("$svc")
+        fi
+    done
+    if [[ ${#recreated[@]} -gt 0 ]]; then
+        info "Recreated (config or image changed): ${recreated[*]}"
+    fi
+    if [[ ${#bounce[@]} -gt 0 ]]; then
+        docker compose --profile all restart "${bounce[@]}" || return 1
+    fi
+    return 0
+}
+
 cmd_restart() {
     # restart reuses old images but the state volume is shared: an upgraded
     # install must still get its key/bundle perms repaired here (this path
@@ -1643,7 +1696,7 @@ cmd_restart() {
     ensure_perms_repaired
     if [[ $# -eq 0 ]] || [[ "$1" == "all" ]]; then
         info "Restarting all services..."
-        docker compose --profile all restart
+        compose_restart "--profile all" || return 1
         success "All services restarted!"
     elif [[ $# -eq 1 ]]; then
         # Single argument - only treat as profile if it's an exact profile name
@@ -1659,7 +1712,7 @@ cmd_restart() {
 
         if [[ -n "$profile_match" ]]; then
             info "Restarting $profile_match profile services..."
-            docker compose --profile "$profile_match" restart
+            compose_restart "--profile $profile_match" || return 1
             success "Profile $profile_match restarted!"
         else
             local services
@@ -1669,7 +1722,8 @@ cmd_restart() {
                 return 1
             fi
             info "Restarting: $services"
-            docker compose restart $services
+            # shellcheck disable=SC2086
+            compose_restart "" $services || return 1
             success "Services restarted!"
         fi
     else
@@ -1681,7 +1735,8 @@ cmd_restart() {
             return 1
         fi
         info "Restarting: $services"
-        docker compose restart $services
+        # shellcheck disable=SC2086
+        compose_restart "" $services || return 1
         success "Services restarted!"
     fi
 }

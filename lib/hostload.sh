@@ -113,7 +113,7 @@ hostload_status() {
         local wname; wname=$(host_proc_name "$worst")
         echo -e "    ${YELLOW}!${NC} $zcount zombie process(es), most under PID $worst (${wname:-gone})"
         echo -e "      ${DIM}That parent is not reaping. If it is a MoaV container, recreate it:${NC}"
-        echo -e "      ${DIM}moav start   # docker compose up -d; 'moav restart' keeps the old config${NC}"
+        echo -e "      ${DIM}moav restart <service>   # restarts it, recreating it if its config changed${NC}"
         pass=false
     else
         echo -e "    ${GREEN}✓${NC} $zcount zombie process(es)"

@@ -529,8 +529,8 @@ check_source_rebuilds() {
 # design — never auto-rebuilds or restarts a running server (a build-all would
 # OOM low-RAM VPSes, and restarting a live circumvention node is the operator's
 # call). Fixes two non-obvious gotchas: (1) `moav build` doesn't recreate
-# containers and `moav restart` reuses the old image — you need `moav start`
-# (up -d); (2) a config-template change needs a re-bootstrap, not just a build.
+# containers — `moav start` (or `moav restart`, for what is already running)
+# does; (2) a config-template change needs a re-bootstrap, not just a build.
 print_post_update_apply_steps() {
     local rebuild="${POST_UPDATE_REBUILD_SERVICES:-}"
     local templates="${POST_UPDATE_BOOTSTRAP_TEMPLATES:-}"
@@ -590,7 +590,7 @@ print_post_update_apply_steps() {
     fi
     echo ""
 
-    echo -e "${DIM}Note: 'moav restart' reuses the old image. Use 'moav start' (docker compose up -d) to pick up rebuilt images.${NC}"
+    echo -e "${DIM}Note: 'moav build' alone changes nothing that is running. 'moav start' (or 'moav restart' for running services) recreates containers on the new images.${NC}"
 }
 
 # Check for new variables in .env.example that are missing from .env
