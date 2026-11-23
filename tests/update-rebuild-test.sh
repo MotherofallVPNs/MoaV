@@ -68,6 +68,8 @@ must_queue "admin Dockerfile change"   admin       "dockerfiles/Dockerfile.admin
 must_queue "dns-router source change"  dns-router  "dns-router/main.go"
 must_queue "sing-box entrypoint"       sing-box    "scripts/sing-box-entrypoint.sh"
 must_queue "conduit name mismatch"     psiphon-conduit "scripts/conduit-entrypoint.sh"
+must_queue "egress lib (COPY'd)"       trusttunnel "scripts/lib/egress-isolation.sh"
+must_queue "trusttunnel egress lib"    trusttunnel "scripts/lib/egress-trusttunnel.sh"
 
 # --- bind-mounted / infra paths must NOT ------------------------------------
 must_not_queue() {  # <label> <path...>

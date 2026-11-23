@@ -30,6 +30,17 @@ cp "$CONFIG_DIR/vpn.toml" "$RUNTIME_DIR/vpn.toml"
 cp "$CONFIG_DIR/hosts.toml" "$RUNTIME_DIR/hosts.toml"
 cp "$CONFIG_DIR/credentials.toml" "$RUNTIME_DIR/credentials.toml"
 
+# Egress isolation goes on the runtime copy, so the toggle takes effect on
+# restart. Fatal on failure: an exit must not come up unfiltered.
+# shellcheck disable=SC1091  # baked into the image by Dockerfile.trusttunnel
+. /egress-isolation.sh
+# shellcheck disable=SC1091
+. /egress-trusttunnel.sh
+if ! egress_trusttunnel "$RUNTIME_DIR/vpn.toml"; then
+    echo "[TrustTunnel] ERROR: could not apply egress isolation (EGRESS_ISOLATION=off bypasses)"
+    exit 1
+fi
+
 # Wait for certificates to be available
 CERT_WAIT_TIMEOUT=60
 CERT_WAIT_COUNT=0

@@ -467,7 +467,8 @@ check_source_rebuilds() {
             dockerfiles/Dockerfile.psiphon) svc="psiphon-conduit" ;;   # name mismatch
             scripts/client-*.sh)            svc="client" ;;
             # COPY'd into every image that enforces egress isolation.
-            scripts/lib/egress-isolation.sh) svc="sing-box xray wireguard amneziawg" ;;
+            scripts/lib/egress-isolation.sh) svc="sing-box xray wireguard amneziawg trusttunnel" ;;
+            scripts/lib/egress-trusttunnel.sh) svc="trusttunnel" ;;
             scripts/*-entrypoint.sh)        svc="${f#scripts/}"; svc="${svc%-entrypoint.sh}" ;;
             dockerfiles/Dockerfile.*)       svc="${f#dockerfiles/Dockerfile.}" ;;
         esac

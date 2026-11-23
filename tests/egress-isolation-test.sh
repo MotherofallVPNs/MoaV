@@ -268,7 +268,7 @@ before() { # <file> <pattern-a> <pattern-b> -> true if a's first line precedes b
     a=$(grep -nF -- "$2" "$1" | head -1 | cut -d: -f1); b=$(grep -nF -- "$3" "$1" | head -1 | cut -d: -f1)
     [ -n "$a" ] && [ -n "$b" ] && [ "$a" -lt "$b" ]
 }
-for svc in sing-box xray wireguard amneziawg; do
+for svc in sing-box xray wireguard amneziawg trusttunnel; do
     svc_block "$svc" | grep -qF 'EGRESS_ISOLATION=${EGRESS_ISOLATION:-on}' \
         && ok "compose passes EGRESS_ISOLATION (default on) to $svc" \
         || bad "compose does not pass EGRESS_ISOLATION=\${EGRESS_ISOLATION:-on} to $svc"
@@ -296,13 +296,18 @@ check "Dockerfile.xray installs jq" grep -qE "apk add .*\bjq\b" "$ROOT/dockerfil
 
 check ".env.example documents EGRESS_ISOLATION, default on" grep -qxF "EGRESS_ISOLATION=on" "$ROOT/.env.example"
 check "moav update rebuilds the images that bake the lib in" \
-    grep -qE 'scripts/lib/egress-isolation\.sh\).*sing-box xray wireguard amneziawg' "$ROOT/lib/update.sh"
+    grep -qE 'scripts/lib/egress-isolation\.sh\).*sing-box xray wireguard amneziawg trusttunnel' "$ROOT/lib/update.sh"
 
 # Layers that isolate by other means: guard those too, they are part of the promise.
 check "wstunnel can only reach its --restrict-to target (the WireGuard endpoint)" \
     grep -qF 'set -- server --restrict-to "$WSTUNNEL_RESTRICT"' "$ROOT/scripts/wstunnel-entrypoint.sh"
-check "trusttunnel keeps private-network connections disabled" \
+check "trusttunnel keeps private-network connections disabled in the template" \
     grep -qxF "allow_private_network_connections = false" "$ROOT/configs/trusttunnel/vpn.toml.template"
+e="$ROOT/scripts/trusttunnel-entrypoint.sh"
+check "trusttunnel: isolation is applied to the runtime config before the endpoint starts" \
+    before "$e" 'egress_trusttunnel "$RUNTIME_DIR/vpn.toml"' 'exec setpriv'
+check "Dockerfile.trusttunnel ships its own lib and iptables" \
+    sh -c "grep -qF 'COPY scripts/lib/egress-trusttunnel.sh /egress-trusttunnel.sh' '$ROOT/dockerfiles/Dockerfile.trusttunnel' && grep -qE '^ +iptables ' '$ROOT/dockerfiles/Dockerfile.trusttunnel'"
 
 echo ""
 if [ $fail -eq 0 ]; then echo "PASSED ($pass checks)"; else echo "FAILED ($fail failed, $pass passed)"; exit 1; fi
