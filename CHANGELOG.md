@@ -112,7 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   run used to prove only whichever came up first.
 - **Shell lint now blocks at warning level.** CI ran `shellcheck
   --severity=error` only, so warnings never failed a PR. `scripts/lint-shell.sh`
-  fails on any warning that is not in `tests/shellcheck-baseline.txt` (the 393
+  fails on any warning that is not in `tests/shellcheck-baseline.txt` (the 386
   that predate the gate), on a pinned shellcheck 0.11.0. The parse check also
   covers the `#!/bin/sh` entrypoints it used to skip.
 

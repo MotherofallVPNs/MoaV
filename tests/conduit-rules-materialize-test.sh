@@ -30,6 +30,7 @@ source "$ROOT/lib/service.sh"
 
 WORK="$(mktemp -d)"
 trap 'chmod -R u+w "$WORK" 2>/dev/null; rm -rf "$WORK"' EXIT
+# shellcheck disable=SC2034  # read by the sourced lib/service.sh
 SCRIPT_DIR="$WORK"
 MON="$WORK/configs/monitoring"
 RULES="$MON/conduit_lifetime.rules.yml"

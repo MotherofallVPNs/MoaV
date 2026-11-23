@@ -18,6 +18,7 @@ echo "dnstunnel profile starts for dnstt / MasterDNS / XDNS only"
 
 # Real get_env_val from moav.sh, so .env parsing matches production.
 eval "$(sed -n '/^get_env_val() {/,/^}/p' "$ROOT/moav.sh")"
+# shellcheck disable=SC2034  # read by the sourced lib/service.sh
 SCRIPT_DIR="$ROOT"
 # shellcheck source=../lib/service.sh
 source "$ROOT/lib/service.sh"
