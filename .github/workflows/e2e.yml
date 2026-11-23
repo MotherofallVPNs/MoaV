@@ -386,10 +386,12 @@ jobs:
             [ "$(awg_cli)" = "$cli_before" ] \
               || { echo "::error::regenerate-users changed e2e-test's AmneziaWG keys/params; the existing client would break"; exit 1; }
             want=$(sed -n 's/^PublicKey = //p' "$(awg_cli_file)" | head -1)
+            # Right after the restart the interface exists but reports "(none)" until setconf runs.
             live=""
-            for _ in $(seq 1 15); do
-              live=$(docker exec moav-amneziawg awg show awg0 public-key 2>/dev/null) && [ -n "$live" ] && break
-              sleep 2
+            for _ in $(seq 1 30); do
+              live=$(docker exec moav-amneziawg awg show awg0 public-key 2>/dev/null || true)
+              [[ "$live" =~ ^[A-Za-z0-9+/]{43}=$ ]] && break
+              live=""; sleep 2
             done
             if [ -z "$live" ]; then
               echo "::warning::moav-amneziawg did not answer after regenerate-users (liveness is asserted after the connectivity tests)"
