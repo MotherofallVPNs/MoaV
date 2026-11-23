@@ -89,6 +89,8 @@ jobs:
         run: bash tests/cli-surface-test.sh
       - name: DNS-tunnel bundle completeness
         run: bash tests/dns-tunnel-bundle-test.sh
+      - name: DNS-tunnel startup gating (dnstt / MasterDNS / XDNS)
+        run: bash tests/dns-tunnel-startup-test.sh
       - name: user subscription vs bundle-blob distinction
         run: bash tests/user-subscription-test.sh
       - name: bundle guide section visibility (all protocols)

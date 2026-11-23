@@ -68,6 +68,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `actions/upload-artifact` v4 -> v7.0.2. These run on Node 24, so a
   self-hosted e2e runner must be at Actions Runner 2.327.1 or newer.
 
+### Deprecated
+- **Slipstream (phase 1 of removal).** Upstream slipstream-rust is archived
+  and points users to MasterDNS; MasterDNS and dnstt already cover the
+  DNS-tunnel use case.
+  - `ENABLE_SLIPSTREAM` now defaults to `false` (`.env.example`, compose and
+    script fallbacks). An explicit value already in your `.env` is left alone,
+    and `moav update` still pins the running state for sparse `.env` files.
+  - `dns-router` no longer routes the Slipstream subdomain (`s.`). A leftover
+    `ENABLE_SLIPSTREAM=true` is ignored with a warning (router, `moav doctor`,
+    `moav switch-dns`), so **existing Slipstream clients stop connecting after
+    this update**. A commented placeholder in `buildRoutes()` marks where a
+    future DNS-tunnel backend can plug in.
+  - `data/protocols.json` keeps the entry as a tombstone (`status: "removed"`,
+    `removed_on: "2026-11-23"`, migration note). The service, image and code
+    are removed in a later release.
+  - **Migrate:** keep `ENABLE_MASTERDNS=true` and/or `ENABLE_DNSTT=true` with
+    their NS records (`moav doctor dns`), run
+    `moav switch-dns dnstt+masterdns+xdns` (or set `ENABLE_SLIPSTREAM=false`),
+    then `moav regenerate-users` and hand out the new bundles.
+
 ### Fixed
 - **`moav restart` now applies `.env` changes.** It ran `docker compose restart`,
   which keeps a container's old environment and image, so an edited `.env`
@@ -122,6 +142,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The cert textfile directory is also forced to 755 so node-exporter (`nobody`)
   can read it regardless of umask. Regression test:
   `tests/conduit-rules-materialize-test.sh`.
+- **Slipstream client guide used flags the Rust client does not have.** The
+  bundle guide (EN + FA) and the `slipstream-client.conf` comment told users to
+  run `--dns-server` / `--socks-listen`; the real flags are `--resolver` and
+  `--tcp-listen-host` / `--tcp-listen-port` (as `scripts/client-connect.sh`
+  already used). The guide also claimed binaries "for your OS"; the upstream
+  build ships Linux amd64/arm64 only.
+- **MasterDNS-only and XDNS-only servers now start the DNS tunnel.**
+  `lib/service.sh` decided whether to start the `dnstunnel` profile
+  (`dns-router` + backends) from `ENABLE_DNSTT || ENABLE_SLIPSTREAM` alone, so
+  with dnstt off the "all" profile pick, `moav status` and `moav profiles`
+  left out `dns-router` and nothing answered on port 53. Every decision site
+  now uses one helper that checks dnstt, MasterDNS and XDNS, the same three
+  flags `dns-router` routes. Slipstream no longer counts: a Slipstream-only
+  `.env` skips the profile instead of starting a router with no routes, which
+  exited and restart-looped. Covered by `tests/dns-tunnel-startup-test.sh`.
 
 ### Security
 - **Admin dashboard Python dependencies refreshed.** `admin/requirements.txt`
@@ -153,6 +188,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dependency updates with security fixes, plus the 2.15.3 fix for a deadlock
   in fixed-capacity proxies (MoaV always passes `-capacity`).
 - **Default-on egress isolation: tunneled client traffic can no longer reach private or infrastructure networks.** A MoaV exit forwarded whatever destination a client asked for, so any user could reach other containers on the Docker network (the sing-box Clash API, Prometheus, Grafana), services on the host and its LAN, and the cloud metadata endpoint. Blocked destinations: RFC1918 (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), CGNAT (`100.64.0.0/10`), link-local (`169.254.0.0/16`), loopback (`127.0.0.0/8`, plus its `0.0.0.0/8` alias), IPv6 ULA/link-local/loopback (`fc00::/7`, `fe80::/10`, `::1`, `::`), and DappNode's core networks (`172.33.0.0/16`, `10.20.0.0/24`). Enforced in every layer that can originate client traffic: **sing-box** (a `reject` route rule after a `resolve`, so a name that points at a private IP is caught too, plus a UDP-only `OUTPUT` filter in the container, because sing-box routes a UDP session once and later packets may name any destination), **Xray** (a routing rule to a blackhole outbound, plus freedom `finalRules`, which check the address actually dialed and every UDP packet), and **WireGuard / AmneziaWG** (a `MOAV-EGRESS` chain hooked at the top of `FORWARD`, IPv4 and IPv6, installed before the interface comes up). dnstt, Slipstream, MasterDNS and GooseRelay egress through sing-box and are covered by it; wstunnel can only reach the WireGuard endpoint. The rules are applied at container start from one list (`scripts/lib/egress-isolation.sh`), so existing installs get them from `moav update && moav build && moav start` with no re-bootstrap. New `.env` toggle `EGRESS_ISOLATION` (default `on`); set it to `off` only for a trusted LAN relay, then `moav restart` to apply it (either direction). **Behavior changes:** WireGuard/AmneziaWG peers can no longer reach each other through the tunnel (their addresses are RFC1918), and on dual-stack servers sing-box now resolves client-requested names with its public resolvers instead of Docker's DNS, as IPv4-only servers already did. Trojan's fallback to the decoy keeps working, and works again on IPv4-only servers, where the `prefer_ipv4` resolve rule had been sending the name `decoy` to public DNS.
+- **Slipstream binaries are SHA256-verified at build.** `Dockerfile.slipstream`
+  (server) and `Dockerfile.client` (`moav test` client) downloaded the
+  net2share/slipstream-rust-build assets unchecked. The default version's
+  digests are now pinned in-tree, and any other `SLIPSTREAM_VERSION` is checked
+  against that release's `SHA256SUMS`; a mismatch fails the build.
 
 ### Documentation
 - **Security policy** ([SECURITY.md](SECURITY.md)): supported versions, private

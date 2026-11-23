@@ -401,7 +401,7 @@ echo ""
 # is enabled and its key/config is present. ($STATE_DIR + the host lib config
 # dirs are set above, before the per-user loop.)
 
-if [[ "${ENABLE_SLIPSTREAM:-true}" == "true" ]]; then
+if [[ "${ENABLE_SLIPSTREAM:-false}" == "true" ]]; then
     if [[ -f "$STATE_DIR/keys/slipstream-cert.pem" ]]; then
         if slipstream_generate_client_instructions "$USERNAME" "$OUTPUT_DIR"; then
             log_info "✓ Slipstream instructions generated"

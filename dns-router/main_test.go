@@ -1,6 +1,6 @@
 // Tests for the MoaV DNS router.
 //
-// The central claim these tests defend: dnstt, Slipstream, MasterDNS, and XDNS
+// The central claim these tests defend: dnstt, MasterDNS, and XDNS
 // can all run in parallel behind a single port-53 listener with zero risk of a
 // query being misrouted. Routing is a pure function of the query's domain
 // suffix, and each tunnel owns a distinct NS-delegated subdomain, so the
@@ -63,26 +63,25 @@ func backendFor(r *Router, query string) string {
 	return route.Backend
 }
 
-// threeRoutes returns the canonical 3-tunnel routing table (default on),
-// matching production default subdomains (t./s./m.).
-func threeRoutes() []Route {
+// baseRoutes returns the dnstt + MasterDNS routing table, matching production
+// default subdomains (t./m.). The retired Slipstream subdomain (s.) is absent.
+func baseRoutes() []Route {
 	return []Route{
 		{Domain: "t.example.com", Backend: "dnstt:5353"},
-		{Domain: "s.example.com", Backend: "slipstream:5354"},
 		{Domain: "m.example.com", Backend: "masterdns:5355"},
 	}
 }
 
-// fourRoutes returns the full 4-tunnel routing table including XDNS (opt-in).
-func fourRoutes() []Route {
-	return append(threeRoutes(), Route{Domain: "x.example.com", Backend: "xray:5355"})
+// allRoutes returns the full routing table including XDNS.
+func allRoutes() []Route {
+	return append(baseRoutes(), Route{Domain: "x.example.com", Backend: "xray:5355"})
 }
 
 // TestDomainRouting: a query for each tunnel's subdomain must resolve to that
-// tunnel's backend, and to no other — for both the 3-tunnel default and the
-// 4-tunnel (XDNS-enabled) configuration.
+// tunnel's backend, and to no other — with and without XDNS. The retired
+// Slipstream subdomain must route nowhere.
 func TestDomainRouting(t *testing.T) {
-	for _, routes := range [][]Route{threeRoutes(), fourRoutes()} {
+	for _, routes := range [][]Route{baseRoutes(), allRoutes()} {
 		r := newRouter(":5353", routes)
 		cases := []struct {
 			query   string
@@ -90,12 +89,12 @@ func TestDomainRouting(t *testing.T) {
 		}{
 			{"t.example.com", "dnstt:5353"},
 			{"abc.t.example.com", "dnstt:5353"},
-			{"s.example.com", "slipstream:5354"},
-			{"deadbeef.s.example.com", "slipstream:5354"},
+			{"s.example.com", ""},
+			{"deadbeef.s.example.com", ""},
 			{"m.example.com", "masterdns:5355"},
 			{"chunk1.m.example.com", "masterdns:5355"},
 		}
-		if len(routes) == 4 {
+		if len(routes) == 3 {
 			cases = append(cases,
 				struct{ query, backend string }{"x.example.com", "xray:5355"},
 				struct{ query, backend string }{"abc.x.example.com", "xray:5355"},
@@ -125,7 +124,7 @@ func TestDomainRouting(t *testing.T) {
 // (or to the bare parent domain) match nothing. Because findRoute is a
 // pure suffix test over disjoint subdomains, cross-routing is impossible.
 func TestDomainIsolation(t *testing.T) {
-	r := newRouter(":5353", threeRoutes())
+	r := newRouter(":5353", allRoutes())
 
 	// Each entry: a query, and the ONLY backend it may ever reach ("" = none).
 	tests := []struct {
@@ -134,10 +133,13 @@ func TestDomainIsolation(t *testing.T) {
 	}{
 		{"t.example.com", "dnstt:5353"},
 		{"x.y.t.example.com", "dnstt:5353"},
-		{"s.example.com", "slipstream:5354"},
-		{"x.y.s.example.com", "slipstream:5354"},
 		{"m.example.com", "masterdns:5355"},
 		{"x.y.m.example.com", "masterdns:5355"},
+		{"x.example.com", "xray:5355"},
+		{"x.y.x.example.com", "xray:5355"},
+		// Retired Slipstream subdomain belongs to no tunnel.
+		{"s.example.com", ""},
+		{"x.y.s.example.com", ""},
 		// Parent domain alone belongs to no tunnel.
 		{"example.com", ""},
 		// A subdomain that resembles but is not a tunnel subdomain.
@@ -158,17 +160,14 @@ func TestDomainIsolation(t *testing.T) {
 
 	// Cross-check the matrix directly: no tunnel's query name must match any
 	// other tunnel's suffix.
-	dnstt, slip, master, xdns := "t.example.com", "s.example.com", "m.example.com", "x.example.com"
-	if matchDomainSuffix("host.t.example.com", slip) || matchDomainSuffix("host.t.example.com", master) || matchDomainSuffix("host.t.example.com", xdns) {
+	dnstt, master, xdns := "t.example.com", "m.example.com", "x.example.com"
+	if matchDomainSuffix("host.t.example.com", master) || matchDomainSuffix("host.t.example.com", xdns) {
 		t.Error("dnstt query matched another tunnel's suffix")
 	}
-	if matchDomainSuffix("host.s.example.com", dnstt) || matchDomainSuffix("host.s.example.com", master) || matchDomainSuffix("host.s.example.com", xdns) {
-		t.Error("slipstream query matched another tunnel's suffix")
-	}
-	if matchDomainSuffix("host.m.example.com", dnstt) || matchDomainSuffix("host.m.example.com", slip) || matchDomainSuffix("host.m.example.com", xdns) {
+	if matchDomainSuffix("host.m.example.com", dnstt) || matchDomainSuffix("host.m.example.com", xdns) {
 		t.Error("masterdns query matched another tunnel's suffix")
 	}
-	if matchDomainSuffix("host.x.example.com", dnstt) || matchDomainSuffix("host.x.example.com", slip) || matchDomainSuffix("host.x.example.com", master) {
+	if matchDomainSuffix("host.x.example.com", dnstt) || matchDomainSuffix("host.x.example.com", master) {
 		t.Error("xdns query matched another tunnel's suffix")
 	}
 }
@@ -178,7 +177,7 @@ func TestDomainIsolation(t *testing.T) {
 func TestExtractQueryName(t *testing.T) {
 	valid := []string{
 		"t.example.com", // dnstt
-		"s.example.com", // slipstream
+		"s.example.com", // retired slipstream subdomain (parses, routes nowhere)
 		"m.example.com", // masterdns
 		"x.example.com", // xdns
 		"google.com",    // unrelated — parses fine, just won't route
@@ -198,7 +197,7 @@ func TestExtractQueryName(t *testing.T) {
 	}
 
 	// The unrelated name parses but routes nowhere.
-	r := newRouter(":5353", threeRoutes())
+	r := newRouter(":5353", allRoutes())
 	name, err := extractQueryName(buildDNSQuery("google.com"))
 	if err != nil {
 		t.Fatalf("google.com should parse: %v", err)
@@ -369,8 +368,9 @@ func TestMatchDomainSuffix(t *testing.T) {
 	}
 }
 
-// TestBuildRoutes verifies that buildRoutes() correctly wires all four tunnels
-// when all ENABLE_* flags are true — proving the full parallel configuration.
+// TestBuildRoutes verifies that buildRoutes() wires every supported tunnel
+// when all ENABLE_* flags are true, and that a lingering ENABLE_SLIPSTREAM=true
+// from an older .env adds no route (Slipstream was removed from the router).
 func TestBuildRoutes(t *testing.T) {
 	t.Setenv("ENABLE_DNSTT", "true")
 	t.Setenv("ENABLE_SLIPSTREAM", "true")
@@ -389,13 +389,12 @@ func TestBuildRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildRoutes() error: %v", err)
 	}
-	if len(routes) != 4 {
-		t.Fatalf("buildRoutes() returned %d routes, want 4: %+v", len(routes), routes)
+	if len(routes) != 3 {
+		t.Fatalf("buildRoutes() returned %d routes, want 3: %+v", len(routes), routes)
 	}
 
 	want := map[string]string{
 		"t.example.com": "dnstt:5353",
-		"s.example.com": "slipstream:5354",
 		"m.example.com": "masterdns:5355",
 		"x.example.com": "xray:5355",
 	}
@@ -414,38 +413,42 @@ func TestBuildRoutes(t *testing.T) {
 		t.Errorf("missing routes: %+v", want)
 	}
 
-	// All four routes must be mutually isolated through the real router.
+	// All routes must be mutually isolated through the real router, and the
+	// retired Slipstream subdomain must route nowhere.
 	r := newRouter(":5353", routes)
 	if backendFor(r, "host.t.example.com") != "dnstt:5353" ||
-		backendFor(r, "host.s.example.com") != "slipstream:5354" ||
 		backendFor(r, "host.m.example.com") != "masterdns:5355" ||
 		backendFor(r, "host.x.example.com") != "xray:5355" {
 		t.Error("buildRoutes() produced routes that do not isolate cleanly")
 	}
+	if b := backendFor(r, "host.s.example.com"); b != "" {
+		t.Errorf("retired slipstream subdomain routed to %q, want no route", b)
+	}
 
-	// Default (XDNS off) returns 3 routes.
+	// XDNS off: 2 routes, x-subdomain unrouted.
 	t.Setenv("ENABLE_XDNS", "false")
-	routes3, err := buildRoutes()
+	routes2, err := buildRoutes()
 	if err != nil {
 		t.Fatalf("buildRoutes() (xdns off) error: %v", err)
 	}
-	if len(routes3) != 3 {
-		t.Errorf("XDNS off: want 3 routes, got %d", len(routes3))
+	if len(routes2) != 2 {
+		t.Errorf("XDNS off: want 2 routes, got %d", len(routes2))
 	}
-	if r3 := newRouter(":5353", routes3); backendFor(r3, "host.x.example.com") != "" {
+	if r2 := newRouter(":5353", routes2); backendFor(r2, "host.x.example.com") != "" {
 		t.Error("XDNS off: x-subdomain query should not route")
 	}
 
-	// With everything disabled, no routes (graceful-exit path in main()).
+	// Only ENABLE_SLIPSTREAM left on: no routes (graceful-exit path in main()).
+	// SLIPSTREAM_DOMAIN unset must not error, since the flag is now ignored.
 	t.Setenv("ENABLE_DNSTT", "false")
-	t.Setenv("ENABLE_SLIPSTREAM", "false")
 	t.Setenv("ENABLE_MASTERDNS", "false")
+	t.Setenv("SLIPSTREAM_DOMAIN", "")
 	empty, err := buildRoutes()
 	if err != nil {
-		t.Fatalf("buildRoutes() (all disabled) error: %v", err)
+		t.Fatalf("buildRoutes() (only slipstream flag on) error: %v", err)
 	}
 	if len(empty) != 0 {
-		t.Errorf("all disabled: want 0 routes, got %d", len(empty))
+		t.Errorf("only slipstream flag on: want 0 routes, got %d", len(empty))
 	}
 }
 

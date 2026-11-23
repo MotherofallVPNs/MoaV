@@ -1,7 +1,7 @@
 # =============================================================================
 # MoaV DNS Router - Domain-based DNS query routing
 # =============================================================================
-# Routes DNS queries to dnstt or Slipstream backends based on domain suffix.
+# Routes DNS queries to dnstt, MasterDNS and XDNS backends by domain suffix.
 # Lightweight Go UDP forwarder with connection pooling.
 # =============================================================================
 

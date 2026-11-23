@@ -87,7 +87,7 @@ If any component versions were bumped in this release, verify they are consisten
 | awg-tools | `AWGTOOLS_VERSION` | amneziawg + client build args | `Dockerfile.amneziawg`, `Dockerfile.client` |
 | Prometheus | `PROMETHEUS_VERSION` | — | `Dockerfile.prometheus` |
 | Grafana | `GRAFANA_VERSION` | — | `Dockerfile.grafana` |
-| Slipstream | `SLIPSTREAM_VERSION` | slipstream + client build args | `Dockerfile.slipstream`, `Dockerfile.client` |
+| Slipstream (deprecated, frozen) | `SLIPSTREAM_VERSION` | slipstream + client build args | `Dockerfile.slipstream`, `Dockerfile.client`. Do not bump: upstream is archived. The default version's SHA256 digests are pinned in both Dockerfiles; a non-default version is verified against that release's `SHA256SUMS`. |
 | telemt | `TELEMT_VERSION` | telemt build args | `Dockerfile.telemt` |
 | Conduit | `CONDUIT_VERSION` | conduit build args | `Dockerfile.conduit` |
 

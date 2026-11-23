@@ -1,5 +1,7 @@
 #!/bin/bash
 # Slipstream QUIC-over-DNS tunnel configuration functions
+# DEPRECATED (2026-11-23): off by default and not routed by dns-router;
+# kept one release for migration, removed in a later release.
 
 SLIPSTREAM_CONFIG_DIR="/configs/slipstream"
 
@@ -70,7 +72,8 @@ slipstream_generate_client_instructions() {
     # from here; keep it the first slipstream-named file so it wins the glob.
     cat > "$output_dir/slipstream-client.conf" <<EOF
 # Slipstream client config. Setup guide: README.html.
-# Run: slipstream-client --domain $slipstream_domain --cert slipstream-cert.pem --dns-server 1.1.1.1:53 --socks-listen 127.0.0.1:1080
+# DEPRECATED: Slipstream is being removed from MoaV; use MasterDNS or dnstt.
+# Run (Linux): slipstream-client --domain $slipstream_domain --cert slipstream-cert.pem --resolver 1.1.1.1:53 --tcp-listen-host 127.0.0.1 --tcp-listen-port 1080
 domain = $slipstream_domain
 EOF
 

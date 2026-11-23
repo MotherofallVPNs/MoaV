@@ -2,7 +2,7 @@
 # MoaV Client - Multi-protocol client for testing and connecting
 # =============================================================================
 # Supports: Reality, Trojan, AnyTLS, Hysteria2, XHTTP, WireGuard (via wstunnel),
-#           AmneziaWG, dnstt, Slipstream, TrustTunnel, Tor/Snowflake
+#           AmneziaWG, dnstt, Slipstream (deprecated), TrustTunnel, Tor/Snowflake
 #
 # Strategy: Download pre-built binaries with proper architecture detection
 # =============================================================================
@@ -47,9 +47,26 @@ ARG SLIPSTREAM_VERSION=2026.04.22.1
 RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-RUN ARCH="${TARGETARCH:-amd64}" && \
-    wget -qO /usr/local/bin/slipstream-client \
-    "https://github.com/net2share/slipstream-rust-build/releases/download/v${SLIPSTREAM_VERSION}/slipstream-client-linux-${ARCH}" && \
+# SHA256-verified: pinned digests for the default version, else the release's SHA256SUMS.
+RUN set -eu; \
+    ARCH="${TARGETARCH:-amd64}"; \
+    case "${ARCH}" in amd64|arm64) ;; *) echo "Unsupported TARGETARCH=${ARCH}" >&2; exit 1 ;; esac; \
+    ASSET="slipstream-client-linux-${ARCH}"; \
+    BASE="https://github.com/net2share/slipstream-rust-build/releases/download/v${SLIPSTREAM_VERSION}"; \
+    wget -qO /usr/local/bin/slipstream-client "${BASE}/${ASSET}"; \
+    case "${SLIPSTREAM_VERSION}/${ASSET}" in \
+      2026.04.22.1/slipstream-client-linux-amd64) EXPECTED=45b83b84aed77edbce749fbf7a8ebf13df8a521424e51c51c1358084b46635f4 ;; \
+      2026.04.22.1/slipstream-client-linux-arm64) EXPECTED=a042b907afa54df1e106407ef3f0922b7316e61ec6980b310b52b5631fad8e9b ;; \
+      *) wget -qO /tmp/SHA256SUMS "${BASE}/SHA256SUMS"; \
+         EXPECTED="$(awk -v a="${ASSET}" '$2 == a || $2 == "*" a {print $1; exit}' /tmp/SHA256SUMS)"; \
+         rm -f /tmp/SHA256SUMS ;; \
+    esac; \
+    if [ -z "${EXPECTED}" ]; then echo "No SHA256 for ${ASSET} v${SLIPSTREAM_VERSION}" >&2; exit 1; fi; \
+    ACTUAL="$(sha256sum /usr/local/bin/slipstream-client | cut -d' ' -f1)"; \
+    if [ "${EXPECTED}" != "${ACTUAL}" ]; then \
+      echo "SHA256 mismatch for ${ASSET}: expected ${EXPECTED}, got ${ACTUAL}" >&2; exit 1; \
+    fi; \
+    echo "slipstream-client SHA256 OK (${ACTUAL})"; \
     chmod +x /usr/local/bin/slipstream-client
 
 # Bundle the glibc shared libs the binary needs so it runs on Alpine

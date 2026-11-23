@@ -64,7 +64,7 @@
   - **پروکسی با پنهان‌کاری بالا** — Reality (VLESS)، Trojan، Hysteria2، XHTTP (VLESS+XHTTP+Reality)، CDN (VLESS+WS از طریق Cloudflare)
   - **VPN کامل** — WireGuard (مستقیم و روی wstunnel)، AmneziaWG
   - **ویژه** — TrustTunnel (HTTP/2+QUIC)، Telegram MTProxy (fake-TLS)، Shadowsocks-2022، GooseRelay (SOCKS5 روی Google Apps Script)
-  - **تونل‌های DNS** — dnstt، Slipstream، MasterDNS و XDNS — هر چهار تا هم‌زمان روی پورت ۵۳ از طریق `dns-router`
+  - **تونل‌های DNS** — dnstt، MasterDNS و XDNS — همه هم‌زمان روی پورت ۵۳ از طریق `dns-router` (Slipstream منسوخ شده است؛ پایین‌تر را ببینید)
 - **پنهان‌کاری در اولویت** — ترافیک شبیه HTTPS، WebSocket، DNS یا IMAPS معمولی دیده می‌شود
 - **اعتبارنامهٔ مستقل برای هر کاربر** — ساخت، لغو و مدیریت کاربران به‌صورت جداگانه
 - **راه‌اندازی ساده** — بر پایهٔ Docker Compose، با یک فرمان
@@ -196,9 +196,9 @@ moav help                 # نمایش همهٔ فرمان‌ها
 | AmneziaWG | 51821/udp | ★★★★★ | ★★★★☆ | ✅ | WireGuard مبهم‌شده، مقاوم در برابر امضاهای رایج DPI |
 | WireGuard (wstunnel) | 8080/tcp | ★★★★☆ | ★★★★☆ | ✅ | VPN وقتی UDP بسته است |
 | DNS Tunnel (dnstt) | 53/udp | ★★★☆☆ | ★☆☆☆☆ | ✅ | آخرین راه، سخت‌بستنی |
-| Slipstream | 53/udp | ★★★☆☆ | ★★☆☆☆ | ✅ | QUIC روی DNS، ۱.۵ تا ۵ برابر سریع‌تر از dnstt |
+| Slipstream | 53/udp | ★★★☆☆ | ★★☆☆☆ | ⬜ | **منسوخ**: به‌طور پیش‌فرض خاموش و دیگر مسیریابی نمی‌شود؛ از MasterDNS یا dnstt استفاده کنید |
 | MasterDNS | 53/udp | ★★★☆☆ | ★★★☆☆ | ✅ | تونل DNS پیشرفته (ARQ و توزیع بار resolver)، MahsaNG v16 |
-| XDNS (VLESS+mKCP+DNS) | 53/udp | ★★★☆☆ | ★☆☆☆☆ | ✅ | تونل DNS با Xray FinalMask؛ هر چهار تونل DNS پورت ۵۳ را مشترک دارند |
+| XDNS (VLESS+mKCP+DNS) | 53/udp | ★★★☆☆ | ★☆☆☆☆ | ✅ | تونل DNS با Xray FinalMask؛ همهٔ تونل‌های DNS پورت ۵۳ را مشترک دارند |
 | GooseRelay | 8444/tcp | ★★★★★ | ★★☆☆☆ | ⬜ | SOCKS5 روی Google Apps Script، با نمای google.com، MahsaNG v16 |
 | Telegram MTProxy | 993/tcp | ★★★★☆ | ★★★☆☆ | ✅ | Fake-TLS V2، دسترسی مستقیم به تلگرام |
 | XHTTP (VLESS+XHTTP+Reality) | 2096/tcp | ★★★★★ | ★★★★☆ | ✅ | Xray-core، بدون نیاز به دامنه |
@@ -209,6 +209,8 @@ moav help                 # نمایش همهٔ فرمان‌ها
 **Default** = enabled in `.env.example`. Services still only run under their
 profile, so `moav start conduit` is what actually starts Conduit. MahsaNet is an
 action (`moav donate`), not a service.
+
+**Slipstream منسوخ شده است** (۲۳ نوامبر ۲۰۲۶): پروژهٔ اصلی آن، slipstream-rust، بایگانی شده و MasterDNS و dnstt همین کاربرد تونل DNS را پوشش می‌دهند. نصب‌های جدید با `ENABLE_SLIPSTREAM=false` شروع می‌شوند و `dns-router` دیگر زیردامنهٔ `s.` را مسیریابی نمی‌کند؛ پس بعد از این به‌روزرسانی کلاینت‌های Slipstream دیگر وصل نمی‌شوند، حتی اگر در `.env` مقدار `true` مانده باشد. برای مهاجرت: مطمئن شوید `ENABLE_MASTERDNS=true` (و/یا `ENABLE_DNSTT=true`) است و رکورد NS آن تنظیم شده (`moav doctor dns`)، بعد `moav switch-dns dnstt+masterdns+xdns` را اجرا کنید (یا `ENABLE_SLIPSTREAM=false` بگذارید)، سپس `moav regenerate-users` را بزنید و بستهٔ جدید را برای کاربران بفرستید. سرویس و کد Slipstream در نسخه‌ای بعدی کامل حذف می‌شود.
 
 <a id="using"></a>
 
@@ -323,7 +325,7 @@ moav donate                   # اهدای کانفیگ و پهنای‌باند
 | 8444/tcp | TCP | GooseRelay exit (when `ENABLE_GOOSERELAY=true`) | خیر |
 | 9443/tcp | TCP | Admin dashboard | خیر |
 | 9444/tcp | TCP | Grafana (monitoring) | خیر |
-| 53/udp | UDP | DNS tunnels (dnstt / Slipstream / MasterDNS / XDNS — all share this port) | بله |
+| 53/udp | UDP | DNS tunnels (dnstt / MasterDNS / XDNS — all share this port) | بله |
 | 80/tcp | TCP | Let's Encrypt | بله (در زمان نصب) |
 
 <a id="domainless"></a>
@@ -476,7 +478,7 @@ MoaV یک لایهٔ استقرار است. کار روی خود پروتکل‌
 | [TrustTunnel](https://github.com/TrustTunnel/TrustTunnel) · [کلاینت](https://github.com/TrustTunnel/TrustTunnelClient) | ترابرد HTTP/2 و QUIC |
 | [telemt](https://github.com/telemt/telemt) | Telegram MTProxy (fake-TLS) |
 | [dnstt](https://www.bamsoftware.com/software/dnstt/) | تونل DNS اصلی |
-| [Slipstream](https://github.com/net2share/slipstream-rust-build) | QUIC روی DNS |
+| [Slipstream](https://github.com/net2share/slipstream-rust-build) | QUIC روی DNS (منسوخ، در حال حذف) |
 | [MasterDNS](https://github.com/masterking32/MasterDnsVPN) | تونل DNS با ARQ و توزیع بار روی resolver‌ها |
 | [GooseRelay](https://github.com/kianmhz/GooseRelayVPN) | SOCKS5 روی Google Apps Script |
 

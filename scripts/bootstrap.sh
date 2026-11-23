@@ -114,7 +114,7 @@ domain_required=false
 [[ "${ENABLE_ANYTLS:-false}" == "true" ]] && domain_required=true
 [[ "${ENABLE_HYSTERIA2:-true}" == "true" ]] && domain_required=true
 [[ "${ENABLE_DNSTT:-true}" == "true" ]] && domain_required=true
-[[ "${ENABLE_SLIPSTREAM:-true}" == "true" ]] && domain_required=true
+[[ "${ENABLE_SLIPSTREAM:-false}" == "true" ]] && domain_required=true
 [[ "${ENABLE_MASTERDNS:-true}" == "true" ]] && domain_required=true
 [[ "${ENABLE_TRUSTTUNNEL:-true}" == "true" ]] && domain_required=true
 
@@ -369,7 +369,7 @@ export ENABLE_HYSTERIA2="${ENABLE_HYSTERIA2:-true}"
 export ENABLE_WIREGUARD="${ENABLE_WIREGUARD:-true}"
 export ENABLE_AMNEZIAWG="${ENABLE_AMNEZIAWG:-true}"
 export ENABLE_DNSTT="${ENABLE_DNSTT:-true}"
-export ENABLE_SLIPSTREAM="${ENABLE_SLIPSTREAM:-true}"
+export ENABLE_SLIPSTREAM="${ENABLE_SLIPSTREAM:-false}"
 export SLIPSTREAM_SUBDOMAIN="${SLIPSTREAM_SUBDOMAIN:-s}"
 export ENABLE_MASTERDNS="${ENABLE_MASTERDNS:-true}"
 export MASTERDNS_SUBDOMAIN="${MASTERDNS_SUBDOMAIN:-m}"
@@ -547,7 +547,7 @@ fi
 # -----------------------------------------------------------------------------
 # Generate Slipstream config (before creating users)
 # -----------------------------------------------------------------------------
-if [[ "${ENABLE_SLIPSTREAM:-true}" == "true" ]]; then
+if [[ "${ENABLE_SLIPSTREAM:-false}" == "true" ]]; then
     log_info "Generating Slipstream configuration..."
     if generate_slipstream_config; then
         log_info "Slipstream configuration complete"

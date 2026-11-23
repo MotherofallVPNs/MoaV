@@ -619,7 +619,7 @@ fi
 # -----------------------------------------------------------------------------
 # Generate Slipstream instructions (if enabled)
 # -----------------------------------------------------------------------------
-if [[ "${ENABLE_SLIPSTREAM:-true}" == "true" ]]; then
+if [[ "${ENABLE_SLIPSTREAM:-false}" == "true" ]]; then
     if [[ -f "$OUTPUT_DIR/slipstream-cert.pem" ]] && [[ "$FORCE_REGENERATE" != "force" ]]; then
         log_info "  - Slipstream instructions exist, skipping"
     else

@@ -199,10 +199,10 @@ services:
       - all
 
   # ===========================================================================
-  # DNS TUNNELS (dnstunnel profile): dns-router + dnstt + slipstream
+  # DNS TUNNELS (dnstunnel profile): dns-router + dnstt + masterdns (+ deprecated slipstream)
   # ===========================================================================
 
-  # DNS Router: Routes DNS queries to dnstt/slipstream by domain suffix
+  # DNS Router: Routes DNS queries to dnstt/masterdns/xdns by domain suffix
   dns-router:
     build:
       context: .
@@ -220,11 +220,11 @@ services:
     environment:
       - DOMAIN=${DOMAIN}
       - DNSTT_DOMAIN=${DNSTT_SUBDOMAIN:-t}.${DOMAIN}
-      - SLIPSTREAM_DOMAIN=${SLIPSTREAM_SUBDOMAIN:-s}.${DOMAIN}
       - MASTERDNS_DOMAIN=${MASTERDNS_SUBDOMAIN:-m}.${DOMAIN}${MASTERDNS_PUBLIC_SUBDOMAIN:+,${MASTERDNS_PUBLIC_SUBDOMAIN}.${DOMAIN}}
       - XDNS_DOMAIN=${XDNS_SUBDOMAIN:-x}.${DOMAIN}
       - ENABLE_DNSTT=${ENABLE_DNSTT:-true}
-      - ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM:-true}
+      # Only read to warn: Slipstream is no longer routed.
+      - ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM:-false}
       - ENABLE_MASTERDNS=${ENABLE_MASTERDNS:-true}
       - ENABLE_XDNS=${ENABLE_XDNS:-true}
       - XDNS_BACKEND=xray:5355
@@ -281,7 +281,8 @@ services:
       - dnstunnel
       - all
 
-  # Slipstream: QUIC-over-DNS tunnel (1.5-5x faster than dnstt)
+  # Slipstream: QUIC-over-DNS tunnel. DEPRECATED: off by default and no longer
+  # routed by dns-router (upstream archived); removed in a later release.
   slipstream:
     build:
       context: .
@@ -315,7 +316,7 @@ services:
       - all
 
   # MasterDNS: advanced DNS tunnel (ARQ + resolver LB) — MahsaNG v16 component.
-  # Enabled by default (ENABLE_MASTERDNS=true). Coexists with dnstt/Slipstream
+  # Enabled by default (ENABLE_MASTERDNS=true). Coexists with dnstt/XDNS
   # on its own subdomain; dns-router fans queries out by domain suffix.
   masterdns:
     build:
@@ -1400,7 +1401,7 @@ services:
       - HYSTERIA2_OBFS_TYPE=${HYSTERIA2_OBFS_TYPE:-salamander}
       - ENABLE_WIREGUARD=${ENABLE_WIREGUARD:-true}
       - ENABLE_DNSTT=${ENABLE_DNSTT:-true}
-      - ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM:-true}
+      - ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM:-false}
       - SLIPSTREAM_SUBDOMAIN=${SLIPSTREAM_SUBDOMAIN:-s}
       - ENABLE_TRUSTTUNNEL=${ENABLE_TRUSTTUNNEL:-true}
       - ENABLE_TELEMT=${ENABLE_TELEMT:-true}

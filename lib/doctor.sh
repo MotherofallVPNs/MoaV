@@ -541,7 +541,7 @@ doctor_check_dns() {
     if doctor_is_enabled "$(get_env_val "ENABLE_DNSTT" "$env_file" "true")"; then
         dnstt_enabled=true
     fi
-    if doctor_is_enabled "$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")"; then
+    if doctor_is_enabled "$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "false")"; then
         slipstream_enabled=true
     fi
 
@@ -570,6 +570,7 @@ doctor_check_dns() {
         fi
 
         if [[ "$slipstream_enabled" == "true" ]]; then
+            warn "ENABLE_SLIPSTREAM=true: Slipstream is deprecated and no longer routed by dns-router. Move users to MasterDNS or dnstt, then set ENABLE_SLIPSTREAM=false."
             local slipstream_subdomain=""
             slipstream_subdomain=$(get_env_val "SLIPSTREAM_SUBDOMAIN" "$env_file" "s")
             if ! doctor_check_ns_record "Slipstream NS record" "${slipstream_subdomain}.${domain}" "$dns_host" "set NS ${slipstream_subdomain} -> ${dns_host}"; then
@@ -605,7 +606,7 @@ doctor_check_dns() {
             fi
         fi
     else
-        info "DNS tunnel checks skipped: dnstt, Slipstream, MasterDNS, and XDNS are all disabled."
+        info "DNS tunnel checks skipped: dnstt, MasterDNS, and XDNS are all disabled."
     fi
 
     local cdn_flag
@@ -853,7 +854,7 @@ doctor_check_ports() {
     # Check port 53 availability for any enabled DNS tunnel
     local dnstt_enabled slip_enabled xdns_enabled masterdns_enabled
     dnstt_enabled=$(get_env_val "ENABLE_DNSTT" "$env_file" "true")
-    slip_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
+    slip_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "false")
     masterdns_enabled=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
     xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "true")
 

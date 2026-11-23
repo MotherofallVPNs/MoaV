@@ -3,8 +3,9 @@ set -euo pipefail
 
 # =============================================================================
 # DNS Router Entrypoint
-# Routes DNS queries to dnstt, Slipstream, MasterDNS, and/or XDNS backends
-# by domain suffix. All tunnels can run simultaneously on port 53.
+# Routes DNS queries to dnstt, MasterDNS, and/or XDNS backends by domain
+# suffix. All tunnels can run simultaneously on port 53. Slipstream is
+# deprecated and no longer routed (ENABLE_SLIPSTREAM is ignored here).
 # =============================================================================
 
 echo "================================================"
@@ -13,29 +14,28 @@ echo "================================================"
 
 # Validate at least one backend is enabled
 ENABLE_DNSTT="${ENABLE_DNSTT:-true}"
-ENABLE_SLIPSTREAM="${ENABLE_SLIPSTREAM:-true}"
+ENABLE_SLIPSTREAM="${ENABLE_SLIPSTREAM:-false}"
 ENABLE_MASTERDNS="${ENABLE_MASTERDNS:-true}"
 ENABLE_XDNS="${ENABLE_XDNS:-true}"
 
-if [[ "$ENABLE_DNSTT" != "true" && "$ENABLE_SLIPSTREAM" != "true" && "$ENABLE_MASTERDNS" != "true" && "$ENABLE_XDNS" != "true" ]]; then
+if [[ "$ENABLE_SLIPSTREAM" == "true" ]]; then
+    echo "[WARN] ENABLE_SLIPSTREAM=true is ignored: Slipstream is deprecated and no longer routed."
+    echo "       Move clients to MasterDNS or dnstt, then set ENABLE_SLIPSTREAM=false."
+fi
+
+if [[ "$ENABLE_DNSTT" != "true" && "$ENABLE_MASTERDNS" != "true" && "$ENABLE_XDNS" != "true" ]]; then
     echo "[ERROR] All DNS tunnel backends are disabled. Nothing to route."
     exit 1
 fi
 
 echo "[dns-router] Configuration:"
 echo "  ENABLE_DNSTT=${ENABLE_DNSTT}"
-echo "  ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM}"
 echo "  ENABLE_MASTERDNS=${ENABLE_MASTERDNS}"
 echo "  ENABLE_XDNS=${ENABLE_XDNS}"
 
 if [[ "$ENABLE_DNSTT" == "true" ]]; then
     echo "  DNSTT_DOMAIN=${DNSTT_DOMAIN:-<not set>}"
     echo "  DNSTT_BACKEND=${DNSTT_BACKEND:-dnstt:5353}"
-fi
-
-if [[ "$ENABLE_SLIPSTREAM" == "true" ]]; then
-    echo "  SLIPSTREAM_DOMAIN=${SLIPSTREAM_DOMAIN:-<not set>}"
-    echo "  SLIPSTREAM_BACKEND=${SLIPSTREAM_BACKEND:-slipstream:5354}"
 fi
 
 if [[ "$ENABLE_MASTERDNS" == "true" ]]; then
