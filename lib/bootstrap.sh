@@ -159,7 +159,7 @@ run_bootstrap() {
             fi
 
             info "Starting services..."
-            docker compose $SELECTED_PROFILE_STRING up -d --remove-orphans
+            compose_up_enabled "$SELECTED_PROFILE_STRING"
             echo ""
             success "Services started!"
 

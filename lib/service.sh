@@ -705,6 +705,50 @@ filter_disabled_profiles() {
     echo "${kept[*]}"
 }
 
+# Compose services that must not start even though their profile does: the
+# dnstunnel profile bundles dnstt + masterdns + slipstream behind one gate.
+disabled_compose_services() {
+    local env_file="${1:-$SCRIPT_DIR/.env}"
+    local out=()
+    [[ "$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "false")" == "true" ]] || out+=("slipstream")
+    [[ "$(get_env_val "ENABLE_DNSTT"      "$env_file" "true")"  == "true" ]] || out+=("dnstt")
+    [[ "$(get_env_val "ENABLE_MASTERDNS"  "$env_file" "true")"  == "true" ]] || out+=("masterdns")
+    echo "${out[*]}"
+}
+
+# `docker compose <profiles> up` args: the profiles' services minus disabled ones.
+# Prints nothing if nothing is excluded (plain `up` keeps compose's own ordering).
+compose_up_services() {
+    local profiles="$1" env_file="${2:-$SCRIPT_DIR/.env}"
+    local skip all kept=() s
+    skip=" $(disabled_compose_services "$env_file") "
+    [[ "$skip" =~ [a-z] ]] || return 0
+    # shellcheck disable=SC2086  # $profiles is a word list of --profile flags
+    all=$(docker compose $profiles config --services 2>/dev/null) || return 0
+    for s in $all; do
+        [[ "$skip" == *" $s "* ]] || kept+=("$s")
+    done
+    echo "${kept[*]}"
+}
+
+# `docker compose <profiles> up -d --remove-orphans` without the disabled services.
+compose_up_enabled() {
+    local profiles="$1" env_file="${2:-$SCRIPT_DIR/.env}" up_services
+    up_services=$(compose_up_services "$profiles" "$env_file")
+    if [[ -z "$up_services" ]]; then
+        # shellcheck disable=SC2086
+        docker compose $profiles up -d --remove-orphans
+        return
+    fi
+    info "Not starting disabled services: $(disabled_compose_services "$env_file")"
+    # An upgraded install still has the old Slipstream container, now unrouted.
+    if [[ " $(disabled_compose_services "$env_file") " == *" slipstream "* ]]; then
+        docker compose --profile all rm -sf slipstream >/dev/null 2>&1 || true
+    fi
+    # shellcheck disable=SC2086
+    docker compose $profiles up -d --remove-orphans $up_services
+}
+
 # 3-option prompt for explicit `moav start <name>` when ENABLE_* is false.
 # Echoes: start-and-enable | skip | start-once
 confirm_disabled_profile() {
@@ -1028,7 +1072,7 @@ start_services() {
     echo ""
     info "Building containers (if needed)..."
 
-    local cmd="docker compose $profiles up -d --remove-orphans"
+    local cmd="compose_up_enabled '$profiles'"
 
     if run_command "$cmd" "Starting services"; then
         echo ""
@@ -1323,7 +1367,7 @@ cmd_profiles() {
 cmd_start() {
     local profiles=""
     local valid_profiles="proxy wireguard amneziawg dnstunnel trusttunnel xhttp telegram admin conduit snowflake gooserelay monitoring client all setup"
-    local force=false
+    local force=false start_once=false
     local args=()
     for arg in "$@"; do
         case "$arg" in
@@ -1399,7 +1443,8 @@ cmd_start() {
                             info "Skipped: $resolved"
                             continue
                             ;;
-                        start-once|start-and-enable) ;;
+                        start-once) start_once=true ;;
+                        start-and-enable) ;;
                     esac
                 fi
                 profiles+="--profile $resolved "
@@ -1483,7 +1528,12 @@ cmd_start() {
     fi
 
     info "Starting services..."
-    docker compose $profiles up -d --remove-orphans
+    # --force / "start once" mean start what was asked, flags or not.
+    if $force || $start_once; then
+        docker compose $profiles up -d --remove-orphans
+    else
+        compose_up_enabled "$profiles"
+    fi
     success "Services started!"
     echo ""
     # Show admin URL if admin was started

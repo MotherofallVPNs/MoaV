@@ -68,6 +68,47 @@ grep -q 'ENABLE_DNSTT" != "true" && "$ENABLE_MASTERDNS" != "true" && "$ENABLE_XD
     && ok "dns-router entrypoint gates on the same three flags" \
     || bad "dns-router entrypoint and dns_tunnel_enabled disagree on which flags count"
 
+# The dnstunnel profile groups dnstt + masterdns + slipstream, so a profile-level
+# gate alone still launched a disabled member (Slipstream restart-looped on a
+# fresh install: no cert, exit 1, restart: unless-stopped).
+DOCKER_LOG="$TMP/docker.log"
+docker() {
+    echo "$*" >> "$DOCKER_LOG"
+    if [[ "$*" == *"config --services"* ]]; then
+        printf '%s\n' certbot decoy dns-router dnstt masterdns slipstream xray sing-box
+    fi
+}
+up_case() {  # <label> <env-lines> <must-start> <must-not-start>
+    local label="$1" env="$TMP/up-$1.env" upline s okc=true
+    printf '%b' "$2" > "$env"
+    : > "$DOCKER_LOG"
+    compose_up_enabled "--profile proxy --profile dnstunnel " "$env" >/dev/null 2>&1
+    upline=$(grep ' up -d' "$DOCKER_LOG" | tail -1)
+    # No service list = every service of the profiles starts.
+    if [[ "$upline" != *"--remove-orphans" ]]; then
+        for s in $3; do [[ " $upline " == *" $s "* ]] || okc=false; done
+    fi
+    for s in $4; do [[ " $upline " == *" $s "* ]] && okc=false; done
+    $okc && ok "start: $label" || bad "start: $label → '$upline'"
+}
+up_case "fresh install skips slipstream" "ENABLE_DNSTT=true\nENABLE_MASTERDNS=true\n" \
+    "dnstt masterdns dns-router sing-box" "slipstream"
+up_case "ENABLE_SLIPSTREAM=false + dnstt off" "ENABLE_SLIPSTREAM=false\nENABLE_DNSTT=false\n" \
+    "masterdns dns-router" "slipstream dnstt"
+up_case "masterdns off" "ENABLE_MASTERDNS=false\n" "dnstt dns-router" "masterdns slipstream"
+grep -q 'rm -sf slipstream' "$DOCKER_LOG" \
+    && ok "an upgraded install's leftover Slipstream container is removed" \
+    || bad "leftover Slipstream container is not removed on start"
+up_case "ENABLE_SLIPSTREAM=true still starts it" "ENABLE_SLIPSTREAM=true\n" "slipstream dnstt masterdns" ""
+unset -f docker
+
+# Every start path goes through the helper (start, first-run bootstrap, menu, switch-dns).
+n=$(grep -c 'compose_up_enabled "\$' "$ROOT/lib/service.sh" "$ROOT/lib/bootstrap.sh" "$ROOT/lib/dns.sh" | awk -F: '{s+=$2} END{print s}')
+m=$(grep -c "compose_up_enabled '\$profiles'" "$ROOT/lib/service.sh")
+[[ "$n" -ge 3 && "$m" -ge 1 ]] \
+    && ok "cmd_start, bootstrap, start_services and switch-dns use compose_up_enabled" \
+    || bad "a start path bypasses compose_up_enabled ($n + $m call sites)"
+
 echo ""
 echo "  $pass passed, $fail failed"
 [[ $fail -eq 0 ]]

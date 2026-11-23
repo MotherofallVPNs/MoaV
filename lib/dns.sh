@@ -383,7 +383,7 @@ cmd_switch_dns() {
     for p in $profiles_unique; do profile_args+="--profile $p "; done
 
     info "Starting profiles: $profiles_unique"
-    docker compose $profile_args up -d --remove-orphans
+    compose_up_enabled "$profile_args"
     echo ""
     success "Switched to: ${to_enable[*]}"
     echo ""
