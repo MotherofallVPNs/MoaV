@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a server data-race fix on duplicate `SESSION_INIT`, and `golang.org/x/crypto`
   0.49.0 -> 0.52.0. Release SHA256SUMS still verified at build. Clients on
   v2026.06.13 keep working against the new server.
+- **Routine component bumps** from the 2026-11 dependency audit:
+  - **telemt 3.5.14 -> [3.5.17](https://github.com/telemt/telemt/releases/tag/3.5.17)**:
+    stalled ME relay fix, buffered relay writes flushed when the source stalls,
+    SOCKS BND family validation, IPv4 metrics allowlists on dual-stack
+    listeners. The 3.5.17 management-API rework leaves every endpoint the MoaV
+    exporter reads unchanged.
+  - **Prometheus 3.15.1 -> [3.16.0](https://github.com/prometheus/prometheus/releases/tag/v3.16.0)**,
+    **node_exporter 1.12.1 -> [1.13.1](https://github.com/prometheus/node_exporter/releases/tag/v1.13.1)**,
+    **cAdvisor 0.60.6 -> [0.61.1](https://github.com/google/cadvisor/releases/tag/v0.61.1)**
+    (`moav build --local` pins; default installs pull the upstream images).
 
 ### Fixed
 - **`moav update` now tracks the AmneziaWG pins.** `AMNEZIAWG_GO_VERSION` and

@@ -7,7 +7,7 @@
 
 FROM alpine:3.21
 
-ARG NODE_EXPORTER_VERSION=1.12.1
+ARG NODE_EXPORTER_VERSION=1.13.1
 ARG TARGETARCH=amd64
 
 RUN apk add --no-cache ca-certificates tzdata wget
