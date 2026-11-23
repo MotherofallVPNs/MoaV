@@ -147,6 +147,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     then `moav regenerate-users` and hand out the new bundles.
 
 ### Fixed
+- **WireGuard/AmneziaWG now say "permission denied" when they cannot read their
+  config**, instead of "Config file not found ... run bootstrap first". These
+  containers run without DAC capabilities, so a `configs/wireguard` or
+  `configs/amneziawg` dir not owned by root makes the config unreadable, and
+  re-running bootstrap was the wrong fix. The message now points at
+  `moav start`, which repairs ownership.
+- **e2e: WireGuard and AmneziaWG no longer crash-loop mid-run.** The workflow
+  chowned `configs/` to the runner user after start, so every later WG/AWG
+  restart (`regenerate-users`, `user add`) failed and looped until teardown,
+  unnoticed. The runner now gets access through an ACL and those two dirs stay
+  owned by root. The health check also runs after the connectivity tests and
+  fails the job if any service crashed mid-run.
+- **`moav bootstrap` could silently generate no configs on an existing
+  install.** Its "already bootstrapped?" check piped `docker volume ls` into
+  `grep -q`; under `pipefail` the early exit could SIGPIPE docker and read as
+  "fresh install", so the stale `.bootstrapped` flag was never cleared and the
+  bootstrap container exited early ("Already bootstrapped") while the CLI
+  reported success. A separate cause from the image-pull timeout fixed in
+  `525e284`. The same pattern in `moav update`'s tor-geoip check is fixed too.
 - **`moav restart` now applies `.env` changes.** It ran `docker compose restart`,
   which keeps a container's old environment and image, so an edited `.env`
   value (for example `EGRESS_ISOLATION`, a port, a log level) silently did not
