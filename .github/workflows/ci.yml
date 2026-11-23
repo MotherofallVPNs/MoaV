@@ -21,16 +21,31 @@ jobs:
           files=$(git ls-files '*.sh' 'moav.sh' | sort -u)
           echo "count=$(echo "$files" | wc -l)" >> "$GITHUB_OUTPUT"
           printf '%s\n' "$files" > /tmp/shfiles
-      - name: bash -n (parse check)
+      - name: Install pinned shellcheck
+        run: |
+          # The runner's preinstalled shellcheck changes with the image; the
+          # warning baseline is only valid for one release.
+          ver="$(bash scripts/lint-shell.sh --pinned-version)"
+          curl -fsSL --retry 3 -o /tmp/shellcheck.tar.xz \
+            "https://github.com/koalaman/shellcheck/releases/download/v${ver}/shellcheck-v${ver}.linux.x86_64.tar.xz"
+          echo "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198  /tmp/shellcheck.tar.xz" | sha256sum -c -
+          tar -xJf /tmp/shellcheck.tar.xz -C /tmp
+          sudo install -m 0755 "/tmp/shellcheck-v${ver}/shellcheck" /usr/local/bin/shellcheck
+          shellcheck --version
+      - name: parse check (bash -n / sh -n)
         run: |
           rc=0
           while IFS= read -r f; do
-            # Only parse-check bash scripts; some entrypoints are POSIX sh
-            head -1 "$f" | grep -qE 'bash' && { bash -n "$f" || rc=1; }
+            # Entrypoints with a #!/bin/sh shebang are POSIX sh: check those with sh.
+            if head -1 "$f" | grep -qE 'bash'; then bash -n "$f" || rc=1; else sh -n "$f" || rc=1; fi
           done < /tmp/shfiles
           exit $rc
       - name: shellcheck (severity=error)
         run: xargs shellcheck --severity=error < /tmp/shfiles
+      - name: shellcheck (severity=warning, no new findings)
+        run: bash scripts/lint-shell.sh
+      - name: shell lint gate blocks (self-test)
+        run: bash tests/lint-shell-test.sh
       - name: share-link golden test
         run: bash tests/singbox-links-test.sh
       - name: moav:// bundle emitter golden test
