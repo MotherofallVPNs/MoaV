@@ -141,6 +141,11 @@ jobs:
         run: bash tests/admin-tls-test.sh
       - name: admin IP whitelist (CIDR) unit test
         run: python3 tests/admin-ip-whitelist-test.py
+      - name: admin dashboard renders on the pinned Python deps
+        run: |
+          python3 -m venv /tmp/admin-venv
+          /tmp/admin-venv/bin/pip install -q -r admin/requirements.txt
+          /tmp/admin-venv/bin/python tests/admin-dashboard-render-test.py
       - name: MahsaNet donate protocols validation
         run: python3 tests/mahsanet-protocols-test.py
       - name: refactor verification (static)
