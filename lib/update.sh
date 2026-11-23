@@ -485,7 +485,7 @@ check_source_rebuilds() {
 
     # Setup-profile one-shots never run on upgrade, so a new volume stays empty.
     if grep -q '^  tor-geoip-updater:' "$SCRIPT_DIR/docker-compose.yml" 2>/dev/null \
-       && docker volume ls --format '{{.Name}}' 2>/dev/null | grep -q 'moav_tor_geoip'; then
+       && docker volume ls --format '{{.Name}}' 2>/dev/null | grep 'moav_tor_geoip' >/dev/null; then
         if ! docker run --rm -v moav_moav_tor_geoip:/geoip alpine:3.24 \
                  test -s /geoip/geoip 2>/dev/null; then
             POST_UPDATE_SETUP_JOBS="tor-geoip-updater"

@@ -16,7 +16,8 @@ check_bootstrap() {
     fi
 
     # Fallback: check docker volume (with timeout)
-    if docker volume ls 2>/dev/null | grep -q "moav_moav_state"; then
+    # not `grep -q`: under pipefail its early exit SIGPIPEs docker and fails the test
+    if docker volume ls 2>/dev/null | grep "moav_moav_state" >/dev/null; then
         # Quick check - just see if volume exists and has data
         # Use timeout to prevent hanging
         local has_keys

@@ -185,6 +185,33 @@ else
     bad "truncated amneziawg.env still kills amneziawg_add_peer"
 fi
 
+# --- 9. check_bootstrap must not lose a `docker volume ls | grep -q` race -------
+# grep -q exits on the first match; docker, still writing, gets SIGPIPE and under
+# pipefail the test reads false. An existing install then looked fresh, `moav
+# bootstrap --yes` kept the stale .bootstrapped flag and generated no configs.
+cb_case() (
+    set -euo pipefail
+    tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+    cat > "$tmp/docker" <<'STUB'
+#!/bin/bash
+case "$1 $2" in
+  "volume ls") echo "DRIVER VOLUME NAME"; echo "local moav_moav_state"
+               for i in $(seq 1 20000); do echo "local other_volume_$i"; done ;;
+  "run --rm") echo "awg-server.key" ;;
+esac
+STUB
+    chmod +x "$tmp/docker"; PATH="$tmp:$PATH"; cd "$tmp"
+    # shellcheck disable=SC1090
+    eval "$(awk '/^check_bootstrap\(\) \{/,/^}/' "$ROOT/lib/bootstrap.sh")"
+    timeout() { shift; "$@"; }
+    check_bootstrap
+)
+if cb_case; then
+    ok "check_bootstrap sees an existing state volume in a long docker listing"
+else
+    bad "check_bootstrap misses the state volume (grep -q SIGPIPE under pipefail)"
+fi
+
 echo
 echo "  $pass passed, $fail failed"
 [[ $fail -eq 0 ]]
