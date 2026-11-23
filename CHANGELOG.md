@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **amneziawg-go v3.1.20260828 -> [v3.1.20261116](https://github.com/amnezia-vpn/amneziawg-go/releases/tag/v3.1.20261116)**:
+  hardening of the AWG 3.1 obfuscation parameters (`Jmin > Jmax` rejected
+  instead of underflowing the junk packet size, negative lengths in
+  `<r>/<rc>/<rd>/<dz>` tags rejected, I1-I5 and S4 safe to change at runtime, a
+  timer race fixed). Same wire format; existing client configs keep working.
+- **MasterDNS v2026.06.13 -> [v2026.11.18](https://github.com/masterking32/MasterDnsVPN/releases/tag/v2026.11.18.210322-7198b45)**:
+  NXDOMAIN for non-tunnel DNS queries, fallback handling for non-DNS UDP,
+  a server data-race fix on duplicate `SESSION_INIT`, and `golang.org/x/crypto`
+  0.49.0 -> 0.52.0. Release SHA256SUMS still verified at build. Clients on
+  v2026.06.13 keep working against the new server.
+
+### Fixed
+- **`moav update` now tracks the AmneziaWG pins.** `AMNEZIAWG_GO_VERSION` and
+  `AWGTOOLS_VERSION` were missing from the component-version check, so an
+  existing `.env` never picked up a new amneziawg-go build.
+
 ## [2.4.0] - 2026-10-29
 
 Minor release: `moav update` can now run unattended (`--yes` / `MOAV_NONINTERACTIVE=1`), which is what the MoaV Deploy mobile app needs to update a server over SSH. No breaking changes; keys, users, and certificates are untouched.
