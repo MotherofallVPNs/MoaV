@@ -125,7 +125,7 @@ if [[ "${ENABLE_SS:-true}" == "true" ]]; then
     _ss_psk_path="$STATE_DIR/keys/shadowsocks-server.psk"
     _ss_psk_present=false
     if [[ -s "$_ss_psk_path" ]] \
-       || docker run --rm -v moav_moav_state:/state alpine test -s /state/keys/shadowsocks-server.psk 2>/dev/null; then
+       || docker run --rm -v moav_moav_state:/state alpine:3.24 test -s /state/keys/shadowsocks-server.psk 2>/dev/null; then
         _ss_psk_present=true
     fi
     _ss_inbound_present=false
@@ -172,7 +172,7 @@ if [[ -f "$STATE_DIR/keys/reality.env" ]]; then
     source "$STATE_DIR/keys/reality.env"
 else
     # Try docker volume (load all keys including private for derivation fallback)
-    REALITY_ENV_CONTENT=$(docker run --rm -v moav_moav_state:/state alpine cat /state/keys/reality.env 2>/dev/null || echo "")
+    REALITY_ENV_CONTENT=$(docker run --rm -v moav_moav_state:/state alpine:3.24 cat /state/keys/reality.env 2>/dev/null || echo "")
     # `|| true` on each: when the volume read comes back empty, grep exits 1 and
     # pipefail propagates it to the assignment, which set -e turns into a silent
     # exit -- the operator saw "Failed to add sing-box user" and nothing more.
@@ -186,7 +186,7 @@ fi
 if [[ -f "$STATE_DIR/keys/xdns.env" ]]; then
     source "$STATE_DIR/keys/xdns.env"
 else
-    XDNS_ENV_CONTENT=$(docker run --rm -v moav_moav_state:/state alpine cat /state/keys/xdns.env 2>/dev/null || echo "")
+    XDNS_ENV_CONTENT=$(docker run --rm -v moav_moav_state:/state alpine:3.24 cat /state/keys/xdns.env 2>/dev/null || echo "")
     XDNS_VLESS_ENCRYPTION=$(echo "$XDNS_ENV_CONTENT" | grep XDNS_VLESS_ENCRYPTION | cut -d= -f2 || true)
 fi
 
@@ -207,7 +207,7 @@ if [[ -z "${REALITY_PUBLIC_KEY:-}" ]] && [[ -n "${REALITY_PRIVATE_KEY:-}" ]]; th
             sed -i "s/^REALITY_PUBLIC_KEY=.*/REALITY_PUBLIC_KEY=$REALITY_PUBLIC_KEY/" "$STATE_DIR/keys/reality.env"
         fi
         # Also update Docker volume
-        docker run --rm -v moav_moav_state:/state alpine sh -c \
+        docker run --rm -v moav_moav_state:/state alpine:3.24 sh -c \
             "sed -i 's/^REALITY_PUBLIC_KEY=.*/REALITY_PUBLIC_KEY=$REALITY_PUBLIC_KEY/' /state/keys/reality.env" 2>/dev/null || true
     else
         log_warn "Could not derive Reality public key - Reality links will be incomplete"
@@ -219,7 +219,7 @@ if [[ -f "$STATE_DIR/keys/clash-api.env" ]]; then
     source "$STATE_DIR/keys/clash-api.env"
 else
     # Try docker volume
-    HYSTERIA2_OBFS_PASSWORD=$(docker run --rm -v moav_moav_state:/state alpine cat /state/keys/clash-api.env 2>/dev/null | grep HYSTERIA2_OBFS_PASSWORD | cut -d= -f2 || echo "")
+    HYSTERIA2_OBFS_PASSWORD=$(docker run --rm -v moav_moav_state:/state alpine:3.24 cat /state/keys/clash-api.env 2>/dev/null | grep HYSTERIA2_OBFS_PASSWORD | cut -d= -f2 || echo "")
 fi
 
 # Get server IP
@@ -326,7 +326,7 @@ fi
 CDN_WS_PATH="${CDN_WS_PATH:-$(get_env_val "CDN_WS_PATH" ".env")}"
 if [[ -z "${CDN_WS_PATH:-}" ]]; then
     # Check bootstrap-generated state (persisted random path)
-    CDN_WS_PATH=$(docker run --rm -v moav_moav_state:/state alpine cat /state/keys/cdn.env 2>/dev/null | grep '^CDN_WS_PATH=' | cut -d= -f2 || true)
+    CDN_WS_PATH=$(docker run --rm -v moav_moav_state:/state alpine:3.24 cat /state/keys/cdn.env 2>/dev/null | grep '^CDN_WS_PATH=' | cut -d= -f2 || true)
 fi
 CDN_WS_PATH="${CDN_WS_PATH:-/ws}"
 CDN_TRANSPORT="${CDN_TRANSPORT:-$(get_env_val "CDN_TRANSPORT" ".env")}"
@@ -355,7 +355,7 @@ if [[ "${ENABLE_SS:-true}" == "true" ]] && [[ -n "${SS_USER_PSK:-}" ]]; then
         SS_SERVER_PSK=$(cat "$STATE_DIR/keys/shadowsocks-server.psk" 2>/dev/null | tr -d '\n')
     fi
     if [[ -z "$SS_SERVER_PSK" ]]; then
-        SS_SERVER_PSK=$(docker run --rm -v moav_moav_state:/state alpine cat /state/keys/shadowsocks-server.psk 2>/dev/null | tr -d '\n' || echo "")
+        SS_SERVER_PSK=$(docker run --rm -v moav_moav_state:/state alpine:3.24 cat /state/keys/shadowsocks-server.psk 2>/dev/null | tr -d '\n' || echo "")
     fi
 
     if [[ -z "$SS_SERVER_PSK" ]]; then
@@ -412,7 +412,7 @@ if [[ "${ENABLE_SNELL:-true}" == "true" ]] && jq -e '.inbounds[] | select(.tag =
         SNELL_PSK=$(cat "$STATE_DIR/keys/snell-server.psk" 2>/dev/null | tr -d '\n')
     fi
     if [[ -z "$SNELL_PSK" ]]; then
-        SNELL_PSK=$(docker run --rm -v moav_moav_state:/state alpine cat /state/keys/snell-server.psk 2>/dev/null | tr -d '\n' || echo "")
+        SNELL_PSK=$(docker run --rm -v moav_moav_state:/state alpine:3.24 cat /state/keys/snell-server.psk 2>/dev/null | tr -d '\n' || echo "")
     fi
     if [[ -z "$SNELL_PSK" ]]; then
         log_warn "Snell PSK not found — skipping Snell bundle for $USERNAME"

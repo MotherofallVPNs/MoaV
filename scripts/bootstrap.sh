@@ -230,7 +230,7 @@ if [[ -f "$STATE_DIR/.bootstrapped" ]]; then
     # of this script is unreachable for existing installs.
     secure_state_keys "$STATE_DIR/keys"
     log_info "Already bootstrapped. To re-bootstrap, run:"
-    log_info "  docker run --rm -v moav_moav_state:/state alpine rm /state/.bootstrapped"
+    log_info "  docker run --rm -v moav_moav_state:/state alpine:3.24 rm /state/.bootstrapped"
     log_info "  docker compose --profile setup run --rm bootstrap"
     exit 0
 fi

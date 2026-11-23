@@ -502,7 +502,7 @@ fi
             $_tmo docker run --rm \
                 -v moav_moav_state:/state \
                 -v "$(pwd)/state/users/$USERNAME:/host-user:ro" \
-                alpine sh -c "mkdir -p /state/users/$USERNAME && cp -a /host-user/. /state/users/$USERNAME/" \
+                alpine:3.24 sh -c "mkdir -p /state/users/$USERNAME && cp -a /host-user/. /state/users/$USERNAME/" \
                 2>/dev/null && log_info "✓ Synced credentials to Docker volume" \
                 || log_warn "Could not sync to Docker volume (bootstrap will import on next run)"
         fi

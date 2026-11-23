@@ -20,7 +20,7 @@ check_bootstrap() {
         # Quick check - just see if volume exists and has data
         # Use timeout to prevent hanging
         local has_keys
-        has_keys=$(timeout 3 docker run --rm -v moav_moav_state:/state alpine sh -c "ls /state/keys 2>/dev/null | head -1" 2>/dev/null || echo "")
+        has_keys=$(timeout 3 docker run --rm -v moav_moav_state:/state alpine:3.24 sh -c "ls /state/keys 2>/dev/null | head -1" 2>/dev/null || echo "")
         if [[ -n "$has_keys" ]]; then
             return 0  # Bootstrap has been run
         fi
@@ -276,7 +276,7 @@ cmd_domainless() {
     # Clear bootstrap flag if exists
     if check_bootstrap; then
         info "Clearing previous bootstrap to regenerate configs..."
-        docker run --rm -v moav_moav_state:/state alpine rm -f /state/.bootstrapped 2>/dev/null || true
+        docker run --rm -v moav_moav_state:/state alpine:3.24 rm -f /state/.bootstrapped 2>/dev/null || true
     fi
 
     echo ""
@@ -323,7 +323,7 @@ cmd_bootstrap() {
         fi
         # Clear the bootstrapped flag so bootstrap.sh doesn't exit early
         info "Clearing bootstrap flag..."
-        docker run --rm -v moav_moav_state:/state alpine rm -f /state/.bootstrapped
+        docker run --rm -v moav_moav_state:/state alpine:3.24 rm -f /state/.bootstrapped
     else
         local domain=$(get_env_val "DOMAIN" ".env")
         info "Bootstrap will perform first-time setup:"

@@ -315,7 +315,7 @@ jobs:
           # still resolves in the proxy configs BEFORE connectivity runs, so a
           # re-orphaning regression fails loudly here and the connectivity test
           # below validates the reconciled config end-to-end.
-          docker run --rm -v moav_moav_state:/state alpine rm -f /state/.bootstrapped
+          docker run --rm -v moav_moav_state:/state alpine:3.24 rm -f /state/.bootstrapped
           docker compose --profile setup run --rm bootstrap
           docker compose restart sing-box xray >/dev/null 2>&1 || true
           sudo chown -R "$USER" configs state outputs 2>/dev/null || true
