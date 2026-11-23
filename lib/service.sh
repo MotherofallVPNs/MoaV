@@ -27,7 +27,7 @@ show_versions() {
     trusttunnel_ver=$(get_component_version "TRUSTTUNNEL_VERSION" "")
     trusttunnel_client_ver=$(get_component_version "TRUSTTUNNEL_CLIENT_VERSION" "")
     awgtools_ver=$(get_component_version "AWGTOOLS_VERSION" "")
-    xray_ver=$(get_component_version "XRAY_VERSION" "v26.10.21")
+    xray_ver=$(get_component_version "XRAY_VERSION" "v26.11.9")
     dnstt_ver=$(get_component_version "DNSTT_VERSION" "latest")
 
     echo ""
