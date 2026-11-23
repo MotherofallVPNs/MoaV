@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The one-shot `docker run ... alpine` helpers in `lib/` and `scripts/`
     (state reads, migrate export/import, doctor checks) use `alpine:3.24`,
     the same base as the built images, instead of an implicit `alpine:latest`.
+    The two probes that run under a short deadline (bootstrap state detection,
+    the `user add` volume sync) pull the image first, so a first-time pull
+    can't time out and make bootstrap misread an existing install as fresh.
   - `anthropics/claude-code-action` is SHA-pinned like every other action.
   - `moav uninstall --remove-images` removes external images by ID, because
     digest-pinned pulls are listed as `repo:<none>`. The match list now also
