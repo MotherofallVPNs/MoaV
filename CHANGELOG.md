@@ -93,6 +93,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     build, and slipstream keeps its own bundled glibc loader, so nothing else
     changes. The shim was x86_64-only and was the reason the image could not
     move to 3.24 on arm64; it was also installed with `--allow-untrusted`.
+    The client's connectivity probes (`moav test`, `moav client`, the image
+    HEALTHCHECK) now pass `curl -4`: curl 8.23 on 3.24 sends the SOCKS proxy
+    an IPv6 address for `--socks5` URLs where 8.14 sent IPv4, and a server
+    without IPv6 egress then failed every protocol test.
 - **docker-socket-proxy v0.5.0 -> `3.4@sha256:027f9fa5...`** (upstream
   [v0.6.0](https://github.com/Tecnativa/docker-socket-proxy/releases/tag/v0.6.0)).
   Upstream retired the `:vX.Y.Z` tags, so `v0.5.0` is never rebuilt and its

@@ -15,6 +15,8 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # Test configuration
+# curl -4: curl 8.23 (Alpine 3.24) hands the SOCKS proxy an IPv6 literal when
+# --socks5 resolves locally; servers without IPv6 egress then fail every probe.
 TEST_URL="${TEST_URL:-https://www.google.com/generate_204}"
 TEST_TIMEOUT="${TEST_TIMEOUT:-10}"
 TEMP_DIR="/tmp/moav-test-$$"
@@ -256,11 +258,11 @@ EOF
 
     # Test connection
     log_debug "Testing connectivity via SOCKS5 on port 10800..."
-    if curl -sf --socks5 127.0.0.1:10800 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10800 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         # Verify we can access the internet and get exit IP
         local exit_ip=""
-        exit_ip=$(curl -sf --socks5 127.0.0.1:10800 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --socks5 127.0.0.1:10800 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+        exit_ip=$(curl -sf -4 --socks5 127.0.0.1:10800 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf -4 --socks5 127.0.0.1:10800 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
         if [[ -n "$exit_ip" ]]; then
             log_success "Reality connection successful (exit IP: $exit_ip)"
             RESULTS[reality]="pass"
@@ -424,11 +426,11 @@ EOF
     log_debug "sing-box started successfully (PID: $pid)"
     log_debug "Testing connectivity via SOCKS5 on port 10801..."
 
-    if curl -sf --socks5 127.0.0.1:10801 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10801 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         # Verify we can access the internet and get exit IP
         local exit_ip=""
-        exit_ip=$(curl -sf --socks5 127.0.0.1:10801 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --socks5 127.0.0.1:10801 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+        exit_ip=$(curl -sf -4 --socks5 127.0.0.1:10801 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf -4 --socks5 127.0.0.1:10801 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
         if [[ -n "$exit_ip" ]]; then
             log_success "Trojan connection successful (exit IP: $exit_ip)"
             RESULTS[trojan]="pass"
@@ -539,10 +541,10 @@ EOF
         log_error "$detail"; RESULTS[shadowsocks]="fail"; DETAILS[shadowsocks]="$detail"; return
     fi
 
-    if curl -sf --socks5 127.0.0.1:10807 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10807 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         local exit_ip=""
-        exit_ip=$(curl -sf --socks5 127.0.0.1:10807 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --socks5 127.0.0.1:10807 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+        exit_ip=$(curl -sf -4 --socks5 127.0.0.1:10807 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf -4 --socks5 127.0.0.1:10807 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
         if [[ -n "$exit_ip" ]]; then
             log_success "Shadowsocks-2022 connection successful (exit IP: $exit_ip)"
             RESULTS[shadowsocks]="pass"; DETAILS[shadowsocks]="Connected via Shadowsocks-2022, exit IP: $exit_ip"
@@ -607,9 +609,9 @@ test_xdns() {
 
     # XDNS is high-latency; give it a longer ceiling than the default timeout.
     local xdns_timeout=$(( TEST_TIMEOUT > 20 ? TEST_TIMEOUT : 20 ))
-    if curl -sf --socks5 127.0.0.1:7891 --max-time "$xdns_timeout" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:7891 --max-time "$xdns_timeout" "$TEST_URL" >/dev/null 2>&1; then
         local exit_ip=""
-        exit_ip=$(curl -sf --socks5 127.0.0.1:7891 --max-time "$xdns_timeout" https://api.ipify.org 2>/dev/null || true)
+        exit_ip=$(curl -sf -4 --socks5 127.0.0.1:7891 --max-time "$xdns_timeout" https://api.ipify.org 2>/dev/null || true)
         if [[ -n "$exit_ip" ]]; then
             log_success "XDNS connection successful (exit IP: $exit_ip)"
             RESULTS[xdns]="pass"; DETAILS[xdns]="Connected via XDNS, exit IP: $exit_ip"
@@ -758,11 +760,11 @@ EOF
     log_debug "sing-box started successfully (PID: $pid)"
     log_debug "Testing connectivity via SOCKS5 on port 10805..."
 
-    if curl -sf --socks5 127.0.0.1:10805 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10805 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         # Verify we can access the internet and get exit IP
         local exit_ip=""
-        exit_ip=$(curl -sf --socks5 127.0.0.1:10805 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --socks5 127.0.0.1:10805 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+        exit_ip=$(curl -sf -4 --socks5 127.0.0.1:10805 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf -4 --socks5 127.0.0.1:10805 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
         if [[ -n "$exit_ip" ]]; then
             log_success "AnyTLS connection successful (exit IP: $exit_ip)"
             RESULTS[anytls]="pass"
@@ -948,11 +950,11 @@ EOF
     log_debug "sing-box started successfully (PID: $pid)"
     log_debug "Testing connectivity via SOCKS5 on port 10802..."
 
-    if curl -sf --socks5 127.0.0.1:10802 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10802 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         # Verify we can access the internet and get exit IP
         local exit_ip=""
-        exit_ip=$(curl -sf --socks5 127.0.0.1:10802 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --socks5 127.0.0.1:10802 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+        exit_ip=$(curl -sf -4 --socks5 127.0.0.1:10802 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf -4 --socks5 127.0.0.1:10802 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
         if [[ -n "$exit_ip" ]]; then
             log_success "Hysteria2 connection successful (exit IP: $exit_ip)"
             RESULTS[hysteria2]="pass"
@@ -1445,13 +1447,13 @@ test_dnstt() {
     local test_success=false
 
     # Test 1: Basic connectivity through the tunnel
-    if curl -sf --socks5 127.0.0.1:10803 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10803 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         log_debug "Basic connectivity test passed"
         test_success=true
     else
         log_debug "Basic connectivity test failed, trying extended timeout..."
         # DNS tunneling is slow, try with longer timeout
-        if curl -sf --socks5 127.0.0.1:10803 --max-time 30 "$TEST_URL" >/dev/null 2>&1; then
+        if curl -sf -4 --socks5 127.0.0.1:10803 --max-time 30 "$TEST_URL" >/dev/null 2>&1; then
             log_debug "Extended timeout test passed"
             test_success=true
         fi
@@ -1460,8 +1462,8 @@ test_dnstt() {
     if [[ "$test_success" == "true" ]]; then
         # Test 2: Verify public IP (optional but recommended)
         local tunnel_ip=""
-        tunnel_ip=$(curl -sf --socks5 127.0.0.1:10803 --max-time 30 https://api.ipify.org 2>/dev/null || true)
-        [[ -z "$tunnel_ip" ]] && tunnel_ip=$(curl -sf --socks5 127.0.0.1:10803 --max-time 30 https://ifconfig.me 2>/dev/null || true)
+        tunnel_ip=$(curl -sf -4 --socks5 127.0.0.1:10803 --max-time 30 https://api.ipify.org 2>/dev/null || true)
+        [[ -z "$tunnel_ip" ]] && tunnel_ip=$(curl -sf -4 --socks5 127.0.0.1:10803 --max-time 30 https://ifconfig.me 2>/dev/null || true)
 
         if [[ -n "$tunnel_ip" ]]; then
             log_success "dnstt tunnel working, exit IP: $tunnel_ip"
@@ -1575,12 +1577,12 @@ test_slipstream() {
     local test_success=false
 
     # Test connectivity through the tunnel
-    if curl -sf --socks5 127.0.0.1:10804 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10804 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         log_debug "Basic connectivity test passed"
         test_success=true
     else
         log_debug "Basic connectivity test failed, trying extended timeout..."
-        if curl -sf --socks5 127.0.0.1:10804 --max-time 30 "$TEST_URL" >/dev/null 2>&1; then
+        if curl -sf -4 --socks5 127.0.0.1:10804 --max-time 30 "$TEST_URL" >/dev/null 2>&1; then
             log_debug "Extended timeout test passed"
             test_success=true
         fi
@@ -1588,8 +1590,8 @@ test_slipstream() {
 
     if [[ "$test_success" == "true" ]]; then
         local tunnel_ip=""
-        tunnel_ip=$(curl -sf --socks5 127.0.0.1:10804 --max-time 30 https://api.ipify.org 2>/dev/null || true)
-        [[ -z "$tunnel_ip" ]] && tunnel_ip=$(curl -sf --socks5 127.0.0.1:10804 --max-time 30 https://ifconfig.me 2>/dev/null || true)
+        tunnel_ip=$(curl -sf -4 --socks5 127.0.0.1:10804 --max-time 30 https://api.ipify.org 2>/dev/null || true)
+        [[ -z "$tunnel_ip" ]] && tunnel_ip=$(curl -sf -4 --socks5 127.0.0.1:10804 --max-time 30 https://ifconfig.me 2>/dev/null || true)
 
         if [[ -n "$tunnel_ip" ]]; then
             log_success "Slipstream tunnel working, exit IP: $tunnel_ip"
@@ -2000,10 +2002,10 @@ EOF
 
     # Test connection via SOCKS5
     log_debug "Testing connectivity via SOCKS5 on port 10806..."
-    if curl -sf --socks5 127.0.0.1:10806 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10806 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         local exit_ip=""
-        exit_ip=$(curl -sf --socks5 127.0.0.1:10806 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --socks5 127.0.0.1:10806 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+        exit_ip=$(curl -sf -4 --socks5 127.0.0.1:10806 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf -4 --socks5 127.0.0.1:10806 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
         if [[ -n "$exit_ip" ]]; then
             log_success "XHTTP connection successful (exit IP: $exit_ip)"
             RESULTS[xhttp]="pass"
@@ -2184,9 +2186,9 @@ EOF
         log_error "$detail"; RESULTS[cdn]="fail"; DETAILS[cdn]="$detail"; return
     fi
 
-    if curl -sf --socks5 127.0.0.1:10808 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10808 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         local exit_ip=""
-        exit_ip=$(curl -sf --socks5 127.0.0.1:10808 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || true)
+        exit_ip=$(curl -sf -4 --socks5 127.0.0.1:10808 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || true)
         log_success "CDN connection successful${exit_ip:+ (exit IP: $exit_ip)}"
         RESULTS[cdn]="pass"; DETAILS[cdn]="Connected via CDN${exit_ip:+, exit IP: $exit_ip}"
     else
