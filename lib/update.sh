@@ -540,8 +540,13 @@ print_post_update_apply_steps() {
     local setup_jobs="${POST_UPDATE_SETUP_JOBS:-}"
     local compose_changed="${POST_UPDATE_COMPOSE_CHANGED:-}"
 
-    [[ -z "$rebuild" && -z "$templates" && -z "$regen_bundles" && -z "$recreate" \
-       && -z "$setup_jobs" && -z "$compose_changed" ]] && return 0
+    # Nothing left to apply: the running containers are already the current
+    # ones, so this is the one point where image cleanup is safe.
+    if [[ -z "$rebuild" && -z "$templates" && -z "$regen_bundles" && -z "$recreate" \
+          && -z "$setup_jobs" && -z "$compose_changed" ]]; then
+        prune_dangling_images
+        return 0
+    fi
 
     echo ""
     if [[ -n "$templates" ]]; then
@@ -592,6 +597,30 @@ print_post_update_apply_steps() {
     echo ""
 
     echo -e "${DIM}Note: 'moav build' alone changes nothing that is running. 'moav start' (or 'moav restart' for running services) recreates containers on the new images.${NC}"
+}
+
+# Best-effort cleanup of dangling (untagged, unreferenced) images left behind by
+# earlier rebuilds. Never -a: tagged images, build bases and test images stay.
+prune_dangling_images() {
+    command -v docker >/dev/null 2>&1 || return 0
+    # Only with a healthy stack: a container that is failing after a recreate
+    # may still need its previous image for a rollback.
+    local sick=""
+    sick=$( { docker ps -q --filter health=unhealthy
+              docker ps -q --filter health=starting
+              docker ps -q --filter status=restarting; } 2>/dev/null ) || true
+    if [[ -n "$sick" ]]; then
+        info "Skipped image cleanup: a container is unhealthy, starting or restarting"
+        return 0
+    fi
+    local out="" reclaimed=""
+    if ! out=$(docker image prune -f 2>/dev/null); then
+        info "Skipped image cleanup: docker image prune failed (nothing removed)"
+        return 0
+    fi
+    reclaimed=$(awk -F': ' '/^Total reclaimed space/ {print $2}' <<< "$out") || true
+    info "Dangling images cleaned up, reclaimed ${reclaimed:-0B} (tagged and in-use images untouched)"
+    return 0
 }
 
 # Check for new variables in .env.example that are missing from .env

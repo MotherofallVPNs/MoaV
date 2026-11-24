@@ -134,6 +134,8 @@ jobs:
         run: bash tests/update-discard-test.sh
       - name: build cache cap (sizing reaches docker builder)
         run: bash tests/build-cache-test.sh
+      - name: moav update image cleanup is dangling-only (never -a / --volumes)
+        run: bash tests/update-image-prune-test.sh
       - name: moav build --help prints usage, builds nothing
         run: bash tests/build-help-test.sh
       - name: monitoring privacy (no user x destination) (#297)

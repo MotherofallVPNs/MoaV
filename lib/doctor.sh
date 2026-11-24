@@ -184,7 +184,8 @@ doctor_check_disk() {
 
     if [[ "${avail_mb:-0}" -lt 1024 ]]; then
         echo -e "    ${RED}✗${NC} Less than 1 GB free disk space"
-        echo -e "      ${DIM}Clean up: docker system prune -a --volumes${NC}"
+        echo -e "      ${DIM}Remove dangling images: docker image prune -f${NC}"
+        echo -e "      ${DIM}Trim the system journal: journalctl --vacuum-size=200M${NC}"
         echo -e "      ${DIM}Find large files: apt install ncdu && ncdu /${NC}"
         return 1
     elif [[ "${avail_mb:-0}" -lt 2048 ]]; then
