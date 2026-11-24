@@ -163,6 +163,51 @@ for e in wireguard amneziawg; do
     fi
 done
 
+# --- dual-stack Address: one `ip address add` per prefix ----------------------
+# bootstrap writes "Address = 10.x/24, fd00:…/64" when the server has IPv6, and
+# the whole string was passed to ip(8) ("any valid prefix is expected"), so the
+# container restart-looped. Run the real set_addresses() against a stub `ip`.
+_stub=$(mktemp -d)
+cat > "$_stub/ip" <<'STUB'
+#!/bin/sh
+echo "$*" >> "$IP_LOG"
+case "$*" in *,*) exit 1 ;; esac
+[ "${IP_V6_FAIL:-0}" = 1 ] && case "$*" in *:*) exit 2 ;; esac
+exit 0
+STUB
+chmod +x "$_stub/ip"
+for e in wireguard amneziawg; do
+    f="$ROOT/scripts/${e}-entrypoint.sh"
+    fn=$(awk '/^set_addresses\(\) \{/,/^\}/' "$f")
+    [ -n "$fn" ] || { bad "$e: no set_addresses() function"; continue; }
+    grep -qE '^[^#]*ip addr(ess)? add "\$ADDRESS"' "$f" \
+        && bad "$e: still passes the whole Address to ip(8)" \
+        || ok "$e: never passes the raw Address to ip(8)"
+    run() {  # $1=Address $2=IP_V6_FAIL -> prints rc, log in $_stub/log
+        : > "$_stub/log"
+        PATH="$_stub:$PATH" IP_LOG="$_stub/log" IP_V6_FAIL="$2" ADDRESS="$1" INTERFACE=awg0 \
+            sh -c "set -eu; $fn
+set_addresses" >/dev/null 2>&1; echo $?
+    }
+    rc=$(run "10.67.67.1/24,fd00:cafe:dead::1/64" 0)
+    if [[ $rc == 0 ]] && grep -qx 'address add 10.67.67.1/24 dev awg0' "$_stub/log" \
+       && grep -qx 'address add fd00:cafe:dead::1/64 dev awg0' "$_stub/log" \
+       && [[ $(wc -l < "$_stub/log") -eq 2 ]]; then
+        ok "$e: dual-stack Address configures both prefixes"
+    else bad "$e: dual-stack Address (rc=$rc): $(tr '\n' ';' < "$_stub/log")"; fi
+    rc=$(run "10.66.66.1/24" 0)
+    [[ $rc == 0 && $(cat "$_stub/log") == 'address add 10.66.66.1/24 dev awg0' ]] \
+        && ok "$e: single-address case unchanged" || bad "$e: single address broke (rc=$rc)"
+    rc=$(run "10.67.67.1/24,fd00:cafe:dead::1/64" 1)
+    [[ $rc == 0 ]] && ok "$e: IPv6 add failure is non-fatal (IPv4 still up)" \
+                   || bad "$e: IPv6-disabled netns kills the container (rc=$rc)"
+    PATH="$_stub:$PATH" IP_LOG=/dev/null ADDRESS="10.1.1.1/24" INTERFACE=awg0 \
+        sh -c "set -eu; ip() { return 1; }; $fn
+set_addresses" >/dev/null 2>&1 \
+        && bad "$e: IPv4 add failure was swallowed" || ok "$e: IPv4 add failure is fatal"
+done
+rm -rf "$_stub"
+
 # --- admin entrypoint: clash-secret read must not crash a secret-less install -
 # The read runs under `set -eu`; grep exits 1 when /state/keys/clash-api.env is
 # absent (a valid state: no sing-box protocols), so the `|| true` is load-bearing

@@ -114,9 +114,26 @@ rm -f "$STRIPPED"
 . /egress-isolation.sh
 egress_firewall "$INTERFACE" || { echo "[amneziawg] ERROR: egress isolation rules failed (EGRESS_ISOLATION=off bypasses)"; exit 1; }
 
+# Address may be dual-stack ("10.x/24,fd00::1/64") but ip(8) takes one prefix
+# per call. A failed IPv6 add (IPv6 off in the netns) warns; IPv4 stays fatal.
+set_addresses() {
+    _rc=0
+    for _a in $(printf '%s' "$ADDRESS" | tr ',' ' '); do
+        if ip address add "$_a" dev "$INTERFACE"; then
+            echo "[amneziawg]   address $_a"
+        else
+            case "$_a" in
+                *:*) echo "[amneziawg] WARNING: could not add IPv6 address $_a; continuing without it" ;;
+                *)   echo "[amneziawg] ERROR: could not add address $_a"; _rc=1 ;;
+            esac
+        fi
+    done
+    return "$_rc"
+}
+
 # Set interface address and MTU, then bring up
 echo "[amneziawg] Setting address $ADDRESS..."
-ip addr add "$ADDRESS" dev "$INTERFACE"
+set_addresses || exit 1
 [ -n "$MTU" ] && ip link set "$INTERFACE" mtu "$MTU"
 ip link set "$INTERFACE" up
 
@@ -197,7 +214,7 @@ while true; do
             sleep 2
             if ip link show "$INTERFACE" > /dev/null 2>&1; then
                 echo "$PRIVATE_KEY" | awg set "$INTERFACE" $AWG_SET_ARGS 2>/dev/null || true
-                ip addr add "$ADDRESS" dev "$INTERFACE" 2>/dev/null || true
+                set_addresses >/dev/null 2>&1 || true
                 [ -n "$MTU" ] && ip link set "$INTERFACE" mtu "$MTU" 2>/dev/null || true
                 ip link set "$INTERFACE" up 2>/dev/null || true
                 KERNEL_MODE=0

@@ -131,9 +131,26 @@ fi
 . /egress-isolation.sh
 egress_firewall "$INTERFACE" || { echo "[wireguard] ERROR: egress isolation rules failed (EGRESS_ISOLATION=off bypasses)"; exit 1; }
 
+# Address may be dual-stack ("10.x/24,fd00::1/64") but ip(8) takes one prefix
+# per call. A failed IPv6 add (IPv6 off in the netns) warns; IPv4 stays fatal.
+set_addresses() {
+    _rc=0
+    for _a in $(printf '%s' "$ADDRESS" | tr ',' ' '); do
+        if ip address add "$_a" dev "$INTERFACE"; then
+            echo "[wireguard]   address $_a"
+        else
+            case "$_a" in
+                *:*) echo "[wireguard] WARNING: could not add IPv6 address $_a; continuing without it" ;;
+                *)   echo "[wireguard] ERROR: could not add address $_a"; _rc=1 ;;
+            esac
+        fi
+    done
+    return "$_rc"
+}
+
 # Set interface address and bring up
 echo "[wireguard] Setting address $ADDRESS..."
-ip addr add "$ADDRESS" dev "$INTERFACE"
+set_addresses || exit 1
 ip link set "$INTERFACE" up
 
 # Run PostUp iptables rules
@@ -198,7 +215,7 @@ while true; do
         echo "[wireguard] Interface down, attempting restart..."
         ip link add "$INTERFACE" type wireguard 2>/dev/null || true
         echo "$PRIVATE_KEY" | wg set "$INTERFACE" private-key /dev/stdin listen-port "$LISTEN_PORT" 2>/dev/null || true
-        ip addr add "$ADDRESS" dev "$INTERFACE" 2>/dev/null || true
+        set_addresses >/dev/null 2>&1 || true
         ip link set "$INTERFACE" up 2>/dev/null || true
     fi
 done
