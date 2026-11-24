@@ -105,7 +105,7 @@ if ! awg setconf "$INTERFACE" "$STRIPPED"; then
     rm -f "$STRIPPED"
     exit 1
 fi
-rm -f "$STRIPPED"
+# $STRIPPED is kept: the monitor loop re-applies it if awg0 has to be recreated.
 
 # Peers were loaded by `awg setconf` above (it reads every [Peer] block).
 
@@ -160,6 +160,7 @@ cleanup() {
     egress_firewall_clear "$INTERFACE"
     ip link del "$INTERFACE" 2>/dev/null || true
     kill $AWG_PID 2>/dev/null || true
+    rm -f "$STRIPPED"
     exit 0
 }
 trap cleanup SIGTERM SIGINT
@@ -213,7 +214,7 @@ while true; do
             AWG_PID=$!
             sleep 2
             if ip link show "$INTERFACE" > /dev/null 2>&1; then
-                echo "$PRIVATE_KEY" | awg set "$INTERFACE" $AWG_SET_ARGS 2>/dev/null || true
+                awg setconf "$INTERFACE" "$STRIPPED" 2>/dev/null || true
                 set_addresses >/dev/null 2>&1 || true
                 [ -n "$MTU" ] && ip link set "$INTERFACE" mtu "$MTU" 2>/dev/null || true
                 ip link set "$INTERFACE" up 2>/dev/null || true
