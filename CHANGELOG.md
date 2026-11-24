@@ -199,6 +199,15 @@ Security and stability release. Tunneled client traffic is now kept away from pr
   covers the `#!/bin/sh` entrypoints it used to skip.
 
 ### Fixed
+- **TrustTunnel no longer crash-loops after `moav user add` from a non-root
+  operator.** When the CLI user could not write a config dir, `user add` reset
+  it to `2770`, which took away the traverse bit that TrustTunnel's endpoint
+  (uid 999, outside the admin group) needs. Its next restart, which `user add`
+  itself triggers, panicked on `credentials.toml: Permission denied` and the
+  endpoint stayed down until the next `moav start`. `configs/sing-box`, `xray`,
+  `trusttunnel` and `telemt` now get `2775`, matching bootstrap, the admin
+  container and `moav start`. Present since v2.0.0. Found in the v2.5.0 release
+  e2e.
 - **`moav start` no longer launches disabled DNS-tunnel containers.** The
   `dnstunnel` profile groups dnstt, MasterDNS and Slipstream, so starting it
   started all three regardless of their `ENABLE_*` flags. On a fresh install

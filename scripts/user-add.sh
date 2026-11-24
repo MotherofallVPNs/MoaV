@@ -205,11 +205,15 @@ _fix_perms() {
     mkdir -p "$dir" 2>/dev/null || \
         sudo mkdir -p "$dir" 2>/dev/null || \
         su-exec root mkdir -p "$dir" 2>/dev/null || true
+    # sing-box/xray/trusttunnel/telemt daemons run as uids outside the admin
+    # group and must traverse their config dir (TrustTunnel crash-looped on 2770).
+    local _mode=2770
+    case "$dir" in configs/sing-box|configs/xray|configs/trusttunnel|configs/telemt) _mode=2775 ;; esac
     if [[ -d "$dir" ]] && [[ ! -w "$dir" ]]; then
         sudo chown "$_owner:$ADMIN_GID" "$dir" 2>/dev/null || \
             su-exec root chown "$_owner:$ADMIN_GID" "$dir" 2>/dev/null || true
-        sudo chmod 2770 "$dir" 2>/dev/null || \
-            su-exec root chmod 2770 "$dir" 2>/dev/null || true
+        sudo chmod "$_mode" "$dir" 2>/dev/null || \
+            su-exec root chmod "$_mode" "$dir" 2>/dev/null || true
     fi
 }
 
