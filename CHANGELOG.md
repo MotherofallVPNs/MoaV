@@ -358,6 +358,15 @@ Security and stability release. Tunneled client traffic is now kept away from pr
     `moav switch-dns dnstt+masterdns+xdns` (or set `ENABLE_SLIPSTREAM=false`),
     then `moav regenerate-users` and hand out the new bundles.
 
+### Known limitations
+- **AmneziaWG in the test client does not run on ARM64.** `moav test` and
+  `moav client` install `awg` from the upstream amneziawg-tools release zip
+  (`alpine-3.19-amneziawg-tools.zip`), which contains an x86_64 binary only,
+  so on ARM64 hosts the AmneziaWG check fails while the other protocols test
+  normally. The AmneziaWG server builds `awg` from source and is not affected,
+  and neither is the moav-client AmneziaWG sidecar. Revisit when an arm64 `awg`
+  build is available: [amneziawg-tools releases](https://github.com/amnezia-vpn/amneziawg-tools/releases).
+
 ### Documentation
 - **Security policy** ([SECURITY.md](SECURITY.md)): supported versions, private
   reporting through GitHub Private Vulnerability Reporting with an email

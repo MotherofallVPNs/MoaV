@@ -214,6 +214,8 @@ RUN ARCH=$(cat /tmp/arch) && \
     echo "trusttunnel_client: download failed (optional)"
 
 # amneziawg: download awg-tools for AmneziaWG client support
+# Upstream ships this prebuilt awg for x86_64 only, so AmneziaWG cannot run here on
+# arm64 (known limitation, see CHANGELOG 2.5.0); revisit when an arm64 build exists.
 ARG AWGTOOLS_VERSION=3.1.20260812
 RUN cd /tmp && \
     echo "Downloading awg-tools v${AWGTOOLS_VERSION}..." && \

@@ -316,6 +316,8 @@ Full docs: **[moav.sh/docs](https://moav.sh/docs/)**
 
 **Ports:** each protocol's port and whether it needs a domain are in the [Protocols](#protocols) table above — open only the ones you enable.
 
+**Known limitation (ARM64):** the built-in test client (`moav test`, `moav client`) cannot run AmneziaWG on ARM64 hosts. It installs `awg` from the upstream amneziawg-tools release, which ships an x86_64 binary only, so the AmneziaWG check fails there while the other protocols test normally. The AmneziaWG server builds `awg` from source and runs on ARM64, as does the [moav-client](https://github.com/MotherofallVPNs/moav-client) AmneziaWG sidecar. Revisit when an arm64 `awg` build is available: [amneziawg-tools releases](https://github.com/amnezia-vpn/amneziawg-tools/releases).
+
 ## Project Structure
 
 ```
