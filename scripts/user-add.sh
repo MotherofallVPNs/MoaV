@@ -239,6 +239,38 @@ if [[ ! -w "outputs/bundles" ]]; then
     exit 1
 fi
 
+# Check every server config this add will write before touching any of them:
+# a mid-run "Permission denied" left the user in sing-box but not TrustTunnel.
+_preflight_config_writes() {
+    local blocked="" on f
+    while read -r on f; do
+        [[ "$on" == "true" ]] || continue
+        # An untraversable dir hides the file, and the sub-script then skips it.
+        if [[ -d "${f%/*}" && ! -x "${f%/*}" ]]; then blocked="$blocked ${f%/*}"
+        elif [[ -f "$f" && ! -w "$f" ]]; then blocked="$blocked $f"; fi
+    done <<EOF
+true configs/sing-box/config.json
+${ENABLE_XHTTP:-true} configs/xray/config.json
+${ENABLE_WIREGUARD:-true} configs/wireguard/wg0.conf
+${ENABLE_AMNEZIAWG:-true} configs/amneziawg/awg0.conf
+${ENABLE_TRUSTTUNNEL:-true} configs/trusttunnel/credentials.toml
+${ENABLE_TELEMT:-true} configs/telemt/config.toml
+EOF
+    if [[ -d state/users && ! -w state/users ]]; then blocked="$blocked state/users"; fi
+    [[ -z "$blocked" ]] && return 0
+    log_error "Cannot write:$blocked"
+    if [[ "$(id -u)" -ne 0 && " $(id -G) " != *" $ADMIN_GID "* ]]; then
+        log_error "These belong to group $ADMIN_GID, the MoaV admin group, and only root or that group may write them. $(id -un) is not in it."
+        log_error "Run as root (sudo moav user add ...), or join the group once and log in again:"
+        log_error "  sudo groupadd -g $ADMIN_GID moav 2>/dev/null; sudo usermod -aG \"\$(getent group $ADMIN_GID | cut -d: -f1)\" $(id -un)"
+    else
+        log_error "Run 'sudo moav start' once to restore their ownership (root:$ADMIN_GID, group-writable), or run as root."
+    fi
+    log_error "No user was added."
+    return 1
+}
+_preflight_config_writes || exit 1
+
 # -----------------------------------------------------------------------------
 # Create each user
 # -----------------------------------------------------------------------------

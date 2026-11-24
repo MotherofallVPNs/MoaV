@@ -212,6 +212,15 @@ Security and stability release. Tunneled client traffic is now kept away from pr
   and `-h` were taken as service names, so the command ran a full
   `docker compose build` and reported "Build complete!". Both now print the
   services, profiles and options and exit 0 without building.
+- **`moav user add` from a non-root operator outside group 2000 now stops
+  before changing anything, and says how to fix it.** MoaV's server configs are
+  `root:2000` (the admin group) with group write and no world write. An
+  operator account outside that group got through sing-box and then failed on
+  `configs/trusttunnel/credentials.toml: Permission denied`, leaving a
+  half-added user. `user add` now checks every config it will write first and,
+  if any is out of reach, names them and prints the fix: run it as root, or add
+  the account to group 2000 once (`sudo usermod -aG`) and log in again. No
+  permissions were widened.
 - **`moav start` no longer launches disabled DNS-tunnel containers.** The
   `dnstunnel` profile groups dnstt, MasterDNS and Slipstream, so starting it
   started all three regardless of their `ENABLE_*` flags. On a fresh install
