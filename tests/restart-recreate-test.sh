@@ -57,7 +57,10 @@ run_restart() { # table rows via stdin; args = moav restart args
         error() { echo "ERR $*"; }; success() { :; }
         ensure_perms_repaired() { :; }
         resolve_services() { echo "$@"; }
-        eval "$(sed -n '/^compose_restart() {/,/^}/p; /^cmd_restart() {/,/^}/p' "$SVC")"
+        # shellcheck disable=SC2034  # read by the eval'd compose_profiles
+        SCRIPT_DIR="$ROOT"
+        eval "$(sed -n '/^compose_restart() {/,/^}/p; /^cmd_restart() {/,/^}/p
+                        /^compose_profiles() {/,/^}/p; /^is_compose_profile() {/,/^}/p' "$SVC")"
         set -e
         cmd_restart "$@"
     ) > "$work/out" 2>&1

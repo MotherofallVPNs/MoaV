@@ -1366,7 +1366,8 @@ cmd_profiles() {
 
 cmd_start() {
     local profiles=""
-    local valid_profiles="proxy wireguard amneziawg dnstunnel trusttunnel xhttp telegram admin conduit snowflake gooserelay monitoring client all setup"
+    local valid_profiles
+    valid_profiles=$(compose_profiles | tr '\n' ' ')
     local force=false start_once=false
     local args=()
     for arg in "$@"; do
@@ -1433,7 +1434,7 @@ cmd_start() {
             fi
 
             # Check if it's a valid profile
-            if echo "$valid_profiles" | grep -qw "$resolved"; then
+            if is_compose_profile "$resolved"; then
                 # Explicit name + ENABLE_*=false → 3-option prompt (--force bypasses).
                 if ! $force && [[ "$(profile_enabled "$resolved" "$SCRIPT_DIR/.env")" != "true" ]]; then
                     local _decision
@@ -1561,6 +1562,61 @@ cmd_start() {
     auto_setup_cert_renew
 }
 
+# Every profile docker-compose.yml defines, one per line in file order. The one
+# list build/start/stop/restart/logs accept, so a new profile cannot be missed.
+compose_profiles() {
+    awk '
+        /^[ \t]+profiles:[ \t]*\[/ {
+            line = $0; sub(/^[^[]*\[/, "", line); sub(/\].*$/, "", line)
+            n = split(line, a, ",")
+            for (i = 1; i <= n; i++) {
+                p = a[i]; gsub(/[ \t"\047]/, "", p)
+                if (p != "" && !seen[p]++) print p
+            }
+            next
+        }
+        /^[ \t]+profiles:[ \t]*(#.*)?$/ { inp = 1; next }
+        inp && /^[ \t]*#/ { next }
+        inp && /^[ \t]+-[ \t]+/ { p = $2; gsub(/["\047]/, "", p); if (!seen[p]++) print p; next }
+        { inp = 0 }
+    ' "$SCRIPT_DIR/docker-compose.yml" 2>/dev/null || true
+}
+
+# Every service docker-compose.yml defines, one per line in file order.
+compose_services() {
+    awk '
+        /^services:[ \t]*(#.*)?$/ { ins = 1; next }
+        /^[^ \t#]/ { ins = 0 }
+        ins && /^  [A-Za-z0-9][A-Za-z0-9_.-]*:[ \t]*(#.*)?$/ { s = $1; sub(/:.*$/, "", s); print s }
+    ' "$SCRIPT_DIR/docker-compose.yml" 2>/dev/null || true
+}
+
+# Is $1 exactly a compose profile name? (Aliases go through resolve_profile first.)
+is_compose_profile() {
+    local _p
+    for _p in $(compose_profiles); do
+        if [[ "$_p" == "$1" ]]; then return 0; fi
+    done
+    return 1
+}
+
+# compose_profiles for help text: comma-separated, wrapped at $1 columns,
+# continuation lines indented by $2 spaces.
+compose_profiles_help() {
+    local width="${1:-68}" indent
+    indent=$(printf '%*s' "${2:-0}" '')
+    compose_profiles | paste -sd, - | sed 's/,/, /g' | fold -s -w "$width" \
+        | sed -e 's/ *$//' -e "2,\$s/^/${indent}/"
+}
+
+is_compose_service() {
+    local _s
+    for _s in $(compose_services); do
+        if [[ "$_s" == "$1" ]]; then return 0; fi
+    done
+    return 1
+}
+
 # Resolve profile name aliases to actual docker-compose profile names
 resolve_profile() {
     local profile="$1"
@@ -1651,14 +1707,10 @@ cmd_stop() {
     else
         # Only treat as profile if it's an exact profile name
         # Service names like "grafana", "prometheus" stop just that service
-        local profiles="proxy wireguard amneziawg dnstunnel trusttunnel admin conduit snowflake monitoring telegram"
         local profile_match=""
-        for p in $profiles; do
-            if [[ "${args[0]}" == "$p" ]]; then
-                profile_match="$p"
-                break
-            fi
-        done
+        if is_compose_profile "${args[0]}"; then
+            profile_match="${args[0]}"
+        fi
 
         if [[ -n "$profile_match" ]]; then
             if [[ "$remove_containers" == "true" ]]; then
@@ -1757,14 +1809,10 @@ cmd_restart() {
     elif [[ $# -eq 1 ]]; then
         # Single argument - only treat as profile if it's an exact profile name
         # Service names like "grafana", "prometheus", "telemt" restart just that service
-        local profiles="proxy wireguard amneziawg dnstunnel trusttunnel admin conduit snowflake monitoring telegram"
         local profile_match=""
-        for p in $profiles; do
-            if [[ "$1" == "$p" ]]; then
-                profile_match="$p"
-                break
-            fi
-        done
+        if is_compose_profile "$1"; then
+            profile_match="$1"
+        fi
 
         if [[ -n "$profile_match" ]]; then
             info "Restarting $profile_match profile services..."
@@ -1964,8 +2012,7 @@ cmd_logs() {
                 ;;
             *)
                 # Check if it's an exact profile name first
-                local valid_profiles="proxy wireguard amneziawg dnstunnel trusttunnel xhttp telegram admin conduit snowflake gooserelay monitoring client all setup"
-                if echo "$valid_profiles" | grep -qw "$1"; then
+                if is_compose_profile "$1"; then
                     profile_flags="$profile_flags --profile $1"
                 else
                     # Treat as service name (resolve aliases like slip → slipstream, tg → telemt)

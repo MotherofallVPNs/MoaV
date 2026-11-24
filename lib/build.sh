@@ -106,9 +106,10 @@ show_build_help() {
     echo "service (Go services one at a time first, then the rest in parallel)."
     echo ""
     echo "Arguments:"
-    echo "  SERVICE      A compose service or alias (e.g. sing-box, xray, trusttunnel)"
-    echo "  PROFILE      A profile: proxy wireguard amneziawg dnstunnel trusttunnel"
-    echo "               admin conduit snowflake monitoring"
+    echo "  SERVICE      A compose service or alias (e.g. wstunnel, masterdns, dns-router)"
+    echo "  PROFILE      A profile from docker-compose.yml, or an alias of one"
+    echo "               (sing-box, xray, telemt, ...):"
+    echo "               $(compose_profiles_help 60 15)"
     echo ""
     echo "Options:"
     echo "  --no-cache   Build without the Docker layer cache"
@@ -124,6 +125,24 @@ show_build_help() {
     echo "  moav build trusttunnel         # One profile"
     echo "  moav build sing-box --no-cache # One service, no cache"
     echo "  moav build --local all         # Everything from source"
+}
+
+# What a `moav build` argument names: prints "profile <name>" or
+# "service <name>"; returns 1 when docker-compose.yml has neither.
+build_target() {
+    local resolved known
+    resolved=$(resolve_profile "$1")
+    if is_compose_profile "$resolved"; then
+        echo "profile $resolved"
+        return 0
+    fi
+    resolved=$(resolve_service "$1")
+    known=$(compose_services)
+    if [[ -n "$known" ]] && ! grep -qxF -- "$resolved" <<< "$known" \
+       && ! _local_build_info "$resolved" >/dev/null 2>&1; then
+        return 1
+    fi
+    echo "service $resolved"
 }
 
 cmd_build() {
@@ -193,26 +212,31 @@ cmd_build() {
         compose_build --profile all build $no_cache $remaining_services
         success "All services built!"
     else
-        # Resolve all arguments: each can be a profile name or a service name
-        local profiles="proxy wireguard amneziawg dnstunnel trusttunnel admin conduit snowflake monitoring"
+        # Each argument is a compose profile (or an alias of one) or a service.
         local matched_profiles=()
         local remaining_args=()
+        local unknown_args=()
+        local target
 
         for arg in "${services_args[@]}"; do
-            local resolved_arg
-            resolved_arg=$(resolve_profile "$arg")
-            local is_profile=""
-            for p in $profiles; do
-                if [[ "$resolved_arg" == "$p" ]]; then
-                    matched_profiles+=("$p")
-                    is_profile="true"
-                    break
+            if ! target=$(build_target "$arg"); then
+                unknown_args+=("$arg")
+            elif [[ "$target" == "profile "* ]]; then
+                target="${target#profile }"
+                if [[ " ${matched_profiles[*]:-} " != *" $target "* ]]; then
+                    matched_profiles+=("$target")
                 fi
-            done
-            if [[ -z "$is_profile" ]]; then
+            else
                 remaining_args+=("$arg")
             fi
         done
+
+        if [[ ${#unknown_args[@]} -gt 0 ]]; then
+            error "Unknown service or profile: ${unknown_args[*]}"
+            echo "Profiles: $(compose_profiles_help 68 10)"
+            echo "Services: $(compose_services | paste -sd, - | sed 's/,/, /g' | fold -s -w 68 | sed -e 's/ *$//' -e '2,$s/^/          /')"
+            return 1
+        fi
 
         # Build matched profiles
         for profile in "${matched_profiles[@]}"; do

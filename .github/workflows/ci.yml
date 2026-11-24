@@ -138,6 +138,8 @@ jobs:
         run: bash tests/update-image-prune-test.sh
       - name: moav build --help prints usage, builds nothing
         run: bash tests/build-help-test.sh
+      - name: moav build knows every compose profile and service
+        run: bash tests/build-profiles-test.sh
       - name: monitoring privacy (no user x destination) (#297)
         run: bash tests/monitoring-privacy-test.sh
       - name: site analytics aggregation (#297)

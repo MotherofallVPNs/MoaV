@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`moav build` knows every profile in `docker-compose.yml`.** It kept its own
+  profile list, which was missing `xhttp`, `telegram`, `gooserelay`, `client`
+  and `setup`. `moav build xhttp` and `moav build setup` failed with "no such
+  service"; `telegram` and `gooserelay` only worked because a service or alias
+  happens to share the name. `build`, `start`, `stop`, `restart`, `logs` and the
+  help text now all read the profiles from the compose file, so `moav stop` and
+  `moav restart` also accept `xhttp`, `gooserelay`, `client` and `setup` as
+  profiles. A name that is neither a profile nor a service is rejected up front
+  with the valid names, instead of reaching compose.
+
 ## [2.5.0] - 2026-11-23
 
 Security and stability release. Tunneled client traffic is now kept away from private and infrastructure networks by default (egress isolation), every Go service is closed off from the MPTCP remote-root exploit for CVE-2026-98432, TrustTunnel moves to 1.3.1 with HTTP/2 and HTTP/3 tested separately, Slipstream starts its removal in favour of MasterDNS and dnstt, and `moav regenerate-users` no longer rotates the AmneziaWG server key. Base images move off end-of-life Alpine and Go releases, every runtime image is pinned by digest, and Renovate now tracks dependencies. Keys, users and certificates are untouched, but some operators have to act: read the section below before updating.
