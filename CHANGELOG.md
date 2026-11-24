@@ -208,6 +208,10 @@ Security and stability release. Tunneled client traffic is now kept away from pr
   `trusttunnel` and `telemt` now get `2775`, matching bootstrap, the admin
   container and `moav start`. Present since v2.0.0. Found in the v2.5.0 release
   e2e.
+- **`moav build --help` prints the build usage instead of building.** `--help`
+  and `-h` were taken as service names, so the command ran a full
+  `docker compose build` and reported "Build complete!". Both now print the
+  services, profiles and options and exit 0 without building.
 - **`moav start` no longer launches disabled DNS-tunnel containers.** The
   `dnstunnel` profile groups dnstt, MasterDNS and Slipstream, so starting it
   started all three regardless of their `ENABLE_*` flags. On a fresh install
