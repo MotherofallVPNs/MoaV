@@ -86,6 +86,14 @@ Security and stability release. Tunneled client traffic is now kept away from pr
   threshold shared by the renewal job, doctor and the start line.
 
 ### Changed
+- **`moav update` cleans up dangling images.** Once an update has nothing left
+  to apply and no container is unhealthy, starting or restarting, it runs
+  `docker image prune -f`. Only untagged images that no container references
+  are removed: tagged images, build bases and the test-client images stay, so
+  nothing has to be rebuilt. `moav update` does not recreate containers
+  itself, so the images an update supersedes are reclaimed by the next
+  `moav update` after `moav build && moav start`. A failed prune is reported
+  in one line and never fails the update.
 - **`moav test` uses TrustTunnel client 1.3.0** (was 1.0.49), so the e2e and
   the CI interop job exercise the client release that ships in moav-client
   v1.5.0 against endpoint 1.3.1 over HTTP/2 and HTTP/3. The test image now runs
@@ -199,6 +207,10 @@ Security and stability release. Tunneled client traffic is now kept away from pr
   covers the `#!/bin/sh` entrypoints it used to skip.
 
 ### Fixed
+- **`moav doctor` no longer suggests `docker system prune -a --volumes`** when
+  the disk is nearly full. `--volumes` deletes the Grafana and Prometheus data
+  and the user bundles. It now points to `docker image prune -f` (dangling
+  images only) and `journalctl --vacuum-size=200M`.
 - **TrustTunnel no longer crash-loops after `moav user add` from a non-root
   operator.** When the CLI user could not write a config dir, `user add` reset
   it to `2770`, which took away the traverse bit that TrustTunnel's endpoint
