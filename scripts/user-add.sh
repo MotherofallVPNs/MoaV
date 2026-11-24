@@ -205,11 +205,15 @@ _fix_perms() {
     mkdir -p "$dir" 2>/dev/null || \
         sudo mkdir -p "$dir" 2>/dev/null || \
         su-exec root mkdir -p "$dir" 2>/dev/null || true
+    # sing-box/xray/trusttunnel/telemt daemons run as uids outside the admin
+    # group and must traverse their config dir (TrustTunnel crash-looped on 2770).
+    local _mode=2770
+    case "$dir" in configs/sing-box|configs/xray|configs/trusttunnel|configs/telemt) _mode=2775 ;; esac
     if [[ -d "$dir" ]] && [[ ! -w "$dir" ]]; then
         sudo chown "$_owner:$ADMIN_GID" "$dir" 2>/dev/null || \
             su-exec root chown "$_owner:$ADMIN_GID" "$dir" 2>/dev/null || true
-        sudo chmod 2770 "$dir" 2>/dev/null || \
-            su-exec root chmod 2770 "$dir" 2>/dev/null || true
+        sudo chmod "$_mode" "$dir" 2>/dev/null || \
+            su-exec root chmod "$_mode" "$dir" 2>/dev/null || true
     fi
 }
 
@@ -234,6 +238,38 @@ if [[ ! -w "outputs/bundles" ]]; then
     log_error "Cannot write to outputs/bundles/ — try: sudo chown -R $(id -u):$ADMIN_GID outputs/bundles && sudo chmod -R ug+rwX,o-rwx outputs/bundles"
     exit 1
 fi
+
+# Check every server config this add will write before touching any of them:
+# a mid-run "Permission denied" left the user in sing-box but not TrustTunnel.
+_preflight_config_writes() {
+    local blocked="" on f
+    while read -r on f; do
+        [[ "$on" == "true" ]] || continue
+        # An untraversable dir hides the file, and the sub-script then skips it.
+        if [[ -d "${f%/*}" && ! -x "${f%/*}" ]]; then blocked="$blocked ${f%/*}"
+        elif [[ -f "$f" && ! -w "$f" ]]; then blocked="$blocked $f"; fi
+    done <<EOF
+true configs/sing-box/config.json
+${ENABLE_XHTTP:-true} configs/xray/config.json
+${ENABLE_WIREGUARD:-true} configs/wireguard/wg0.conf
+${ENABLE_AMNEZIAWG:-true} configs/amneziawg/awg0.conf
+${ENABLE_TRUSTTUNNEL:-true} configs/trusttunnel/credentials.toml
+${ENABLE_TELEMT:-true} configs/telemt/config.toml
+EOF
+    if [[ -d state/users && ! -w state/users ]]; then blocked="$blocked state/users"; fi
+    [[ -z "$blocked" ]] && return 0
+    log_error "Cannot write:$blocked"
+    if [[ "$(id -u)" -ne 0 && " $(id -G) " != *" $ADMIN_GID "* ]]; then
+        log_error "These belong to group $ADMIN_GID, the MoaV admin group, and only root or that group may write them. $(id -un) is not in it."
+        log_error "Run as root (sudo moav user add ...), or join the group once and log in again:"
+        log_error "  sudo groupadd -g $ADMIN_GID moav 2>/dev/null; sudo usermod -aG \"\$(getent group $ADMIN_GID | cut -d: -f1)\" $(id -un)"
+    else
+        log_error "Run 'sudo moav start' once to restore their ownership (root:$ADMIN_GID, group-writable), or run as root."
+    fi
+    log_error "No user was added."
+    return 1
+}
+_preflight_config_writes || exit 1
 
 # -----------------------------------------------------------------------------
 # Create each user
@@ -401,7 +437,7 @@ echo ""
 # is enabled and its key/config is present. ($STATE_DIR + the host lib config
 # dirs are set above, before the per-user loop.)
 
-if [[ "${ENABLE_SLIPSTREAM:-true}" == "true" ]]; then
+if [[ "${ENABLE_SLIPSTREAM:-false}" == "true" ]]; then
     if [[ -f "$STATE_DIR/keys/slipstream-cert.pem" ]]; then
         if slipstream_generate_client_instructions "$USERNAME" "$OUTPUT_DIR"; then
             log_info "✓ Slipstream instructions generated"
@@ -499,10 +535,13 @@ fi
         else
             _tmo=""
             command -v timeout >/dev/null 2>&1 && _tmo="timeout 15"
+            # Pull outside the 15s deadline so a first-time pull can't eat it.
+            docker image inspect alpine:3.24 >/dev/null 2>&1 \
+                || ${_tmo:+timeout 120} docker pull -q alpine:3.24 >/dev/null 2>&1 || true
             $_tmo docker run --rm \
                 -v moav_moav_state:/state \
                 -v "$(pwd)/state/users/$USERNAME:/host-user:ro" \
-                alpine sh -c "mkdir -p /state/users/$USERNAME && cp -a /host-user/. /state/users/$USERNAME/" \
+                alpine:3.24 sh -c "mkdir -p /state/users/$USERNAME && cp -a /host-user/. /state/users/$USERNAME/" \
                 2>/dev/null && log_info "✓ Synced credentials to Docker volume" \
                 || log_warn "Could not sync to Docker volume (bootstrap will import on next run)"
         fi

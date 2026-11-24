@@ -528,8 +528,7 @@ async def dashboard(request: Request, username: str = Depends(verify_auth)):
         for d in (glob.glob("/tmp/certs/live/*/") or glob.glob("/certs/live/*/"))
     )
 
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "dashboard.html", {
         "stats": stats,
         "conduit_stats": conduit_stats,
         "services": active_services,

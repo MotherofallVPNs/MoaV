@@ -66,7 +66,7 @@ for the longer argument.
   - **High-stealth proxy** — Reality (VLESS), Trojan, Hysteria2, XHTTP (VLESS+XHTTP+Reality), CDN (VLESS+WS via Cloudflare)
   - **Full VPN** — WireGuard (direct & wstunnel), AmneziaWG
   - **Specialty** — TrustTunnel (HTTP/2+QUIC), Telegram MTProxy (fake-TLS), Shadowsocks-2022, GooseRelay (SOCKS5 via Google Apps Script)
-  - **DNS tunnels** — dnstt, Slipstream, MasterDNS, and XDNS — all four run simultaneously on port 53 via `dns-router`
+  - **DNS tunnels** — dnstt, MasterDNS, and XDNS — all run simultaneously on port 53 via `dns-router` (Slipstream is deprecated, see below)
 - **Stealth-first** - All traffic looks like normal or garbled HTTPS, WebSocket, DNS, or IMAPS
 - **Per-user credentials** - Create, revoke, and manage users independently
 - **Easy deployment** - Docker Compose based, single command setup
@@ -212,7 +212,7 @@ Then use `moav` from anywhere. See the [Setup Guide](https://moav.sh/docs/SETUP)
 | AmneziaWG | 51821/udp | No | ★★★★★ | ★★★★☆ | ✅ | Obfuscated WireGuard, resists common DPI signatures |
 | WireGuard (wstunnel) | 8080/tcp | No | ★★★★☆ | ★★★★☆ | ✅ | VPN when UDP is blocked |
 | DNS Tunnel (dnstt) | 53/udp | Yes³ | ★★★☆☆ | ★☆☆☆☆ | ✅ | Last resort, hard to block |
-| Slipstream | 53/udp | Yes³ | ★★★☆☆ | ★★☆☆☆ | ✅ | QUIC-over-DNS, 1.5-5x faster than dnstt |
+| Slipstream ⁵ | 53/udp | Yes³ | ★★★☆☆ | ★★☆☆☆ | ⬜ | **Deprecated**: off by default, no longer routed; use MasterDNS or dnstt |
 | MasterDNS | 53/udp | Yes³ | ★★★☆☆ | ★★★☆☆ | ✅ | Advanced DNS tunnel (ARQ + resolver LB), MahsaNG v16 |
 | XDNS (VLESS+mKCP+DNS) | 53/udp | Yes³ | ★★★☆☆ | ★☆☆☆☆ | ✅ | DNS tunnel via Xray FinalMask |
 | GooseRelay | 8444/tcp | No | ★★★★★ | ★★☆☆☆ | ⬜ | SOCKS5 via Google Apps Script, fronted as google.com, MahsaNG v16 |
@@ -221,8 +221,9 @@ Then use `moav` from anywhere. See the [Setup Guide](https://moav.sh/docs/SETUP)
 
 ¹ Reality borrows a public SNI via `REALITY_TARGET`, so no domain of your own is needed.
 ² CDN opens **2082** on the origin; clients connect on **443** through the CDN. Cloudflare needs a domain, CloudFront needs none. See [DNS → CDN mode](https://moav.sh/docs/DNS/#cdn-mode).
-³ DNS tunnels need NS delegation on your domain; all four share `53/udp`.
+³ DNS tunnels need NS delegation on your domain; they all share `53/udp`.
 ⁴ **No domain?** Every protocol marked **No** above (Reality, Shadowsocks-2022, WireGuard, AmneziaWG, WireGuard-over-wstunnel, Telegram MTProxy, GooseRelay, XHTTP), plus the admin dashboard (self-signed) and both bandwidth-donation relays, run without one. Run `moav` and pick "No domain", or `moav domainless`. The domain-only protocols are skipped.
+⁵ **Slipstream is deprecated** (2026-11-23): its upstream, slipstream-rust, is archived, and MasterDNS and dnstt cover the same DNS-tunnel use case. New installs ship with `ENABLE_SLIPSTREAM=false`, and `dns-router` no longer routes the `s.` subdomain, so existing Slipstream clients stop connecting after this update even if your `.env` still says `true`. To migrate: make sure `ENABLE_MASTERDNS=true` (and/or `ENABLE_DNSTT=true`) with its NS record in place (`moav doctor dns`), run `moav switch-dns dnstt+masterdns+xdns` (or set `ENABLE_SLIPSTREAM=false`), then `moav regenerate-users` and send users their new bundles. The Slipstream service and code are removed entirely in a later release.
 
 **Management ports** (not protocols, open only if you use them): `9443` admin dashboard · `9444` Grafana · `80/tcp` Let's Encrypt (setup only).
 
@@ -315,6 +316,8 @@ Full docs: **[moav.sh/docs](https://moav.sh/docs/)**
 
 **Ports:** each protocol's port and whether it needs a domain are in the [Protocols](#protocols) table above — open only the ones you enable.
 
+**Known limitation (ARM64):** the built-in test client (`moav test`, `moav client`) cannot run AmneziaWG on ARM64 hosts. It installs `awg` from the upstream amneziawg-tools release, which ships an x86_64 binary only, so the AmneziaWG check fails there while the other protocols test normally. The AmneziaWG server builds `awg` from source and runs on ARM64, as does the [moav-client](https://github.com/MotherofallVPNs/moav-client) AmneziaWG sidecar. Revisit when an arm64 `awg` build is available: [amneziawg-tools releases](https://github.com/amnezia-vpn/amneziawg-tools/releases).
+
 ## Project Structure
 
 ```
@@ -358,6 +361,8 @@ privileged mode with read-only host mounts, which is its upstream deployment
 mode. If that trade-off is not acceptable, run without the monitoring profile.
 
 See the [OPSEC guide](https://moav.sh/docs/OPSEC) for security guidelines.
+
+**Found a vulnerability?** Report it privately, not in a public issue. See [SECURITY.md](SECURITY.md).
 
 ## Support the project
 
@@ -435,7 +440,7 @@ client ([docs](https://moav.sh/docs/deploy/)).
 | [TrustTunnel](https://github.com/TrustTunnel/TrustTunnel) · [client](https://github.com/TrustTunnel/TrustTunnelClient) | HTTP/2 + QUIC transport |
 | [telemt](https://github.com/telemt/telemt) | Telegram MTProxy (fake-TLS) |
 | [dnstt](https://www.bamsoftware.com/software/dnstt/) | the original DNS tunnel |
-| [Slipstream](https://github.com/net2share/slipstream-rust-build) | QUIC-over-DNS |
+| [Slipstream](https://github.com/net2share/slipstream-rust-build) | QUIC-over-DNS (deprecated, being removed) |
 | [MasterDNS](https://github.com/masterking32/MasterDnsVPN) | ARQ + resolver load-balancing DNS tunnel |
 | [GooseRelay](https://github.com/kianmhz/GooseRelayVPN) | SOCKS5 over Google Apps Script |
 

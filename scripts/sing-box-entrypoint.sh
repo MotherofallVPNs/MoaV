@@ -33,6 +33,19 @@ fi
 RUNTIME_CONFIG="/tmp/sing-box-config.json"
 cp "$CONFIG_FILE" "$RUNTIME_CONFIG"
 
+# Egress isolation is applied to the runtime copy (before validation), so a
+# toggle change applies when `moav restart` recreates the container, and
+# existing installs need no re-bootstrap.
+. /egress-isolation.sh
+if ! egress_singbox "$RUNTIME_CONFIG"; then
+    echo "[sing-box] ERROR: could not apply egress isolation (EGRESS_ISOLATION=off bypasses)"
+    exit 1
+fi
+# Kernel backstop for multi-destination UDP. Not fatal: an odd kernel must not
+# take the proxy down, and the route rules above still hold for TCP.
+egress_udp_backstop \
+    || echo "[sing-box] WARNING: UDP egress backstop not installed; UDP isolation rests on route rules alone"
+
 # Validate config
 echo "[sing-box] Validating configuration..."
 if ! sing-box check -c "$RUNTIME_CONFIG"; then

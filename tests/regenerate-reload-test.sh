@@ -47,6 +47,14 @@ else
     fi
 fi
 
+# Without STATE_DIR the run's generate_amneziawg_config reads /keys, misses the
+# real key and rotates the AWG server key + obfuscation params on every call.
+if grep -q "bootstrap -c 'export STATE_DIR=/state;" "$USERS"; then
+    ok "provisioning run uses /state (AWG server key is not rotated)"
+else
+    bad "provisioning run does not set STATE_DIR=/state — regenerate rotates the AWG server key"
+fi
+
 echo ""
 if [ "$fail" -gt 0 ]; then
     echo "FAILED ($fail failed, $pass passed)"

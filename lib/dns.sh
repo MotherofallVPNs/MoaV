@@ -70,7 +70,7 @@ check_dns_for_dnstunnel() {
     done
 
     local dnstt_enabled=$(get_env_val "ENABLE_DNSTT" "$env_file" "true")
-    local slip_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
+    local slip_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "false")
     local xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "true")
     local masterdns_enabled=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
 
@@ -133,7 +133,7 @@ dns_tunnel_field() {
         slipstream:profile)      echo "dnstunnel" ;;
         slipstream:port_group)   echo "dns-router" ;;
         slipstream:shared_service) echo "false" ;;
-        slipstream:desc)         echo "QUIC-over-DNS (faster than dnstt)" ;;
+        slipstream:desc)         echo "DEPRECATED, not routed by dns-router; use masterdns or dnstt" ;;
         masterdns:enable_var)    echo "ENABLE_MASTERDNS" ;;
         masterdns:port_var)      echo "PORT_DNS" ;;
         masterdns:default_port)  echo "53" ;;
@@ -217,8 +217,8 @@ cmd_switch_dns() {
             echo "dns-router fans queries by subdomain suffix — no port 53 conflicts."
             echo ""
             echo "Usage: moav switch-dns <name>[+<name>...] | off"
-            echo "  moav switch-dns dnstt+slipstream+masterdns+xdns  # all four tunnels"
-            echo "  moav switch-dns dnstt+slipstream    # classic pair"
+            echo "  moav switch-dns dnstt+masterdns+xdns  # all supported tunnels"
+            echo "  moav switch-dns dnstt+masterdns     # classic pair"
             echo "  moav switch-dns xdns                # XDNS only (via dns-router)"
             echo "  moav switch-dns off                 # disable all DNS tunnels"
             return 0
@@ -226,9 +226,10 @@ cmd_switch_dns() {
         help|--help|-h)
             echo "Usage: moav switch-dns [<name>[+<name>...]|off|list]"
             echo ""
-            echo "Enable one or more DNS tunnels on port 53. All four tunnels share the"
+            echo "Enable one or more DNS tunnels on port 53. All tunnels share the"
             echo "dns-router group and can run simultaneously — dns-router fans queries"
-            echo "by subdomain suffix (t→dnstt, s→slipstream, m→masterdns, x→xdns)."
+            echo "by subdomain suffix (t→dnstt, m→masterdns, x→xdns). Slipstream is"
+            echo "deprecated and no longer routed."
             echo ""
             echo "Available tunnels:"
             for t in "${DNS_TUNNELS[@]}"; do
@@ -238,8 +239,8 @@ cmd_switch_dns() {
             echo "  list         Show current state (default with no args)"
             echo ""
             echo "Examples:"
-            echo "  moav switch-dns dnstt+slipstream+masterdns+xdns  # all four"
-            echo "  moav switch-dns dnstt+slipstream   # classic pair"
+            echo "  moav switch-dns dnstt+masterdns+xdns  # all supported"
+            echo "  moav switch-dns dnstt+masterdns    # classic pair"
             echo "  moav switch-dns xdns               # XDNS only via dns-router"
             return 0
             ;;
@@ -264,6 +265,12 @@ cmd_switch_dns() {
     fi
 
     print_section "Switch DNS Tunnel → $target"
+
+    for req in "${requested[@]}"; do
+        if [[ "$req" == "slipstream" ]]; then
+            warn "Slipstream is deprecated and no longer routed by dns-router; clients cannot reach it. Use masterdns or dnstt."
+        fi
+    done
 
     # Determine enable/disable lists
     local to_enable=("${requested[@]}")
@@ -344,7 +351,7 @@ cmd_switch_dns() {
         esac
         [[ -z "$key_paths" ]] && continue
         for p in $key_paths; do
-            if ! docker run --rm -v moav_moav_state:/state alpine test -f "$p" 2>/dev/null; then
+            if ! docker run --rm -v moav_moav_state:/state alpine:3.24 test -f "$p" 2>/dev/null; then
                 warn "$t is missing key file: ${p##*/}"
                 needs_bootstrap=true
             fi
@@ -376,7 +383,7 @@ cmd_switch_dns() {
     for p in $profiles_unique; do profile_args+="--profile $p "; done
 
     info "Starting profiles: $profiles_unique"
-    docker compose $profile_args up -d --remove-orphans
+    compose_up_enabled "$profile_args"
     echo ""
     success "Switched to: ${to_enable[*]}"
     echo ""
@@ -459,10 +466,10 @@ generate_dns_zone_file() {
 ${domain}.	1	IN	A	${server_ip}
 ZONEOF
 
-    # DNS tunnel nameserver (needed for dnstt/Slipstream/MasterDNS/XDNS)
+    # DNS tunnel nameserver (needed for dnstt/MasterDNS/XDNS)
     local dnstt_enabled slipstream_enabled masterdns_enabled xdns_enabled
     dnstt_enabled=$(get_env_val "ENABLE_DNSTT" "$env_file" "true")
-    slipstream_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
+    slipstream_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "false")
     masterdns_enabled=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
     xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "true")
 
@@ -486,10 +493,10 @@ ZONEOF
 dns.${domain}.	1	IN	A	${server_ip}
 
 ;; DNS tunnel NS delegations
-;; All four DNS tunnels share port 53 via dns-router (dnstt/Slipstream/MasterDNS on by default; XDNS opt-in)
+;; DNS tunnels share port 53 via dns-router (dnstt/MasterDNS/XDNS)
 ;; dnstt KCP+Noise DNS tunnel (currently ${dnstt_status})
 ${dnstt_sub}.${domain}.	1	IN	NS	dns.${domain}.
-;; Slipstream QUIC-over-DNS tunnel (currently ${slip_status})
+;; Slipstream: DEPRECATED, no longer routed by dns-router; record can be removed (currently ${slip_status})
 ${slip_sub}.${domain}.	1	IN	NS	dns.${domain}.
 ;; MasterDNS ARQ DNS tunnel — MahsaNG v16 native (currently ${masterdns_status})
 ${masterdns_sub}.${domain}.	1	IN	NS	dns.${domain}.

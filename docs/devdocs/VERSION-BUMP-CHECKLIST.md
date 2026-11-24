@@ -87,11 +87,15 @@ If any component versions were bumped in this release, verify they are consisten
 | awg-tools | `AWGTOOLS_VERSION` | amneziawg + client build args | `Dockerfile.amneziawg`, `Dockerfile.client` |
 | Prometheus | `PROMETHEUS_VERSION` | — | `Dockerfile.prometheus` |
 | Grafana | `GRAFANA_VERSION` | — | `Dockerfile.grafana` |
-| Slipstream | `SLIPSTREAM_VERSION` | slipstream + client build args | `Dockerfile.slipstream`, `Dockerfile.client` |
+| Slipstream (deprecated, frozen) | `SLIPSTREAM_VERSION` | slipstream + client build args | `Dockerfile.slipstream`, `Dockerfile.client`. Do not bump: upstream is archived. The default version's SHA256 digests are pinned in both Dockerfiles; a non-default version is verified against that release's `SHA256SUMS`. |
 | telemt | `TELEMT_VERSION` | telemt build args | `Dockerfile.telemt` |
 | Conduit | `CONDUIT_VERSION` | conduit build args | `Dockerfile.conduit` |
 
 Pattern: `.env.example` is the source, `docker-compose.yml` passes as build arg with fallback default, `Dockerfile` has `ARG` with same fallback default.
+
+Renovate (`.github/renovate.json`) opens grouped PRs against `dev` that update all three places together, plus the
+pinned `image:tag@sha256` defaults in `docker-compose.yml`. Review the upstream notes before merging. New components
+need a matching `customManagers` entry there, or Renovate won't see them.
 
 ---
 

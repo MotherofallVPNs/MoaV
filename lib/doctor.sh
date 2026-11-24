@@ -184,7 +184,8 @@ doctor_check_disk() {
 
     if [[ "${avail_mb:-0}" -lt 1024 ]]; then
         echo -e "    ${RED}✗${NC} Less than 1 GB free disk space"
-        echo -e "      ${DIM}Clean up: docker system prune -a --volumes${NC}"
+        echo -e "      ${DIM}Remove dangling images: docker image prune -f${NC}"
+        echo -e "      ${DIM}Trim the system journal: journalctl --vacuum-size=200M${NC}"
         echo -e "      ${DIM}Find large files: apt install ncdu && ncdu /${NC}"
         return 1
     elif [[ "${avail_mb:-0}" -lt 2048 ]]; then
@@ -541,7 +542,7 @@ doctor_check_dns() {
     if doctor_is_enabled "$(get_env_val "ENABLE_DNSTT" "$env_file" "true")"; then
         dnstt_enabled=true
     fi
-    if doctor_is_enabled "$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")"; then
+    if doctor_is_enabled "$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "false")"; then
         slipstream_enabled=true
     fi
 
@@ -570,6 +571,7 @@ doctor_check_dns() {
         fi
 
         if [[ "$slipstream_enabled" == "true" ]]; then
+            warn "ENABLE_SLIPSTREAM=true: Slipstream is deprecated and no longer routed by dns-router. Move users to MasterDNS or dnstt, then set ENABLE_SLIPSTREAM=false."
             local slipstream_subdomain=""
             slipstream_subdomain=$(get_env_val "SLIPSTREAM_SUBDOMAIN" "$env_file" "s")
             if ! doctor_check_ns_record "Slipstream NS record" "${slipstream_subdomain}.${domain}" "$dns_host" "set NS ${slipstream_subdomain} -> ${dns_host}"; then
@@ -605,7 +607,7 @@ doctor_check_dns() {
             fi
         fi
     else
-        info "DNS tunnel checks skipped: dnstt, Slipstream, MasterDNS, and XDNS are all disabled."
+        info "DNS tunnel checks skipped: dnstt, MasterDNS, and XDNS are all disabled."
     fi
 
     local cdn_flag
@@ -749,7 +751,7 @@ doctor_check_config() {
 
     # Check bootstrap has been run
     local bootstrapped=false
-    docker run --rm -v moav_moav_state:/state alpine test -f /state/.bootstrapped 2>/dev/null && bootstrapped=true
+    docker run --rm -v moav_moav_state:/state alpine:3.24 test -f /state/.bootstrapped 2>/dev/null && bootstrapped=true
 
     if [[ "$bootstrapped" != "true" ]]; then
         echo -e "    ${RED}✗${NC} Bootstrap has not been run"
@@ -787,7 +789,7 @@ doctor_check_config() {
 
     # Check state keys
     local keys_exist=false
-    docker run --rm -v moav_moav_state:/state alpine test -d /state/keys 2>/dev/null && keys_exist=true
+    docker run --rm -v moav_moav_state:/state alpine:3.24 test -d /state/keys 2>/dev/null && keys_exist=true
     if [[ "$keys_exist" == "true" ]]; then
         echo -e "    ${GREEN}✓${NC} State keys directory exists"
     else
@@ -818,7 +820,7 @@ doctor_check_config() {
         local missing=""
         IFS=',' read -ra path_list <<< "$paths"
         for p in "${path_list[@]}"; do
-            if ! docker run --rm -v moav_moav_state:/state alpine test -f "$p" 2>/dev/null; then
+            if ! docker run --rm -v moav_moav_state:/state alpine:3.24 test -f "$p" 2>/dev/null; then
                 missing+="${p##*/} "
             fi
         done
@@ -853,7 +855,7 @@ doctor_check_ports() {
     # Check port 53 availability for any enabled DNS tunnel
     local dnstt_enabled slip_enabled xdns_enabled masterdns_enabled
     dnstt_enabled=$(get_env_val "ENABLE_DNSTT" "$env_file" "true")
-    slip_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
+    slip_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "false")
     masterdns_enabled=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
     xdns_enabled=$(get_env_val "ENABLE_XDNS" "$env_file" "true")
 
@@ -1008,7 +1010,7 @@ EOF
     # anywhere (PR #152 class). Compare the rendered config against state.
     if [[ "$enable_reality" == "true" ]]; then
         local rcfg="$SCRIPT_DIR/configs/sing-box/config.json" state_sid=""
-        state_sid=$(docker run --rm -v moav_moav_state:/state alpine sh -c \
+        state_sid=$(docker run --rm -v moav_moav_state:/state alpine:3.24 sh -c \
             'grep "^REALITY_SHORT_ID=" /state/keys/reality.env 2>/dev/null | cut -d= -f2-' 2>/dev/null | tr -d '\r\n ')
         if [[ -n "$state_sid" && -f "$rcfg" ]]; then
             if grep -qF -- "$state_sid" "$rcfg"; then
@@ -1121,6 +1123,60 @@ doctor_check_updates() {
     fi
 }
 
+# TLS certificate health for domain installs: days until the live Let's Encrypt
+# cert expires (OK > warn threshold, WARN down to 7 days, FAIL under 7 or
+# expired) and whether the daily renewal is really scheduled for this checkout.
+# Domainless mode skips. Pure read: never triggers a renewal.
+doctor_check_cert() {
+    local env_file="$SCRIPT_DIR/.env" domain
+    domain=$(get_env_val "DOMAIN" "$env_file" "")
+    if [[ -z "$domain" ]]; then
+        echo -e "    ${YELLOW}○${NC} Domainless mode: no Let's Encrypt certificate to check"
+        return 2
+    fi
+
+    local rc=0 epoch="" days warn_days
+    warn_days=$(cert_renew_warn_days)
+    if epoch=$(cert_expiry_epoch "$domain"); then
+        days=$(cert_days_left "$epoch")
+        if [[ "$days" -lt 0 ]]; then
+            echo -e "    ${RED}✗${NC} Certificate for ${domain} EXPIRED $(( -days )) day(s) ago"
+            echo -e "      ${DIM}Run: moav cert renew   (TLS protocols and the admin panel are down until then)${NC}"
+            rc=1
+        elif [[ "$days" -lt "$CERT_RENEW_CRIT_DAYS" ]]; then
+            echo -e "    ${RED}✗${NC} Certificate for ${domain} expires in ${days} day(s)"
+            echo -e "      ${DIM}Run: moav cert renew, then check: journalctl -u moav-cert-renew${NC}"
+            rc=1
+        elif [[ "$days" -le "$warn_days" ]]; then
+            echo -e "    ${YELLOW}○${NC} Certificate for ${domain} expires in ${days} day(s); renewal is overdue (certbot renews at 30)"
+            echo -e "      ${DIM}Run: moav cert renew, then check: journalctl -u moav-cert-renew${NC}"
+            rc=2
+        else
+            echo -e "    ${GREEN}✓${NC} Certificate for ${domain} valid for ${days} more days"
+        fi
+    else
+        echo -e "    ${RED}✗${NC} Could not read the certificate expiry for ${domain}"
+        echo -e "      ${DIM}Is Docker running and the cert issued? Check: moav logs certbot${NC}"
+        rc=1
+    fi
+
+    if cert_renew_scheduled; then
+        if _has_systemd; then
+            echo -e "    ${GREEN}✓${NC} Daily renewal scheduled (${CERT_RENEW_UNIT}.timer active)"
+        else
+            echo -e "    ${GREEN}✓${NC} Daily renewal scheduled (${CERT_RENEW_CRON_PATH})"
+        fi
+    elif [[ "$(get_env_val "CERT_AUTORENEW" "$env_file" "true")" != "true" ]]; then
+        echo -e "    ${YELLOW}○${NC} Auto-renewal disabled (CERT_AUTORENEW=false); renew before expiry yourself"
+        [[ "$rc" -eq 0 ]] && rc=2
+    else
+        echo -e "    ${RED}✗${NC} Daily renewal is NOT scheduled (timer missing, inactive, or pointing at another install dir)"
+        echo -e "      ${DIM}Run: moav cert install   (moav start also reinstalls it)${NC}"
+        rc=1
+    fi
+    return "$rc"
+}
+
 # Registry of diagnostic checks: "<name>:<description>" -> doctor_check_<name>.
 # Lives with cmd_doctor (it was briefly carried along by the nettune extraction).
 DOCTOR_CHECKS=(
@@ -1134,6 +1190,7 @@ DOCTOR_CHECKS=(
     "ports:Check required ports are available"
     "conflicts:Check for conflicting services (e.g. DNS tunnels on port 53)"
     "reality:Check Reality fallback targets resolve and are reachable"
+    "cert:Check TLS certificate expiry and the daily renewal timer"
     "net:Check BBR/sysctl tuning + packet drops + PMTU + CGNAT + MTU"
     "host:Check CPU load, swap pressure and zombie processes"
     "peers:Check for duplicate WireGuard/AmneziaWG peer addresses (--fix repairs)"

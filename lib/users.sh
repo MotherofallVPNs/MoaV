@@ -649,7 +649,7 @@ cmd_regenerate_users() {
     local cdn_ws_path=$(get_env_val "CDN_WS_PATH" ".env")
     # Fall back to bootstrap-generated path from state
     if [[ -z "$cdn_ws_path" ]]; then
-        cdn_ws_path=$(docker run --rm -v moav_moav_state:/state alpine cat /state/keys/cdn.env 2>/dev/null | grep '^CDN_WS_PATH=' | cut -d= -f2 || true)
+        cdn_ws_path=$(docker run --rm -v moav_moav_state:/state alpine:3.24 cat /state/keys/cdn.env 2>/dev/null | grep '^CDN_WS_PATH=' | cut -d= -f2 || true)
     fi
     cdn_ws_path="${cdn_ws_path:-/ws}"
     local cdn_transport=$(get_env_val "CDN_TRANSPORT" ".env")
@@ -669,7 +669,7 @@ cmd_regenerate_users() {
     local enable_amneziawg=$(get_env_val "ENABLE_AMNEZIAWG" .env "true")
     local awg_disable_cookies=$(get_env_val "AWG_DISABLE_COOKIES" .env "false")
     local enable_dnstt=$(get_env_val "ENABLE_DNSTT" .env "true")
-    local enable_slipstream=$(get_env_val "ENABLE_SLIPSTREAM" .env "true")
+    local enable_slipstream=$(get_env_val "ENABLE_SLIPSTREAM" .env "false")
     local slipstream_subdomain=$(get_env_val "SLIPSTREAM_SUBDOMAIN" .env "s")
     local enable_masterdns=$(get_env_val "ENABLE_MASTERDNS" .env "true")
     local masterdns_subdomain=$(get_env_val "MASTERDNS_SUBDOMAIN" .env "m")
@@ -752,7 +752,7 @@ cmd_regenerate_users() {
             -e "PORT_DNS=${port_dns:-53}" \
             -e "PORT_XDNS=${port_xdns:-53}" \
         --entrypoint /bin/bash \
-        bootstrap -c 'source /app/lib/common.sh; source /app/lib/sing-box.sh; source /app/lib/xray.sh; source /app/lib/sync.sh; source /app/lib/provision.sh; source /app/lib/amneziawg.sh; if [ "${ENABLE_AMNEZIAWG:-true}" = true ]; then generate_amneziawg_config; fi; provision_all_users force'; then
+        bootstrap -c 'export STATE_DIR=/state; source /app/lib/common.sh; source /app/lib/sing-box.sh; source /app/lib/xray.sh; source /app/lib/sync.sh; source /app/lib/provision.sh; source /app/lib/amneziawg.sh; if [ "${ENABLE_AMNEZIAWG:-true}" = true ]; then generate_amneziawg_config; fi; provision_all_users force'; then
         user_count=$(echo "$users_found" | wc -w | tr -d ' ')
         echo -e "  ${GREEN}✓${NC} provisioning run finished"
     else

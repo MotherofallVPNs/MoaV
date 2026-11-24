@@ -1,11 +1,11 @@
 # =============================================================================
 # MoaV DNS Router - Domain-based DNS query routing
 # =============================================================================
-# Routes DNS queries to dnstt or Slipstream backends based on domain suffix.
+# Routes DNS queries to dnstt, MasterDNS and XDNS backends by domain suffix.
 # Lightweight Go UDP forwarder with connection pooling.
 # =============================================================================
 
-FROM --platform=$BUILDPLATFORM golang:1.22-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS builder
 
 ARG TARGETARCH
 ARG TARGETOS=linux
@@ -30,7 +30,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     GOMAXPROCS=1 \
     go build -p=1 -o /dns-router -trimpath -ldflags "-s -w" .
 
-FROM alpine:3.21
+FROM alpine:3.24
 
 RUN apk add --no-cache ca-certificates tzdata bash
 

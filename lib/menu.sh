@@ -152,7 +152,7 @@ show_usage() {
     echo "  cert [CMD]            TLS certificate status/renew + auto-renewal timer (install/uninstall)"
     echo "  net [status|apply|revert]  Kernel network tuning (BBR, buffers) for throughput"
     echo "  setup-dns             Free port 53 for DNS tunnels (disables systemd-resolved)"
-    echo "  switch-dns [NAME|off] Enable/disable DNS tunnel daemons (dnstt/slipstream/masterdns/xdns)"
+    echo "  switch-dns [NAME|off] Enable/disable DNS tunnel daemons (dnstt/masterdns/xdns)"
     echo ""
     echo "Profiles: proxy, wireguard, amneziawg, dnstunnel, trusttunnel, xhttp, telegram,"
     echo "          admin, conduit, snowflake, monitoring, client, all"

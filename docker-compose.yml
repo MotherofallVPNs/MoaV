@@ -81,6 +81,8 @@ services:
       - moav_logs:/var/log/sing-box
     environment:
       - TZ=${TZ:-UTC}
+      # Default on: tunneled traffic may not reach private/infra ranges.
+      - EGRESS_ISOLATION=${EGRESS_ISOLATION:-on}
     cap_drop:
       - ALL
     cap_add:
@@ -173,6 +175,8 @@ services:
       - /lib/modules:/lib/modules:ro
     environment:
       - TZ=${TZ:-UTC}
+      # Default on: tunneled traffic may not reach private/infra ranges.
+      - EGRESS_ISOLATION=${EGRESS_ISOLATION:-on}
     cap_drop:
       - ALL
     cap_add:
@@ -195,10 +199,10 @@ services:
       - all
 
   # ===========================================================================
-  # DNS TUNNELS (dnstunnel profile): dns-router + dnstt + slipstream
+  # DNS TUNNELS (dnstunnel profile): dns-router + dnstt + masterdns (+ deprecated slipstream)
   # ===========================================================================
 
-  # DNS Router: Routes DNS queries to dnstt/slipstream by domain suffix
+  # DNS Router: Routes DNS queries to dnstt/masterdns/xdns by domain suffix
   dns-router:
     build:
       context: .
@@ -216,15 +220,16 @@ services:
     environment:
       - DOMAIN=${DOMAIN}
       - DNSTT_DOMAIN=${DNSTT_SUBDOMAIN:-t}.${DOMAIN}
-      - SLIPSTREAM_DOMAIN=${SLIPSTREAM_SUBDOMAIN:-s}.${DOMAIN}
       - MASTERDNS_DOMAIN=${MASTERDNS_SUBDOMAIN:-m}.${DOMAIN}${MASTERDNS_PUBLIC_SUBDOMAIN:+,${MASTERDNS_PUBLIC_SUBDOMAIN}.${DOMAIN}}
       - XDNS_DOMAIN=${XDNS_SUBDOMAIN:-x}.${DOMAIN}
       - ENABLE_DNSTT=${ENABLE_DNSTT:-true}
-      - ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM:-true}
+      # Only read to warn: Slipstream is no longer routed.
+      - ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM:-false}
       - ENABLE_MASTERDNS=${ENABLE_MASTERDNS:-true}
       - ENABLE_XDNS=${ENABLE_XDNS:-true}
       - XDNS_BACKEND=xray:5355
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     cap_drop:
       - ALL
     security_opt:
@@ -262,6 +267,7 @@ services:
       - DNSTT_DOMAIN=${DNSTT_SUBDOMAIN:-t}.${DOMAIN}
       - DNSTT_UPSTREAM=sing-box:1080
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     cap_drop:
       - ALL
     security_opt:
@@ -275,7 +281,8 @@ services:
       - dnstunnel
       - all
 
-  # Slipstream: QUIC-over-DNS tunnel (1.5-5x faster than dnstt)
+  # Slipstream: QUIC-over-DNS tunnel. DEPRECATED: off by default and no longer
+  # routed by dns-router (upstream archived); removed in a later release.
   slipstream:
     build:
       context: .
@@ -309,14 +316,14 @@ services:
       - all
 
   # MasterDNS: advanced DNS tunnel (ARQ + resolver LB) — MahsaNG v16 component.
-  # Enabled by default (ENABLE_MASTERDNS=true). Coexists with dnstt/Slipstream
+  # Enabled by default (ENABLE_MASTERDNS=true). Coexists with dnstt/XDNS
   # on its own subdomain; dns-router fans queries out by domain suffix.
   masterdns:
     build:
       context: .
       dockerfile: dockerfiles/Dockerfile.masterdns
       args:
-        MASTERDNS_VERSION: ${MASTERDNS_VERSION:-v2026.06.13.234407-7de2476}
+        MASTERDNS_VERSION: ${MASTERDNS_VERSION:-v2026.11.18.210322-7198b45}
     container_name: moav-masterdns
     restart: unless-stopped
     logging: *default-logging
@@ -333,6 +340,7 @@ services:
       - MASTERDNS_SUBDOMAIN=${MASTERDNS_SUBDOMAIN:-m}
       - MASTERDNS_PUBLIC_SUBDOMAIN=${MASTERDNS_PUBLIC_SUBDOMAIN:-}
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     cap_drop:
       - ALL
     security_opt:
@@ -350,7 +358,7 @@ services:
   # CERTBOT: TLS certificate management
   # ===========================================================================
   certbot:
-    image: ${IMAGE_CERTBOT:-certbot/certbot:latest}
+    image: ${IMAGE_CERTBOT:-certbot/certbot:v5.10.0@sha256:c5698da859429ccee0fcc299a8000368198222d1f9e789ab6e388b491e8ce06d}
     container_name: moav-certbot
     depends_on:
       - decoy
@@ -396,7 +404,7 @@ services:
   # DECOY: Static website (served by sing-box fallback)
   # ===========================================================================
   decoy:
-    image: ${IMAGE_NGINX:-nginx:alpine}
+    image: ${IMAGE_NGINX:-nginx:1.31.9-alpine@sha256:fb4658584bd9a916ffb6f6e365f97c25cfdb2923801f551ea08356e695f14ff7}
     container_name: moav-decoy
     restart: unless-stopped
     logging: *default-logging
@@ -445,7 +453,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.telemt
       args:
-        TELEMT_VERSION: ${TELEMT_VERSION:-3.5.14}
+        TELEMT_VERSION: ${TELEMT_VERSION:-3.5.17}
     container_name: moav-telemt
     restart: unless-stopped
     logging: *default-logging
@@ -504,6 +512,7 @@ services:
       - moav_conduit:/data
     environment:
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
       - CONDUIT_BANDWIDTH=${CONDUIT_BANDWIDTH:-200}
       - CONDUIT_MAX_COMMON_CLIENTS=${CONDUIT_MAX_COMMON_CLIENTS:-100}
     expose:
@@ -534,7 +543,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.snowflake
       args:
-        SNOWFLAKE_VERSION: ${SNOWFLAKE_VERSION:-2.15.2}
+        SNOWFLAKE_VERSION: ${SNOWFLAKE_VERSION:-2.15.4}
         # prebuilt (default) = pull the official thetorproject/snowflake-proxy
         # binary; source = compile from source (set SNOWFLAKE_BINARY=source if
         # Docker Hub is unreachable for the prebuilt image).
@@ -554,6 +563,7 @@ services:
       - moav_tor_geoip:/usr/share/tor:ro
     environment:
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
       - SNOWFLAKE_BANDWIDTH=${SNOWFLAKE_BANDWIDTH:-50}
       - SNOWFLAKE_CAPACITY=${SNOWFLAKE_CAPACITY:-20}
     cap_drop:
@@ -600,6 +610,7 @@ services:
     environment:
       - ENABLE_GOOSERELAY=${ENABLE_GOOSERELAY:-false}
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     cap_drop:
       - ALL
     security_opt:
@@ -621,7 +632,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.amneziawg
       args:
-        AMNEZIAWG_GO_VERSION: ${AMNEZIAWG_GO_VERSION:-v3.1.20260828}
+        AMNEZIAWG_GO_VERSION: ${AMNEZIAWG_GO_VERSION:-v3.1.20261116}
         AWGTOOLS_VERSION: ${AWGTOOLS_VERSION:-3.1.20260812}
         GOPROXY: "${GOPROXY:-https://proxy.golang.org|https://goproxy.cn|direct}"
         GOSUMDB: "${GOSUMDB:-off}"
@@ -638,6 +649,9 @@ services:
       - /lib/modules:/lib/modules:ro
     environment:
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
+      # Default on: tunneled traffic may not reach private/infra ranges.
+      - EGRESS_ISOLATION=${EGRESS_ISOLATION:-on}
     cap_drop:
       - ALL
     cap_add:
@@ -670,7 +684,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.trusttunnel
       args:
-        TRUSTTUNNEL_VERSION: ${TRUSTTUNNEL_VERSION:-1.1.0}
+        TRUSTTUNNEL_VERSION: ${TRUSTTUNNEL_VERSION:-1.3.1}
     container_name: moav-trusttunnel
     restart: unless-stopped
     logging: *default-logging
@@ -688,6 +702,8 @@ services:
       - DOMAIN=${DOMAIN}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - TZ=${TZ:-UTC}
+      # Default on: tunneled traffic may not reach private/infra ranges.
+      - EGRESS_ISOLATION=${EGRESS_ISOLATION:-on}
     cap_drop:
       - ALL
     cap_add:
@@ -720,7 +736,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.xray
       args:
-        XRAY_VERSION: ${XRAY_VERSION:-v26.10.21}
+        XRAY_VERSION: ${XRAY_VERSION:-v26.11.9}
         GOPROXY: "${GOPROXY:-https://proxy.golang.org|https://goproxy.cn|direct}"
         GOSUMDB: "${GOSUMDB:-off}"
     container_name: moav-xray
@@ -737,6 +753,11 @@ services:
       - moav_state:/state:ro
     environment:
       - TZ=${TZ:-UTC}
+      # Go >= 1.24 listens with MPTCP by default; keep it off on every Go
+      # service in this file (CVE-2026-98432 exploit path).
+      - GODEBUG=multipathtcp=0
+      # Default on: tunneled traffic may not reach private/infra ranges.
+      - EGRESS_ISOLATION=${EGRESS_ISOLATION:-on}
     healthcheck:
       # `xray run -test` parses config and exits 0; `xray test` does not exist (#117).
       test: ["CMD", "/usr/local/bin/xray", "run", "-test", "-c", "/etc/xray/config.json"]
@@ -762,7 +783,9 @@ services:
   # ADMIN: Stats dashboard + User management API
   # ===========================================================================
   docker-proxy:
-    image: tecnativa/docker-socket-proxy:v0.5.0
+    # Upstream retired :vX.Y.Z tags; 3.4 is rebuilt weekly, so pin the digest
+    # (multi-arch index) and refresh it on each dependency audit.
+    image: tecnativa/docker-socket-proxy:3.4@sha256:027f9fa5ee70be5836eeaa10ce889d7a83f34a8db16a7f412818b92997e0beab
     container_name: moav-docker-proxy
     restart: unless-stopped
     logging: *default-logging
@@ -859,7 +882,7 @@ services:
   # MONITORING: Prometheus + Grafana observability stack
   # ===========================================================================
   prometheus:
-    image: ${IMAGE_PROMETHEUS:-prom/prometheus:latest}
+    image: ${IMAGE_PROMETHEUS:-prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06}
     container_name: moav-prometheus
     restart: unless-stopped
     logging: *default-logging
@@ -870,6 +893,7 @@ services:
     volumes:
       - ./configs/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./configs/monitoring/conduit_lifetime.rules.yml:/etc/prometheus/conduit_lifetime.rules.yml:ro
+      - ./configs/monitoring/cert_expiry.rules.yml:/etc/prometheus/cert_expiry.rules.yml:ro
       - moav_prometheus:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -882,6 +906,7 @@ services:
       - '--web.enable-lifecycle'
     environment:
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     cap_drop:
       - ALL
     security_opt:
@@ -898,7 +923,7 @@ services:
       - all
 
   grafana:
-    image: ${IMAGE_GRAFANA:-grafana/grafana:latest}
+    image: ${IMAGE_GRAFANA:-grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf}
     container_name: moav-grafana
     restart: unless-stopped
     # Same reason as admin: the entrypoint execs grafana, so PID 1 does not reap.
@@ -943,6 +968,7 @@ services:
       - GRAFANA_SUBDOMAIN=${GRAFANA_SUBDOMAIN:-}
       - GRAFANA_APP_TITLE=${GRAFANA_APP_TITLE:-}
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     # Note: read_only not set - grafana entrypoint writes branding files to container filesystem
     # user:"0" and the writable FS above are load-bearing (the entrypoint
     # patches branding into /usr/share/grafana/public, which uid 472 cannot
@@ -967,7 +993,7 @@ services:
   # Uses port 2083 (Cloudflare-supported HTTPS port)
   # Setup: Add DNS record grafana.yourdomain.xyz -> server IP (Cloudflare proxied, orange cloud)
   grafana-proxy:
-    image: ${IMAGE_NGINX:-nginx:alpine}
+    image: ${IMAGE_NGINX:-nginx:1.31.9-alpine@sha256:fb4658584bd9a916ffb6f6e365f97c25cfdb2923801f551ea08356e695f14ff7}
     container_name: moav-grafana-proxy
     restart: unless-stopped
     logging: *default-logging
@@ -1005,7 +1031,7 @@ services:
       - all
 
   node-exporter:
-    image: ${IMAGE_NODE_EXPORTER:-prom/node-exporter:latest}
+    image: ${IMAGE_NODE_EXPORTER:-prom/node-exporter:v1.13.1@sha256:7296504d4ada44b7d7ab4431e27e9f9900d8488f8d55842f4b12ae2704e16dfe}
     container_name: moav-node-exporter
     restart: unless-stopped
     logging: *default-logging
@@ -1017,13 +1043,18 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/rootfs:ro
+      # moav_cert_* (expiry, last check, renew result) from scripts/cert-renew.sh
+      # and `moav start`; the host side owns the directory (lib/cert.sh).
+      - ./configs/monitoring/textfile:/textfile:ro
     command:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
       - '--path.rootfs=/rootfs'
+      - '--collector.textfile.directory=/textfile'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
     environment:
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     cap_drop:
       - ALL
     security_opt:
@@ -1044,8 +1075,9 @@ services:
     # deployment mode. Scope limits: every mount is :ro, its API is read-only
     # metrics on an internal port, and the whole service only exists under the
     # opt-in `monitoring` profile — disable monitoring and it is gone.
+    # gcr.io/cadvisor is frozen at v0.55.1; upstream publishes to ghcr.io now.
     # Use IMAGE_CADVISOR env var, or build locally with: moav build --local
-    image: ${IMAGE_CADVISOR:-gcr.io/cadvisor/cadvisor:latest}
+    image: ${IMAGE_CADVISOR:-ghcr.io/google/cadvisor:v0.61.1@sha256:4929b70e82079d001d0028b85d6a4dd25ad4666b719455c9542b983489963916}
     container_name: moav-cadvisor
     restart: unless-stopped
     logging: *default-logging
@@ -1077,6 +1109,7 @@ services:
       - '-v=0'
     environment:
       - TZ=${TZ:-UTC}
+      - GODEBUG=multipathtcp=0
     mem_limit: 256m
     cpus: 0.5
     profiles:
@@ -1280,7 +1313,7 @@ services:
   # Uses curlimages/curl (~9 MB) instead of python:3.11-alpine (~50 MB).
   # curl + ca-certs + gunzip (busybox) all pre-installed; no apk needed.
   geoip-updater:
-    image: curlimages/curl:latest
+    image: curlimages/curl:8.23.0@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93
     container_name: moav-geoip-updater
     user: "0:0"  # curlimages/curl defaults to UID 100; need root to write mounted volume
     volumes:
@@ -1307,7 +1340,7 @@ services:
   # NOT the same as the db-ip mmdb above: that one is binary MaxMind format for
   # our Python exporters, and the two are not interchangeable.
   tor-geoip-updater:
-    image: curlimages/curl:latest
+    image: curlimages/curl:8.23.0@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93
     container_name: moav-tor-geoip-updater
     user: "0:0"  # same reason as geoip-updater: curlimages/curl is UID 100 and cannot write the volume
     entrypoint: ["/bin/sh"]
@@ -1371,7 +1404,7 @@ services:
       - HYSTERIA2_OBFS_TYPE=${HYSTERIA2_OBFS_TYPE:-salamander}
       - ENABLE_WIREGUARD=${ENABLE_WIREGUARD:-true}
       - ENABLE_DNSTT=${ENABLE_DNSTT:-true}
-      - ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM:-true}
+      - ENABLE_SLIPSTREAM=${ENABLE_SLIPSTREAM:-false}
       - SLIPSTREAM_SUBDOMAIN=${SLIPSTREAM_SUBDOMAIN:-s}
       - ENABLE_TRUSTTUNNEL=${ENABLE_TRUSTTUNNEL:-true}
       - ENABLE_TELEMT=${ENABLE_TELEMT:-true}
@@ -1426,7 +1459,7 @@ services:
         GOSUMDB: "${GOSUMDB:-off}"
         SINGBOX_VERSION: ${SINGBOX_VERSION:-1.14.4}
         WSTUNNEL_VERSION: ${WSTUNNEL_VERSION:-11.1.0}
-        TRUSTTUNNEL_CLIENT_VERSION: ${TRUSTTUNNEL_CLIENT_VERSION:-1.0.49}
+        TRUSTTUNNEL_CLIENT_VERSION: ${TRUSTTUNNEL_CLIENT_VERSION:-1.3.0}
         AWGTOOLS_VERSION: ${AWGTOOLS_VERSION:-3.1.20260812}
         SLIPSTREAM_VERSION: ${SLIPSTREAM_VERSION:-2026.04.22.1}
         DNSTT_VERSION: ${DNSTT_VERSION:-v1.20260501.0}

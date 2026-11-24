@@ -114,6 +114,13 @@ moav build && moav start
   *other human login accounts*, be aware that an account with uid 2000 or in
   group 2000 would gain access to those bundles. Don't share a MoaV host with
   untrusted local users, or ensure uid/gid 2000 is unused by real accounts.
+- **Running `moav` as a non-root operator.** Server configs are `root:2000`,
+  writable by group 2000 only. Run `moav user add` (and revoke) as root, or add
+  your account to group 2000 once and log in again:
+  `sudo groupadd -g 2000 moav 2>/dev/null; sudo usermod -aG "$(getent group 2000 | cut -d: -f1)" "$USER"`.
+  Membership grants the same access as the admin dashboard, including the
+  user bundles, so only add accounts you would trust with it. Without it,
+  `moav user add` stops before changing anything and prints this fix.
 
 ## Questions
 

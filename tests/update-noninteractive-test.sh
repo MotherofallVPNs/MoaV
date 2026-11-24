@@ -56,6 +56,10 @@ fi
 command -v git >/dev/null 2>&1 || { echo "  SKIP  git unavailable"; echo ""; echo "PASSED ($pass checks)"; exit 0; }
 
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+# An up-to-date update ends in the dangling-image cleanup; keep the host's
+# real docker out of it.
+mkdir -p "$WORK/bin"; printf '#!/bin/sh\nexit 0\n' > "$WORK/bin/docker"; chmod +x "$WORK/bin/docker"
+PATH="$WORK/bin:$PATH"
 
 # Fresh install dir per case: an origin to fetch/pull from (same commit, so no
 # _post-update re-exec), a tracked file to dirty, and a gitignored .env whose

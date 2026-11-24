@@ -98,6 +98,34 @@ compose_build() {
     fi
 }
 
+show_build_help() {
+    echo "Usage: moav build [SERVICE|PROFILE|all ...] [--no-cache]"
+    echo "       moav build --local [SERVICE|all ...] [--no-cache]"
+    echo ""
+    echo "Build MoaV container images. With no argument, or 'all', builds every"
+    echo "service (Go services one at a time first, then the rest in parallel)."
+    echo ""
+    echo "Arguments:"
+    echo "  SERVICE      A compose service or alias (e.g. sing-box, xray, trusttunnel)"
+    echo "  PROFILE      A profile: proxy wireguard amneziawg dnstunnel trusttunnel"
+    echo "               admin conduit snowflake monitoring"
+    echo ""
+    echo "Options:"
+    echo "  --no-cache   Build without the Docker layer cache"
+    echo "  --local      Build normally-pulled images from source, for hosts where"
+    echo "               registries are blocked (default: ${DEFAULT_LOCAL_BUILDS};"
+    echo "               all: ${ALL_LOCAL_BUILD_SERVICES})"
+    echo "  -h, --help   Show this help"
+    echo ""
+    echo "Set MOAV_BUILD_PARALLEL=N to cap build concurrency (auto-tiered by RAM)."
+    echo ""
+    echo "Examples:"
+    echo "  moav build                     # Build everything"
+    echo "  moav build trusttunnel         # One profile"
+    echo "  moav build sing-box --no-cache # One service, no cache"
+    echo "  moav build --local all         # Everything from source"
+}
+
 cmd_build() {
     local no_cache=""
     local build_local=""
@@ -106,6 +134,7 @@ cmd_build() {
     # Parse arguments
     for arg in "$@"; do
         case "$arg" in
+            -h|--help) show_build_help; return 0 ;;
             --no-cache) no_cache="--no-cache" ;;
             --local) build_local="true" ;;
             *) services_args+=("$arg") ;;
@@ -280,7 +309,7 @@ ALL_LOCAL_BUILD_SERVICES="cadvisor prometheus grafana node-exporter nginx certbo
 
 _local_build_info() {
     case "$1" in
-        cadvisor)       echo "dockerfiles/Dockerfile.cadvisor|moav-cadvisor:local|IMAGE_CADVISOR|CADVISOR_VERSION|CADVISOR_VERSION|cAdvisor container metrics (gcr.io)" ;;
+        cadvisor)       echo "dockerfiles/Dockerfile.cadvisor|moav-cadvisor:local|IMAGE_CADVISOR|CADVISOR_VERSION|CADVISOR_VERSION|cAdvisor container metrics (ghcr.io)" ;;
         prometheus)     echo "dockerfiles/Dockerfile.prometheus|moav-prometheus:local|IMAGE_PROMETHEUS|PROMETHEUS_VERSION|PROMETHEUS_VERSION|Prometheus time-series DB" ;;
         grafana)        echo "dockerfiles/Dockerfile.grafana|moav-grafana:local|IMAGE_GRAFANA|GRAFANA_VERSION|GRAFANA_VERSION|Grafana dashboards" ;;
         node-exporter)  echo "dockerfiles/Dockerfile.node-exporter|moav-node-exporter:local|IMAGE_NODE_EXPORTER|NODE_EXPORTER_VERSION|NODE_EXPORTER_VERSION|Node system metrics" ;;

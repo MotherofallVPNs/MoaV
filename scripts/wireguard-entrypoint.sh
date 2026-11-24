@@ -20,8 +20,20 @@ echo "[wireguard] Starting WireGuard..."
 
 # Check if config exists
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo "[wireguard] ERROR: Config file not found at $CONFIG_FILE"
-    echo "[wireguard] Run bootstrap first to generate WireGuard configuration"
+    # [ -f ] is also false on EACCES; tell the two apart so nobody re-bootstraps a perms bug.
+    _read_err=$(cat "$CONFIG_FILE" 2>&1 >/dev/null || true)
+    case "$_read_err" in
+        *[Pp]ermission\ denied*)
+            echo "[wireguard] ERROR: permission denied reading $CONFIG_FILE"
+            echo "[wireguard] $(ls -ldn "$(dirname "$CONFIG_FILE")" 2>&1)"
+            echo "[wireguard] This container has no DAC override, so root must OWN the config."
+            echo "[wireguard] Run 'moav start' to repair permissions (do not re-run bootstrap)."
+            ;;
+        *)
+            echo "[wireguard] ERROR: Config file not found at $CONFIG_FILE"
+            echo "[wireguard] Run bootstrap first to generate WireGuard configuration"
+            ;;
+    esac
     exit 1
 fi
 
@@ -114,9 +126,31 @@ if [ -n "$PEER_PUBKEY" ] && [ -n "$PEER_ALLOWED" ]; then
     wg set "$INTERFACE" peer "$PEER_PUBKEY" allowed-ips "$PEER_ALLOWED"
 fi
 
+# Egress isolation goes in while the interface is still down, ahead of the
+# ACCEPT below. A failure is fatal: an exit must not come up unfiltered.
+. /egress-isolation.sh
+egress_firewall "$INTERFACE" || { echo "[wireguard] ERROR: egress isolation rules failed (EGRESS_ISOLATION=off bypasses)"; exit 1; }
+
+# Address may be dual-stack ("10.x/24,fd00::1/64") but ip(8) takes one prefix
+# per call. A failed IPv6 add (IPv6 off in the netns) warns; IPv4 stays fatal.
+set_addresses() {
+    _rc=0
+    for _a in $(printf '%s' "$ADDRESS" | tr ',' ' '); do
+        if ip address add "$_a" dev "$INTERFACE"; then
+            echo "[wireguard]   address $_a"
+        else
+            case "$_a" in
+                *:*) echo "[wireguard] WARNING: could not add IPv6 address $_a; continuing without it" ;;
+                *)   echo "[wireguard] ERROR: could not add address $_a"; _rc=1 ;;
+            esac
+        fi
+    done
+    return "$_rc"
+}
+
 # Set interface address and bring up
 echo "[wireguard] Setting address $ADDRESS..."
-ip addr add "$ADDRESS" dev "$INTERFACE"
+set_addresses || exit 1
 ip link set "$INTERFACE" up
 
 # Run PostUp iptables rules
@@ -139,6 +173,7 @@ cleanup() {
     iptables -D FORWARD -i "$INTERFACE" -j ACCEPT 2>/dev/null || true
     iptables -D FORWARD -o "$INTERFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
     iptables -t nat -D POSTROUTING -o eth+ -j MASQUERADE 2>/dev/null || true
+    egress_firewall_clear "$INTERFACE"
     ip link del "$INTERFACE" 2>/dev/null || true
     exit 0
 }
@@ -180,7 +215,7 @@ while true; do
         echo "[wireguard] Interface down, attempting restart..."
         ip link add "$INTERFACE" type wireguard 2>/dev/null || true
         echo "$PRIVATE_KEY" | wg set "$INTERFACE" private-key /dev/stdin listen-port "$LISTEN_PORT" 2>/dev/null || true
-        ip addr add "$ADDRESS" dev "$INTERFACE" 2>/dev/null || true
+        set_addresses >/dev/null 2>&1 || true
         ip link set "$INTERFACE" up 2>/dev/null || true
     fi
 done

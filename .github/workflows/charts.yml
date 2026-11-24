@@ -40,13 +40,13 @@ jobs:
       # fetch-depth: 0 + tags: the test-suite chart reads every release tag's tree
       # to count test files, and a shallow checkout has no tags — it failed with
       # "needs at least two tags" on a runner while working locally.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
 
       # Public repo, read-only, no credential: the translation chart counts files.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: MotherofallVPNs/moav-site
           path: .moav-site

@@ -76,6 +76,19 @@ grep -qE 'chown -R "0:\$ADMIN_GID" /configs/' "$ROOT/scripts/bootstrap.sh" \
     && ok "bootstrap keeps configs owner root" \
     || bad "bootstrap no longer chowns configs to 0:\$ADMIN_GID — DAC-less container roots lose read"
 
+# The e2e used to `chown -R runner configs` after start, so every later WG/AWG
+# restart crash-looped. Runner access must go through tests/e2e-runner-access.sh.
+if grep -qE '^[^#]*chown -R [^#]*configs' "$ROOT/.github/workflows/e2e.yml"; then
+    bad "e2e.yml chowns configs/ to the runner again — WG/AWG crash-loop on the next restart"
+else
+    ok "e2e.yml leaves configs/{wireguard,amneziawg} owned by root"
+fi
+for ep in wireguard amneziawg; do
+    grep -q 'permission denied reading' "$ROOT/scripts/$ep-entrypoint.sh" \
+        && ok "$ep entrypoint reports EACCES as permission denied, not 'not found'" \
+        || bad "$ep entrypoint reports an unreadable config as 'Config file not found'"
+done
+
 # --- the world-read split -------------------------------------------------
 # wireguard/amneziawg configs (server private keys) are consumed by
 # container-root: fully locked. sing-box/xray/telemt/trusttunnel run their
@@ -131,6 +144,35 @@ if grep -E 'o-rwx' "$ROOT/scripts/bootstrap.sh" | grep -q 'monitoring'; then
 else
     ok "bootstrap leaves configs/monitoring world-readable"
 fi
+
+# --- user-add's _fix_perms must keep the non-root daemons' config dirs traversable.
+# TrustTunnel (uid 999, not in the admin group) crash-looped with "credentials.toml:
+# Permission denied" after a non-root `moav user add` set configs/trusttunnel to 2770.
+eval "$(sed -n '/^_fix_perms() {/,/^}/p' "$ROOT/scripts/user-add.sh")"
+sudo() { "$@"; }   # chown to root fails unprivileged (|| true); chmod is what we check
+ADMIN_GID=$(id -g)
+(
+    cd "$T" || exit 1
+    for d in sing-box xray trusttunnel telemt wireguard amneziawg; do
+        mkdir -p "configs/$d"; chmod 555 "configs/$d"; _fix_perms "configs/$d"
+    done
+    for d in sing-box xray trusttunnel telemt; do
+        m=$(mode "configs/$d")
+        [[ "${m: -1}" == 5 ]] && echo "ok configs/$d $m" || echo "bad configs/$d $m"
+    done
+    for d in wireguard amneziawg; do
+        m=$(mode "configs/$d")
+        [[ "${m: -1}" == 0 ]] && echo "ok configs/$d $m" || echo "bad configs/$d $m"
+    done
+) > "$T/fixperms.out" 2>&1
+unset -f sudo
+while read -r r d m; do
+    case "$r" in
+        ok)  ok "user-add _fix_perms leaves $d at $m" ;;
+        *)   bad "user-add _fix_perms sets $d to $m (non-root daemon can't read it / private dir world-readable)" ;;
+    esac
+done < <(grep -E '^(ok|bad) ' "$T/fixperms.out")
+[[ $(grep -cE '^(ok|bad) ' "$T/fixperms.out") -eq 6 ]] || bad "_fix_perms check did not run: $(head -3 "$T/fixperms.out")"
 
 echo ""
 echo "  $pass passed, $fail failed"

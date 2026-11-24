@@ -8,6 +8,8 @@ ARG SINGBOX_VERSION=1.14.4
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
+    iptables \
+    jq \
     libcap2-bin \
     && rm -rf /var/lib/apt/lists/*
 
@@ -29,6 +31,7 @@ RUN mkdir -p /etc/sing-box /var/log/sing-box /state && \
     chown -R moav:moav /app /etc/sing-box /var/log/sing-box /state
 
 COPY scripts/sing-box-entrypoint.sh /entrypoint.sh
+COPY scripts/lib/egress-isolation.sh /egress-isolation.sh
 RUN chmod +x /entrypoint.sh
 
 EXPOSE 443/tcp 443/udp 8443/tcp 2082/tcp

@@ -23,11 +23,11 @@ show_versions() {
     conduit_ver=$(get_component_version "CONDUIT_VERSION" "2.1.0")
     snowflake_ver=$(get_component_version "SNOWFLAKE_VERSION" "latest")
     slipstream_ver=$(get_component_version "SLIPSTREAM_VERSION" "2026.04.22.1")
-    telemt_ver=$(get_component_version "TELEMT_VERSION" "3.5.14")
+    telemt_ver=$(get_component_version "TELEMT_VERSION" "3.5.17")
     trusttunnel_ver=$(get_component_version "TRUSTTUNNEL_VERSION" "")
     trusttunnel_client_ver=$(get_component_version "TRUSTTUNNEL_CLIENT_VERSION" "")
     awgtools_ver=$(get_component_version "AWGTOOLS_VERSION" "")
-    xray_ver=$(get_component_version "XRAY_VERSION" "v26.10.21")
+    xray_ver=$(get_component_version "XRAY_VERSION" "v26.11.9")
     dnstt_ver=$(get_component_version "DNSTT_VERSION" "latest")
 
     echo ""
@@ -146,13 +146,11 @@ show_status() {
             disabled_services["decoy"]=1
         fi
         [[ "$enable_wireguard" != "true" ]] && disabled_services["wireguard"]=1 && disabled_services["wstunnel"]=1
-        local enable_slipstream=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
+        local enable_slipstream=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "false")
         [[ "$enable_dnstt" != "true" ]] && disabled_services["dnstt"]=1
         [[ "$enable_slipstream" != "true" ]] && disabled_services["slipstream"]=1
-        # dns-router is disabled if both dnstt and slipstream are disabled
-        if [[ "$enable_dnstt" != "true" ]] && [[ "$enable_slipstream" != "true" ]]; then
-            disabled_services["dns-router"]=1
-        fi
+        [[ "$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")" != "true" ]] && disabled_services["masterdns"]=1
+        [[ "$(dns_tunnel_enabled "$env_file")" != "true" ]] && disabled_services["dns-router"]=1
         [[ "$enable_admin" != "true" ]] && disabled_services["admin"]=1
         local enable_telemt=$(get_env_val "ENABLE_TELEMT" "$env_file" "true")
         [[ "$enable_telemt" != "true" ]] && disabled_services["telemt"]=1
@@ -341,8 +339,6 @@ select_profiles() {
         local enable_hysteria2=$(get_env_val "ENABLE_HYSTERIA2" "$env_file" "true")
         local enable_wireguard=$(get_env_val "ENABLE_WIREGUARD" "$env_file" "true")
         local enable_amneziawg=$(get_env_val "ENABLE_AMNEZIAWG" "$env_file" "true")
-        local enable_dnstt=$(get_env_val "ENABLE_DNSTT" "$env_file" "true")
-        local enable_slipstream=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
         local enable_trusttunnel=$(get_env_val "ENABLE_TRUSTTUNNEL" "$env_file" "true")
         local enable_telemt=$(get_env_val "ENABLE_TELEMT" "$env_file" "true")
         local enable_admin=$(get_env_val "ENABLE_ADMIN_UI" "$env_file" "true")
@@ -354,10 +350,7 @@ select_profiles() {
         fi
         [[ "$enable_wireguard" != "true" ]] && wg_enabled=false
         [[ "$enable_amneziawg" != "true" ]] && amneziawg_enabled=false
-        # dnstunnel is disabled if both dnstt and slipstream are disabled
-        if [[ "$enable_dnstt" != "true" ]] && [[ "$enable_slipstream" != "true" ]]; then
-            dnstunnel_enabled=false
-        fi
+        [[ "$(dns_tunnel_enabled "$env_file")" != "true" ]] && dnstunnel_enabled=false
         [[ "$enable_trusttunnel" != "true" ]] && trusttunnel_enabled=false
         [[ "$enable_xhttp" == "true" ]] && xhttp_enabled=true
         [[ "$enable_telemt" != "true" ]] && telegram_enabled=false
@@ -461,8 +454,6 @@ select_profiles() {
         local enable_hysteria2=$(get_env_val "ENABLE_HYSTERIA2" "$env_file" "true")
         local enable_wireguard=$(get_env_val "ENABLE_WIREGUARD" "$env_file" "true")
         local enable_amneziawg=$(get_env_val "ENABLE_AMNEZIAWG" "$env_file" "true")
-        local enable_dnstt=$(get_env_val "ENABLE_DNSTT" "$env_file" "true")
-        local enable_slipstream=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
         local enable_trusttunnel=$(get_env_val "ENABLE_TRUSTTUNNEL" "$env_file" "true")
         local enable_telemt=$(get_env_val "ENABLE_TELEMT" "$env_file" "true")
         local enable_admin=$(get_env_val "ENABLE_ADMIN_UI" "$env_file" "true")
@@ -486,8 +477,8 @@ select_profiles() {
             SELECTED_PROFILES+=("amneziawg")
         fi
 
-        # dnstunnel profile (dnstt + Slipstream)
-        if [[ "$enable_dnstt" == "true" ]] || [[ "$enable_slipstream" == "true" ]]; then
+        # dnstunnel profile (dnstt, MasterDNS, XDNS)
+        if [[ "$(dns_tunnel_enabled "$env_file")" == "true" ]]; then
             SELECTED_PROFILES+=("dnstunnel")
         fi
 
@@ -642,6 +633,17 @@ get_default_profiles() {
 # Profile ↔ ENABLE_* mapping (issue #106) — Compose profiles don't know
 # about MoaV's ENABLE_* flags. These helpers are the bridge.
 
+# Does any routed DNS tunnel need dns-router? Mirrors the router entrypoint's
+# check; Slipstream is unrouted, so counting it would crash-loop the router.
+dns_tunnel_enabled() {
+    local env_file="${1:-$SCRIPT_DIR/.env}"
+    local _d _m _x
+    _d=$(get_env_val "ENABLE_DNSTT"     "$env_file" "true")
+    _m=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
+    _x=$(get_env_val "ENABLE_XDNS"      "$env_file" "true")
+    [[ "$_d" == "true" || "$_m" == "true" || "$_x" == "true" ]] && echo true || echo false
+}
+
 # Is <profile> enabled in .env? Multi-flag profiles survive if any flag is on.
 profile_enabled() {
     local profile="$1" env_file="${2:-$SCRIPT_DIR/.env}"
@@ -658,14 +660,7 @@ profile_enabled() {
                 && echo true || echo false ;;
         wireguard)   [[ "$(get_env_val "ENABLE_WIREGUARD"   "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
         amneziawg)   [[ "$(get_env_val "ENABLE_AMNEZIAWG"   "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
-        dnstunnel)
-            local _d _s _m _x
-            _d=$(get_env_val "ENABLE_DNSTT"     "$env_file" "true")
-            _s=$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "true")
-            _m=$(get_env_val "ENABLE_MASTERDNS" "$env_file" "true")
-            _x=$(get_env_val "ENABLE_XDNS"      "$env_file" "true")
-            [[ "$_d" == "true" || "$_s" == "true" || "$_m" == "true" || "$_x" == "true" ]] \
-                && echo true || echo false ;;
+        dnstunnel)   dns_tunnel_enabled "$env_file" ;;
         trusttunnel) [[ "$(get_env_val "ENABLE_TRUSTTUNNEL" "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
         xhttp)       [[ "$(get_env_val "ENABLE_XHTTP"       "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
         telegram)    [[ "$(get_env_val "ENABLE_TELEMT"      "$env_file" "true")"  == "true" ]] && echo true || echo false ;;
@@ -710,6 +705,50 @@ filter_disabled_profiles() {
     echo "${kept[*]}"
 }
 
+# Compose services that must not start even though their profile does: the
+# dnstunnel profile bundles dnstt + masterdns + slipstream behind one gate.
+disabled_compose_services() {
+    local env_file="${1:-$SCRIPT_DIR/.env}"
+    local out=()
+    [[ "$(get_env_val "ENABLE_SLIPSTREAM" "$env_file" "false")" == "true" ]] || out+=("slipstream")
+    [[ "$(get_env_val "ENABLE_DNSTT"      "$env_file" "true")"  == "true" ]] || out+=("dnstt")
+    [[ "$(get_env_val "ENABLE_MASTERDNS"  "$env_file" "true")"  == "true" ]] || out+=("masterdns")
+    echo "${out[*]}"
+}
+
+# `docker compose <profiles> up` args: the profiles' services minus disabled ones.
+# Prints nothing if nothing is excluded (plain `up` keeps compose's own ordering).
+compose_up_services() {
+    local profiles="$1" env_file="${2:-$SCRIPT_DIR/.env}"
+    local skip all kept=() s
+    skip=" $(disabled_compose_services "$env_file") "
+    [[ "$skip" =~ [a-z] ]] || return 0
+    # shellcheck disable=SC2086  # $profiles is a word list of --profile flags
+    all=$(docker compose $profiles config --services 2>/dev/null) || return 0
+    for s in $all; do
+        [[ "$skip" == *" $s "* ]] || kept+=("$s")
+    done
+    echo "${kept[*]}"
+}
+
+# `docker compose <profiles> up -d --remove-orphans` without the disabled services.
+compose_up_enabled() {
+    local profiles="$1" env_file="${2:-$SCRIPT_DIR/.env}" up_services
+    up_services=$(compose_up_services "$profiles" "$env_file")
+    if [[ -z "$up_services" ]]; then
+        # shellcheck disable=SC2086
+        docker compose $profiles up -d --remove-orphans
+        return
+    fi
+    info "Not starting disabled services: $(disabled_compose_services "$env_file")"
+    # An upgraded install still has the old Slipstream container, now unrouted.
+    if [[ " $(disabled_compose_services "$env_file") " == *" slipstream "* ]]; then
+        docker compose --profile all rm -sf slipstream >/dev/null 2>&1 || true
+    fi
+    # shellcheck disable=SC2086
+    docker compose $profiles up -d --remove-orphans $up_services
+}
+
 # 3-option prompt for explicit `moav start <name>` when ENABLE_* is false.
 # Echoes: start-and-enable | skip | start-once
 confirm_disabled_profile() {
@@ -729,7 +768,7 @@ confirm_disabled_profile() {
         gooserelay)  enable_var="ENABLE_GOOSERELAY" ;;
         monitoring)  enable_var="ENABLE_MONITORING" ;;
         proxy)       multi_flag_hint="ENABLE_REALITY, ENABLE_TROJAN, ENABLE_ANYTLS, ENABLE_HYSTERIA2, ENABLE_SS" ;;
-        dnstunnel)   multi_flag_hint="ENABLE_DNSTT, ENABLE_SLIPSTREAM, ENABLE_MASTERDNS, ENABLE_XDNS" ;;
+        dnstunnel)   multi_flag_hint="ENABLE_DNSTT, ENABLE_MASTERDNS, ENABLE_XDNS" ;;
     esac
 
     echo "" >&2
@@ -785,12 +824,31 @@ confirm_disabled_profile() {
 # repo ships a committed `.template` (offsets at 0) and we copy it into place on
 # first monitoring start. Never clobber an existing file — it holds the
 # operator's banked offsets.
+#
+# If the file is missing when compose mounts it, Docker creates a root-owned
+# DIRECTORY in its place and Prometheus crash-loops forever on "read ...: is a
+# directory" (nothing else in the stack notices). That happened on the e2e
+# runner: configs/monitoring/ was root-owned after a container wrote it, the
+# plain cp failed, and every later run mounted the stand-in. So: replace a
+# stand-in, retry the copy with root, and fail loudly instead of silently.
 ensure_conduit_lifetime_rules() {
     local rules="$SCRIPT_DIR/configs/monitoring/conduit_lifetime.rules.yml"
     local template="${rules}.template"
-    if [[ ! -f "$rules" && -f "$template" ]]; then
-        cp "$template" "$rules"
+    local sudo_prefix; sudo_prefix=$(_root_prefix)
+    if [[ -d "$rules" ]]; then
+        warn "$rules is a directory (Docker stand-in for a missing file); replacing it"
+        rm -rf "$rules" 2>/dev/null || $sudo_prefix rm -rf "$rules" 2>/dev/null || true
     fi
+    [[ -f "$rules" ]] && return 0
+    [[ -f "$template" ]] || return 0
+    if ! cp "$template" "$rules" 2>/dev/null; then
+        $sudo_prefix cp "$template" "$rules" 2>/dev/null || {
+            error "Cannot write $rules (parent not writable); Prometheus will not start"
+            return 1
+        }
+    fi
+    chmod 644 "$rules" 2>/dev/null || $sudo_prefix chmod 644 "$rules" 2>/dev/null || true
+    return 0
 }
 
 # Same reachability story for the bind-mounted bundle tree: the admin
@@ -836,7 +894,7 @@ repair_state_key_perms() {
     # a cap_drop-ALL container root cannot read once 0600. The three keys read
     # directly by non-root daemons (dnstt/masterdns/slipstream run USER moav)
     # stay 644 — inside the volume, the mount boundary is the control.
-    docker run --rm -v moav_moav_state:/state alpine sh -c '
+    docker run --rm -v moav_moav_state:/state alpine:3.24 sh -c '
         [ -d /state/keys ] || exit 0
         chown 0:0 /state/keys 2>/dev/null || true
         cd /state/keys 2>/dev/null || exit 0
@@ -874,8 +932,11 @@ ensure_clash_api_secret() {
     fi
 
     # Make sure Prometheus has its Conduit rules file to mount (gitignored +
-    # runtime-generated, so it may be absent on a fresh checkout).
-    ensure_conduit_lifetime_rules
+    # runtime-generated, so it may be absent on a fresh checkout), and that the
+    # node-exporter textfile dir exists before Docker would create it root-owned.
+    # A failure is reported, not fatal: the rest of the stack still starts.
+    ensure_conduit_lifetime_rules || true
+    cert_metric_dir_ensure
 
     # Check if ENABLE_MONITORING is explicitly set to false
     local enable_monitoring
@@ -899,7 +960,7 @@ ensure_clash_api_secret() {
 
     # Get the authoritative secret from state volume (source of truth from bootstrap)
     local state_secret
-    state_secret=$(docker run --rm -v moav_moav_state:/state alpine cat /state/keys/clash-api.env 2>/dev/null | grep "^CLASH_API_SECRET=" | cut -d'=' -f2 || true)
+    state_secret=$(docker run --rm -v moav_moav_state:/state alpine:3.24 cat /state/keys/clash-api.env 2>/dev/null | grep "^CLASH_API_SECRET=" | cut -d'=' -f2 || true)
 
     # If .env matches state, we're good
     if [[ -n "$current_secret" ]] && [[ "$current_secret" == "$state_secret" ]]; then
@@ -1011,7 +1072,7 @@ start_services() {
     echo ""
     info "Building containers (if needed)..."
 
-    local cmd="docker compose $profiles up -d --remove-orphans"
+    local cmd="compose_up_enabled '$profiles'"
 
     if run_command "$cmd" "Starting services"; then
         echo ""
@@ -1104,11 +1165,7 @@ restart_services() {
     echo ""
     info "Restarting services..."
 
-    if [[ "$profiles" == "--profile all" ]]; then
-        docker compose --profile all restart
-    else
-        docker compose $profiles restart
-    fi
+    compose_restart "$profiles" || { error "Restart failed"; return 1; }
 
     success "Services restarted!"
 }
@@ -1271,7 +1328,7 @@ show_log_help() {
     echo -e "${CYAN}Useful Commands:${NC}"
     echo "  • Check status:       docker compose ps"
     echo "  • Stop all:           docker compose --profile all stop"
-    echo "  • Restart service:    docker compose restart sing-box"
+    echo "  • Restart service:    moav restart sing-box"
 }
 
 cmd_profiles() {
@@ -1310,7 +1367,7 @@ cmd_profiles() {
 cmd_start() {
     local profiles=""
     local valid_profiles="proxy wireguard amneziawg dnstunnel trusttunnel xhttp telegram admin conduit snowflake gooserelay monitoring client all setup"
-    local force=false
+    local force=false start_once=false
     local args=()
     for arg in "$@"; do
         case "$arg" in
@@ -1386,7 +1443,8 @@ cmd_start() {
                             info "Skipped: $resolved"
                             continue
                             ;;
-                        start-once|start-and-enable) ;;
+                        start-once) start_once=true ;;
+                        start-and-enable) ;;
                     esac
                 fi
                 profiles+="--profile $resolved "
@@ -1456,21 +1514,10 @@ cmd_start() {
         done
     fi
 
-    # Check port 53 conflicts for DNS tunnels
-    local dnstt_enabled
-    dnstt_enabled=$(get_env_val "ENABLE_DNSTT" "$SCRIPT_DIR/.env" "true")
-    local slipstream_enabled
-    slipstream_enabled=$(get_env_val "ENABLE_SLIPSTREAM" "$SCRIPT_DIR/.env" "true")
-    local xdns_start_enabled
-    xdns_start_enabled=$(get_env_val "ENABLE_XDNS" "$SCRIPT_DIR/.env" "true")
-
-    # Check if any DNS tunnel needs port 53 (all go through dns-router now)
+    # Port 53 conflict check: every routed DNS tunnel goes through dns-router
     local needs_port53=false
-    local masterdns_start_enabled
-    masterdns_start_enabled=$(get_env_val "ENABLE_MASTERDNS" "$SCRIPT_DIR/.env" "true")
     if echo "$profiles" | grep -qE "dnstunnel|all" && \
-       [[ "$dnstt_enabled" == "true" || "$slipstream_enabled" == "true" || \
-          "$masterdns_start_enabled" == "true" || "$xdns_start_enabled" == "true" ]]; then
+       [[ "$(dns_tunnel_enabled "$SCRIPT_DIR/.env")" == "true" ]]; then
         needs_port53=true
     fi
 
@@ -1481,7 +1528,12 @@ cmd_start() {
     fi
 
     info "Starting services..."
-    docker compose $profiles up -d --remove-orphans
+    # --force / "start once" mean start what was asked, flags or not.
+    if $force || $start_once; then
+        docker compose $profiles up -d --remove-orphans
+    else
+        compose_up_enabled "$profiles"
+    fi
     success "Services started!"
     echo ""
     # Show admin URL if admin was started
@@ -1636,6 +1688,63 @@ cmd_stop() {
     fi
 }
 
+# `docker compose restart` keeps a container's old env and image, so an .env
+# edit (EGRESS_ISOLATION, ports, ...) never applied. `up -d` recreates exactly
+# the containers whose config or image changed; the rest are then restarted.
+# Only services that already have a container are touched, as before.
+# Usage: compose_restart "<--profile args>" [service...]  (none = whole profile)
+compose_restart() {
+    local profile_args="$1"; shift
+    local candidates
+    if [[ $# -gt 0 ]]; then
+        candidates="$*"
+    else
+        # shellcheck disable=SC2086
+        candidates=$(docker compose $profile_args config --services 2>/dev/null | tr '\n' ' ')
+    fi
+
+    local -A before=() after=() was_running=()
+    local svc id state
+    while read -r svc id state; do
+        [[ -n "$svc" ]] || continue
+        before[$svc]=$id
+        if [[ "$state" == "running" ]]; then was_running[$svc]=1; fi
+    done < <(docker compose --profile all ps -a --format '{{.Service}} {{.ID}} {{.State}}' 2>/dev/null)
+
+    local targets=()
+    for svc in $candidates; do
+        if [[ -n "${before[$svc]:-}" ]]; then targets+=("$svc"); fi
+    done
+    if [[ ${#targets[@]} -eq 0 ]]; then
+        warn "No containers to restart (bring services up with: moav start)"
+        return 0
+    fi
+
+    # --no-deps: like `restart`, never brings up a dependency that is down.
+    docker compose --profile all up -d --no-deps "${targets[@]}" || return 1
+
+    while read -r svc id; do
+        if [[ -n "$svc" ]]; then after[$svc]=$id; fi
+    done < <(docker compose --profile all ps -a --format '{{.Service}} {{.ID}}' 2>/dev/null)
+
+    local recreated=() bounce=()
+    for svc in "${targets[@]}"; do
+        if [[ "${after[$svc]:-}" != "${before[$svc]}" ]]; then
+            recreated+=("$svc")
+        elif [[ -n "${was_running[$svc]:-}" ]]; then
+            # Unchanged and was already up (a stopped one was just started).
+            bounce+=("$svc")
+        fi
+    done
+    if [[ ${#recreated[@]} -gt 0 ]]; then
+        info "Recreated (config or image changed): ${recreated[*]}"
+    fi
+    if [[ ${#bounce[@]} -gt 0 ]]; then
+        docker compose --profile all restart "${bounce[@]}" || return 1
+    fi
+    return 0
+}
+
 cmd_restart() {
     # restart reuses old images but the state volume is shared: an upgraded
     # install must still get its key/bundle perms repaired here (this path
@@ -1643,7 +1752,7 @@ cmd_restart() {
     ensure_perms_repaired
     if [[ $# -eq 0 ]] || [[ "$1" == "all" ]]; then
         info "Restarting all services..."
-        docker compose --profile all restart
+        compose_restart "--profile all" || return 1
         success "All services restarted!"
     elif [[ $# -eq 1 ]]; then
         # Single argument - only treat as profile if it's an exact profile name
@@ -1659,7 +1768,7 @@ cmd_restart() {
 
         if [[ -n "$profile_match" ]]; then
             info "Restarting $profile_match profile services..."
-            docker compose --profile "$profile_match" restart
+            compose_restart "--profile $profile_match" || return 1
             success "Profile $profile_match restarted!"
         else
             local services
@@ -1669,7 +1778,8 @@ cmd_restart() {
                 return 1
             fi
             info "Restarting: $services"
-            docker compose restart $services
+            # shellcheck disable=SC2086
+            compose_restart "" $services || return 1
             success "Services restarted!"
         fi
     else
@@ -1681,7 +1791,8 @@ cmd_restart() {
             return 1
         fi
         info "Restarting: $services"
-        docker compose restart $services
+        # shellcheck disable=SC2086
+        compose_restart "" $services || return 1
         success "Services restarted!"
     fi
 }

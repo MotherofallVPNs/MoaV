@@ -1,5 +1,5 @@
 # Minimal WireGuard container - uses config directly without auto-generation
-FROM alpine:3.21
+FROM alpine:3.24
 
 RUN apk add --no-cache \
     wireguard-tools \
@@ -11,6 +11,7 @@ RUN apk add --no-cache \
 RUN mkdir -p /etc/wireguard
 
 COPY scripts/wireguard-entrypoint.sh /entrypoint.sh
+COPY scripts/lib/egress-isolation.sh /egress-isolation.sh
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]

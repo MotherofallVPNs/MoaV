@@ -2,7 +2,7 @@
 # MoaV Client - Multi-protocol client for testing and connecting
 # =============================================================================
 # Supports: Reality, Trojan, AnyTLS, Hysteria2, XHTTP, WireGuard (via wstunnel),
-#           AmneziaWG, dnstt, Slipstream, TrustTunnel, Tor/Snowflake
+#           AmneziaWG, dnstt, Slipstream (deprecated), TrustTunnel, Tor/Snowflake
 #
 # Strategy: Download pre-built binaries with proper architecture detection
 # =============================================================================
@@ -10,7 +10,7 @@
 # =============================================================================
 # Builder stage - compile dnstt
 # =============================================================================
-FROM --platform=$BUILDPLATFORM golang:1.22-alpine AS dnstt-builder
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS dnstt-builder
 
 # For cross-compilation
 ARG TARGETARCH
@@ -47,9 +47,26 @@ ARG SLIPSTREAM_VERSION=2026.04.22.1
 RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-RUN ARCH="${TARGETARCH:-amd64}" && \
-    wget -qO /usr/local/bin/slipstream-client \
-    "https://github.com/net2share/slipstream-rust-build/releases/download/v${SLIPSTREAM_VERSION}/slipstream-client-linux-${ARCH}" && \
+# SHA256-verified: pinned digests for the default version, else the release's SHA256SUMS.
+RUN set -eu; \
+    ARCH="${TARGETARCH:-amd64}"; \
+    case "${ARCH}" in amd64|arm64) ;; *) echo "Unsupported TARGETARCH=${ARCH}" >&2; exit 1 ;; esac; \
+    ASSET="slipstream-client-linux-${ARCH}"; \
+    BASE="https://github.com/net2share/slipstream-rust-build/releases/download/v${SLIPSTREAM_VERSION}"; \
+    wget -qO /usr/local/bin/slipstream-client "${BASE}/${ASSET}"; \
+    case "${SLIPSTREAM_VERSION}/${ASSET}" in \
+      2026.04.22.1/slipstream-client-linux-amd64) EXPECTED=45b83b84aed77edbce749fbf7a8ebf13df8a521424e51c51c1358084b46635f4 ;; \
+      2026.04.22.1/slipstream-client-linux-arm64) EXPECTED=a042b907afa54df1e106407ef3f0922b7316e61ec6980b310b52b5631fad8e9b ;; \
+      *) wget -qO /tmp/SHA256SUMS "${BASE}/SHA256SUMS"; \
+         EXPECTED="$(awk -v a="${ASSET}" '$2 == a || $2 == "*" a {print $1; exit}' /tmp/SHA256SUMS)"; \
+         rm -f /tmp/SHA256SUMS ;; \
+    esac; \
+    if [ -z "${EXPECTED}" ]; then echo "No SHA256 for ${ASSET} v${SLIPSTREAM_VERSION}" >&2; exit 1; fi; \
+    ACTUAL="$(sha256sum /usr/local/bin/slipstream-client | cut -d' ' -f1)"; \
+    if [ "${EXPECTED}" != "${ACTUAL}" ]; then \
+      echo "SHA256 mismatch for ${ASSET}: expected ${EXPECTED}, got ${ACTUAL}" >&2; exit 1; \
+    fi; \
+    echo "slipstream-client SHA256 OK (${ACTUAL})"; \
     chmod +x /usr/local/bin/slipstream-client
 
 # Bundle the glibc shared libs the binary needs so it runs on Alpine
@@ -73,16 +90,16 @@ RUN ARCH="${TARGETARCH:-amd64}" && \
 # =============================================================================
 # Final image - download pre-built binaries for correct architecture
 # =============================================================================
-FROM alpine:3.21
+FROM alpine:3.24
 
 # Architecture detection for multi-arch support
 ARG TARGETARCH
 
 # Versions - read from .env via docker-compose build args, with fallback defaults
 ARG SINGBOX_VERSION=1.14.4
-ARG XRAY_VERSION=26.10.21
+ARG XRAY_VERSION=26.11.9
 ARG WSTUNNEL_VERSION=11.1.0
-ARG TRUSTTUNNEL_VERSION=1.1.0
+ARG TRUSTTUNNEL_VERSION=1.3.1
 
 # Install runtime dependencies
 RUN apk add --no-cache \
@@ -98,29 +115,6 @@ RUN apk add --no-cache \
     tor \
     wireguard-tools \
     && rm -rf /var/cache/apk/*
-
-# Real glibc alongside musl. The prebuilt sing-box release (and other prebuilt
-# releases here) are glibc-dynamic — interpreter /lib64/ld-linux-x86-64.so.2,
-# which this Alpine/musl base lacks, so they fail with "cannot execute:
-# required file not found". glibc and musl coexist (each binary uses its own
-# loader), so the alpine-musl tools (amneziawg-tools, etc.) keep working.
-# gcompat's shim is not sufficient for sing-box.
-ARG GLIBC_VERSION=2.35-r1
-# --allow-untrusted: the .apk is pulled straight from the official GitHub
-# release over HTTPS (which authenticates the source); sgerrand's signing key
-# is no longer served at a stable URL, so we skip apk's signature check rather
-# than depend on a 404-prone key fetch.
-# The apk drops the loader at /usr/glibc-compat/lib but does NOT create the
-# /lib64/ld-linux-x86-64.so.2 symlink that glibc binaries name as their ELF
-# interpreter — without it sing-box still fails "cannot execute". Create it
-# ourselves (verified: sing-box runs once this symlink exists).
-RUN wget -q "https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-${GLIBC_VERSION}.apk" && \
-    apk add --no-cache --allow-untrusted "glibc-${GLIBC_VERSION}.apk" && \
-    mkdir -p /lib64 && \
-    ln -sf /usr/glibc-compat/lib/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2 && \
-    ln -sf /usr/glibc-compat/lib/ld-linux-x86-64.so.2 /lib/ld-linux-x86-64.so.2 && \
-    rm -f "glibc-${GLIBC_VERSION}.apk" && \
-    rm -rf /var/cache/apk/*
 
 # Architecture mapping helper script
 # TARGETARCH from buildx: amd64, arm64, arm/v7, etc.
@@ -141,12 +135,13 @@ RUN echo '#!/bin/sh' > /tmp/get-arch.sh && \
 # Determine architecture once
 RUN ARCH=$(/tmp/get-arch.sh) && echo "Building for architecture: $ARCH" && echo "$ARCH" > /tmp/arch
 
-# sing-box: download pre-built binary
+# sing-box: download pre-built binary. The -musl asset runs natively on Alpine;
+# the plain linux-<arch> asset is glibc-dynamic and would need a glibc shim.
 RUN ARCH=$(cat /tmp/arch) && \
     echo "Downloading sing-box for ${ARCH}..." && \
-    wget -qO- "https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-${ARCH}.tar.gz" | \
+    wget -qO- "https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-${ARCH}-musl.tar.gz" | \
     tar xz -C /tmp && \
-    mv /tmp/sing-box-${SINGBOX_VERSION}-linux-${ARCH}/sing-box /usr/local/bin/ && \
+    mv /tmp/sing-box-${SINGBOX_VERSION}-linux-${ARCH}-musl/sing-box /usr/local/bin/ && \
     chmod +x /usr/local/bin/sing-box && \
     rm -rf /tmp/sing-box-* && \
     echo "sing-box ${SINGBOX_VERSION} installed (${ARCH})"
@@ -200,7 +195,7 @@ RUN chmod +x /usr/local/bin/slipstream-client /usr/local/bin/slipstream-client-b
 
 # trusttunnel-client: download CLI client from TrustTunnelClient repo
 # TrustTunnelClient uses: linux-x86_64, linux-aarch64
-ARG TRUSTTUNNEL_CLIENT_VERSION=1.0.49
+ARG TRUSTTUNNEL_CLIENT_VERSION=1.3.0
 RUN ARCH=$(cat /tmp/arch) && \
     case "$ARCH" in \
         amd64) TT_ARCH="x86_64" ;; \
@@ -213,11 +208,14 @@ RUN ARCH=$(cat /tmp/arch) && \
     tar xzf /tmp/tt.tar.gz -C /tmp --strip-components=1 && \
     mv /tmp/trusttunnel_client /usr/local/bin/ && \
     chmod +x /usr/local/bin/trusttunnel_client && \
-    rm -rf /tmp/tt.tar.gz /tmp/*.md /tmp/LICENSE && \
+    /usr/local/bin/trusttunnel_client --version && \
+    rm -rf /tmp/tt.tar.gz /tmp/*.md /tmp/LICENSE /tmp/*.sig && \
     echo "trusttunnel_client v${TRUSTTUNNEL_CLIENT_VERSION} installed (${TT_ARCH})" || \
     echo "trusttunnel_client: download failed (optional)"
 
 # amneziawg: download awg-tools for AmneziaWG client support
+# Upstream ships this prebuilt awg for x86_64 only, so AmneziaWG cannot run here on
+# arm64 (known limitation, see CHANGELOG 2.5.0); revisit when an arm64 build exists.
 ARG AWGTOOLS_VERSION=3.1.20260812
 RUN cd /tmp && \
     echo "Downloading awg-tools v${AWGTOOLS_VERSION}..." && \
@@ -244,9 +242,9 @@ RUN chmod +x /app/*.sh
 # SOCKS5: 1080, HTTP: 8080
 EXPOSE 1080 8080
 
-# Health check
+# Health check (-4: see the curl note in tests/client-test.sh)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-    CMD curl -sf --socks5 127.0.0.1:1080 https://www.google.com/generate_204 || exit 1
+    CMD curl -sf -4 --socks5 127.0.0.1:1080 https://www.google.com/generate_204 || exit 1
 
 WORKDIR /app
 ENTRYPOINT ["/app/client-entrypoint.sh"]

@@ -191,7 +191,7 @@ if [[ -d "$STATE_DIR/users/$USERNAME" ]]; then
 fi
 
 # Also try docker volume path
-if docker run --rm -v moav_moav_state:/state alpine sh -c "[ -d /state/users/$USERNAME ] && rm -rf /state/users/$USERNAME" 2>/dev/null; then
+if docker run --rm -v moav_moav_state:/state alpine:3.24 sh -c "[ -d /state/users/$USERNAME ] && rm -rf /state/users/$USERNAME" 2>/dev/null; then
     CLEANED_FILES=true
 fi
 

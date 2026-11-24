@@ -15,6 +15,8 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # Test configuration
+# curl -4: curl 8.23 (Alpine 3.24) hands the SOCKS proxy an IPv6 literal when
+# --socks5 resolves locally; servers without IPv6 egress then fail every probe.
 TEST_URL="${TEST_URL:-https://www.google.com/generate_204}"
 TEST_TIMEOUT="${TEST_TIMEOUT:-10}"
 TEMP_DIR="/tmp/moav-test-$$"
@@ -256,11 +258,11 @@ EOF
 
     # Test connection
     log_debug "Testing connectivity via SOCKS5 on port 10800..."
-    if curl -sf --socks5 127.0.0.1:10800 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10800 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         # Verify we can access the internet and get exit IP
         local exit_ip=""
-        exit_ip=$(curl -sf --socks5 127.0.0.1:10800 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --socks5 127.0.0.1:10800 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+        exit_ip=$(curl -sf -4 --socks5 127.0.0.1:10800 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf -4 --socks5 127.0.0.1:10800 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
         if [[ -n "$exit_ip" ]]; then
             log_success "Reality connection successful (exit IP: $exit_ip)"
             RESULTS[reality]="pass"
@@ -424,11 +426,11 @@ EOF
     log_debug "sing-box started successfully (PID: $pid)"
     log_debug "Testing connectivity via SOCKS5 on port 10801..."
 
-    if curl -sf --socks5 127.0.0.1:10801 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10801 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         # Verify we can access the internet and get exit IP
         local exit_ip=""
-        exit_ip=$(curl -sf --socks5 127.0.0.1:10801 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --socks5 127.0.0.1:10801 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+        exit_ip=$(curl -sf -4 --socks5 127.0.0.1:10801 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf -4 --socks5 127.0.0.1:10801 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
         if [[ -n "$exit_ip" ]]; then
             log_success "Trojan connection successful (exit IP: $exit_ip)"
             RESULTS[trojan]="pass"
@@ -539,10 +541,10 @@ EOF
         log_error "$detail"; RESULTS[shadowsocks]="fail"; DETAILS[shadowsocks]="$detail"; return
     fi
 
-    if curl -sf --socks5 127.0.0.1:10807 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10807 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         local exit_ip=""
-        exit_ip=$(curl -sf --socks5 127.0.0.1:10807 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --socks5 127.0.0.1:10807 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+        exit_ip=$(curl -sf -4 --socks5 127.0.0.1:10807 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf -4 --socks5 127.0.0.1:10807 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
         if [[ -n "$exit_ip" ]]; then
             log_success "Shadowsocks-2022 connection successful (exit IP: $exit_ip)"
             RESULTS[shadowsocks]="pass"; DETAILS[shadowsocks]="Connected via Shadowsocks-2022, exit IP: $exit_ip"
@@ -607,9 +609,9 @@ test_xdns() {
 
     # XDNS is high-latency; give it a longer ceiling than the default timeout.
     local xdns_timeout=$(( TEST_TIMEOUT > 20 ? TEST_TIMEOUT : 20 ))
-    if curl -sf --socks5 127.0.0.1:7891 --max-time "$xdns_timeout" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:7891 --max-time "$xdns_timeout" "$TEST_URL" >/dev/null 2>&1; then
         local exit_ip=""
-        exit_ip=$(curl -sf --socks5 127.0.0.1:7891 --max-time "$xdns_timeout" https://api.ipify.org 2>/dev/null || true)
+        exit_ip=$(curl -sf -4 --socks5 127.0.0.1:7891 --max-time "$xdns_timeout" https://api.ipify.org 2>/dev/null || true)
         if [[ -n "$exit_ip" ]]; then
             log_success "XDNS connection successful (exit IP: $exit_ip)"
             RESULTS[xdns]="pass"; DETAILS[xdns]="Connected via XDNS, exit IP: $exit_ip"
@@ -758,11 +760,11 @@ EOF
     log_debug "sing-box started successfully (PID: $pid)"
     log_debug "Testing connectivity via SOCKS5 on port 10805..."
 
-    if curl -sf --socks5 127.0.0.1:10805 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10805 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         # Verify we can access the internet and get exit IP
         local exit_ip=""
-        exit_ip=$(curl -sf --socks5 127.0.0.1:10805 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --socks5 127.0.0.1:10805 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+        exit_ip=$(curl -sf -4 --socks5 127.0.0.1:10805 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf -4 --socks5 127.0.0.1:10805 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
         if [[ -n "$exit_ip" ]]; then
             log_success "AnyTLS connection successful (exit IP: $exit_ip)"
             RESULTS[anytls]="pass"
@@ -948,11 +950,11 @@ EOF
     log_debug "sing-box started successfully (PID: $pid)"
     log_debug "Testing connectivity via SOCKS5 on port 10802..."
 
-    if curl -sf --socks5 127.0.0.1:10802 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10802 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         # Verify we can access the internet and get exit IP
         local exit_ip=""
-        exit_ip=$(curl -sf --socks5 127.0.0.1:10802 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --socks5 127.0.0.1:10802 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+        exit_ip=$(curl -sf -4 --socks5 127.0.0.1:10802 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf -4 --socks5 127.0.0.1:10802 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
         if [[ -n "$exit_ip" ]]; then
             log_success "Hysteria2 connection successful (exit IP: $exit_ip)"
             RESULTS[hysteria2]="pass"
@@ -1445,13 +1447,13 @@ test_dnstt() {
     local test_success=false
 
     # Test 1: Basic connectivity through the tunnel
-    if curl -sf --socks5 127.0.0.1:10803 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10803 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         log_debug "Basic connectivity test passed"
         test_success=true
     else
         log_debug "Basic connectivity test failed, trying extended timeout..."
         # DNS tunneling is slow, try with longer timeout
-        if curl -sf --socks5 127.0.0.1:10803 --max-time 30 "$TEST_URL" >/dev/null 2>&1; then
+        if curl -sf -4 --socks5 127.0.0.1:10803 --max-time 30 "$TEST_URL" >/dev/null 2>&1; then
             log_debug "Extended timeout test passed"
             test_success=true
         fi
@@ -1460,8 +1462,8 @@ test_dnstt() {
     if [[ "$test_success" == "true" ]]; then
         # Test 2: Verify public IP (optional but recommended)
         local tunnel_ip=""
-        tunnel_ip=$(curl -sf --socks5 127.0.0.1:10803 --max-time 30 https://api.ipify.org 2>/dev/null || true)
-        [[ -z "$tunnel_ip" ]] && tunnel_ip=$(curl -sf --socks5 127.0.0.1:10803 --max-time 30 https://ifconfig.me 2>/dev/null || true)
+        tunnel_ip=$(curl -sf -4 --socks5 127.0.0.1:10803 --max-time 30 https://api.ipify.org 2>/dev/null || true)
+        [[ -z "$tunnel_ip" ]] && tunnel_ip=$(curl -sf -4 --socks5 127.0.0.1:10803 --max-time 30 https://ifconfig.me 2>/dev/null || true)
 
         if [[ -n "$tunnel_ip" ]]; then
             log_success "dnstt tunnel working, exit IP: $tunnel_ip"
@@ -1575,12 +1577,12 @@ test_slipstream() {
     local test_success=false
 
     # Test connectivity through the tunnel
-    if curl -sf --socks5 127.0.0.1:10804 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10804 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         log_debug "Basic connectivity test passed"
         test_success=true
     else
         log_debug "Basic connectivity test failed, trying extended timeout..."
-        if curl -sf --socks5 127.0.0.1:10804 --max-time 30 "$TEST_URL" >/dev/null 2>&1; then
+        if curl -sf -4 --socks5 127.0.0.1:10804 --max-time 30 "$TEST_URL" >/dev/null 2>&1; then
             log_debug "Extended timeout test passed"
             test_success=true
         fi
@@ -1588,8 +1590,8 @@ test_slipstream() {
 
     if [[ "$test_success" == "true" ]]; then
         local tunnel_ip=""
-        tunnel_ip=$(curl -sf --socks5 127.0.0.1:10804 --max-time 30 https://api.ipify.org 2>/dev/null || true)
-        [[ -z "$tunnel_ip" ]] && tunnel_ip=$(curl -sf --socks5 127.0.0.1:10804 --max-time 30 https://ifconfig.me 2>/dev/null || true)
+        tunnel_ip=$(curl -sf -4 --socks5 127.0.0.1:10804 --max-time 30 https://api.ipify.org 2>/dev/null || true)
+        [[ -z "$tunnel_ip" ]] && tunnel_ip=$(curl -sf -4 --socks5 127.0.0.1:10804 --max-time 30 https://ifconfig.me 2>/dev/null || true)
 
         if [[ -n "$tunnel_ip" ]]; then
             log_success "Slipstream tunnel working, exit IP: $tunnel_ip"
@@ -1614,6 +1616,60 @@ test_slipstream() {
 
     kill $pid 2>/dev/null || true
     wait $pid 2>/dev/null || true
+}
+
+# Run trusttunnel_client on ONE transport and fetch through the tunnel. Sets
+# TT_PASS_RESULT (ok|notun|fail), TT_PASS_DETAIL, TT_PASS_EXIT_IP, TT_PASS_ISOLATED.
+trusttunnel_transport_pass() {
+    local proto="$1" base_config="$2" server_ip="$3" port="$4"
+    local config="$TEMP_DIR/trusttunnel-$proto.toml" log="$TEMP_DIR/trusttunnel-$proto.log"
+    TT_PASS_RESULT="fail"; TT_PASS_DETAIL=""; TT_PASS_EXIT_IP=""; TT_PASS_ISOLATED=false
+
+    sed -e "s|^upstream_protocol[[:space:]]*=.*|upstream_protocol = \"$proto\"|" \
+        -e 's|^upstream_fallback_protocol[[:space:]]*=.*|upstream_fallback_protocol = ""|' \
+        "$base_config" > "$config"
+
+    # The client falls back to the other transport on its own even with no
+    # fallback configured, so an "http3" pass could succeed over TCP. Block it.
+    local rule=()
+    case "$proto" in
+        http2) rule=(OUTPUT -d "$server_ip" -p udp --dport "$port" -j DROP) ;;
+        http3) rule=(OUTPUT -d "$server_ip" -p tcp --dport "$port" -j REJECT) ;;
+    esac
+    if iptables -I "${rule[@]}" 2>/dev/null; then TT_PASS_ISOLATED=true; fi
+
+    # TrustTunnel client creates TUN interface (full VPN)
+    trusttunnel_client --config "$config" >"$log" 2>&1 &
+    local pid=$!
+    sleep 8
+
+    if ! kill -0 "$pid" 2>/dev/null; then
+        # Match the client's TUN error exactly. A bare "tun" matched its own name
+        # on every log line, so ANY early exit (bad auth too) read as "no TUN".
+        if grep -q "Failed to initialize tunnel\|TUNSETIFF failed" "$log" 2>/dev/null; then
+            TT_PASS_RESULT="notun"
+        else
+            local reason
+            reason=$(grep -E 'ERROR|fatal|Failed to ping' "$log" 2>/dev/null | tail -2 | sed -E 's/^[0-9.: ]+//' | tr '\n"' '  ' || true)
+            TT_PASS_DETAIL="client exited before connecting${reason:+: $reason}"
+        fi
+    elif curl -sf --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1 && kill -0 "$pid" 2>/dev/null; then
+        # Must still be running: a dead client drops its routes and the fetch goes direct.
+        TT_PASS_RESULT="ok"
+        TT_PASS_EXIT_IP=$(curl -sf --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                          curl -sf --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+    else
+        TT_PASS_DETAIL="no traffic through the tunnel"
+        local error_msg
+        error_msg=$(grep -i "error\|fail\|unreachable\|timeout\|refused" "$log" 2>/dev/null | tail -3 | tr '\n"' '  ' || true)
+        [[ -n "$error_msg" ]] && TT_PASS_DETAIL="$error_msg"
+    fi
+
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    if [[ "$TT_PASS_ISOLATED" == "true" ]]; then iptables -D "${rule[@]}" 2>/dev/null || true; fi
+    rm -f "$config"
+    return 0
 }
 
 # Test TrustTunnel
@@ -1735,7 +1791,6 @@ test_trusttunnel() {
     fi
 
     # Full test with trusttunnel_client
-    local error_log="$TEMP_DIR/trusttunnel-error.log"
     local test_config="$TEMP_DIR/trusttunnel-test.toml"
 
     # Use TOML config if available, otherwise generate one
@@ -1766,73 +1821,60 @@ mtu_size = 1280
 EOF
     fi
 
-    log_debug "Starting trusttunnel_client with config..."
-    # TrustTunnel client creates TUN interface (full VPN)
-    trusttunnel_client --config "$test_config" >"$error_log" 2>&1 &
-    local pid=$!
-    sleep 8
-
-    if ! kill -0 $pid 2>/dev/null; then
-        # Check if it's a TUN/listener creation failure
-        if grep -qi "Failed to create listener\|tun\|permission" "$error_log" 2>/dev/null; then
-            log_debug "TUN interface creation failed, falling back to endpoint reachability test..."
-            rm -f "$test_config"
-
-            # Fall back to endpoint reachability test
-            if nc -z -w 3 "$server_ip" "$port" 2>/dev/null || curl -sf --max-time 3 "https://${host}:${port}" -o /dev/null 2>/dev/null; then
-                log_success "TrustTunnel config valid, endpoint reachable: ${host}:${port}"
-                RESULTS[trusttunnel]="pass"
-                DETAILS[trusttunnel]="Config valid, endpoint ${server_ip}:${port} reachable (TUN unavailable for full VPN test)"
-            else
-                log_warn "TrustTunnel config valid, endpoint may not be reachable: ${host}:${port}"
-                RESULTS[trusttunnel]="warn"
-                DETAILS[trusttunnel]="Config valid, endpoint ${server_ip}:${port} not reachable (may be blocked)"
-            fi
-            return
-        fi
-
-        detail="trusttunnel_client failed to start"
-        if [[ -s "$error_log" ]]; then
-            local error_msg=$(tail -5 "$error_log" 2>/dev/null | tr '\n' ' ' || true)
-            detail="TrustTunnel error: $error_msg"
-        fi
-        log_error "$detail"
-        RESULTS[trusttunnel]="fail"
-        DETAILS[trusttunnel]="$detail"
-        rm -f "$test_config"
-        return
-    fi
-
-    log_debug "trusttunnel_client running (PID $pid), testing connectivity..."
-
-    # Test connectivity directly (traffic goes through TUN interface)
-    if curl -sf --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
-        local exit_ip=""
-        exit_ip=$(curl -sf --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
-        if [[ -n "$exit_ip" ]]; then
-            log_success "TrustTunnel VPN connection successful (exit IP: $exit_ip)"
-            RESULTS[trusttunnel]="pass"
-            DETAILS[trusttunnel]="Connected via TrustTunnel VPN, exit IP: $exit_ip"
-        else
-            log_success "TrustTunnel VPN connection successful"
-            RESULTS[trusttunnel]="pass"
-            DETAILS[trusttunnel]="Connected via TrustTunnel VPN"
-        fi
-    else
-        detail="VPN connection test failed"
-        if [[ -s "$error_log" ]]; then
-            local error_msg=$(grep -i "error\|fail\|unreachable\|timeout\|refused" "$error_log" 2>/dev/null | tail -3 | tr '\n' ' ' || true)
-            [[ -n "$error_msg" ]] && detail="$error_msg"
-        fi
-        log_error "$detail"
-        RESULTS[trusttunnel]="fail"
-        DETAILS[trusttunnel]="$detail"
-    fi
-
-    kill $pid 2>/dev/null || true
-    wait $pid 2>/dev/null || true
+    # One pass per transport. The bundle prefers HTTP/2 and falls back to HTTP/3,
+    # so a single run only ever proved whichever transport came up first.
+    local proto label passed="" failed="" exit_ip="" isolated=true
+    for proto in http2 http3; do
+        label="HTTP/2"; [[ "$proto" == "http3" ]] && label="HTTP/3"
+        log_debug "Starting trusttunnel_client over $label..."
+        trusttunnel_transport_pass "$proto" "$test_config" "$server_ip" "$port"
+        [[ "$TT_PASS_ISOLATED" == "true" ]] || isolated=false
+        case "$TT_PASS_RESULT" in
+            ok)
+                passed="${passed:+$passed and }$label"
+                [[ -n "$TT_PASS_EXIT_IP" ]] && exit_ip="$TT_PASS_EXIT_IP"
+                ;;
+            notun)
+                # TUN worked for the previous transport, so this is a real failure.
+                if [[ -n "$passed" ]]; then
+                    failed="${failed:+$failed; }$label: client could not create its TUN listener"
+                    continue
+                fi
+                log_debug "TUN interface creation failed, falling back to endpoint reachability test..."
+                rm -f "$test_config"
+                if nc -z -w 3 "$server_ip" "$port" 2>/dev/null || curl -sf --max-time 3 "https://${host}:${port}" -o /dev/null 2>/dev/null; then
+                    log_success "TrustTunnel config valid, endpoint reachable: ${host}:${port}"
+                    RESULTS[trusttunnel]="pass"
+                    DETAILS[trusttunnel]="Config valid, endpoint ${server_ip}:${port} reachable (TUN unavailable for full VPN test)"
+                else
+                    log_warn "TrustTunnel config valid, endpoint may not be reachable: ${host}:${port}"
+                    RESULTS[trusttunnel]="warn"
+                    DETAILS[trusttunnel]="Config valid, endpoint ${server_ip}:${port} not reachable (may be blocked)"
+                fi
+                return
+                ;;
+            *)
+                failed="${failed:+$failed; }$label: $TT_PASS_DETAIL"
+                ;;
+        esac
+    done
     rm -f "$test_config"
+
+    # Without the firewall the client may have switched transport: say so.
+    local note=""
+    [[ "$isolated" == "true" ]] || note=" (transports not isolated: iptables unavailable)"
+
+    if [[ -z "$failed" ]]; then
+        detail="Connected via TrustTunnel VPN over $passed${exit_ip:+, exit IP: $exit_ip}$note"
+        log_success "$detail"
+        RESULTS[trusttunnel]="pass"
+        DETAILS[trusttunnel]="$detail"
+    else
+        detail="${passed:+$passed ok; }$failed$note"
+        log_error "TrustTunnel: $detail"
+        RESULTS[trusttunnel]="fail"
+        DETAILS[trusttunnel]="$detail"
+    fi
 }
 
 # Test XHTTP (VLESS+XHTTP+Reality via Xray-core)
@@ -1960,10 +2002,10 @@ EOF
 
     # Test connection via SOCKS5
     log_debug "Testing connectivity via SOCKS5 on port 10806..."
-    if curl -sf --socks5 127.0.0.1:10806 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10806 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         local exit_ip=""
-        exit_ip=$(curl -sf --socks5 127.0.0.1:10806 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
-                  curl -sf --socks5 127.0.0.1:10806 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
+        exit_ip=$(curl -sf -4 --socks5 127.0.0.1:10806 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || \
+                  curl -sf -4 --socks5 127.0.0.1:10806 --max-time "$TEST_TIMEOUT" https://ifconfig.me 2>/dev/null || true)
         if [[ -n "$exit_ip" ]]; then
             log_success "XHTTP connection successful (exit IP: $exit_ip)"
             RESULTS[xhttp]="pass"
@@ -2144,9 +2186,9 @@ EOF
         log_error "$detail"; RESULTS[cdn]="fail"; DETAILS[cdn]="$detail"; return
     fi
 
-    if curl -sf --socks5 127.0.0.1:10808 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
+    if curl -sf -4 --socks5 127.0.0.1:10808 --max-time "$TEST_TIMEOUT" "$TEST_URL" >/dev/null 2>&1; then
         local exit_ip=""
-        exit_ip=$(curl -sf --socks5 127.0.0.1:10808 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || true)
+        exit_ip=$(curl -sf -4 --socks5 127.0.0.1:10808 --max-time "$TEST_TIMEOUT" https://api.ipify.org 2>/dev/null || true)
         log_success "CDN connection successful${exit_ip:+ (exit IP: $exit_ip)}"
         RESULTS[cdn]="pass"; DETAILS[cdn]="Connected via CDN${exit_ip:+, exit IP: $exit_ip}"
     else
@@ -2229,25 +2271,51 @@ test_wstunnel() {
 }
 
 # Test MasterDNS. No standalone MasterDNS client ships in this harness (it's a
-# MahsaNG v16 component), so this validates the bundle rather than tunnelling.
-# Honest skip with what to check manually.
+# MahsaNG v16 component), so this validates the bundled client config and that
+# the tunnel domain is delegated through public DNS. It carries no traffic.
 test_masterdns() {
     log_info "Testing MasterDNS..."
-    local f="$CONFIG_DIR/masterdns-instructions.txt"
+    local f="$CONFIG_DIR/masterdns-client_config.toml"
     if [[ ! -f "$f" ]]; then
         log_warn "No MasterDNS config in bundle"
         RESULTS[masterdns]="skip"; DETAILS[masterdns]="No MasterDNS config in bundle"; return
     fi
-    local detail="Bundle present; no standalone MasterDNS client in this harness — verify with a MahsaNG v16 client and check the 'm' subdomain NS delegation (moav doctor dns)"
-    log_warn "  $detail"
-    RESULTS[masterdns]="skip"; DETAILS[masterdns]="$detail"
+    local domain key method
+    domain=$(sed -nE 's/^DOMAINS[[:space:]]*=[[:space:]]*\["([^"]+)".*/\1/p' "$f" | head -1)
+    key=$(sed -nE 's/^ENCRYPTION_KEY[[:space:]]*=[[:space:]]*"([^"]*)".*/\1/p' "$f" | head -1)
+    method=$(sed -nE 's/^DATA_ENCRYPTION_METHOD[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$f" | head -1)
+    local problems=""
+    [[ -n "$domain" && "$domain" == *.* ]] || problems+="DOMAINS missing; "
+    [[ -n "$key" && "$key" != "KEY_NOT_GENERATED" ]] || problems+="ENCRYPTION_KEY not generated; "
+    [[ -n "$method" ]] || problems+="DATA_ENCRYPTION_METHOD missing; "
+    if [[ -n "$problems" ]]; then
+        log_error "  MasterDNS config invalid: $problems"
+        RESULTS[masterdns]="fail"; DETAILS[masterdns]="Bundle config invalid: ${problems%; }"; return
+    fi
+
+    # The tunnel needs the domain delegated to this server. Arbitrary names under
+    # it SERVFAIL through public resolvers (masterdns only answers its own
+    # protocol), so check the NS delegation instead.
+    local ns=""
+    if command -v dig >/dev/null 2>&1; then
+        ns=$(dig +short +tries=2 +time=5 @1.1.1.1 "$domain" NS 2>/dev/null | head -1)
+    fi
+    if [[ -n "$ns" ]]; then
+        local detail="Config valid; $domain is delegated (NS ${ns%.}) via public DNS. Tunnel itself needs a MahsaNG v16 client"
+        log_success "  $detail"
+        RESULTS[masterdns]="pass"; DETAILS[masterdns]="$detail"
+    else
+        local detail="Config valid for $domain, but public DNS has no NS delegation for it (or dig/resolver unavailable). Check: moav doctor dns"
+        log_warn "  $detail"
+        RESULTS[masterdns]="warn"; DETAILS[masterdns]="$detail"
+    fi
 }
 
 # Test GooseRelay. The exit server is only reachable via a Google Apps Script the
 # user deploys, so it can't be exercised from the harness. Honest skip.
 test_gooserelay() {
     log_info "Testing GooseRelay..."
-    local f="$CONFIG_DIR/gooserelay-instructions.txt"
+    local f="$CONFIG_DIR/gooserelay-client_config.json"
     if [[ ! -f "$f" ]]; then
         log_warn "No GooseRelay config in bundle (off by default)"
         RESULTS[gooserelay]="skip"; DETAILS[gooserelay]="No GooseRelay config in bundle"; return

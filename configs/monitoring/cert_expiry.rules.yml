@@ -1,0 +1,66 @@
+# TLS certificate expiry / renewal alerts. Source: moav_cert_* gauges written to
+# configs/monitoring/textfile/moav_cert.prom by scripts/cert-renew.sh (daily
+# timer) and by `moav start`, served through node-exporter's textfile collector.
+#
+# Let's Encrypt certs last 90 days and certbot renews at 30 days left, so a cert
+# under 14 days means renewal has been failing for over two weeks. Visible on
+# Prometheus /alerts and in Grafana; wire an Alertmanager to be paged.
+groups:
+  - name: moav_cert
+    rules:
+      - alert: MoaVCertExpiringSoon
+        expr: (moav_cert_expiry_seconds - time()) / 86400 < 14
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "TLS certificate expires in {{ $value | printf \"%.1f\" }} days"
+          description: "Renewal is overdue (certbot renews at 30 days). Run: moav cert renew, then moav doctor cert."
+
+      - alert: MoaVCertExpiringCritical
+        expr: (moav_cert_expiry_seconds - time()) / 86400 < 5
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "TLS certificate expires in {{ $value | printf \"%.1f\" }} days"
+          description: "All TLS protocols (Trojan, Hysteria2, AnyTLS, CDN, admin) break at expiry. Run: moav cert renew."
+
+      - alert: MoaVCertRenewFailed
+        expr: moav_cert_renew_failed == 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The last certbot renew attempt failed"
+          description: "Inspect: journalctl -u moav-cert-renew, docker compose logs certbot, moav doctor cert."
+
+      # The daily writer has not run for two days: timer missing/disabled, or
+      # the install moved and the unit points at a dead path.
+      - alert: MoaVCertMetricStale
+        expr: moav_cert_managed == 1 and on() (time() - moav_cert_check_timestamp_seconds) > 172800
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cert renewal job has not run for over 48h"
+          description: "Run: moav doctor cert, then moav cert install (or moav start) to reinstall the daily timer."
+
+      # Nothing ever wrote the metric: textfile dir not mounted, file deleted,
+      # or monitoring started outside `moav start`.
+      - alert: MoaVCertMetricMissing
+        expr: absent(moav_cert_managed)
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "moav_cert_* metrics are absent"
+          description: "The cert-expiry writer never ran. Run: moav start (rewrites the metric), then moav doctor cert."
+
+      - alert: MoaVCertExpiryUnreadable
+        expr: moav_cert_managed == 1 unless on() moav_cert_expiry_seconds
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cert expiry could not be read on the last check"
+          description: "DOMAIN is set but the live fullchain.pem was unreadable. Inspect: moav cert status, moav logs certbot."

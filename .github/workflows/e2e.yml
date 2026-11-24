@@ -71,7 +71,7 @@ jobs:
       E2E_TIER: ${{ inputs.tier }}
       E2E_DOMAINLESS_ONLY: ${{ inputs.domainless_only }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Preflight
         run: |
@@ -97,6 +97,11 @@ jobs:
               || { echo "::error::$t is required by the e2e suite and could not be installed"; exit 1; }
           done
           echo "suite tooling: zip=$(command -v zip) unzip=$(command -v unzip) qrencode=$(command -v qrencode)"
+          # setfacl grants the runner access to configs/{wireguard,amneziawg} without
+          # taking ownership away from root (tests/e2e-runner-access.sh).
+          command -v setfacl >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get install -y -qq acl; }
+          command -v setfacl >/dev/null 2>&1 \
+            || { echo "::error::setfacl (package acl) is required by the e2e suite and could not be installed"; exit 1; }
           # WG/AWG live-tunnel tests need TUN passed into the test container.
           # Without it they silently degrade to config checks (that is exactly
           # how WireGuard "passed" on a DNS resolve for months) — so hard-fail.
@@ -210,56 +215,18 @@ jobs:
 
       - name: Assert every long-lived service is actually RUNNING
         run: |
-          # `docker compose ps` previously appeared ONLY in the failure-diagnostics
-          # step, so nothing checked container health on a green path: a service
-          # that crash-looped at startup went unnoticed, because the protocol
-          # tests can still pass (and WG/AWG warn without a kernel module either
-          # way). This matters most for the entrypoints — a bad `set -euo
-          # pipefail` change kills a container instantly and silently.
-          echo "::group::container states"
-          docker ps -a --filter 'name=^moav-' --format '{{.Names}}\t{{.State}}\t{{.Status}}'
-          echo "::endgroup::"
-          # The one-shot set is DERIVED from docker-compose.yml, not listed here.
-          # A hand-kept list drifts: geoip-updater was added later and this step
-          # then failed the whole e2e because a job that correctly exits 0 was
-          # read as a dead service. Absence of a restart policy is what makes a
-          # service one-shot, so ask the compose file.
-          python3 -c 'import yaml; d=yaml.safe_load(open("docker-compose.yml"))["services"]; print("\n".join("moav-"+n for n,v in sorted(d.items()) if v.get("restart") is None))' > /tmp/oneshot.txt
-          echo "::group::one-shot services (exiting is correct)"; cat /tmp/oneshot.txt; echo "::endgroup::"
-
-          bad=0
-          while IFS=$'\t' read -r name state status exitcode; do
-            [ -n "$name" ] || continue
-            if grep -qxF "$name" /tmp/oneshot.txt; then
-              # Exiting is correct, but exiting NON-ZERO never is.
-              if [ "$state" != "running" ] && [ "${exitcode:-0}" != "0" ]; then
-                echo "::error::$name is a one-shot job that failed (exit $exitcode: $status)"; bad=1
-              fi
-              continue
-            fi
-            case "$state" in
-              running) ;;
-              restarting) echo "::error::$name is RESTARTING ($status) — crash loop"; bad=1 ;;
-              *)          echo "::error::$name is $state ($status) — expected running"; bad=1 ;;
-            esac
-          done < <(docker ps -a --filter 'name=^moav-' --format '{{.Names}}\t{{.State}}\t{{.Status}}\t{{.ExitCode}}')
-          if [ "$bad" -ne 0 ]; then
-            echo "--- logs from the failed container(s) ---"
-            docker ps -a --filter 'name=^moav-' --format '{{.Names}}\t{{.State}}\t{{.ExitCode}}' \
-              | awk -F'\t' '$2!="running" && $3!="0"{print $1}' \
-              | while read -r c; do echo "::group::$c"; docker logs --tail 30 "$c" 2>&1; echo "::endgroup::"; done
-            exit 1
-          fi
-          echo "All long-lived moav-* containers are running."
+          # Without this, a service that crash-looped at startup went unnoticed: the
+          # protocol tests can still pass. Also records restart counts for the re-check.
+          bash tests/e2e-assert-running.sh "$RUNNER_TEMP/e2e-restart-baseline.tsv"
 
       - name: Reclaim config/state ownership for the host CLI
         run: |
           # build/bootstrap/start containers run as root and write configs/,
           # state/, outputs/ root-owned. The host-side CLI (moav user add/test)
           # runs as the non-root runner user, which then can't read them
-          # ("Skipping sing-box (not configured)"). Reclaim ownership so the CLI
-          # works — the same access a root operator gets for free.
-          sudo chown -R "$(id -u):$(id -g)" configs state outputs 2>/dev/null || true
+          # ("Skipping sing-box (not configured)"). Grant the CLI the access a root
+          # operator has, but keep configs/{wireguard,amneziawg} owned by root.
+          bash tests/e2e-runner-access.sh
 
       - name: Provision test user (exercises `moav user add` + `revoke`)
         run: |
@@ -306,10 +273,10 @@ jobs:
           # still resolves in the proxy configs BEFORE connectivity runs, so a
           # re-orphaning regression fails loudly here and the connectivity test
           # below validates the reconciled config end-to-end.
-          docker run --rm -v moav_moav_state:/state alpine rm -f /state/.bootstrapped
+          docker run --rm -v moav_moav_state:/state alpine:3.24 rm -f /state/.bootstrapped
           docker compose --profile setup run --rm bootstrap
           docker compose restart sing-box xray >/dev/null 2>&1 || true
-          sudo chown -R "$USER" configs state outputs 2>/dev/null || true
+          bash tests/e2e-runner-access.sh
           bash tests/assert-users-reconciled.sh
           sleep 10
 
@@ -357,9 +324,41 @@ jobs:
           # The sprint's worst bug lived exactly here (every user FAILED when
           # ENABLE_REALITY=false) and the command itself had never been run by
           # any test — only bootstrap's internal reconcile was exercised.
+          #
+          # #365: it also rotated the AWG server key + obfuscation params on every
+          # run, cutting off every existing AmneziaWG client. Snapshot both sides.
+          AWG=no; grep -qE '^ENABLE_AMNEZIAWG=true' .env && AWG=yes
+          awg_srv() { sudo grep -E '^(PrivateKey|Jc|Jmin|Jmax|S[1-4]|H[1-4]|I[1-5]) =' configs/amneziawg/awg0.conf | sha256sum; }
+          awg_cli_file() { compgen -G 'outputs/bundles/e2e-test/moav-*awg.conf' | head -1; }
+          awg_cli() { grep -E '^(PrivateKey|PublicKey|Jc|Jmin|Jmax|S[1-4]|H[1-4]|I[1-5]) =' "$(awg_cli_file)" | sha256sum; }
+          if [ "$AWG" = yes ]; then
+            [ -n "$(awg_cli_file)" ] || { echo "::error::e2e-test has no AmneziaWG config to compare"; exit 1; }
+            srv_before=$(awg_srv); cli_before=$(awg_cli)
+          fi
           ./moav.sh regenerate-users
-          sudo chown -R "$USER" configs state outputs 2>/dev/null || true
+          bash tests/e2e-runner-access.sh
           bash tests/assert-users-reconciled.sh
+          if [ "$AWG" = yes ]; then
+            [ "$(awg_srv)" = "$srv_before" ] \
+              || { echo "::error::regenerate-users changed the AmneziaWG server key or obfuscation params (#365)"; exit 1; }
+            [ "$(awg_cli)" = "$cli_before" ] \
+              || { echo "::error::regenerate-users changed e2e-test's AmneziaWG keys/params; the existing client would break"; exit 1; }
+            want=$(sed -n 's/^PublicKey = //p' "$(awg_cli_file)" | head -1)
+            # Right after the restart the interface exists but reports "(none)" until setconf runs.
+            live=""
+            for _ in $(seq 1 30); do
+              live=$(docker exec moav-amneziawg awg show awg0 public-key 2>/dev/null || true)
+              [[ "$live" =~ ^[A-Za-z0-9+/]{43}=$ ]] && break
+              live=""; sleep 2
+            done
+            if [ -z "$live" ]; then
+              echo "::warning::moav-amneziawg did not answer after regenerate-users (liveness is asserted after the connectivity tests)"
+            elif [ "$live" != "$want" ]; then
+              echo "::error::running AmneziaWG server key ($live) does not match the client bundle ($want)"; exit 1
+            else
+              echo "AmneziaWG server key + params unchanged across regenerate-users; live server matches the client ($live)"
+            fi
+          fi
           # Every regenerated guide must come back fully rendered.
           bad=0
           for b in outputs/bundles/*/README.html; do
@@ -385,7 +384,7 @@ jobs:
           have() { [ -e "outputs/bundles/$1/$2" ]; }
           want() { u=$1; shift; for f in "$@"; do have "$u" "$f" || { echo "::error::$u: $f missing (should be present)"; fails=$((fails+1)); }; done; }
           deny() { u=$1; shift; for f in "$@"; do ! have "$u" "$f" || { echo "::error::$u: $f present (should be absent)"; fails=$((fails+1)); }; done; }
-          own()  { sudo chown -R "$USER" configs state outputs 2>/dev/null || true; }
+          own()  { bash tests/e2e-runner-access.sh; }
 
           cp .env /tmp/e2e-env.bak
           trap 'cp /tmp/e2e-env.bak .env' EXIT
@@ -517,7 +516,7 @@ jobs:
 
           cp .env /tmp/e2e-cdn-env.bak
           trap 'cp /tmp/e2e-cdn-env.bak .env' EXIT
-          own() { sudo chown -R "$USER" configs state outputs 2>/dev/null || true; }
+          own() { bash tests/e2e-runner-access.sh; }
 
           setflag() {  # <true|false>
             if grep -q '^ENABLE_CDN=' .env; then
@@ -582,7 +581,7 @@ jobs:
           # and each assertion names its own file so a failure is unambiguous.
           set -u
           fails=0
-          own() { sudo chown -R "$USER" configs state outputs 2>/dev/null || true; }
+          own() { bash tests/e2e-runner-access.sh; }
           setflag() {  # <NAME> <true|false>
             if grep -q "^ENABLE_$1=" .env; then sed -i "s/^ENABLE_$1=.*/ENABLE_$1=$2/" .env
             else echo "ENABLE_$1=$2" >> .env; fi
@@ -657,6 +656,11 @@ jobs:
           fi
           echo "Collected $count protocol results."
 
+      - name: Assert no service crashed during the mid-run steps
+        # regenerate-users, user add and the toggle flips restart WG/AWG and others.
+        # A crash there used to be invisible: the first health check runs before them.
+        run: bash tests/e2e-assert-running.sh "$RUNNER_TEMP/e2e-restart-baseline.tsv" --since-baseline
+
       - name: Evaluate results
         run: |
           jq -r '.tests | to_entries[] | "  \(.key): \(.value.status)"' e2e-results.json
@@ -704,6 +708,39 @@ jobs:
       - name: CLI smoke test
         run: bash tests/cli-smoke-test.sh
 
+      - name: Cert health (doctor cert, textfile metric scraped, alert rules loaded, renewal run)
+        # Domain mode only: domainless has no Let's Encrypt cert. Runs AFTER the
+        # protocol matrix because `moav cert renew` is a real certbot renew: a
+        # no-op while the preserved cert is not due, a legitimate renewal (one
+        # LE issuance) plus consumer restarts once it is. Either way it must
+        # exit 0; a non-zero here is the yorkschool failure class surfacing.
+        if: env.E2E_DOMAINLESS_ONLY != 'true'
+        run: |
+          ./moav.sh doctor cert
+          f=configs/monitoring/textfile/moav_cert.prom
+          test -s "$f" || { echo "::error::$f missing: moav start did not write the cert metric"; exit 1; }
+          grep -E '^moav_cert_expiry_days -?[0-9]+$' "$f" \
+            || { echo "::error::no moav_cert_expiry_days in $f"; cat "$f"; exit 1; }
+          # Prometheus must see it through node-exporter's textfile collector.
+          r=""
+          for _ in $(seq 1 12); do
+            r=$(docker compose exec -T prometheus wget -qO- 'http://localhost:9091/api/v1/query?query=moav_cert_expiry_days' 2>/dev/null || true)
+            echo "$r" | grep -q '"value"' && break
+            sleep 10
+          done
+          if ! echo "$r" | grep -q '"value"'; then
+            echo "::error::moav_cert_expiry_days not scraped by Prometheus"; echo "$r"
+            # Say which layer broke: the exporter, the scrape, or Prometheus itself.
+            docker ps -a --filter 'name=moav-prometheus' --filter 'name=moav-node-exporter' --format '{{.Names}}\t{{.State}}\t{{.Status}}'
+            docker compose exec -T node-exporter wget -qO- http://localhost:9100/metrics 2>/dev/null | grep '^moav_cert' || echo "node-exporter serves no moav_cert_*"
+            docker logs --tail 5 moav-prometheus 2>&1 | cut -c1-300
+            exit 1
+          fi
+          echo "$r"
+          docker compose exec -T prometheus wget -qO- 'http://localhost:9091/api/v1/rules' | grep -q 'MoaVCertExpiringSoon' \
+            || { echo "::error::cert_expiry.rules.yml not loaded by Prometheus"; exit 1; }
+          ./moav.sh cert renew
+
       - name: Full/Mega — domainless pass (after the domain run)
         # full + mega run domain THEN domainless. Skip if the primary run is
         # already domainless-only (would just repeat it).
@@ -735,7 +772,7 @@ jobs:
           ./moav.sh bootstrap --yes
           ./moav.sh start all
           sleep 30
-          sudo chown -R "$(id -u):$(id -g)" configs state outputs 2>/dev/null || true
+          bash tests/e2e-runner-access.sh
           ./moav.sh user revoke e2e-dl 2>/dev/null || true
           ./moav.sh user add e2e-dl
           ./moav.sh test e2e-dl --json | tee e2e-domainless-raw.txt
@@ -764,7 +801,7 @@ jobs:
 
       - name: Upload results + logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-results
           path: |

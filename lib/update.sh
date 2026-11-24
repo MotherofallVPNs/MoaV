@@ -303,6 +303,8 @@ check_component_versions() {
         "DNSTT_VERSION"
         "MASTERDNS_VERSION"
         "GOOSERELAY_VERSION"
+        "AMNEZIAWG_GO_VERSION"
+        "AWGTOOLS_VERSION"
     )
 
     local updates_available=()
@@ -338,6 +340,11 @@ check_component_versions() {
                 DNSTT_VERSION) services_to_rebuild+=("dnstt") ;;
                 MASTERDNS_VERSION) services_to_rebuild+=("masterdns") ;;
                 GOOSERELAY_VERSION) services_to_rebuild+=("gooserelay") ;;
+                AMNEZIAWG_GO_VERSION|AWGTOOLS_VERSION)
+                    if [[ ! " ${services_to_rebuild[*]} " =~ " amneziawg " ]]; then
+                        services_to_rebuild+=("amneziawg")
+                    fi
+                    ;;
             esac
         fi
     done
@@ -459,22 +466,27 @@ check_source_rebuilds() {
             scripts/conduit-entrypoint.sh)  svc="psiphon-conduit" ;;   # name mismatch
             dockerfiles/Dockerfile.psiphon) svc="psiphon-conduit" ;;   # name mismatch
             scripts/client-*.sh)            svc="client" ;;
+            # COPY'd into every image that enforces egress isolation.
+            scripts/lib/egress-isolation.sh) svc="sing-box xray wireguard amneziawg trusttunnel" ;;
+            scripts/lib/egress-trusttunnel.sh) svc="trusttunnel" ;;
             scripts/*-entrypoint.sh)        svc="${f#scripts/}"; svc="${svc%-entrypoint.sh}" ;;
             dockerfiles/Dockerfile.*)       svc="${f#dockerfiles/Dockerfile.}" ;;
         esac
-        [[ -z "$svc" ]] && continue
-        # Drop anything not in the allowlist: bind-mounted entrypoints (grafana),
-        # infra images, unknown name mappings.
-        [[ "$valid" == *" $svc "* ]] || continue
-        # Drop services no longer in compose: a deleted one still shows in the diff.
-        grep -qE "^  ${svc}:" "$SCRIPT_DIR/docker-compose.yml" 2>/dev/null || continue
-        [[ " $queued " == *" $svc "* ]] || queued="${queued:+$queued }$svc"
+        # One file can feed several images, so svc may be a list.
+        for svc in $svc; do
+            # Drop anything not in the allowlist: bind-mounted entrypoints (grafana),
+            # infra images, unknown name mappings.
+            [[ "$valid" == *" $svc "* ]] || continue
+            # Drop services no longer in compose: a deleted one still shows in the diff.
+            grep -qE "^  ${svc}:" "$SCRIPT_DIR/docker-compose.yml" 2>/dev/null || continue
+            [[ " $queued " == *" $svc "* ]] || queued="${queued:+$queued }$svc"
+        done
     done <<< "$changed"
 
     # Setup-profile one-shots never run on upgrade, so a new volume stays empty.
     if grep -q '^  tor-geoip-updater:' "$SCRIPT_DIR/docker-compose.yml" 2>/dev/null \
-       && docker volume ls --format '{{.Name}}' 2>/dev/null | grep -q 'moav_tor_geoip'; then
-        if ! docker run --rm -v moav_moav_tor_geoip:/geoip alpine \
+       && docker volume ls --format '{{.Name}}' 2>/dev/null | grep 'moav_tor_geoip' >/dev/null; then
+        if ! docker run --rm -v moav_moav_tor_geoip:/geoip alpine:3.24 \
                  test -s /geoip/geoip 2>/dev/null; then
             POST_UPDATE_SETUP_JOBS="tor-geoip-updater"
         fi
@@ -518,8 +530,8 @@ check_source_rebuilds() {
 # design — never auto-rebuilds or restarts a running server (a build-all would
 # OOM low-RAM VPSes, and restarting a live circumvention node is the operator's
 # call). Fixes two non-obvious gotchas: (1) `moav build` doesn't recreate
-# containers and `moav restart` reuses the old image — you need `moav start`
-# (up -d); (2) a config-template change needs a re-bootstrap, not just a build.
+# containers — `moav start` (or `moav restart`, for what is already running)
+# does; (2) a config-template change needs a re-bootstrap, not just a build.
 print_post_update_apply_steps() {
     local rebuild="${POST_UPDATE_REBUILD_SERVICES:-}"
     local templates="${POST_UPDATE_BOOTSTRAP_TEMPLATES:-}"
@@ -528,8 +540,13 @@ print_post_update_apply_steps() {
     local setup_jobs="${POST_UPDATE_SETUP_JOBS:-}"
     local compose_changed="${POST_UPDATE_COMPOSE_CHANGED:-}"
 
-    [[ -z "$rebuild" && -z "$templates" && -z "$regen_bundles" && -z "$recreate" \
-       && -z "$setup_jobs" && -z "$compose_changed" ]] && return 0
+    # Nothing left to apply: the running containers are already the current
+    # ones, so this is the one point where image cleanup is safe.
+    if [[ -z "$rebuild" && -z "$templates" && -z "$regen_bundles" && -z "$recreate" \
+          && -z "$setup_jobs" && -z "$compose_changed" ]]; then
+        prune_dangling_images
+        return 0
+    fi
 
     echo ""
     if [[ -n "$templates" ]]; then
@@ -579,7 +596,31 @@ print_post_update_apply_steps() {
     fi
     echo ""
 
-    echo -e "${DIM}Note: 'moav restart' reuses the old image. Use 'moav start' (docker compose up -d) to pick up rebuilt images.${NC}"
+    echo -e "${DIM}Note: 'moav build' alone changes nothing that is running. 'moav start' (or 'moav restart' for running services) recreates containers on the new images.${NC}"
+}
+
+# Best-effort cleanup of dangling (untagged, unreferenced) images left behind by
+# earlier rebuilds. Never -a: tagged images, build bases and test images stay.
+prune_dangling_images() {
+    command -v docker >/dev/null 2>&1 || return 0
+    # Only with a healthy stack: a container that is failing after a recreate
+    # may still need its previous image for a rollback.
+    local sick=""
+    sick=$( { docker ps -q --filter health=unhealthy
+              docker ps -q --filter health=starting
+              docker ps -q --filter status=restarting; } 2>/dev/null ) || true
+    if [[ -n "$sick" ]]; then
+        info "Skipped image cleanup: a container is unhealthy, starting or restarting"
+        return 0
+    fi
+    local out="" reclaimed=""
+    if ! out=$(docker image prune -f 2>/dev/null); then
+        info "Skipped image cleanup: docker image prune failed (nothing removed)"
+        return 0
+    fi
+    reclaimed=$(awk -F': ' '/^Total reclaimed space/ {print $2}' <<< "$out") || true
+    info "Dangling images cleaned up, reclaimed ${reclaimed:-0B} (tagged and in-use images untouched)"
+    return 0
 }
 
 # Check for new variables in .env.example that are missing from .env

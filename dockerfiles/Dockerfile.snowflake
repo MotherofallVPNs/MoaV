@@ -14,7 +14,7 @@
 #   moav build:   SNOWFLAKE_BINARY=source moav build snowflake
 #   docker build: --build-arg SNOWFLAKE_BINARY=source
 
-ARG SNOWFLAKE_VERSION=2.15.2
+ARG SNOWFLAKE_VERSION=2.15.4
 # Selects which stage provides the binary: prebuilt (default) or source. Must be
 # a *global* ARG (declared before the first FROM) so it can be used in the FROM
 # selector below — a mid-file ARG is out of scope for FROM and resolves blank.
@@ -30,7 +30,7 @@ FROM thetorproject/snowflake-proxy:v${SNOWFLAKE_VERSION} AS snowflake-upstream
 
 # Copy the whole rootfs into alpine and `find` the proxy binary (robust to the
 # upstream image's layout/base). The binary is static Go, so it runs on alpine.
-FROM alpine:3.21 AS prebuilt
+FROM alpine:3.24 AS prebuilt
 COPY --from=snowflake-upstream / /img/
 RUN set -eux; \
     BIN="$(find /img \( -type f -o -type l \) \( -name proxy -o -name snowflake-proxy \) 2>/dev/null | head -n1)"; \
@@ -59,7 +59,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM ${SNOWFLAKE_BINARY} AS binary
 
 # --- Runtime ------------------------------------------------------------------
-FROM alpine:3.21
+FROM alpine:3.24
 
 RUN apk add --no-cache \
     iproute2 \

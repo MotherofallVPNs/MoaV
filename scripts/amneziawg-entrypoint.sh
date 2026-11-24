@@ -20,8 +20,20 @@ echo "[amneziawg] Starting AmneziaWG..."
 
 # Check if config exists
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo "[amneziawg] ERROR: Config file not found at $CONFIG_FILE"
-    echo "[amneziawg] Run bootstrap first to generate AmneziaWG configuration"
+    # [ -f ] is also false on EACCES; tell the two apart so nobody re-bootstraps a perms bug.
+    _read_err=$(cat "$CONFIG_FILE" 2>&1 >/dev/null || true)
+    case "$_read_err" in
+        *[Pp]ermission\ denied*)
+            echo "[amneziawg] ERROR: permission denied reading $CONFIG_FILE"
+            echo "[amneziawg] $(ls -ldn "$(dirname "$CONFIG_FILE")" 2>&1)"
+            echo "[amneziawg] This container has no DAC override, so root must OWN the config."
+            echo "[amneziawg] Run 'moav start' to repair permissions (do not re-run bootstrap)."
+            ;;
+        *)
+            echo "[amneziawg] ERROR: Config file not found at $CONFIG_FILE"
+            echo "[amneziawg] Run bootstrap first to generate AmneziaWG configuration"
+            ;;
+    esac
     exit 1
 fi
 
@@ -93,13 +105,35 @@ if ! awg setconf "$INTERFACE" "$STRIPPED"; then
     rm -f "$STRIPPED"
     exit 1
 fi
-rm -f "$STRIPPED"
+# $STRIPPED is kept: the monitor loop re-applies it if awg0 has to be recreated.
 
 # Peers were loaded by `awg setconf` above (it reads every [Peer] block).
 
+# Egress isolation goes in while the interface is still down, ahead of the
+# ACCEPT below. A failure is fatal: an exit must not come up unfiltered.
+. /egress-isolation.sh
+egress_firewall "$INTERFACE" || { echo "[amneziawg] ERROR: egress isolation rules failed (EGRESS_ISOLATION=off bypasses)"; exit 1; }
+
+# Address may be dual-stack ("10.x/24,fd00::1/64") but ip(8) takes one prefix
+# per call. A failed IPv6 add (IPv6 off in the netns) warns; IPv4 stays fatal.
+set_addresses() {
+    _rc=0
+    for _a in $(printf '%s' "$ADDRESS" | tr ',' ' '); do
+        if ip address add "$_a" dev "$INTERFACE"; then
+            echo "[amneziawg]   address $_a"
+        else
+            case "$_a" in
+                *:*) echo "[amneziawg] WARNING: could not add IPv6 address $_a; continuing without it" ;;
+                *)   echo "[amneziawg] ERROR: could not add address $_a"; _rc=1 ;;
+            esac
+        fi
+    done
+    return "$_rc"
+}
+
 # Set interface address and MTU, then bring up
 echo "[amneziawg] Setting address $ADDRESS..."
-ip addr add "$ADDRESS" dev "$INTERFACE"
+set_addresses || exit 1
 [ -n "$MTU" ] && ip link set "$INTERFACE" mtu "$MTU"
 ip link set "$INTERFACE" up
 
@@ -123,8 +157,10 @@ cleanup() {
     iptables -D FORWARD -i "$INTERFACE" -j ACCEPT 2>/dev/null || true
     iptables -D FORWARD -o "$INTERFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
     iptables -t nat -D POSTROUTING -o eth+ -j MASQUERADE 2>/dev/null || true
+    egress_firewall_clear "$INTERFACE"
     ip link del "$INTERFACE" 2>/dev/null || true
     kill $AWG_PID 2>/dev/null || true
+    rm -f "$STRIPPED"
     exit 0
 }
 trap cleanup SIGTERM SIGINT
@@ -178,8 +214,8 @@ while true; do
             AWG_PID=$!
             sleep 2
             if ip link show "$INTERFACE" > /dev/null 2>&1; then
-                echo "$PRIVATE_KEY" | awg set "$INTERFACE" $AWG_SET_ARGS 2>/dev/null || true
-                ip addr add "$ADDRESS" dev "$INTERFACE" 2>/dev/null || true
+                awg setconf "$INTERFACE" "$STRIPPED" 2>/dev/null || true
+                set_addresses >/dev/null 2>&1 || true
                 [ -n "$MTU" ] && ip link set "$INTERFACE" mtu "$MTU" 2>/dev/null || true
                 ip link set "$INTERFACE" up 2>/dev/null || true
                 KERNEL_MODE=0

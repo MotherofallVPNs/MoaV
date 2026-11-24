@@ -14,23 +14,38 @@ jobs:
     name: shellcheck + bash -n
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: List shell scripts
         id: files
         run: |
           files=$(git ls-files '*.sh' 'moav.sh' | sort -u)
           echo "count=$(echo "$files" | wc -l)" >> "$GITHUB_OUTPUT"
           printf '%s\n' "$files" > /tmp/shfiles
-      - name: bash -n (parse check)
+      - name: Install pinned shellcheck
+        run: |
+          # The runner's preinstalled shellcheck changes with the image; the
+          # warning baseline is only valid for one release.
+          ver="$(bash scripts/lint-shell.sh --pinned-version)"
+          curl -fsSL --retry 3 -o /tmp/shellcheck.tar.xz \
+            "https://github.com/koalaman/shellcheck/releases/download/v${ver}/shellcheck-v${ver}.linux.x86_64.tar.xz"
+          echo "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198  /tmp/shellcheck.tar.xz" | sha256sum -c -
+          tar -xJf /tmp/shellcheck.tar.xz -C /tmp
+          sudo install -m 0755 "/tmp/shellcheck-v${ver}/shellcheck" /usr/local/bin/shellcheck
+          shellcheck --version
+      - name: parse check (bash -n / sh -n)
         run: |
           rc=0
           while IFS= read -r f; do
-            # Only parse-check bash scripts; some entrypoints are POSIX sh
-            head -1 "$f" | grep -qE 'bash' && { bash -n "$f" || rc=1; }
+            # Entrypoints with a #!/bin/sh shebang are POSIX sh: check those with sh.
+            if head -1 "$f" | grep -qE 'bash'; then bash -n "$f" || rc=1; else sh -n "$f" || rc=1; fi
           done < /tmp/shfiles
           exit $rc
       - name: shellcheck (severity=error)
         run: xargs shellcheck --severity=error < /tmp/shfiles
+      - name: shellcheck (severity=warning, no new findings)
+        run: bash scripts/lint-shell.sh
+      - name: shell lint gate blocks (self-test)
+        run: bash tests/lint-shell-test.sh
       - name: share-link golden test
         run: bash tests/singbox-links-test.sh
       - name: moav:// bundle emitter golden test
@@ -45,6 +60,8 @@ jobs:
         run: bash tests/user-add-timeout-test.sh
       - name: bundle permission test
         run: bash tests/bundle-perms-test.sh
+      - name: user add checks its config writes before provisioning
+        run: bash tests/user-add-preflight-test.sh
       - name: entrypoint strict-mode test
         run: bash tests/entrypoint-strict-test.sh
       - name: sing-box state read-only (no key-ownership downgrade)
@@ -53,6 +70,10 @@ jobs:
         run: bash tests/singbox-config-valid-test.sh
       - name: sing-box real-binary check + format (pinned version)
         run: bash tests/singbox-check-test.sh
+      - name: egress isolation (private/infra ranges blocked by default)
+        run: bash tests/egress-isolation-test.sh
+      - name: moav restart applies .env changes (recreate on change)
+        run: bash tests/restart-recreate-test.sh
       - name: Snell protocol wiring + add-user
         run: bash tests/snell-test.sh
       - name: wg/awg keygen fallback (local image, not lscr.io)
@@ -85,6 +106,8 @@ jobs:
         run: bash tests/cli-surface-test.sh
       - name: DNS-tunnel bundle completeness
         run: bash tests/dns-tunnel-bundle-test.sh
+      - name: DNS-tunnel startup gating (dnstt / MasterDNS / XDNS)
+        run: bash tests/dns-tunnel-startup-test.sh
       - name: user subscription vs bundle-blob distinction
         run: bash tests/user-subscription-test.sh
       - name: bundle guide section visibility (all protocols)
@@ -111,6 +134,10 @@ jobs:
         run: bash tests/update-discard-test.sh
       - name: build cache cap (sizing reaches docker builder)
         run: bash tests/build-cache-test.sh
+      - name: moav update image cleanup is dangling-only (never -a / --volumes)
+        run: bash tests/update-image-prune-test.sh
+      - name: moav build --help prints usage, builds nothing
+        run: bash tests/build-help-test.sh
       - name: monitoring privacy (no user x destination) (#297)
         run: bash tests/monitoring-privacy-test.sh
       - name: site analytics aggregation (#297)
@@ -141,6 +168,11 @@ jobs:
         run: bash tests/admin-tls-test.sh
       - name: admin IP whitelist (CIDR) unit test
         run: python3 tests/admin-ip-whitelist-test.py
+      - name: admin dashboard renders on the pinned Python deps
+        run: |
+          python3 -m venv /tmp/admin-venv
+          /tmp/admin-venv/bin/pip install -q -r admin/requirements.txt
+          /tmp/admin-venv/bin/python tests/admin-dashboard-render-test.py
       - name: MahsaNet donate protocols validation
         run: python3 tests/mahsanet-protocols-test.py
       - name: refactor verification (static)
@@ -169,6 +201,10 @@ jobs:
         run: bash tests/tls-note-test.sh
       - name: moav cert (domainless no-op + install idempotency)
         run: bash tests/cert-test.sh
+      - name: cert-renew outcome test
+        run: bash tests/cert-renew-test.sh
+      - name: Prometheus rules file materialized (Docker directory stand-in, root-owned parent)
+        run: bash tests/conduit-rules-materialize-test.sh
       - name: moav update -b accepts a tag (release candidate)
         run: bash tests/update-tag-test.sh
       - name: moav update non-interactive (--yes / MOAV_NONINTERACTIVE)
@@ -184,14 +220,22 @@ jobs:
       - name: llms.txt links resolve (network)
         run: LLMS_CHECK_URLS=1 bash tests/llms-links-test.sh
 
+  trusttunnel-interop:
+    name: TrustTunnel endpoint (H2 + H3 interop)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: pinned endpoint <-> pinned client over HTTP/2 and HTTP/3
+        run: bash tests/trusttunnel-interop-test.sh
+
   go-test:
     name: go test dns-router
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
-          go-version: '1.22'
+          go-version: '1.27'
           cache: false   # dns-router is stdlib-only (no go.sum to hash)
       - name: go vet
         working-directory: dns-router
@@ -204,7 +248,7 @@ jobs:
     name: docker compose config
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Validate compose file
         run: |
           cp .env.example .env

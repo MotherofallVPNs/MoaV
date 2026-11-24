@@ -16,11 +16,16 @@ check_bootstrap() {
     fi
 
     # Fallback: check docker volume (with timeout)
-    if docker volume ls 2>/dev/null | grep -q "moav_moav_state"; then
+    # not `grep -q`: under pipefail its early exit SIGPIPEs docker and fails the test
+    if docker volume ls 2>/dev/null | grep "moav_moav_state" >/dev/null; then
         # Quick check - just see if volume exists and has data
         # Use timeout to prevent hanging
         local has_keys
-        has_keys=$(timeout 3 docker run --rm -v moav_moav_state:/state alpine sh -c "ls /state/keys 2>/dev/null | head -1" 2>/dev/null || echo "")
+        # Pull outside the 3s probe: a first-time pull of the pinned tag would
+        # time out and misreport the volume as empty.
+        docker image inspect alpine:3.24 >/dev/null 2>&1 \
+            || timeout 120 docker pull -q alpine:3.24 >/dev/null 2>&1 || true
+        has_keys=$(timeout 3 docker run --rm -v moav_moav_state:/state alpine:3.24 sh -c "ls /state/keys 2>/dev/null | head -1" 2>/dev/null || echo "")
         if [[ -n "$has_keys" ]]; then
             return 0  # Bootstrap has been run
         fi
@@ -154,7 +159,7 @@ run_bootstrap() {
             fi
 
             info "Starting services..."
-            docker compose $SELECTED_PROFILE_STRING up -d --remove-orphans
+            compose_up_enabled "$SELECTED_PROFILE_STRING"
             echo ""
             success "Services started!"
 
@@ -276,7 +281,7 @@ cmd_domainless() {
     # Clear bootstrap flag if exists
     if check_bootstrap; then
         info "Clearing previous bootstrap to regenerate configs..."
-        docker run --rm -v moav_moav_state:/state alpine rm -f /state/.bootstrapped 2>/dev/null || true
+        docker run --rm -v moav_moav_state:/state alpine:3.24 rm -f /state/.bootstrapped 2>/dev/null || true
     fi
 
     echo ""
@@ -323,7 +328,7 @@ cmd_bootstrap() {
         fi
         # Clear the bootstrapped flag so bootstrap.sh doesn't exit early
         info "Clearing bootstrap flag..."
-        docker run --rm -v moav_moav_state:/state alpine rm -f /state/.bootstrapped
+        docker run --rm -v moav_moav_state:/state alpine:3.24 rm -f /state/.bootstrapped
     else
         local domain=$(get_env_val "DOMAIN" ".env")
         info "Bootstrap will perform first-time setup:"
