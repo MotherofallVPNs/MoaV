@@ -192,6 +192,10 @@ apply_status() { # [--json]
 
 # shellcheck disable=SC2120  # arguments come from the dispatcher; the update chain passes none
 cmd_apply() {
+    # Usually run from the MoaV Deploy app's SSH session (umask 077): what apply
+    # builds and renders must stay readable by the non-root containers.
+    umask 022
+
     local no_cache="" regenerate="" bootstrap=true want_status=false want_json=false
     local targets=()
     while [[ $# -gt 0 ]]; do
@@ -290,6 +294,8 @@ cmd_apply() {
         error "Bootstrap has not been run, so there is nothing to apply. Run: moav bootstrap"
         exit 2
     fi
+    # Heal a checkout an earlier update wrote owner-only, before build and start.
+    repair_checkout_perms
 
     local profiles="" templates="" setup_jobs="" recreate="" base=""
     if $full; then

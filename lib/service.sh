@@ -918,6 +918,7 @@ _PERMS_REPAIRED=""
 ensure_perms_repaired() {
     [[ -n "$_PERMS_REPAIRED" ]] && return 0
     _PERMS_REPAIRED=1
+    repair_checkout_perms
     repair_state_key_perms
     repair_bundle_perms
 }

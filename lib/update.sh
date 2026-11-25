@@ -12,6 +12,10 @@
 # Definitions only — nothing here runs at source time.
 
 cmd_update() {
+    # git writes the working tree with the caller's umask; under 077 the
+    # non-root containers (admin, prometheus, dns-router) cannot read it.
+    umask 022
+
     local target_branch=""
 
     # Parse arguments
@@ -244,6 +248,7 @@ cmd_update() {
         if [[ "$current_commit" != "$new_commit" ]]; then
             exec "$SCRIPT_DIR/moav.sh" _post-update "$current_commit"
         fi
+        repair_checkout_perms
         check_component_versions
         migrate_dns_tunnel_state
         check_env_additions
@@ -275,6 +280,7 @@ cmd_update() {
         # Post-update checks (reached on "already up to date"; the updated path
         # re-execs into _post-update above and never returns here). No pull
         # happened, so there are no config-template changes to diff.
+        repair_checkout_perms
         check_component_versions
         migrate_dns_tunnel_state
         check_env_additions

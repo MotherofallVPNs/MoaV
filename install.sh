@@ -20,6 +20,10 @@
 
 set -euo pipefail
 
+# The clone below must be readable by MoaV's non-root containers (0644/0755),
+# whatever umask this shell was started with.
+umask 022
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'

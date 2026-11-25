@@ -75,6 +75,11 @@ build_services() {
 }
 
 compose_build() {
+    # COPY bakes the host file modes into the image: build from a checkout the
+    # non-root image users can read, whatever umask the caller has.
+    umask 022
+    repair_checkout_perms
+
     local total_mb limit
     total_mb=$(awk '/MemTotal/ {printf "%.0f", $2/1024}' /proc/meminfo 2>/dev/null || echo 0)
 
@@ -146,6 +151,8 @@ build_target() {
 }
 
 cmd_build() {
+    umask 022   # as in compose_build: nothing built here may come out owner-only
+
     local no_cache=""
     local build_local=""
     local services_args=()
@@ -353,6 +360,9 @@ build_local_images() {
     local services_to_build=("$@")
     local env_file=".env"
     local built_count=0
+
+    umask 022   # as in compose_build: this is the other `docker build` path
+    repair_checkout_perms
 
     print_section "Building Local Images"
     echo ""
