@@ -60,7 +60,9 @@ RUN mkdir -p /app /state/keys /etc/slipstream && \
 
 # Copy entrypoint
 COPY scripts/slipstream-entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# Explicit mode: this runs as `moav`, and COPY keeps the checkout's modes
+# (owner-only when the checkout was made under umask 077).
+RUN chmod 755 /app/entrypoint.sh
 
 EXPOSE 5354/udp
 

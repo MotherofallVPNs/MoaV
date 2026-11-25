@@ -24,7 +24,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 COPY admin/ /app/
 COPY scripts/admin-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && chown -R moav:moav /app
+# Explicit modes: the checkout may be owner-only (umask 077) and COPY keeps that.
+RUN chmod 755 /entrypoint.sh && chmod -R u=rwX,go=rX /app && chown -R moav:moav /app
 
 EXPOSE 8443
 

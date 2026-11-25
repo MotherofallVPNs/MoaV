@@ -6,6 +6,8 @@ FROM python:3.11-alpine
 
 WORKDIR /app
 COPY snowflake/main.py .
+# Explicit modes: the checkout may be owner-only (umask 077) and COPY keeps that.
+RUN chmod 644 /app/*.py
 
 EXPOSE 9105
 

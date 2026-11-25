@@ -48,7 +48,8 @@ RUN mkdir -p /app /etc/telemt /app/tlsfront && \
 
 # Copy entrypoint
 COPY scripts/telemt-entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# Explicit modes: the checkout may be owner-only (umask 077) and COPY keeps that.
+RUN chmod 755 /app/entrypoint.sh
 
 EXPOSE 993/tcp 9090/tcp
 

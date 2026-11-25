@@ -10,6 +10,8 @@ WORKDIR /app
 COPY lib/geoip.py .
 COPY lib/sitestats.py .
 COPY singbox/main.py .
+# Explicit modes: the checkout may be owner-only (umask 077) and COPY keeps that.
+RUN chmod 644 /app/*.py
 
 EXPOSE 9102
 

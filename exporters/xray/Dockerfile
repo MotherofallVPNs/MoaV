@@ -10,6 +10,8 @@ RUN pip install --no-cache-dir maxminddb
 WORKDIR /app
 COPY lib/geoip.py .
 COPY xray/main.py .
+# Explicit modes: the checkout may be owner-only (umask 077) and COPY keeps that.
+RUN chmod 644 /app/*.py
 
 EXPOSE 9103
 
