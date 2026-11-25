@@ -32,8 +32,13 @@ cmd_update() {
                 export MOAV_NONINTERACTIVE=1
                 shift
                 ;;
+            --apply)
+                # Exported for the same reason as --yes: read after the re-exec.
+                export MOAV_UPDATE_APPLY=1
+                shift
+                ;;
             -h|--help)
-                echo "Usage: moav update [-b BRANCH] [-y]"
+                echo "Usage: moav update [-b BRANCH] [-y] [--apply]"
                 echo ""
                 echo "Update MoaV to the latest version"
                 echo ""
@@ -44,12 +49,16 @@ cmd_update() {
                 echo "                        MOAV_NONINTERACTIVE=1). Local changes are"
                 echo "                        stashed; .env version pins and new variables"
                 echo "                        are applied. Services are not restarted."
+                echo "  --apply               Then run 'moav apply' if the update left"
+                echo "                        anything to apply: rebuild, refresh bundles,"
+                echo "                        recreate containers. Exits with its code."
                 echo ""
                 echo "Examples:"
                 echo "  moav update              # Update current branch"
                 echo "  moav update -b main      # Switch to main and update"
                 echo "  moav update -b dev       # Switch to dev branch"
                 echo "  moav update --yes        # Unattended (cron, SSH without a TTY)"
+                echo "  moav update --yes --apply  # Unattended, and end on the new images"
                 return 0
                 ;;
             *)
@@ -239,6 +248,7 @@ cmd_update() {
         migrate_dns_tunnel_state
         check_env_additions
         print_post_update_apply_steps
+        apply_after_update
         return 0
     fi
 
@@ -269,6 +279,7 @@ cmd_update() {
         migrate_dns_tunnel_state
         check_env_additions
         print_post_update_apply_steps
+        apply_after_update
     else
         error "Failed to update. Check your network connection or git status."
         echo ""
@@ -529,7 +540,7 @@ check_source_rebuilds() {
 # and/or stale server configs (POST_UPDATE_BOOTSTRAP_TEMPLATES). Print-only by
 # design — never auto-rebuilds or restarts a running server (a build-all would
 # OOM low-RAM VPSes, and restarting a live circumvention node is the operator's
-# call). Fixes two non-obvious gotchas: (1) `moav build` doesn't recreate
+# call: `moav apply`, or `moav update --apply`). Fixes two non-obvious gotchas: (1) `moav build` doesn't recreate
 # containers — `moav start` (or `moav restart`, for what is already running)
 # does; (2) a config-template change needs a re-bootstrap, not just a build.
 print_post_update_apply_steps() {
@@ -547,6 +558,9 @@ print_post_update_apply_steps() {
         prune_dangling_images
         return 0
     fi
+
+    # Remembered for `moav apply`, which runs the steps printed below.
+    record_pending_apply
 
     echo ""
     if [[ -n "$templates" ]]; then
@@ -597,6 +611,35 @@ print_post_update_apply_steps() {
     echo ""
 
     echo -e "${DIM}Note: 'moav build' alone changes nothing that is running. 'moav start' (or 'moav restart' for running services) recreates containers on the new images.${NC}"
+    if [[ "${MOAV_UPDATE_APPLY:-0}" != "1" ]]; then
+        echo ""
+        echo -e "Or run all of it in one go: ${WHITE}moav apply${NC}"
+    fi
+}
+
+# Written when an update leaves steps to apply; removed by a full `moav apply`
+# or a full `moav start`, the last step of applying by hand.
+APPLY_PENDING_FILE="$SCRIPT_DIR/.moav_apply.pending"
+
+# `moav update` left steps to apply: remember the revision the containers are
+# still on. An older unapplied update keeps its (earlier) base.
+record_pending_apply() {
+    local base=""
+    if [[ -f "$APPLY_PENDING_FILE" ]]; then
+        base=$(sed -n '/^base=/{s///p;q;}' "$APPLY_PENDING_FILE" 2>/dev/null || true)
+        [[ -z "$base" ]] || return 0
+    fi
+    printf 'base=%s\n' "${POST_UPDATE_BASE_COMMIT:-}" > "$APPLY_PENDING_FILE" 2>/dev/null || true
+}
+
+# `moav update --apply`: chain into the apply once the update left something to do.
+apply_after_update() {
+    [[ "${MOAV_UPDATE_APPLY:-0}" == "1" ]] || return 0
+    if [[ ! -f "$APPLY_PENDING_FILE" ]]; then
+        info "Nothing to apply: the running services are already on this revision."
+        return 0
+    fi
+    cmd_apply
 }
 
 # Best-effort cleanup of dangling (untagged, unreferenced) images left behind by

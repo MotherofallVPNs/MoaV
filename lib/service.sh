@@ -1368,7 +1368,7 @@ cmd_start() {
     local profiles=""
     local valid_profiles
     valid_profiles=$(compose_profiles | tr '\n' ' ')
-    local force=false start_once=false
+    local force=false start_once=false full_start=false
     local args=()
     for arg in "$@"; do
         case "$arg" in
@@ -1398,6 +1398,7 @@ cmd_start() {
             for p in $_filtered; do
                 profiles+="--profile $p "
             done
+            full_start=true
         else
             # No defaults set - show interactive menu
             select_profiles "start"
@@ -1426,6 +1427,7 @@ cmd_start() {
                     return 1
                 fi
                 info "Expanding 'all' to enabled profiles: $_all_expanded"
+                full_start=true
                 local _ap
                 for _ap in $_all_expanded; do
                     profiles+="--profile $_ap "
@@ -1536,6 +1538,11 @@ cmd_start() {
         compose_up_enabled "$profiles"
     fi
     success "Services started!"
+    # The whole stack was just recreated: an update applied by hand is done.
+    # (`moav apply` clears its own note, after the steps that follow the start.)
+    if $full_start && [[ -z "${APPLY_KEEP_PENDING:-}" && -n "${APPLY_PENDING_FILE:-}" ]]; then
+        rm -f "$APPLY_PENDING_FILE" 2>/dev/null || true
+    fi
     echo ""
     # Show admin URL if admin was started
     if echo "$profiles" | grep -qE "admin|all"; then

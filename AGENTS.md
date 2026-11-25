@@ -52,7 +52,8 @@ command line; a missing required value aborts. `MOAV_BOOTSTRAP=1` also runs
 `moav bootstrap --yes`, which uses the saved `DEFAULT_PROFILES` instead of
 prompting for a service selection.
 
-**Upgrade in place:** `moav update -b main && moav build && moav start`
+**Upgrade in place:** `moav update -b main && moav apply`, or in one command
+`moav update -b main --yes --apply`
 (see [docs/V2-MIGRATION.md](docs/V2-MIGRATION.md) for the 1.9.x → v2 path).
 
 ## Everyday operations
@@ -79,7 +80,8 @@ with none they act on the whole stack.
 | `moav cert` | Certificate status / renewal (Let's Encrypt) |
 | `moav admin password` | Generate/reset the admin **and** Grafana password (`ADMIN_PASSWORD`) |
 | `moav export` / `moav import` | Full backup / restore (keys, users, configs) — used for server migration |
-| `moav update [--yes]` | Pull new code (follow with `moav build && moav start`). `--yes` (or `MOAV_NONINTERACTIVE=1`) never prompts: stashes local changes, applies `.env` version pins and new variables, does not restart services |
+| `moav apply [svc\|profile ...]` | Make the checkout live after an update or a `.env` edit: build, re-bootstrap if config templates changed, `regenerate-users`, recreate containers, prune dangling images. Never prompts, safe to re-run. Prints `[moav-apply] step N/6: …` markers and ends with `[moav-apply] exit=CODE result=…`; exit codes in `moav apply --help`. Run it detached (`nohup moav apply > apply.log 2>&1 &`) and poll `moav apply --status --json` |
+| `moav update [--yes] [--apply]` | Pull new code (follow with `moav apply`, or pass `--apply` to chain into it). `--yes` (or `MOAV_NONINTERACTIVE=1`) never prompts: stashes local changes, applies `.env` version pins and new variables, does not restart services |
 
 Full reference: [moav.sh/docs/CLI](https://moav.sh/docs/CLI/). Debugging flow when
 a user reports "it stopped working": `moav status` → `moav doctor` →

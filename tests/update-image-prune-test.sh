@@ -39,7 +39,8 @@ chmod +x "$TMP/docker"
 # <env assignments...> -> output in $TMP/out, docker calls in $TMP/args, rc echoed
 run_update_end() {
     : > "$TMP/args"
-    env PATH="$TMP:$PATH" ARGS_LOG="$TMP/args" "$@" \
+    [ -n "${KEEP_PENDING:-}" ] || rm -f "$TMP/pending"
+    env PATH="$TMP:$PATH" ARGS_LOG="$TMP/args" PENDING="$TMP/pending" "$@" \
         bash -c 'set -euo pipefail; cd "$0"; SCRIPT_DIR="$0"
                  # moav.sh defines the colours; the libs only use them.
                  BLUE="" YELLOW="" CYAN="" WHITE="" DIM="" NC=""
@@ -49,6 +50,7 @@ run_update_end() {
                  source lib/common.sh >/dev/null 2>&1
                  # shellcheck disable=SC1091
                  source lib/update.sh >/dev/null 2>&1
+                 APPLY_PENDING_FILE="$PENDING"   # never the checkout under test
                  print_post_update_apply_steps' "$ROOT" > "$TMP/out" 2>&1
     echo $?
 }
@@ -94,6 +96,17 @@ for pending in POST_UPDATE_REBUILD_SERVICES=admin POST_UPDATE_CONFIG_RECREATE=pr
         bad "pruned (rc=$rc) before ${pending%%=*} was applied"
     fi
 done
+
+# --- pending steps are remembered for `moav apply` ---------------------------
+rc=$(run_update_end POST_UPDATE_REBUILD_SERVICES=admin POST_UPDATE_BASE_COMMIT=abc1234)
+grep -qx 'base=abc1234' "$TMP/pending" 2>/dev/null \
+    && ok "pending steps are recorded for 'moav apply' with the pre-update commit" \
+    || bad "no pending-apply marker was written (rc=$rc)"
+rc=$(KEEP_PENDING=1 run_update_end POST_UPDATE_REBUILD_SERVICES=xray POST_UPDATE_BASE_COMMIT=def5678)
+grep -qx 'base=abc1234' "$TMP/pending" 2>/dev/null \
+    && ok "a second unapplied update keeps the earlier base" \
+    || bad "the earlier base was overwritten: $(cat "$TMP/pending" 2>/dev/null)"
+rm -f "$TMP/pending"
 
 # --- best-effort: a failing prune must not fail the update -------------------
 rc=$(run_update_end FAKE_PRUNE_RC=1)

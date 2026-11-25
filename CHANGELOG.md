@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`moav apply`: one command to make an update live.** It runs what
+  `moav update` prints: `moav build` for the saved default profiles,
+  `moav bootstrap --yes` when the update changed config templates,
+  `moav regenerate-users`, `moav start` (recreates containers whose image or
+  config changed), any setup job or config recreate the update called for, and
+  the dangling-image cleanup. It never prompts and is safe to re-run: unchanged
+  images are cache hits and unchanged containers keep running.
+  `moav apply xray` (any service or profile) applies just that, and
+  `moav update --apply` chains into it when the update left something to apply.
+  Made for unattended and detached use (the MoaV Deploy app): every step prints
+  `[moav-apply] step N/6: NAME`, the last line is always
+  `[moav-apply] exit=CODE result=...`, the exit code says which step failed
+  (2 preflight, 3 already running, 10 build, 11 bootstrap, 12 regenerate-users,
+  13 start), a second apply is refused while one runs, and
+  `moav apply --status [--json]` reports the running or last run. A failed
+  build restarts nothing. `moav update` now ends with a pointer to it.
+
+### Changed
+- **`moav regenerate-users` exits 1 when the provisioning run fails.** It
+  printed "provisioning run failed" and exited 0, so a caller could not tell.
+
 ### Fixed
 - **`moav build` knows every profile in `docker-compose.yml`.** It kept its own
   profile list, which was missing `xhttp`, `telegram`, `gooserelay`, `client`
