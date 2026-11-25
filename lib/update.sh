@@ -57,8 +57,12 @@ cmd_update() {
                 echo "                        anything to apply: rebuild, refresh bundles,"
                 echo "                        recreate containers. Exits with its code."
                 echo ""
+                echo "An update only pulls the code: nothing is rebuilt or restarted until"
+                echo "you run 'moav apply' (or pass --apply). See 'moav apply --help'."
+                echo ""
                 echo "Examples:"
-                echo "  moav update              # Update current branch"
+                echo "  moav update              # Update current branch, then run: moav apply"
+                echo "  moav update --apply      # Update and apply in one go"
                 echo "  moav update -b main      # Switch to main and update"
                 echo "  moav update -b dev       # Switch to dev branch"
                 echo "  moav update --yes        # Unattended (cron, SSH without a TTY)"
@@ -546,7 +550,8 @@ check_source_rebuilds() {
 # and/or stale server configs (POST_UPDATE_BOOTSTRAP_TEMPLATES). Print-only by
 # design — never auto-rebuilds or restarts a running server (a build-all would
 # OOM low-RAM VPSes, and restarting a live circumvention node is the operator's
-# call: `moav apply`, or `moav update --apply`). Fixes two non-obvious gotchas: (1) `moav build` doesn't recreate
+# call: `moav apply`, printed first, or `moav update --apply`). The numbered
+# by-hand steps cover two non-obvious gotchas: (1) `moav build` doesn't recreate
 # containers — `moav start` (or `moav restart`, for what is already running)
 # does; (2) a config-template change needs a re-bootstrap, not just a build.
 print_post_update_apply_steps() {
@@ -562,6 +567,12 @@ print_post_update_apply_steps() {
     if [[ -z "$rebuild" && -z "$templates" && -z "$regen_bundles" && -z "$recreate" \
           && -z "$setup_jobs" && -z "$compose_changed" ]]; then
         prune_dangling_images
+        # An earlier update is still waiting (--apply chains into it by itself).
+        if [[ -f "$APPLY_PENDING_FILE" && "${MOAV_UPDATE_APPLY:-0}" != "1" ]]; then
+            echo ""
+            warn "An earlier update has not been applied yet: the running services have not picked it up."
+            echo -e "Apply it with: ${WHITE}moav apply${NC}"
+        fi
         return 0
     fi
 
@@ -576,12 +587,26 @@ print_post_update_apply_steps() {
         done <<< "$templates"
         echo ""
         echo "The configs on disk will not reflect this until they are regenerated."
-        echo "Re-bootstrap to apply it (idempotent; keeps your keys and user UUIDs)."
+        echo "A re-bootstrap does that (idempotent; keeps your keys and user UUIDs);"
+        echo "'moav apply' runs it for you."
         echo ""
     fi
 
     local n=1
-    echo -e "${WHITE}Apply this update in order:${NC}"
+    if [[ "${MOAV_UPDATE_APPLY:-0}" == "1" ]]; then
+        echo -e "${WHITE}Applying this update now with 'moav apply'. What it needs, in order:${NC}"
+    else
+        # `moav apply` first; the numbered list is what it runs, for doing it by hand.
+        warn "This update is not live yet: nothing was rebuilt or restarted."
+        echo ""
+        echo -e "${WHITE}Apply it with one command:${NC}"
+        echo ""
+        echo -e "    ${WHITE}moav apply${NC}   ${DIM}# build, refresh bundles, recreate containers; never prompts, safe to re-run${NC}"
+        echo ""
+        echo -e "${DIM}Next time, update and apply in one go: moav update --apply${NC}"
+        echo ""
+        echo -e "Or apply it by hand, in order (what 'moav apply' does for you):"
+    fi
     echo ""
     if [[ -n "$rebuild" ]]; then
         echo -e "  ${WHITE}${n}.${NC} moav build ${rebuild}   ${DIM}# build new images (add --no-cache only to force a clean rebuild)${NC}"
@@ -616,10 +641,10 @@ print_post_update_apply_steps() {
     fi
     echo ""
 
-    echo -e "${DIM}Note: 'moav build' alone changes nothing that is running. 'moav start' (or 'moav restart' for running services) recreates containers on the new images.${NC}"
     if [[ "${MOAV_UPDATE_APPLY:-0}" != "1" ]]; then
+        echo -e "${DIM}Note: 'moav build' alone changes nothing that is running. 'moav start' (or 'moav restart' for running services) recreates containers on the new images.${NC}"
         echo ""
-        echo -e "Or run all of it in one go: ${WHITE}moav apply${NC}"
+        echo -e "One command instead of the steps above: ${WHITE}moav apply${NC}"
     fi
 }
 

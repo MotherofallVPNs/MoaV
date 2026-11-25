@@ -1172,7 +1172,7 @@ doctor_check_updates() {
         return 0
     elif version_gt "$latest" "$current_version"; then
         echo -e "    ${YELLOW}○${NC} Update available: v${latest} (current: v${current_version})"
-        echo -e "      ${DIM}Run: moav update${NC}"
+        echo -e "      ${DIM}Run: moav update --apply   (or: moav update, then moav apply)${NC}"
         return 1
     else
         # Running ahead of the latest published release — e.g. a dev/pre-release

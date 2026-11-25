@@ -12,7 +12,7 @@ backports; the fix is to upgrade.
 | Version | Supported |
 |---|---|
 | 2.4.x (latest) | ✅ |
-| 2.0.x to 2.3.x | ❌ upgrade with `moav update` |
+| 2.0.x to 2.3.x | ❌ upgrade with `moav update`, then `moav apply` |
 | 1.x | ❌ see [docs/V2-MIGRATION.md](docs/V2-MIGRATION.md) |
 
 Run `moav version` to see what a server is on.

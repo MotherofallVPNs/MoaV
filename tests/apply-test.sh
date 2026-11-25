@@ -258,6 +258,18 @@ chain "$BASE"
 { [ "$RC" -eq 0 ] && ! logged ' build' && grep -q 'moav apply' <<<"$OUT" && grep -qx "base=$BASE" "$APP/.moav_apply.pending"; } \
     && ok "without --apply the update prints the steps, points at moav apply and records the base" \
     || bad "plain update end: rc=$RC $(tail -3 <<<"$OUT")"
+# `moav apply` is the recommendation: it comes before the by-hand steps, and last.
+first_apply=$(grep -n 'moav apply' <<<"$OUT" | head -1 | cut -d: -f1)
+first_step=$(grep -nE '^ +[^ ]*1\.[^ ]* moav ' <<<"$OUT" | head -1 | cut -d: -f1)
+{ [ -n "$first_apply" ] && [ -n "$first_step" ] && [ "$first_apply" -lt "$first_step" ] \
+  && grep -q 'moav update --apply' <<<"$OUT" && tail -1 <<<"$OUT" | grep -q 'moav apply'; } \
+    && ok "the update's closing message leads and ends with moav apply, steps in between" \
+    || bad "moav apply is not the primary recommendation: apply@${first_apply:-none} step@${first_step:-none}"
+chain "$HEAD_NOW"
+{ [ "$RC" -eq 0 ] && grep -q 'has not been applied yet' <<<"$OUT" && grep -q 'moav apply' <<<"$OUT" \
+  && grep -qx "base=$BASE" "$APP/.moav_apply.pending"; } \
+    && ok "an update with nothing new still reminds about an unapplied earlier one" \
+    || bad "no reminder for the pending apply: rc=$RC $(tail -3 <<<"$OUT")"
 chain "$BASE" MOAV_UPDATE_APPLY=1 FAKE_FAIL=' build'
 { [ "$RC" -eq 10 ] && [ -f "$APP/.moav_apply.pending" ]; } && ok "update --apply exits with the apply's code" \
     || bad "chain failure: rc=$RC"

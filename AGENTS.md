@@ -55,6 +55,17 @@ prompting for a service selection.
 **Upgrade in place:** `moav update -b main && moav apply`, or in one command
 `moav update -b main --yes --apply`
 (see [docs/V2-MIGRATION.md](docs/V2-MIGRATION.md) for the 1.9.x → v2 path).
+`moav apply` is the one post-update command and `moav update` ends by pointing
+at it. Both it and `--apply` are **available from 2.5.1**: a server on 2.5.0 or
+older does not know `--apply`, so there run `moav update` first, then
+`moav apply`.
+
+> **Legacy (pre-2.5.1), will be removed in a future release.** A checkout that
+> stays on 2.5.0 or older has no `moav apply`. There, run the steps
+> `moav update` prints by hand, in order: `moav build`, `moav bootstrap` (only
+> if config templates changed), `moav regenerate-users` (only if told to),
+> `moav start`. Do not script this sequence for 2.5.1 or newer.
+<!-- LEGACY-PRE-2.5.1: remove together with the other legacy update guidance (CHANGELOG 2.5.1, Deprecated) -->
 
 ## Everyday operations
 
@@ -86,6 +97,12 @@ with none they act on the whole stack.
 Full reference: [moav.sh/docs/CLI](https://moav.sh/docs/CLI/). Debugging flow when
 a user reports "it stopped working": `moav status` → `moav doctor` →
 `moav logs <svc>` → `moav test <user>`.
+
+**Containers restarting in a loop after an update** (admin, Prometheus or
+dns-router logging "Permission denied"): the checkout or an image was written
+owner-only by a `umask 077` session. `moav doctor perms` reports it,
+`moav doctor perms --fix` repairs the checkout, and `moav apply` rebuilds and
+recreates the containers. Do not `chmod` by hand or re-clone.
 
 ## Dashboards & access — what to hand the owner
 
