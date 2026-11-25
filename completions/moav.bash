@@ -144,7 +144,7 @@ _moav() {
             COMPREPLY=($(compgen -W "$services $profiles --no-cache --regenerate --no-regenerate --no-bootstrap --status --json" -- "$cur"))
             ;;
         doctor)
-            COMPREPLY=($(compgen -W "docker memory disk dns services config ports env updates all" -- "$cur"))
+            COMPREPLY=($(compgen -W "docker memory disk dns services config perms ports env updates all" -- "$cur"))
             ;;
         uninstall)
             COMPREPLY=($(compgen -W "--wipe" -- "$cur"))

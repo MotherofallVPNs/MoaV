@@ -118,7 +118,7 @@ grep -q 'Skipped image cleanup' "$TMP/out" \
 
 # --- every update exit path ends in the step that carries the cleanup --------
 n=$(grep -c '^ *print_post_update_apply_steps$' "$ROOT/lib/update.sh")
-[ "$n" = "2" ] && grep -A9 '_post-update)' "$ROOT/moav.sh" | grep -q 'print_post_update_apply_steps' \
+[ "$n" = "2" ] && grep -A12 '_post-update)' "$ROOT/moav.sh" | grep -q 'print_post_update_apply_steps' \
     && ok "tag, up-to-date and _post-update paths all end in the apply-steps/cleanup step" \
     || bad "an update path no longer reaches print_post_update_apply_steps (update.sh calls: $n)"
 

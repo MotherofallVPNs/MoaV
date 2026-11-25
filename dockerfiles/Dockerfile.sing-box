@@ -32,7 +32,8 @@ RUN mkdir -p /etc/sing-box /var/log/sing-box /state && \
 
 COPY scripts/sing-box-entrypoint.sh /entrypoint.sh
 COPY scripts/lib/egress-isolation.sh /egress-isolation.sh
-RUN chmod +x /entrypoint.sh
+# Explicit modes: the checkout may be owner-only (umask 077) and COPY keeps that.
+RUN chmod 755 /entrypoint.sh && chmod 644 /egress-isolation.sh
 
 EXPOSE 443/tcp 443/udp 8443/tcp 2082/tcp
 

@@ -350,6 +350,57 @@ json_detail() {
     json_escape "$text"
 }
 
+# -----------------------------------------------------------------------------
+# Checkout permissions. Non-root containers read this checkout: admin (uid 2000)
+# mounts it at /project, prometheus (nobody) and grafana mount files from it.
+# -----------------------------------------------------------------------------
+
+# Host-rendered, untracked, non-secret paths a non-root container mounts.
+CHECKOUT_PERM_EXTRAS="configs/monitoring/conduit_lifetime.rules.yml configs/monitoring/textfile"
+
+# Tracked paths (plus the extras) "other" cannot read or enter, one per line:
+# what git writes when the caller's umask is 077. Empty output = healthy.
+checkout_perm_offenders() {
+    [[ -d "$SCRIPT_DIR/.git" ]] || return 0
+    command -v git >/dev/null 2>&1 || return 0
+    local file_test='( ! -perm -004 -o ( -perm -100 ! -perm -001 ) )'
+    (
+        cd "$SCRIPT_DIR" || exit 0
+        find . -maxdepth 0 ! -perm -005 -print 2>/dev/null || true
+        git ls-tree -rdz --name-only HEAD 2>/dev/null \
+            | xargs -0 sh -c '[ $# -eq 0 ] || find "$@" -maxdepth 0 -type d ! -perm -005 -print' _ 2>/dev/null || true
+        git ls-files -z 2>/dev/null \
+            | T="$file_test" xargs -0 sh -c '[ $# -eq 0 ] || find "$@" -maxdepth 0 -type f $T -print' _ 2>/dev/null || true
+        local p
+        for p in $CHECKOUT_PERM_EXTRAS; do
+            if [[ -d "$p" ]]; then
+                find "$p" -maxdepth 0 ! -perm -005 -print 2>/dev/null || true
+            elif [[ -f "$p" ]]; then
+                find "$p" -maxdepth 0 ! -perm -004 -print 2>/dev/null || true
+            fi
+        done
+    ) || true
+}
+
+# Give "other" read (and search/execute where the owner has it) on those paths.
+# Never touches anything else: .env, state/ and outputs/ keep their modes.
+_CHECKOUT_PERMS_REPAIRED=""
+repair_checkout_perms() {
+    [[ -n "$_CHECKOUT_PERMS_REPAIRED" ]] && return 0
+    _CHECKOUT_PERMS_REPAIRED=1
+    local bad n
+    bad=$(checkout_perm_offenders)
+    [[ -n "$bad" ]] || return 0
+    n=$(printf '%s\n' "$bad" | wc -l | tr -d ' ')
+    ( cd "$SCRIPT_DIR" && printf '%s\n' "$bad" | tr '\n' '\0' | xargs -0 chmod go+rX ) 2>/dev/null || true
+    if [[ -z "$(checkout_perm_offenders)" ]]; then
+        info "Fixed permissions on $n owner-only path(s) in the checkout (written under a restrictive umask)" >&2
+    else
+        warn "Some checkout files are still owner-only, so non-root containers cannot read them. Run as the owner or root: moav doctor perms --fix" >&2
+    fi
+    return 0
+}
+
 run_command() {
     local cmd="$1"
     local description="${2:-Running command}"

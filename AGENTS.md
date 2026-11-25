@@ -148,7 +148,10 @@ pipefail (subshell-probed — `set -o pipefail` is fatal in dash even with
 3.2** (macOS): no `mapfile`/`${var^^}`. Secrets live in **state, not `.env`**
 (renders re-source state via `load_state_secrets`). The admin container runs as
 **uid/gid 2000**; state keys are `0600` root-owned (three non-root-daemon keys
-stay `0644` inside the volume).
+stay `0644` inside the volume). The caller's umask may be `077` (the
+Deploy app's SSH session): a Dockerfile gives every file it `COPY`s from the
+checkout an explicit mode (`chmod 755`/`644`, never `chmod +x`), and host code
+that writes a file a container mounts sets its mode.
 
 **Testing:** `bash tests/<name>.sh` for one suite. CI (`ci.yml`) runs the bash
 suites; **e2e** (`e2e.yml`, `workflow_dispatch`, self-hosted) builds on a real
