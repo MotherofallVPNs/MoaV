@@ -70,7 +70,7 @@ make_install() {  # <dir>
     git init -q "$d"
     git -C "$d" checkout -q -b main 2>/dev/null || true
     git -C "$d" config user.email t@t; git -C "$d" config user.name t
-    printf '.env\n' > "$d/.gitignore"
+    printf '.env\n.moav_apply.*\n' > "$d/.gitignore"   # as in the real .gitignore
     printf 'tracked v1\n' > "$d/tracked.txt"
     printf 'SINGBOX_VERSION=2.0.0\n# a brand-new knob\nNEW_KNOB=true\n' > "$d/.env.example"
     git -C "$d" add -A && git -C "$d" commit -qm init

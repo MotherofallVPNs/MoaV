@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`moav apply`: one command to make an update live.** It runs what
+  `moav update` prints: `moav build` for the saved default profiles,
+  `moav bootstrap --yes` when the update changed config templates,
+  `moav regenerate-users`, `moav start` (recreates containers whose image or
+  config changed), any setup job or config recreate the update called for, and
+  the dangling-image cleanup. It never prompts and is safe to re-run: unchanged
+  images are cache hits and unchanged containers keep running.
+  `moav apply xray` (any service or profile) applies just that, and
+  `moav update --apply` chains into it when the update left something to apply.
+  Made for unattended and detached use (the MoaV Deploy app): every step prints
+  `[moav-apply] step N/6: NAME`, the last line is always
+  `[moav-apply] exit=CODE result=...`, the exit code says which step failed
+  (2 preflight, 3 already running, 10 build, 11 bootstrap, 12 regenerate-users,
+  13 start), a second apply is refused while one runs, and
+  `moav apply --status [--json]` reports the running or last run. A failed
+  build restarts nothing. `moav update` now ends with a pointer to it.
+
+### Changed
+- **`moav regenerate-users` exits 1 when the provisioning run fails.** It
+  printed "provisioning run failed" and exited 0, so a caller could not tell.
+
+### Fixed
+- **`moav build` knows every profile in `docker-compose.yml`.** It kept its own
+  profile list, which was missing `xhttp`, `telegram`, `gooserelay`, `client`
+  and `setup`. `moav build xhttp` and `moav build setup` failed with "no such
+  service"; `telegram` and `gooserelay` only worked because a service or alias
+  happens to share the name. `build`, `start`, `stop`, `restart`, `logs` and the
+  help text now all read the profiles from the compose file, so `moav stop` and
+  `moav restart` also accept `xhttp`, `gooserelay`, `client` and `setup` as
+  profiles. A name that is neither a profile nor a service is rejected up front
+  with the valid names, instead of reaching compose.
+
 ## [2.5.0] - 2026-11-23
 
 Security and stability release. Tunneled client traffic is now kept away from private and infrastructure networks by default (egress isolation), every Go service is closed off from the MPTCP remote-root exploit for CVE-2026-98432, TrustTunnel moves to 1.3.1 with HTTP/2 and HTTP/3 tested separately, Slipstream starts its removal in favour of MasterDNS and dnstt, and `moav regenerate-users` no longer rotates the AmneziaWG server key. Base images move off end-of-life Alpine and Go releases, every runtime image is pinned by digest, and Renovate now tracks dependencies. Keys, users and certificates are untouched, but some operators have to act: read the section below before updating.
