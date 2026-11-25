@@ -25,11 +25,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `moav apply --status [--json]` reports the running or last run. A failed
   build restarts nothing. `moav update` now ends with a pointer to it.
 
+- **`moav doctor perms`.** Fails when files in the checkout are not readable by
+  the containers that mount them, or when a locally built image has an
+  entrypoint its own non-root user cannot read or run, and prints the fix for
+  each. `moav doctor perms --fix` repairs the checkout.
+
 ### Changed
 - **`moav regenerate-users` exits 1 when the provisioning run fails.** It
   printed "provisioning run failed" and exited 0, so a caller could not tell.
 
 ### Fixed
+- **Updating from a session with a restrictive umask no longer crash-loops the
+  non-root containers.** `moav update` and `moav apply` run from the MoaV Deploy
+  app inherit its SSH session's `umask 077`. git then wrote the checkout
+  owner-only (`0600` files, `0700` directories) and `docker build` copied those
+  modes into the images, so every container that does not run as root failed
+  with a permission error and restarted forever: admin on `/project/VERSION`,
+  Prometheus on `prometheus.yml`, dns-router on `/app/entrypoint.sh`. The same
+  update from a login shell (umask 022) was fine. Now `moav`, `install.sh`,
+  `moav update`, `moav build` and `moav apply` set `umask 022` themselves;
+  update, build, apply, start and restart first re-open any tracked file an
+  earlier run left owner-only (only tracked files: `.env`, `state/` and
+  `outputs/` keep their modes); and every Dockerfile gives the files it copies
+  from the checkout an explicit mode instead of `chmod +x`. `moav export` still
+  writes its archive owner-only. **Already affected?** Update, then run
+  `moav apply`. To check or repair by hand: `moav doctor perms`,
+  `moav doctor perms --fix`.
+
 - **`moav build` knows every profile in `docker-compose.yml`.** It kept its own
   profile list, which was missing `xhttp`, `telegram`, `gooserelay`, `client`
   and `setup`. `moav build xhttp` and `moav build setup` failed with "no such

@@ -836,6 +836,65 @@ doctor_check_config() {
     $pass && return 0 || return 1
 }
 
+# What non-root containers must read: the mounted checkout and the entrypoint
+# baked into each local image. Both go owner-only after an update under umask 077.
+doctor_check_perms() {
+    local pass=true checked=false bad n
+
+    if [[ -d "$SCRIPT_DIR/.git" ]] && command -v git >/dev/null 2>&1; then
+        checked=true
+        bad=$(checkout_perm_offenders)
+        if [[ -z "$bad" ]]; then
+            echo -e "    ${GREEN}✓${NC} Checkout is readable by the containers (VERSION, mounted configs, scripts)"
+        else
+            n=$(printf '%s\n' "$bad" | wc -l | tr -d ' ')
+            echo -e "    ${RED}✗${NC} ${n} path(s) in the checkout are owner-only; the non-root containers (admin, prometheus, grafana) cannot read them"
+            # What the containers mount by path first, then the rest.
+            local mounted='^(VERSION$|docker-compose\.yml$|configs/.*\.|scripts/.*\.)'
+            { grep -E "$mounted" <<< "$bad" || true; grep -vE "$mounted" <<< "$bad" || true; } \
+                | head -5 | sed 's/^/        /'
+            if [[ "$n" -gt 5 ]]; then echo "        ... and $((n - 5)) more"; fi
+            echo -e "      ${DIM}Cause: an update or install ran under a restrictive umask (077)${NC}"
+            echo -e "      ${DIM}Fix: moav doctor perms --fix && moav restart${NC}"
+            pass=false
+        fi
+    fi
+
+    if docker info >/dev/null 2>&1; then
+        checked=true
+        local img meta user ep rc svc bad_svcs="" seen=0
+        # Locally built images only: a registry image has a "/" or a digest.
+        for img in $(docker compose --profile all config --images 2>/dev/null | sort -u); do
+            case "$img" in */*|*@*) continue ;; esac
+            meta=$(docker image inspect --format '{{.Config.User}}|{{index .Config.Entrypoint 0}}' "$img" 2>/dev/null) || continue
+            user="${meta%%|*}"; ep="${meta#*|}"
+            case "$user" in ""|0|root|0:*|root:*) continue ;; esac
+            [[ "$ep" == /* ]] || continue
+            rc=0
+            docker run --rm --network none --entrypoint /bin/sh "$img" \
+                -c 'test -r "$1" && test -x "$1"' _ "$ep" < /dev/null >/dev/null 2>&1 || rc=$?
+            # 1 = the image's own user cannot read or run it; 125+ = no shell to ask.
+            [[ "$rc" -le 1 ]] || continue
+            seen=$((seen + 1))
+            if [[ "$rc" -eq 1 ]]; then
+                svc="${img%%:*}"; svc="${svc#moav-}"
+                echo -e "    ${RED}✗${NC} ${img}: ${ep} is not readable or executable by its user '${user}'; the container crash-loops on \"Permission denied\""
+                bad_svcs="${bad_svcs:+$bad_svcs }$svc"
+                pass=false
+            fi
+        done
+        if [[ -n "$bad_svcs" ]]; then
+            echo -e "      ${DIM}Cause: the image was built from an owner-only checkout (umask 077)${NC}"
+            echo -e "      ${DIM}Fix: moav apply ${bad_svcs} --no-cache${NC}"
+        elif [[ "$seen" -gt 0 ]]; then
+            echo -e "    ${GREEN}✓${NC} Entrypoints of the ${seen} non-root image(s) are readable by their user"
+        fi
+    fi
+
+    $checked || return 2
+    $pass && return 0 || return 1
+}
+
 doctor_check_ports() {
     local env_file="$SCRIPT_DIR/.env"
     local pass=true
@@ -1187,6 +1246,7 @@ DOCTOR_CHECKS=(
     "dns:Check DNS records for enabled protocols"
     "services:Check running services vs enabled config"
     "config:Check config files and keys from bootstrap"
+    "perms:Check the checkout and built images are readable by non-root containers (--fix repairs)"
     "ports:Check required ports are available"
     "conflicts:Check for conflicting services (e.g. DNS tunnels on port 53)"
     "reality:Check Reality fallback targets resolve and are reachable"
@@ -1240,9 +1300,17 @@ cmd_doctor() {
     done
     set -- ${_args[@]+"${_args[@]}"}
     local requested_check="${1:-}"
-    # `moav doctor peers --fix [--yes]` — the only check that can repair what
-    # it finds. Deliberately not a blanket `doctor --fix`: the repair rotates
-    # peer addresses and keys, which invalidates those users' existing bundles.
+    # `moav doctor perms --fix`: re-open the tracked checkout files, nothing else.
+    if [[ "$requested_check" == "perms" ]] && [[ "${2:-}" == "--fix" ]]; then
+        print_section "Repair checkout permissions"
+        _CHECKOUT_PERMS_REPAIRED=""
+        repair_checkout_perms
+        doctor_check_perms
+        return $?
+    fi
+    # `moav doctor peers --fix [--yes]`. Deliberately not a blanket
+    # `doctor --fix`: the repair rotates peer addresses and keys, which
+    # invalidates those users' existing bundles.
     if [[ "$requested_check" == "peers" ]] && [[ "${2:-}" == "--fix" ]]; then
         print_section "Repair duplicate peer addresses"
         peers_report || true
@@ -1275,6 +1343,7 @@ cmd_doctor() {
             echo "Examples:"
             echo "  moav doctor"
             echo "  moav doctor dns"
+            echo "  moav doctor perms --fix   # make the checkout readable by the containers again"
             echo "  moav doctor --json        # [{id, status: pass|warn|fail, detail}]"
             return 0
             ;;
