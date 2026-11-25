@@ -118,6 +118,7 @@ moav user add --batch 10  # ساخت گروهی کاربر
 moav donate               # اهدای کانفیگ به MahsaNet/Psiphon/Snowflake
 moav doctor               # عیب‌یابی (DNS، پورت‌ها، سرویس‌ها)
 moav update               # به‌روزرسانی MoaV
+moav apply                # اعمال به‌روزرسانی (ساخت ایمیج‌ها و راه‌اندازی دوبارهٔ سرویس‌ها)
 moav admin password       # تغییر رمز پنل و Grafana
 moav help                 # نمایش همهٔ فرمان‌ها
 ```
@@ -260,6 +261,41 @@ moav donate                   # اهدای کانفیگ و پهنای‌باند
 می‌دهد و چیزی برای اشتراک‌گذاری نیست. `moav conduit link` یک لینک/QR خصوصی برای افراد
 مشخص می‌سازد؛ این لینک کلید خصوصی را در خود دارد، پس فقط از راه Personal Pairing داخل Ryve
 به اشتراک بگذارید. [Psiphon Conduit](https://moav.sh/docs/protocols#psiphon-conduit) را ببینید.
+
+### به‌روزرسانی
+
+```bash
+moav update                   # گرفتن نسخهٔ تازه؛ هنوز چیزی ساخته یا ری‌استارت نشده است
+moav apply                    # اعمال به‌روزرسانی: ساخت ایمیج‌ها، تازه‌کردن بسته‌ها، راه‌اندازی دوبارهٔ کانتینرها
+moav update --apply           # یا هر دو با یک فرمان
+```
+
+`moav apply` و `moav update --apply` **از نسخهٔ ۲.۵.۱ به بعد** در دسترس‌اند. `moav apply` هیچ
+سؤالی نمی‌پرسد و اجرای دوباره‌اش بی‌خطر است. سروری که روی ۲.۵.۰ یا قدیمی‌تر است هنوز `--apply`
+را نمی‌شناسد: اول `moav update` و بعد `moav apply` را اجرا کنید.
+
+**بعد از به‌روزرسانی، کانتینرها پشت‌سرهم ری‌استارت می‌شوند** (admin، Prometheus یا dns-router با
+خطای «Permission denied»)؟ با `moav doctor perms` بررسی کنید، با `moav doctor perms --fix`
+دسترسی فایل‌ها را درست کنید و بعد `moav apply` را اجرا کنید.
+
+<details>
+<summary><strong>روش قدیمی (پیش از ۲.۵.۱): مراحل دستی به‌روزرسانی. در یکی از نسخه‌های بعدی حذف می‌شود.</strong></summary>
+
+<!-- LEGACY-PRE-2.5.1: remove together with the other legacy update guidance (CHANGELOG 2.5.1, Deprecated) -->
+
+فقط برای نصبی که روی ۲.۵.۰ یا قدیمی‌تر می‌ماند و `moav apply` ندارد. بعد از `moav update`
+مراحلی را که خودش چاپ می‌کند به‌ترتیب اجرا کنید:
+
+```bash
+moav build                    # ساخت ایمیج‌های تازه (روی سرویس‌های در حال اجرا اثری ندارد)
+moav bootstrap                # فقط اگر به‌روزرسانی بگوید قالب کانفیگ‌ها عوض شده است
+moav regenerate-users         # فقط اگر به‌روزرسانی بگوید بسته‌های کاربران تازه شوند
+moav start                    # راه‌اندازی دوبارهٔ کانتینرها روی ایمیج‌های تازه
+```
+
+از ۲.۵.۱ به بعد `moav apply` همهٔ این مراحل را با یک فرمان انجام می‌دهد.
+
+</details>
 
 همهٔ فرمان‌ها، گزینه‌ها و متغیرهای محیطی: **[مرجع خط فرمان](https://moav.sh/docs/CLI)**.
 

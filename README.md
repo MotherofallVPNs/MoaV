@@ -276,6 +276,41 @@ public pool — nothing to share. `moav conduit link` prints a private claim lin
 specific people; it embeds the private key, so share it only via Personal Pairing inside
 Ryve. See [Psiphon Conduit](https://moav.sh/docs/protocols#psiphon-conduit).
 
+### Updating
+
+```bash
+moav update                   # pull the new release; nothing is rebuilt or restarted yet
+moav apply                    # make it live: build, refresh bundles, recreate containers
+moav update --apply           # or both in one go
+```
+
+`moav apply` and `moav update --apply` are **available from 2.5.1**. `moav apply` never
+prompts and is safe to re-run, and `moav update` ends by pointing at it. A server on 2.5.0
+or older does not know `--apply` yet: run `moav update` first, then `moav apply`.
+
+**Containers restarting in a loop after an update** (admin, Prometheus or dns-router with
+"Permission denied")? Check with `moav doctor perms`, repair the checkout with
+`moav doctor perms --fix`, then run `moav apply`.
+
+<details>
+<summary><strong>Legacy (pre-2.5.1): the manual update steps. Will be removed in a future release.</strong></summary>
+
+<!-- LEGACY-PRE-2.5.1: remove together with the other legacy update guidance (CHANGELOG 2.5.1, Deprecated) -->
+
+Only for a checkout that stays on 2.5.0 or older (for example pinned to an older tag),
+which has no `moav apply`. After `moav update`, run the steps it prints, in order:
+
+```bash
+moav build                    # build the new images (changes nothing that is running)
+moav bootstrap                # only if the update says config templates changed
+moav regenerate-users         # only if the update says to refresh the user bundles
+moav start                    # recreate containers on the new images
+```
+
+From 2.5.1 on, `moav apply` runs all of this in one command.
+
+</details>
+
 Every command, flag and environment variable: **[CLI Reference](https://moav.sh/docs/CLI)**.
 
 ## Client Apps
