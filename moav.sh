@@ -6,6 +6,10 @@
 
 set -euo pipefail
 
+# Non-root containers read this checkout and the images built from it, so files
+# must land 0644/0755 even when the caller (an SSH/exec session) has umask 077.
+umask 022
+
 # Require bash >= 4. `declare -A` (lib/service.sh, lib/doctor.sh) is a bash 4
 # builtin option, so on stock macOS bash 3.2 commands like `moav status` failed
 # with "declare: -A: invalid option" -- unactionable, and misleading given this
@@ -102,6 +106,7 @@ source "$SCRIPT_DIR/lib/cert.sh"
 source "$SCRIPT_DIR/lib/migrate.sh"
 source "$SCRIPT_DIR/lib/dns.sh"
 source "$SCRIPT_DIR/lib/update.sh"
+source "$SCRIPT_DIR/lib/apply.sh"     # the steps `moav update` prints, run in one go
 source "$SCRIPT_DIR/lib/install.sh"
 source "$SCRIPT_DIR/lib/bootstrap.sh"
 source "$SCRIPT_DIR/lib/users.sh"
@@ -962,12 +967,20 @@ main() {
         _post-update)
             # Internal: re-exec target after self-update pulls new code.
             # $2 = short commit before the pull (for config-template diffing).
+            POST_UPDATE_BASE_COMMIT="${2:-}"
+            # The pull ran in the previous (possibly older) moav under its umask.
+            repair_checkout_perms
             check_component_versions
             check_source_rebuilds "${2:-}"
             migrate_dns_tunnel_state
             check_env_additions
             check_config_template_changes "${2:-}"
             print_post_update_apply_steps
+            apply_after_update
+            ;;
+        apply)
+            shift
+            cmd_apply "$@"
             ;;
         check)
             cmd_check

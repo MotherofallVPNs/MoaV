@@ -155,7 +155,8 @@ EOF
 
     # 7. Create tarball
     info "  Creating archive..."
-    tar -czf "$output_file" -C "$temp_dir" moav-export
+    # Owner-only: the archive holds private keys (moav.sh sets umask 022).
+    ( umask 077; tar -czf "$output_file" -C "$temp_dir" moav-export )
 
     # Cleanup
     rm -rf "$temp_dir"

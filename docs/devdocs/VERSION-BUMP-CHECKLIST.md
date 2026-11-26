@@ -9,6 +9,7 @@ Step-by-step checklist for releasing a new MoaV version. Use this every time you
 - [ ] Review `git log` since last release tag
 - [ ] Identify all Added / Changed / Fixed / Security items
 - [ ] Note any breaking changes that require user action
+- [ ] Check for docs whose removal is due: `git grep -n LEGACY-PRE-` lists guidance kept for operators on older releases (the pre-2.5.1 manual update steps were deprecated in 2.5.1 and are due for removal in a later release; when you drop them, note it under `### Removed`)
 
 ---
 
@@ -130,7 +131,7 @@ See [CHANGELOG.md](CHANGELOG.md#1XY---yyyy-mm-dd) for complete details.
 
 ### Upgrade notes
 - [Any breaking changes or required user actions]
-- [Or: "No breaking changes. Run `moav update` to upgrade."]
+- [Or: "No breaking changes. Run `moav update`, then `moav apply` to upgrade."]
 ```
 
 ### 6b. GitHub Release body template
@@ -143,7 +144,9 @@ See [CHANGELOG.md](CHANGELOG.md#1XY---yyyy-mm-dd) for complete details.
 ## Upgrade
 
 ```bash
-moav update
+moav update        # pull the release
+moav apply         # make it live (build, refresh bundles, recreate containers)
+# or both in one go, from 2.5.1 on: moav update --apply
 ```
 
 [If breaking changes exist:]
@@ -164,7 +167,8 @@ gh release create v1.X.Y \
 
 ## 7. Post-release
 
-- [ ] Verify `moav update` works (pulls new version, shows correct version in header)
+- [ ] Verify `moav update` works (pulls new version, shows correct version in header, ends by pointing at `moav apply`)
+- [ ] Verify `moav apply` makes it live (last line `[moav-apply] exit=0 result=ok`)
 - [ ] Update website if needed (`site/` changes)
 - [ ] Announce on relevant channels if major release
 

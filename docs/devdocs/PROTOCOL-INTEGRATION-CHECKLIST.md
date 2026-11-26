@@ -190,10 +190,13 @@
 
 ### 4a. Profile System
 
-- [ ] Add to `valid_profiles` string (~line 2892):
-  ```bash
-  local valid_profiles="proxy wireguard dnstt trusttunnel newproto admin conduit snowflake monitoring client all setup"
-  ```
+- [ ] Nothing to add for the profile *name*: `build`, `start`, `stop`, `restart`,
+  `logs` and the help text read the profile list from `docker-compose.yml`
+  (`compose_profiles` in `lib/service.sh`). `tests/build-profiles-test.sh` fails
+  if a profile is missing from `profile_enabled`, `derive_enabled_profiles` or
+  the shell completion.
+- [ ] Add the `ENABLE_*` mapping to `profile_enabled()` and the profile to the
+  loop in `derive_enabled_profiles()` (`lib/service.sh`).
 - [ ] Add ENABLE_ flag reading in `select_profiles()` (~line 1687):
   ```bash
   local newproto_enabled=true
@@ -230,10 +233,8 @@
 
 ### 4c. Help Text
 
-- [ ] Add to profiles list in help output (~line 2682):
-  ```
-  Profiles: proxy, wireguard, dnstt, trusttunnel, newproto, admin, ...
-  ```
+- [ ] The `Profiles:` line in `moav help` and `moav build --help` is generated
+  from `docker-compose.yml`; add the profile to `completions/moav.bash`.
 - [ ] Add to services list
 - [ ] Add to aliases list (if applicable)
 

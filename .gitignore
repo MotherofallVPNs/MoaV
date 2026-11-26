@@ -10,6 +10,7 @@ outputs/
 state/
 certs/
 .moav_prereqs_ok
+.moav_apply.*
 
 # Logs
 *.log

@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-11-25
+
+Patch release. An update run from a session with a restrictive umask (the MoaV Deploy app) no longer crash-loops the containers that do not run as root, `moav apply` makes an update live in one unattended command, and Grafana moves to 13.3.2, an upstream security release. No breaking changes and no re-bootstrap: keys, users and certificates are untouched.
+
+### Action required for operators
+- **Upgrade:** `moav update`, then `moav apply`. `moav update --apply` does both in one go, but only from this release on: the 2.5.0 `moav update` does not know the flag.
+- **admin, Prometheus or dns-router restarting in a loop after an update through the MoaV Deploy app?** That is the umask bug fixed here. Update, then run `moav apply`. To check or repair by hand: `moav doctor perms`, `moav doctor perms --fix`.
+- **Monitoring profile: recreate Grafana for the 13.3.2 security fixes.** `moav apply` (or `moav start`) pulls the new image and recreates the container. If you build Grafana locally (`IMAGE_GRAFANA=moav-grafana:local`), set `GRAFANA_VERSION=13.3.2` in `.env` first, then run `moav build --local grafana && moav start`.
+
+### Security
+- **Grafana 13.3.1 -> [13.3.2](https://github.com/grafana/grafana/releases/tag/v13.3.2)** (the default image, pinned by digest, and the `moav build --local` pin). Upstream security release that fixes **CVE-2026-107561** and **CVE-2026-88960**. As of 2026-11-25 Grafana has published the two IDs only, with no description, severity or advisory page yet; they should appear under [Grafana security advisories](https://grafana.com/security/security-advisories/). Only the monitoring profile runs Grafana.
+
+### Added
+- **`moav apply`: one command to make an update live.** It runs what `moav update` prints: `moav build` for the saved default profiles, `moav bootstrap --yes` when the update changed config templates, `moav regenerate-users`, `moav start` (recreates containers whose image or config changed), any setup job or config recreate the update called for, and the dangling-image cleanup. It never prompts and is safe to re-run: unchanged images are cache hits and unchanged containers keep running. `moav apply xray` (any service or profile) applies just that, and `moav update --apply` chains into it when the update left something to apply. Made for unattended and detached use (the MoaV Deploy app): every step prints `[moav-apply] step N/6: NAME`, the last line is always `[moav-apply] exit=CODE result=...`, the exit code says which step failed (2 preflight, 3 already running, 10 build, 11 bootstrap, 12 regenerate-users, 13 start), a second apply is refused while one runs, and `moav apply --status [--json]` reports the running or last run. A failed build restarts nothing. `moav update` now ends with a pointer to it.
+- **`moav doctor perms`.** Fails when files in the checkout are not readable by the containers that mount them, or when a locally built image has an entrypoint its own non-root user cannot read or run, and prints the fix for each. `moav doctor perms --fix` repairs the checkout.
+
+### Changed
+- **`moav apply` is now the recommended way to finish an update, in the CLI and the docs.** `moav update` leads its closing message with `moav apply` (and `moav update --apply` for next time); the numbered build, bootstrap, regenerate-users and start steps are still printed below it for doing it by hand. A later `moav update` that finds nothing new reminds you when an earlier update is still unapplied. `moav --help`, `moav update --help`, `moav apply --help`, the update hint in `moav doctor` and the admin dashboard's update banner say the same. `README.md`, `README-fa.md`, `AGENTS.md`, `llms.txt` and `docs/V2-MIGRATION.md` recommend `moav update`, then `moav apply` (or `moav update --apply`), note that both are available from 2.5.1, and point crash-loop and permission problems after an update at `moav doctor perms`, `moav doctor perms --fix` and `moav apply`.
+- **`moav regenerate-users` exits 1 when the provisioning run fails.** It printed "provisioning run failed" and exited 0, so a caller could not tell.
+
+### Deprecated
+- **The manual update sequence in the docs** (`moav update`, then `moav build`, `moav bootstrap`, `moav regenerate-users` and `moav start` by hand). It is kept for servers that stay on 2.5.0 or older, marked "Legacy (pre-2.5.1)", and will be removed from the docs in a future release. Each place carries a `LEGACY-PRE-2.5.1` marker (`git grep LEGACY-PRE-2.5.1`), and the release checklist asks for the check. The commands themselves are not going away, and `moav update` keeps printing the steps.
+
+### Fixed
+- **Updating from a session with a restrictive umask no longer crash-loops the non-root containers.** `moav update` and `moav apply` run from the MoaV Deploy app inherit its SSH session's `umask 077`. git then wrote the checkout owner-only (`0600` files, `0700` directories) and `docker build` copied those modes into the images, so every container that does not run as root failed with a permission error and restarted forever: admin on `/project/VERSION`, Prometheus on `prometheus.yml`, dns-router on `/app/entrypoint.sh`. The same update from a login shell (umask 022) was fine. Now `moav`, `install.sh`, `moav update`, `moav build` and `moav apply` set `umask 022` themselves; update, build, apply, start and restart first re-open any tracked file an earlier run left owner-only (only tracked files: `.env`, `state/` and `outputs/` keep their modes); and every Dockerfile gives the files it copies from the checkout an explicit mode instead of `chmod +x`. `moav export` still writes its archive owner-only. **Already affected?** Update, then run `moav apply`. To check or repair by hand: `moav doctor perms`, `moav doctor perms --fix`.
+- **`moav build` knows every profile in `docker-compose.yml`.** It kept its own profile list, which was missing `xhttp`, `telegram`, `gooserelay`, `client` and `setup`. `moav build xhttp` and `moav build setup` failed with "no such service"; `telegram` and `gooserelay` only worked because a service or alias happens to share the name. `build`, `start`, `stop`, `restart`, `logs` and the help text now all read the profiles from the compose file, so `moav stop` and `moav restart` also accept `xhttp`, `gooserelay`, `client` and `setup` as profiles. A name that is neither a profile nor a service is rejected up front with the valid names, instead of reaching compose.
+
 ## [2.5.0] - 2026-11-23
 
 Security and stability release. Tunneled client traffic is now kept away from private and infrastructure networks by default (egress isolation), every Go service is closed off from the MPTCP remote-root exploit for CVE-2026-98432, TrustTunnel moves to 1.3.1 with HTTP/2 and HTTP/3 tested separately, Slipstream starts its removal in favour of MasterDNS and dnstt, and `moav regenerate-users` no longer rotates the AmneziaWG server key. Base images move off end-of-life Alpine and Go releases, every runtime image is pinned by digest, and Renovate now tracks dependencies. Keys, users and certificates are untouched, but some operators have to act: read the section below before updating.
@@ -2398,7 +2425,8 @@ TrustTunnel config validity.
 - uTLS fingerprint spoofing (Chrome)
 - Automatic short ID generation for Reality
 
-[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v2.5.0...HEAD
+[Unreleased]: https://github.com/MotherofallVPNs/moav/compare/v2.5.1...HEAD
+[2.5.1]: https://github.com/MotherofallVPNs/moav/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/MotherofallVPNs/moav/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/MotherofallVPNs/moav/compare/v2.3.1...v2.4.0
 [2.3.1]: https://github.com/MotherofallVPNs/moav/compare/v2.3.0...v2.3.1

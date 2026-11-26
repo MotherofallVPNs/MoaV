@@ -25,16 +25,33 @@ fixed. No new protocols. Your keys, users, and certificates are preserved.
 
 ```bash
 cd /opt/moav
-moav update -b main      # or the v2.0.0 tag; pulls the new code
-moav build               # REQUIRED — every image is stale coming from 1.9.x
-moav start               # recreate containers on the new images
+moav update -b main      # pulls the new code (the current release, 2.5.1 or newer)
+moav apply               # build the images, refresh bundles, recreate containers
 ```
 
-**`moav build` is not optional.** Coming from 1.9.x, all images predate v2 (the
-admin image especially — it changed how it reads its secret and which uid it
-runs as). Skipping the build leaves you on old images against new configs.
+`moav apply` is **available from 2.5.1**, and `main` is past that, so the command
+exists as soon as the pull finishes. It never prompts and is safe to re-run. Do
+not use `moav update --apply` here: the 1.9.x `moav update` does not know the flag.
+If `moav apply` stops in its preflight (exit 2, nothing changed), it says what is
+missing, usually the saved service selection: run `moav profiles`, then re-run.
 
-That's the whole path. The three commands above are what a healthy upgrade needs.
+**The build is not optional**, and `moav apply` always runs it. Coming from
+1.9.x, all images predate v2 (the admin image especially — it changed how it
+reads its secret and which uid it runs as). Skipping the build leaves you on old
+images against new configs.
+
+That's the whole path. The two commands above are what a healthy upgrade needs.
+
+> **Legacy (pre-2.5.1), will be removed in a future release.** If you upgrade to
+> a tag older than 2.5.1 (for example `moav update -b v2.0.0`), there is no
+> `moav apply`. Run the steps by hand instead:
+>
+> ```bash
+> moav update -b v2.0.0    # an older tag; pulls the new code
+> moav build               # REQUIRED — every image is stale coming from 1.9.x
+> moav start               # recreate containers on the new images
+> ```
+<!-- LEGACY-PRE-2.5.1: remove together with the other legacy update guidance (CHANGELOG 2.5.1, Deprecated) -->
 
 ## What you'll see (and why it's fine)
 
@@ -52,7 +69,9 @@ That's the whole path. The three commands above are what a healthy upgrade needs
 
 ## After the upgrade — verify in order
 
-1. `docker ps` — nothing stuck in `Restarting` (watch ~2 min).
+1. `docker ps` — nothing stuck in `Restarting` (watch ~2 min). If admin,
+   Prometheus or dns-router loops on "Permission denied", run
+   `moav doctor perms --fix`, then `moav apply` (2.5.1 or newer).
 2. `moav doctor` — should be green (BBR/buffer lines are advisory).
 3. **Your existing user's config still connects.** ← the headline check.
 4. `moav test <user>` — protocol validation end-to-end.
@@ -70,7 +89,9 @@ refresh existing bundles to the new format:
 moav regenerate-users     # rebuilds every bundle from state; keys unchanged
 ```
 This is safe — it reuses stored keys and re-emits configs; users just
-re-download. `moav update` will remind you when a bundle-guide change lands.
+re-download. `moav apply` already runs it, so you only need the command on its
+own if you upgraded with the legacy steps. `moav update` will remind you when a
+bundle-guide change lands.
 
 ## If something comes up
 

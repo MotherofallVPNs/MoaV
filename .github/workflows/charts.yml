@@ -109,7 +109,17 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -qm "chore(chart): refresh charts $(date -u '+%Y-%m-%d')"
-          git push -q --force \
-            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" \
-            chart
-          echo "published to the chart branch"
+          # GitHub now and then rejects the push with a server-side error
+          # ("fatal error in commit_refs_rules"); retry before failing the run.
+          for attempt in 1 2 3; do
+            if git push -q --force \
+              "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" \
+              chart; then
+              echo "published to the chart branch"
+              exit 0
+            fi
+            echo "push attempt $attempt failed"
+            if [ "$attempt" != 3 ]; then sleep $((attempt * 20)); fi
+          done
+          echo "::error::could not push the chart branch after 3 attempts"
+          exit 1

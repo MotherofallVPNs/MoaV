@@ -798,5 +798,6 @@ cmd_regenerate_users() {
         echo "      since credentials haven't changed."
     else
         warn "No bundles were regenerated."
+        return 1   # the provisioning run failed; callers (moav apply) need to know
     fi
 }

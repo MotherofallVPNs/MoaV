@@ -91,7 +91,8 @@ for _vpath in ["/project/VERSION", "/app/VERSION"]:
         with open(_vpath) as f:
             CURRENT_VERSION = f.read().strip()
             break
-    except FileNotFoundError:
+    except OSError:
+        # Missing, or owner-only on the host (checkout made under umask 077).
         continue
 
 # Update check cache

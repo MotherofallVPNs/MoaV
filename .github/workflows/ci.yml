@@ -138,6 +138,10 @@ jobs:
         run: bash tests/update-image-prune-test.sh
       - name: moav build --help prints usage, builds nothing
         run: bash tests/build-help-test.sh
+      - name: moav build knows every compose profile and service
+        run: bash tests/build-profiles-test.sh
+      - name: moav apply (build, regenerate, start, cleanup; markers, exit codes, lock)
+        run: bash tests/apply-test.sh
       - name: monitoring privacy (no user x destination) (#297)
         run: bash tests/monitoring-privacy-test.sh
       - name: site analytics aggregation (#297)
@@ -209,6 +213,8 @@ jobs:
         run: bash tests/update-tag-test.sh
       - name: moav update non-interactive (--yes / MOAV_NONINTERACTIVE)
         run: bash tests/update-noninteractive-test.sh
+      - name: umask-safe update/build/apply (owner-only checkout, non-root image entrypoint)
+        run: bash tests/umask-perms-test.sh
       - name: .env has no inline comments on variable lines
         run: bash tests/env-no-inline-comment-test.sh
       - name: xdns VLESS address is Xray >= 26.9 compliant

@@ -31,7 +31,7 @@ help_text=$(sed -n '/^show_usage()/,/^}/p' "$ROOT/lib/menu.sh")
 missing=""
 for cmd in net doctor bootstrap start stop restart status logs profiles build \
            users donate conduit test export import migrate-ip regenerate-users \
-           cert setup-dns switch-dns domainless check admin update; do
+           cert setup-dns switch-dns domainless check admin update apply; do
     grep -qE "^\s*[a-z|-]*\b$cmd\b" <<<"$(sed -n '/case /,/esac/p' "$ROOT/moav.sh")" || continue
     printf '%s' "$help_text" | grep -q "\b$cmd\b" || missing="$missing $cmd"
 done
